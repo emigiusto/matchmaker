@@ -24,18 +24,6 @@ const prisma = new PrismaClient();
 
 export class PlayersService {
   /**
-   * Create a Player for a User (upgrade)
-   * - Only one Player per User (enforced)
-   * - Sets User.isGuest = false
-   * - Handles preferred surfaces via PlayerSurface join table
-   */
-  /**
-   * Helper: Replace all PlayerSurface entries for a player (no duplicates)
-   * - Deletes all existing PlayerSurface entries for the player
-   * - Adds new entries for unique surfaces only
-   * - Keeps logic in service layer, never exposes PlayerSurface directly
-   */
-  /**
    * Helper: Replace all PlayerSurface entries for a player (no duplicates)
    * - Accepts either PrismaClient or transaction client for tx
    * - Deletes all existing PlayerSurface entries for the player
@@ -62,6 +50,12 @@ export class PlayersService {
     }
   }
 
+  /**
+   * Create a Player for a User (upgrade)
+   * - Only one Player per User (enforced)
+   * - Sets User.isGuest = false
+   * - Handles preferred surfaces via PlayerSurface join table
+   */
   static async createPlayerForUser(userId: string, data: CreatePlayerInput): Promise<PlayerDTO> {
     return await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
@@ -145,9 +139,6 @@ export class PlayersService {
     throw new AppError('Soft-delete not implemented yet', 501);
   }
 
-  /**
-   * Convert Player + surfaces to PlayerDTO
-   */
   /**
    * Convert Player + surfaces to PlayerDTO (API shape)
    * Never exposes internal PlayerSurface model.

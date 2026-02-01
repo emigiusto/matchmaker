@@ -56,10 +56,6 @@ export class AvailabilityService {
   /**
    * Delete an availability by ID
    * - Idempotent: does not error if already deleted
-   */
-  /**
-   * Delete an availability by ID
-   * - Idempotent: does not error if already deleted
    * - User cannot delete availability of another user (must be enforced at controller or by passing userId)
    *   (For now, this method only deletes if found; add userId check in future if needed)
    */

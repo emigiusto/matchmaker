@@ -80,9 +80,6 @@ export class FriendshipsService {
 
   /**
    * Remove a friendship by ID
-   */
-  /**
-   * Remove a friendship by ID
    * - Idempotent: does not error if already deleted
    * - Only one record is removed
    */
@@ -93,11 +90,6 @@ export class FriendshipsService {
     await prisma.friendship.delete({ where: { id: friendshipId } });
   }
 
-  /**
-   * List all friends (users and guest contacts) for a user
-   * - Returns normalized output: type, id, name, phone?
-   * - Symmetry is handled in query (returns both outgoing and incoming edges)
-   */
   /**
    * List all friends (users and guest contacts) for a user
    * - Returns normalized output: type, id, name, phone?
@@ -157,10 +149,7 @@ export class FriendshipsService {
    * Convert Friendship to DTO
    * Ensures only one of friendUserId/guestContactId is set
    */
-  /**
-   * Convert Friendship to DTO (API shape)
-   * Never exposes internal Prisma models to controllers.
-   */
+
   private static toDTO(friendship: any): FriendshipDTO {
     return {
       id: friendship.id,
