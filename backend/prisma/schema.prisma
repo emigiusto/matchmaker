@@ -1,0 +1,348 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+////////////////////////////////////////////////////////////
+// USER — identity, auth, contact info (guest-first)
+////////////////////////////////////////////////////////////
+
+model User {
+  id        String   @id @default(uuid())
+  name      String?
+  phone     String?  @unique
+  isGuest   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  player         Player?
+  availabilities Availability[]
+  invitesSent    Invite[]       @relation("InvitesSent")
+  notifications  Notification[]
+
+  // Social graph
+  friendships Friendship[] @relation("UserFriendships")
+  friendOf    Friendship[] @relation("FriendUser")
+
+  guestContacts GuestContact[]
+
+  // Groups
+  groupMemberships GroupMember[]
+  groupsOwned      Group[]       @relation("GroupsOwned")
+
+  // Chat
+  sentMessages Message[] @relation("SenderMessages")
+
+  @@index([createdAt])
+}
+
+////////////////////////////////////////////////////////////
+// PLAYER — tennis-specific persona
+////////////////////////////////////////////////////////////
+
+model Player {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  displayName     String?
+  levelValue      Float?
+  levelConfidence Float?
+  defaultCity     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user              User            @relation(fields: [userId], references: [id])
+  preferredSurfaces PlayerSurface[]
+  matchesA          Match[]         @relation("PlayerA")
+  matchesB          Match[]         @relation("PlayerB")
+  resultsWon        Result[]        @relation("WinnerPlayer")
+
+  @@index([userId])
+  @@index([levelValue])
+  @@index([defaultCity])
+}
+
+////////////////////////////////////////////////////////////
+// PLAYER SURFACES
+////////////////////////////////////////////////////////////
+
+model PlayerSurface {
+  id       String @id @default(uuid())
+  playerId String
+  surface  String
+
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([playerId, surface])
+  @@index([playerId])
+}
+
+////////////////////////////////////////////////////////////
+// GUEST CONTACT
+////////////////////////////////////////////////////////////
+
+model GuestContact {
+  id          String   @id @default(uuid())
+  ownerUserId String
+  name        String
+  phone       String
+  createdAt   DateTime @default(now())
+
+  owner       User         @relation(fields: [ownerUserId], references: [id])
+  friendships Friendship[]
+
+  @@index([ownerUserId])
+  @@index([phone])
+}
+
+////////////////////////////////////////////////////////////
+// FRIENDSHIP — explicit social graph
+// Exactly one of friendUserId or guestContactId must be set
+////////////////////////////////////////////////////////////
+
+model Friendship {
+  id             String   @id @default(uuid())
+  userId         String
+  friendUserId   String?
+  guestContactId String?
+  createdAt      DateTime @default(now())
+
+  user         User          @relation("UserFriendships", fields: [userId], references: [id])
+  friendUser   User?         @relation("FriendUser", fields: [friendUserId], references: [id])
+  guestContact GuestContact? @relation(fields: [guestContactId], references: [id])
+
+  @@unique([userId, friendUserId, guestContactId])
+  @@index([userId])
+  @@index([friendUserId])
+  @@index([guestContactId])
+}
+
+////////////////////////////////////////////////////////////
+// AVAILABILITY
+////////////////////////////////////////////////////////////
+
+model Availability {
+  id           String   @id @default(uuid())
+  userId       String
+  date         DateTime
+  startTime    DateTime
+  endTime      DateTime
+  locationText String
+  minLevel     Float?
+  maxLevel     Float?
+  createdAt    DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  invites Invite[]
+  matches Match[]
+
+  @@index([userId])
+  @@index([date])
+}
+
+////////////////////////////////////////////////////////////
+// INVITE
+////////////////////////////////////////////////////////////
+
+model Invite {
+  id             String       @id @default(uuid())
+  token          String       @unique
+  inviterUserId  String
+  availabilityId String
+  status         InviteStatus @default(pending)
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+
+  inviter      User         @relation("InvitesSent", fields: [inviterUserId], references: [id])
+  availability Availability @relation(fields: [availabilityId], references: [id])
+  match        Match?
+
+  @@index([inviterUserId])
+  @@index([availabilityId])
+  @@index([status, expiresAt])
+  @@index([createdAt])
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  declined
+  expired
+}
+
+////////////////////////////////////////////////////////////
+// MATCH
+////////////////////////////////////////////////////////////
+
+model Match {
+  id             String   @id @default(uuid())
+  inviteId       String   @unique
+  availabilityId String
+  venueId        String?
+  playerAId      String?
+  playerBId      String?
+  scheduledAt    DateTime
+  createdAt      DateTime @default(now())
+
+  invite       Invite        @relation(fields: [inviteId], references: [id])
+  availability Availability  @relation(fields: [availabilityId], references: [id])
+  venue        Venue?        @relation(fields: [venueId], references: [id])
+  playerA      Player?       @relation("PlayerA", fields: [playerAId], references: [id])
+  playerB      Player?       @relation("PlayerB", fields: [playerBId], references: [id])
+  result       Result?
+  conversation Conversation?
+
+  @@index([availabilityId])
+  @@index([venueId])
+  @@index([playerAId])
+  @@index([playerBId])
+  @@index([scheduledAt])
+  @@index([createdAt])
+}
+
+////////////////////////////////////////////////////////////
+// RESULT
+////////////////////////////////////////////////////////////
+
+model Result {
+  id             String   @id @default(uuid())
+  matchId        String   @unique
+  winnerPlayerId String?
+  createdAt      DateTime @default(now())
+
+  match        Match       @relation(fields: [matchId], references: [id])
+  winnerPlayer Player?     @relation("WinnerPlayer", fields: [winnerPlayerId], references: [id])
+  sets         SetResult[]
+
+  @@index([matchId])
+  @@index([winnerPlayerId])
+  @@index([createdAt])
+}
+
+////////////////////////////////////////////////////////////
+// SET RESULT
+////////////////////////////////////////////////////////////
+
+model SetResult {
+  id             String @id @default(uuid())
+  resultId       String
+  setNumber      Int
+  playerAScore   Int
+  playerBScore   Int
+  tiebreakScoreA Int?
+  tiebreakScoreB Int?
+
+  result Result @relation(fields: [resultId], references: [id])
+
+  @@unique([resultId, setNumber])
+  @@index([resultId])
+}
+
+////////////////////////////////////////////////////////////
+// VENUE
+////////////////////////////////////////////////////////////
+
+model Venue {
+  id        String   @id @default(uuid())
+  name      String
+  city      String
+  address   String?
+  indoor    Boolean
+  surface   String
+  createdAt DateTime @default(now())
+
+  matches Match[]
+
+  @@index([city])
+  @@index([surface])
+  @@index([createdAt])
+}
+
+////////////////////////////////////////////////////////////
+// NOTIFICATION
+////////////////////////////////////////////////////////////
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([readAt])
+  @@index([createdAt])
+}
+
+////////////////////////////////////////////////////////////
+// GROUPS
+////////////////////////////////////////////////////////////
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  ownerUserId String
+  createdAt   DateTime @default(now())
+
+  owner   User          @relation("GroupsOwned", fields: [ownerUserId], references: [id])
+  members GroupMember[]
+
+  @@index([ownerUserId])
+}
+
+model GroupMember {
+  id       String   @id @default(uuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+////////////////////////////////////////////////////////////
+// CHAT
+////////////////////////////////////////////////////////////
+
+model Conversation {
+  id        String           @id @default(uuid())
+  type      ConversationType
+  matchId   String?          @unique
+  createdAt DateTime         @default(now())
+
+  match    Match?    @relation(fields: [matchId], references: [id])
+  messages Message[]
+
+  @@index([type])
+}
+
+enum ConversationType {
+  direct
+  group
+  match
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderUserId   String
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation("SenderMessages", fields: [senderUserId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderUserId])
+}

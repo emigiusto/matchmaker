@@ -1,0 +1,28 @@
+{
+  "name": "matchmaker",
+  "version": "1.0.0",
+  "description": "AceUp is an app to organize sports matches by managing player availability, sending invites, and confirming participation through unique links. WhatsApp is used only as a delivery channel for notifications and links.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@prisma/client": "^6.19.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "prisma": "^6.19.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.10",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}
