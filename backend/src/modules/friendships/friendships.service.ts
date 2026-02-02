@@ -11,7 +11,7 @@
 //
 // Future extensions: friendship status (pending/accepted), acceptedAt, etc.
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../shared/prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { FriendshipDTO } from './friendships.types';
 
@@ -22,7 +22,6 @@ export type Friend =
   | { type: 'user'; id: string; name: string; phone?: string }
   | { type: 'guestContact'; id: string; name: string; phone?: string };
 
-const prisma = new PrismaClient();
 
 export class FriendshipsService {
   /**

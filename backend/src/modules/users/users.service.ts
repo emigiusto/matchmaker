@@ -2,11 +2,9 @@
 // All business logic here. Throws AppError on error.
 // Guest-first: users may exist forever as guests.
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../shared/prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { User } from './users.types';
-
-const prisma = new PrismaClient();
 
 /**
  * Retrieve all users from the database.

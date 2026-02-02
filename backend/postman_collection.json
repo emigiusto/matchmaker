@@ -1,0 +1,790 @@
+{
+  "info": {
+    "_postman_id": "7e18166a-9b0f-4985-a10e-97da606eaefd",
+    "name": "Matchmaker API CRUD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "8851136"
+  },
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice\",\n  \"phone\": \"1234567890\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/users",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/users",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/users/4b78c9c9-38de-474f-a8b2-0026016c1beb",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "users",
+                "4b78c9c9-38de-474f-a8b2-0026016c1beb"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bob\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/users/4b78c9c9-38de-474f-a8b2-0026016c1beb",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "users",
+                "4b78c9c9-38de-474f-a8b2-0026016c1beb"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/users/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "4b78c9c9-38de-474f-a8b2-0026016c1beb"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Players",
+      "item": [
+        {
+          "name": "Create Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"4b78c9c9-38de-474f-a8b2-0026016c1beb\",\n  \"displayName\": \"AlicePlayer\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/players",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "players"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Players",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/players",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "players"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Player by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/players/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "players",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Player",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"BobPlayer\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/players/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "players",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Player",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/players/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "players",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Availabilities",
+      "item": [
+        {
+          "name": "Create Availability",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"<userId>\",\n  \"date\": \"2026-02-01\",\n  \"startTime\": \"2026-02-01T10:00:00.000Z\",\n  \"endTime\": \"2026-02-01T12:00:00.000Z\",\n  \"locationText\": \"Central Park\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/availability",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "availability"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Availabilities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/availability",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "availability"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Availability by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/availability/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "availability",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Availability",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationText\": \"New Park\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/availability/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "availability",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Availability",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/availability/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "availability",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Invites",
+      "item": [
+        {
+          "name": "Create Invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inviterUserId\": \"<userId>\",\n  \"availabilityId\": \"<availabilityId>\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/invites",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "invites"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Invites",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/invites",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "invites"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Invite by Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/invites/:token",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "invites",
+                ":token"
+              ],
+              "variable": [
+                {
+                  "key": "token"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/invites/:token/confirm",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "invites",
+                ":token",
+                "confirm"
+              ],
+              "variable": [
+                {
+                  "key": "token"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Decline Invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/invites/:token/decline",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "invites",
+                ":token",
+                "decline"
+              ],
+              "variable": [
+                {
+                  "key": "token"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Matches",
+      "item": [
+        {
+          "name": "Get Match by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/matches/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "matches",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Matches for User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/matches",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "matches"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Matches for Player",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/matches/by-player/:playerId",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "matches",
+                "by-player",
+                ":playerId"
+              ],
+              "variable": [
+                {
+                  "key": "playerId"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Results",
+      "item": [
+        {
+          "name": "Create Result",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {
+              "raw": "http://localhost:3000/results",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["results"]
+            },
+            "body": {"mode": "raw", "raw": "{\n  \"matchId\": \"<matchId>\"\n}"}
+          },
+          "response": []
+        },
+        {
+          "name": "Add Set Result",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {
+              "raw": "http://localhost:3000/results/:id/sets",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["results", ":id", "sets"],
+              "variable": [{"key": "id"}]
+            },
+            "body": {"mode": "raw", "raw": "{\n  \"setNumber\": 1,\n  \"playerAScore\": 6,\n  \"playerBScore\": 4\n}"}
+          },
+          "response": []
+        },
+        {
+          "name": "Get Result by Match",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/results/by-match/:matchId",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["results", "by-match", ":matchId"],
+              "variable": [{"key": "matchId"}]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Create Notification",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {
+              "raw": "http://localhost:3000/notifications",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["notifications"]
+            },
+            "body": {"mode": "raw", "raw": "{\n  \"userId\": \"<userId>\",\n  \"type\": \"invite.accepted\",\n  \"payload\": {}\n}"}
+          },
+          "response": []
+        },
+        {
+          "name": "List Notifications for User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/notifications?userId=<userId>",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["notifications"],
+              "query": [{"key": "userId", "value": "<userId>"}]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "http://localhost:3000/notifications/:id/read",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["notifications", ":id", "read"],
+              "variable": [{"key": "id"}]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Friendships",
+      "item": [
+        {
+          "name": "Add User Friend",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {
+              "raw": "http://localhost:3000/friendships/user",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["friendships", "user"]
+            },
+            "body": {"mode": "raw", "raw": "{\n  \"userId\": \"<userId>\"\n}"}
+          },
+          "response": []
+        },
+        {
+          "name": "Add Guest Contact Friend",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {
+              "raw": "http://localhost:3000/friendships/guest",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["friendships", "guest"]
+            },
+            "body": {"mode": "raw", "raw": "{\n  \"contactId\": \"<contactId>\"\n}"}
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Friend",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "http://localhost:3000/friendships/:id",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["friendships", ":id"],
+              "variable": [{"key": "id"}]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Friends",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/friendships",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["friendships"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

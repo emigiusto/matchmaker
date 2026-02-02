@@ -5,11 +5,11 @@
 // This module manages Player entities (tennis personas) and their preferred surfaces.
 // It does NOT handle social (friends) or matchmaking logic.
 
-import { PrismaClient, Player } from '@prisma/client';
+import { Player } from '@prisma/client';
+import { prisma } from '../../shared/prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types';
 
-const prisma = new PrismaClient();
 
 /**
  * Player vs User:
@@ -25,24 +25,17 @@ const prisma = new PrismaClient();
 export class PlayersService {
   /**
    * Helper: Replace all PlayerSurface entries for a player (no duplicates)
-   * - Accepts either PrismaClient or transaction client for tx
-   * - Deletes all existing PlayerSurface entries for the player
-   * - Adds new entries for unique surfaces only
-   * - Keeps logic in service layer, never exposes PlayerSurface directly
+   * Uses the shared prisma instance directly. Not transactional with Player changes.
    */
-  private static async replacePlayerSurfaces(
-    tx: { playerSurface: PrismaClient['playerSurface'] },
-    playerId: string,
-    surfaces?: string[]
-  ) {
+  private static async replacePlayerSurfaces(playerId: string, surfaces?: string[]) {
     // Remove all existing PlayerSurface entries for this player
-    await tx.playerSurface.deleteMany({ where: { playerId } });
+    await prisma.playerSurface.deleteMany({ where: { playerId } });
     if (surfaces && surfaces.length > 0) {
       // Remove duplicates from input
       const uniqueSurfaces = Array.from(new Set(surfaces));
       await Promise.all(
         uniqueSurfaces.map((surface) =>
-          tx.playerSurface.create({
+          prisma.playerSurface.create({
             data: { playerId, surface },
           })
         )
@@ -57,30 +50,29 @@ export class PlayersService {
    * - Handles preferred surfaces via PlayerSurface join table
    */
   static async createPlayerForUser(userId: string, data: CreatePlayerInput): Promise<PlayerDTO> {
-    return await prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new AppError('User not found', 404);
-      const existingPlayer = await tx.player.findUnique({ where: { userId } });
-      if (existingPlayer) throw new AppError('Player already exists for this user', 409);
-      // Create Player (tennis persona)
-      const player = await tx.player.create({
-        data: {
-          userId,
-          displayName: data.displayName ?? user.name ?? undefined,
-          levelValue: data.levelValue,
-          levelConfidence: data.levelConfidence,
-          defaultCity: data.defaultCity,
-        },
-      });
-      // Replace all PlayerSurface entries (no duplicates)
-      await PlayersService.replacePlayerSurfaces(tx, player.id, data.preferredSurfaces);
-      // Set User.isGuest = false (progressive enrichment)
-      await tx.user.update({ where: { id: userId }, data: { isGuest: false } });
-      // Fetch actual surfaces
-      const surfaces = await tx.playerSurface.findMany({ where: { playerId: player.id } });
-      // Return PlayerDTO
-      return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+    // Not transactional with PlayerSurface changes
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError('User not found', 404);
+    const existingPlayer = await prisma.player.findUnique({ where: { userId } });
+    if (existingPlayer) throw new AppError('Player already exists for this user', 409);
+    // Create Player (tennis persona)
+    const player = await prisma.player.create({
+      data: {
+        userId,
+        displayName: data.displayName ?? user.name ?? undefined,
+        levelValue: data.levelValue,
+        levelConfidence: data.levelConfidence,
+        defaultCity: data.defaultCity,
+      },
     });
+    // Replace all PlayerSurface entries (no duplicates)
+    await PlayersService.replacePlayerSurfaces(player.id, data.preferredSurfaces);
+    // Set User.isGuest = false (progressive enrichment)
+    await prisma.user.update({ where: { id: userId }, data: { isGuest: false } });
+    // Fetch actual surfaces
+    const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
+    // Return PlayerDTO
+    return PlayersService.toDTO(player, surfaces.map(s => s.surface));
   }
 
   /**
@@ -108,27 +100,26 @@ export class PlayersService {
    * - Handles preferred surfaces via PlayerSurface join table
    */
   static async updatePlayer(playerId: string, data: UpdatePlayerInput): Promise<PlayerDTO> {
-    return await prisma.$transaction(async (tx) => {
-      const player = await tx.player.findUnique({ where: { id: playerId } });
-      if (!player) throw new AppError('Player not found', 404);
-      // Update Player fields (tennis persona)
-      const updatedPlayer = await tx.player.update({
-        where: { id: playerId },
-        data: {
-          displayName: data.displayName,
-          levelValue: data.levelValue,
-          levelConfidence: data.levelConfidence,
-          defaultCity: data.defaultCity,
-        },
-      });
-      // Replace all PlayerSurface entries (no duplicates) if provided
-      if (data.preferredSurfaces) {
-        await PlayersService.replacePlayerSurfaces(tx, playerId, data.preferredSurfaces);
-      }
-      // Fetch current surfaces
-      const surfaces = await tx.playerSurface.findMany({ where: { playerId } });
-      return PlayersService.toDTO(updatedPlayer, surfaces.map(s => s.surface));
+    // Not transactional with PlayerSurface changes
+    const player = await prisma.player.findUnique({ where: { id: playerId } });
+    if (!player) throw new AppError('Player not found', 404);
+    // Update Player fields (tennis persona)
+    const updatedPlayer = await prisma.player.update({
+      where: { id: playerId },
+      data: {
+        displayName: data.displayName,
+        levelValue: data.levelValue,
+        levelConfidence: data.levelConfidence,
+        defaultCity: data.defaultCity,
+      },
     });
+    // Replace all PlayerSurface entries (no duplicates) if provided
+    if (data.preferredSurfaces) {
+      await PlayersService.replacePlayerSurfaces(playerId, data.preferredSurfaces);
+    }
+    // Fetch current surfaces
+    const surfaces = await prisma.playerSurface.findMany({ where: { playerId } });
+    return PlayersService.toDTO(updatedPlayer, surfaces.map(s => s.surface));
   }
 
   /**
