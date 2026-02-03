@@ -1,77 +1,189 @@
-// src/modules/matchmaking/matchmaking.service.ts
-// Pure functions for matchmaking logic
-// Algorithm philosophy:
-// - Availability first: prioritize who can play
-// - Friends over strangers: social connections matter
-// - Reasonable matches > perfect matches: optimize for good enough, not perfection
+// matchmaking.service.ts
 
+// Core matchmaking suggestion engine (read-only, pure)
+//
+// INVARIANTS & CONSTRAINTS:
+// - No writes to the database (read-only queries only)
+// - No Invite creation
+// - No Match creation
+// - No Notification creation
+// - No side effects of any kind
+// - Results are deterministic for the same inputs (pure function of DB state)
+//
+// This service takes a user and an availability, finds compatible candidates, and returns ranked, explainable suggestions.
+// It never mutates state, creates invites, or sends notifications. Guest users are supported (no Player required).
+//
+// Models involved: User, Player, Availability, Friendship, Match
 
-import { MatchCandidate, LevelCompatibility } from './matchmaking.types';
-import { scoreAvailability } from './scoring/availability.score';
-import { scoreSocial } from './scoring/social.score';
-import { scoreLevel } from './scoring/level.score';
-import { scoreProximity } from './scoring/proximity.score';
-
-/**
- * Find and score match candidates.
- * Inputs: array of candidates with availability, social, level, and proximity info.
- * Returns: sorted array of MatchCandidate (highest score first).
- * Defensive: skips invalid candidates.
- *
- * @param candidates Array<{ id: string, available: boolean, relationship?: string, levelA?: number, levelB?: number, distanceKm?: number }>
- */
-export function findMatchCandidates(candidates: Array<any>): MatchCandidate[] {
-  if (!Array.isArray(candidates)) return [];
-  return candidates
-    .map((c) => {
-      if (!c || !c.id) return null;
-      // Weighted sum: availability (40%), social (20%), level (20%), proximity (20%)
-      const availabilityScore = scoreAvailability(c.available);
-      const socialScore = scoreSocial(c.relationship);
-      const levelScore = scoreLevel(c.levelA, c.levelB);
-      const proximityScore = scoreProximity(c.distanceKm);
-      const score =
-        0.4 * availabilityScore +
-        0.2 * socialScore +
-        0.2 * levelScore +
-        0.2 * proximityScore;
-      return { id: c.id, score };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.score - a.score);
-}
+import { prisma } from '../../shared/prisma';
+import { MatchmakingRequest, MatchmakingResult, MatchmakingCandidate } from './matchmaking.types';
+import * as Rules from './matchmaking.rules';
 
 /**
- * Calculate level compatibility between two players.
- * Returns LevelCompatibility object with score and details.
- * Defensive: returns score 0 if invalid input.
- * @param levelA number
- * @param levelB number
- * @param maxDiff number (default 5)
+ * findMatchCandidates
+ * Main entry point for matchmaking suggestions.
+ * @param userId - the user requesting a match
+ * @param availabilityId - the availability slot to match for
+ * @returns MatchmakingResult (ranked, explainable suggestions)
  */
-export function calculateLevelCompatibility(levelA?: number, levelB?: number, maxDiff = 5): LevelCompatibility {
-  const score = scoreLevel(levelA, levelB, maxDiff);
-  return { score };
-}
+export async function findMatchCandidates(userId: string, availabilityId: string): Promise<MatchmakingResult> {
+  // 1. Load user and availability
+  const [user, availability] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    prisma.availability.findUnique({ where: { id: availabilityId } })
+  ]);
+  if (!user) throw new Error('User not found');
+  if (!availability) throw new Error('Availability not found');
 
-/**
- * Update player levels after a match.
- * Inputs: array of PlayerLevel, match result (e.g., winnerId), and optional adjustment amount.
- * Returns: new array of PlayerLevel with updated levels.
- * Defensive: returns unchanged if invalid input.
- * @param playerLevels Array<{ playerId: string, level: number }>
- * @param winnerId string | undefined
- * @param adjustment number (default 1)
- */
-export function updateLevelsAfterMatch(playerLevels: Array<{ playerId: string; level: number }>, winnerId?: string, adjustment = 1): Array<{ playerId: string; level: number }> {
-  if (!Array.isArray(playerLevels)) return [];
-  return playerLevels.map((pl) => {
-    if (!pl || typeof pl.level !== 'number') return pl;
-    if (winnerId && pl.playerId === winnerId) {
-      return { ...pl, level: pl.level + adjustment };
-    } else if (winnerId) {
-      return { ...pl, level: Math.max(0, pl.level - adjustment) };
+  // 2. Find all overlapping availabilities (exclude self)
+  const overlappingAvailabilities = await prisma.availability.findMany({
+    where: {
+      id: { not: availabilityId },
+      userId: { not: userId },
+      date: availability.date,
+      startTime: { lt: availability.endTime },
+      endTime: { gt: availability.startTime }
     }
-    return pl;
   });
+
+  // Preload all candidate users
+  const candidateUserIds = overlappingAvailabilities.map(a => a.userId);
+  const candidateUsersArr = await prisma.user.findMany({ where: { id: { in: candidateUserIds } } });
+  const candidateUsers = new Map(candidateUsersArr.map(u => [u.id, u]));
+
+  // Preload all candidate players
+  const candidatePlayersArr = await prisma.player.findMany({ where: { userId: { in: candidateUserIds } } });
+  const candidatePlayers = new Map(candidatePlayersArr.map(p => [p.userId, p]));
+
+  // Preload requester player
+  const requesterPlayer = await prisma.player.findUnique({ where: { userId } });
+
+  // Preload all friendships (bidirectional)
+  const friendships = await prisma.friendship.findMany({
+    where: {
+      OR: [
+        { userId, friendUserId: { in: candidateUserIds } },
+        { friendUserId: userId, userId: { in: candidateUserIds } }
+      ]
+    }
+  });
+  // Build a set of friend pairs for quick lookup
+  const friendPairs = new Set(
+    friendships.map(f => `${f.userId}|${f.friendUserId}`)
+  );
+
+  // Preload all matches between requester and candidates
+  let requesterPlayerId = requesterPlayer?.id;
+  const candidatePlayerIds = candidatePlayersArr.map(p => p.id);
+  let matchPairs = new Set<string>();
+  if (requesterPlayerId) {
+    const matches = await prisma.match.findMany({
+      where: {
+        OR: [
+          { playerAId: requesterPlayerId, playerBId: { in: candidatePlayerIds } },
+          { playerBId: requesterPlayerId, playerAId: { in: candidatePlayerIds } }
+        ]
+      }
+    });
+    matchPairs = new Set(
+      matches.map(m => `${m.playerAId}|${m.playerBId}`)
+    );
+  }
+
+  // 3. For each overlapping availability, build a candidate suggestion with human-readable reasons.
+  const candidates: MatchmakingCandidate[] = [];
+  for (const candidateAvail of overlappingAvailabilities) {
+    const candidateUser = candidateUsers.get(candidateAvail.userId);
+    if (!candidateUser) continue;
+    const candidatePlayer = candidatePlayers.get(candidateAvail.userId);
+
+    // --- Social proximity: explain WHY this person is suggested ---
+    // Friends: any explicit Friendship row (bidirectional) means friend
+    // TODO: In future, add status field to Friendship for pending/accepted distinction
+    // Previous opponents: check Match history (played together as playerA/playerB)
+    // Community: neither friend nor previous opponent
+    // Friends score highest, then previous opponents, then community
+    const isFriend = friendPairs.has(`${userId}|${candidateUser.id}`) || friendPairs.has(`${candidateUser.id}|${userId}`);
+    let isPreviousOpponent = false;
+    if (requesterPlayerId && candidatePlayer) {
+      isPreviousOpponent =
+        matchPairs.has(`${requesterPlayerId}|${candidatePlayer.id}`) ||
+        matchPairs.has(`${candidatePlayer.id}|${requesterPlayerId}`);
+    }
+    // --- End social proximity ---
+
+    // Level compatibility (optional, tolerant if missing)
+    const requesterLevel = requesterPlayer?.levelValue ?? null;
+    const candidateLevel = candidatePlayer?.levelValue ?? null;
+    const confidence =
+      requesterPlayer?.levelConfidence != null && candidatePlayer?.levelConfidence != null
+        ? Math.min(requesterPlayer.levelConfidence, candidatePlayer.levelConfidence)
+        : (requesterLevel != null && candidateLevel != null ? 1 : 0.3);
+
+    // Location (optional)
+    const requesterLocation = null;
+    const candidateLocation = null;
+
+    // --- Lightweight surface heuristics ---
+    let surfaceBonus = 0;
+    let surfaceReason = '';
+    // TODO: Add surface preference support if/when schema supports it
+
+    // 5. Compute scores using rules, collecting human-readable reasons for each factor
+    const reasons: string[] = [];
+    let totalScore = 0;
+
+    // Availability overlap (mandatory, always explained)
+    const overlapScore = Rules.scoreAvailabilityOverlap(
+      { start: candidateAvail.startTime, end: candidateAvail.endTime },
+      { start: availability.startTime, end: availability.endTime }
+    );
+    if (overlapScore.score < 0) {
+      reasons.push(overlapScore.reason || 'No overlap');
+      continue; // skip incompatible
+    }
+    totalScore += overlapScore.score;
+    if (overlapScore.reason) reasons.push(overlapScore.reason);
+
+    // Social proximity (always explained)
+    const socialScore = Rules.scoreSocialProximity({ isFriend, isPreviousOpponent });
+    totalScore += socialScore.score;
+    if (socialScore.reason) reasons.push(socialScore.reason);
+
+    // Level compatibility (always explained)
+    const levelScore = Rules.scoreLevelCompatibility({ requesterLevel, candidateLevel, confidence });
+    totalScore += levelScore.score;
+    if (levelScore.reason) reasons.push(levelScore.reason);
+
+    // Location proximity (always explained, includes city match logic)
+    const locationScore = Rules.scoreLocationProximity({
+      requesterLocation,
+      candidateLocation,
+      requesterCity: requesterPlayer?.defaultCity,
+      candidateCity: candidatePlayer?.defaultCity
+    });
+    totalScore += locationScore.score;
+    if (locationScore.reason) reasons.push(locationScore.reason);
+
+    if (surfaceBonus > 0 && surfaceReason) reasons.push(surfaceReason);
+    totalScore += surfaceBonus;
+
+    if (totalScore < 10) continue;
+
+    candidates.push({
+      candidateUserId: candidateUser.id,
+      candidatePlayerId: candidatePlayer?.id ?? null,
+      score: totalScore,
+      reasons
+    });
+  }
+
+  // 7. Sort by score DESC
+  candidates.sort((a, b) => b.score - a.score);
+
+  // 8. Return explainable results
+  return {
+    availabilityId,
+    candidates
+  };
 }

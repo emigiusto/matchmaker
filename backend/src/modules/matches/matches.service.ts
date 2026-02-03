@@ -93,6 +93,101 @@ export async function listMatchesForPlayer(playerId: string): Promise<MatchDTO[]
   return uniqueMatches.filter(m => m.invite && m.availability).map(toMatchDTO);
 }
 
+// Additional service methods for new routes
+
+/**
+ * List upcoming matches for a user (scheduledAt > now)
+ */
+export async function listUpcomingMatchesForUser(userId: string): Promise<MatchDTO[]> {
+  const now = new Date();
+  const player = await prisma.player.findUnique({ where: { userId } });
+  const orConditions: any[] = [
+    { invite: { inviterId: userId } },
+    { availability: { userId } },
+  ];
+  if (player) {
+    orConditions.push({ playerAId: player.id });
+    orConditions.push({ playerBId: player.id });
+  }
+  const matches = await prisma.match.findMany({
+    where: {
+      OR: orConditions,
+      scheduledAt: { gt: now },
+    },
+    include: { invite: true, availability: true },
+    orderBy: { scheduledAt: 'asc' },
+  });
+  const uniqueMatches = Array.from(new Map(matches.map(m => [m.id, m])).values());
+  return uniqueMatches.filter(m => m.invite && m.availability).map(toMatchDTO);
+}
+
+
+/**
+ * List past matches for a user (scheduledAt < now)
+ */
+export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]> {
+  const now = new Date();
+  const player = await prisma.player.findUnique({ where: { userId } });
+  const orConditions: any[] = [
+    { invite: { inviterId: userId } },
+    { availability: { userId } },
+  ];
+  if (player) {
+    orConditions.push({ playerAId: player.id });
+    orConditions.push({ playerBId: player.id });
+  }
+  const matches = await prisma.match.findMany({
+    where: {
+      OR: orConditions,
+      scheduledAt: { lt: now },
+    },
+    include: { invite: true, availability: true },
+    orderBy: { scheduledAt: 'desc' },
+  });
+  const uniqueMatches = Array.from(new Map(matches.map(m => [m.id, m])).values());
+  return uniqueMatches.filter(m => m.invite && m.availability).map(toMatchDTO);
+}
+
+
+/**
+ * List matches for a specific venue
+ */
+export async function listMatchesForVenue(venueId: string): Promise<MatchDTO[]> {
+  const matches = await prisma.match.findMany({
+    where: { venueId },
+    include: { invite: true, availability: true },
+    orderBy: { scheduledAt: 'desc' },
+  });
+  return matches.filter(m => m.invite && m.availability).map(toMatchDTO);
+}
+
+
+/**
+ * List the most recent matches, optionally filtered by userId
+ */
+export async function listRecentMatches(limit: number, userId?: string): Promise<MatchDTO[]> {
+  let where: any = {};
+  if (userId) {
+    const player = await prisma.player.findUnique({ where: { userId } });
+    const orConditions: any[] = [
+      { invite: { inviterId: userId } },
+      { availability: { userId } },
+    ];
+    if (player) {
+      orConditions.push({ playerAId: player.id });
+      orConditions.push({ playerBId: player.id });
+    }
+    where.OR = orConditions;
+  }
+  const matches = await prisma.match.findMany({
+    where,
+    include: { invite: true, availability: true },
+    orderBy: { scheduledAt: 'desc' },
+    take: limit,
+  });
+  return matches.filter(m => m.invite && m.availability).map(toMatchDTO);
+}
+
 // Helper: convert DB Match to API MatchDTO
 // Defensive: expects match.invite and match.availability to be present
 function toMatchDTO(match: PrismaMatch): MatchDTO {

@@ -10,12 +10,6 @@
  * - readAt is nullable (unread if null)
  * - createdAt is an ISO string
  * - No delivery metadata
- *
- * Additional endpoints for richer UI/admin support:
- * - GET /notifications/:id: Get notification by ID
- * - GET /notifications/unread?userId=...: List unread notifications for a user
- * - GET /notifications/count?userId=...: Count notifications for a user
- * - DELETE /notifications/:id: Delete a notification by ID
  */
 export interface NotificationDTO {
   /** Unique notification ID */

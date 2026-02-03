@@ -76,6 +76,70 @@ export async function getResultByMatch(matchId: string): Promise<ResultDTO> {
   return toResultDTO(result);
 }
 
+/**
+ * Get all results for a player (by playerId)
+ */
+export async function getResultsByPlayer(playerId: string): Promise<ResultDTO[]> {
+  // Find all results where the match has playerAId or playerBId = playerId
+  const matches = await prisma.match.findMany({
+    where: {
+      OR: [
+        { playerAId: playerId },
+        { playerBId: playerId },
+      ],
+    },
+    select: { id: true },
+  });
+  const matchIds = matches.map(m => m.id);
+  if (matchIds.length === 0) return [];
+  const results = await prisma.result.findMany({
+    where: { matchId: { in: matchIds } },
+    include: { sets: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  return results.map(toResultDTO);
+}
+
+/**
+ * Get all results for a user (by userId)
+ */
+export async function getResultsByUser(userId: string): Promise<ResultDTO[]> {
+  // Find all matches where user is inviter, owns availability, or is a player
+  const player = await prisma.player.findUnique({ where: { userId } });
+  const orConditions: any[] = [
+    { invite: { inviterId: userId } },
+    { availability: { userId } },
+  ];
+  if (player) {
+    orConditions.push({ playerAId: player.id });
+    orConditions.push({ playerBId: player.id });
+  }
+  const matches = await prisma.match.findMany({
+    where: { OR: orConditions },
+    select: { id: true },
+  });
+  const matchIds = matches.map(m => m.id);
+  if (matchIds.length === 0) return [];
+  const results = await prisma.result.findMany({
+    where: { matchId: { in: matchIds } },
+    include: { sets: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  return results.map(toResultDTO);
+}
+
+/**
+ * Get the most recent results (optionally limited)
+ */
+export async function getRecentResults(limit: number = 10): Promise<ResultDTO[]> {
+  const results = await prisma.result.findMany({
+    include: { sets: true },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+  return results.map(toResultDTO);
+}
+
 function toResultDTO(result: ResultDB): ResultDTO {
   return {
     id: result.id,
