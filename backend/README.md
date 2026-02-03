@@ -47,19 +47,38 @@ npx prisma migrate dev --name init
 npx prisma generate
 ```
 
-### 5. Start the Server
+### 5. Seed the Database (Development Only)
+The project includes a robust, relational seeder for development and testing. This will generate hundreds of users, players, availabilities, venues, groups, invites, matches, and results with realistic relationships.
+
+**Warning:** Seeding is only allowed when `ENVIRONMENT=DEVELOPMENT` in your `.env` file. The seeder will wipe all existing data in the database.
+
+To run the seeder:
+```bash
+npm run seed
+# or
+npx tsx prisma/seeders/seed.ts
+```
+
+If you see connection errors, ensure your MySQL server allows enough connections, or reduce the batch size in `prisma/seeders/batchInsert.util.ts`.
+
+---
+
+### 6. Start the Server
 ```bash
 npm run dev
 ```
 Server runs on `http://localhost:3000`
-
-## Main Modules
 - **users**: Registration, guest invites, user management
 - **players**: Tennis-specific player profiles
 - **availability**: Player availability slots
 - **invites**: Secure, time-limited match invites
 - **matches**: Immutable match records
 - **friendships**: Social graph (user and guest contacts)
+- **groups**: Group creation, membership, and management
+- **venues**: Tennis venue and court management
+- **results**: Match results and set tracking
+- **notifications**: User notifications (in-app, email, etc.)
+- **messages**: Chat and conversation support
 - **jobs**: Scheduled tasks (cleanup, reminders)
 
 ## API Usage
