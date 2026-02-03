@@ -11,7 +11,7 @@
 //
 // Future extensions: friendship status (pending/accepted), acceptedAt, etc.
 
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { FriendshipDTO } from './friendships.types';
 import { Friendship as PrismaFriendship, User as PrismaUser, GuestContact as PrismaGuestContact } from '@prisma/client';

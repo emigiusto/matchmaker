@@ -9,15 +9,14 @@
 // - No Notification creation
 // - No side effects of any kind
 // - Results are deterministic for the same inputs (pure function of DB state)
-//
 // This service takes a user and an availability, finds compatible candidates, and returns ranked, explainable suggestions.
 // It never mutates state, creates invites, or sends notifications. Guest users are supported (no Player required).
-//
-// Models involved: User, Player, Availability, Friendship, Match
-
-import { prisma } from '../../shared/prisma';
-import { MatchmakingRequest, MatchmakingResult, MatchmakingCandidate } from './matchmaking.types';
+import { MatchmakingResult, MatchmakingCandidate } from './matchmaking.types';
 import * as Rules from './matchmaking.rules';
+import * as MatchmakingConstants from './matchmaking.constants';
+import { cacheGet, cacheSet } from '../../shared/cache/redis';
+import { deleteKeysByPattern } from '../../shared/cache/redis';
+import { prisma } from '../../prisma';
 
 /**
  * findMatchCandidates
@@ -27,6 +26,11 @@ import * as Rules from './matchmaking.rules';
  * @returns MatchmakingResult (ranked, explainable suggestions)
  */
 export async function findMatchCandidates(userId: string, availabilityId: string): Promise<MatchmakingResult> {
+  // 0. Try cache first
+  const cacheKey = `matchmaking:${userId}:${availabilityId}`;
+  const cachedResult = await tryCacheGet(cacheKey);
+  if (cachedResult) return cachedResult;
+
   // 1. Load user and availability
   const [user, availability] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
@@ -168,7 +172,7 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     if (surfaceBonus > 0 && surfaceReason) reasons.push(surfaceReason);
     totalScore += surfaceBonus;
 
-    if (totalScore < 10) continue;
+    if (totalScore < MatchmakingConstants.MIN_SCORE) continue;
 
     candidates.push({
       candidateUserId: candidateUser.id,
@@ -182,8 +186,40 @@ export async function findMatchCandidates(userId: string, availabilityId: string
   candidates.sort((a, b) => b.score - a.score);
 
   // 8. Return explainable results
-  return {
+  const result = {
     availabilityId,
     candidates
   };
+
+  await tryCacheSet(cacheKey, result, 60);
+  return result;
+}
+
+// Private cache helpers
+async function tryCacheGet(cacheKey: string): Promise<MatchmakingResult | null> {
+  try {
+    const cached = await cacheGet(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (err) {
+    console.log('Matchmaking cache get error:', err);
+    // Cache unavailable or error, ignore
+  }
+  return null;
+}
+
+async function tryCacheSet(cacheKey: string, value: any, ttlSeconds: number) {
+  try {
+    await cacheSet(cacheKey, JSON.stringify(value), ttlSeconds);
+  } catch (err) {
+    console.log('Matchmaking cache set error:', err);
+  }
+}
+
+/**
+ * Clears the matchmaking cache for all users or a specific user.
+ * @param userId Optional userId to clear only that user's cache. If omitted, clears all matchmaking cache.
+ */
+export async function clearMatchmakingCache(userId?: string): Promise<void> {
+  const pattern = userId ? `matchmaking:${userId}:*` : 'matchmaking:*';
+  await deleteKeysByPattern(pattern);
 }

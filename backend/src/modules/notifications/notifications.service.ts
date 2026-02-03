@@ -6,7 +6,7 @@
 // TODO: Add WhatsApp delivery (future extension point)
 
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { NotificationDTO } from './notifications.types';
 import { Notification } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError'; // Consistent error handling

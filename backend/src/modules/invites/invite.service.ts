@@ -10,10 +10,11 @@
 // - No Player creation, no user registration, no side effects except Match creation (and explicit notifications).
 // - Comments and code document all domain invariants and design decisions for clarity and maintainability.
 
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import type { Invite, Match } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
-import { InviteDTO, InviteStatus } from './invite.types';
+import { InviteDTO } from './invite.types';
 import { generateInviteToken, getInviteExpiration, isInviteExpired } from './invite.token';
 import { isPending } from './invite.model';
 import { createNotification } from '../notifications/notifications.service';

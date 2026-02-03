@@ -5,7 +5,7 @@
 // Rules are intentionally minimal and explicit: only one Result per Match, and set numbers must be unique per Result.
 // No competitive meaning, ranking, or statistics logic yet. Naming and error handling are consistent with Matches module.
 
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { ResultDTO, SetResultDTO, AddSetResultInput } from './results.types';
 import { AppError } from '../../shared/errors/AppError'; // Consistent error handling
 

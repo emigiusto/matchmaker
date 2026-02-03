@@ -3,10 +3,11 @@
 // Matches are derived and immutable: they are only created via Invite confirmation (see Invites module) and never modified directly.
 // No creation or mutation logic here. No WhatsApp or external messaging logic.
 // Guest fallback: playerA/playerB may be null for guest users or incomplete data.
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { MatchDTO } from './matches.types';
 import { AppError } from '../../shared/errors/AppError';
 import { Match as PrismaMatch } from '@prisma/client';
+import type { Invite as PrismaInvite, Availability as PrismaAvailability } from '@prisma/client';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -62,9 +63,9 @@ export async function listMatchesForUser(userId: string): Promise<MatchDTO[]> {
     orderBy: { scheduledAt: 'desc' },
   });
   // Deduplicate by match.id (in case of overlapping conditions)
-  const uniqueMatches = Array.from(new Map(matches.map(m => [m.id, m])).values());
+  const uniqueMatches = Array.from(new Map(matches.map((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => [m.id, m])).values());
   // Defensive: filter out any matches missing required relations
-  return uniqueMatches.filter(m => m.invite && m.availability).map(toMatchDTO);
+  return uniqueMatches.filter((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => m.invite && m.availability).map(toMatchDTO);
 }
 
 /**
@@ -88,9 +89,9 @@ export async function listMatchesForPlayer(playerId: string): Promise<MatchDTO[]
     orderBy: { scheduledAt: 'desc' },
   });
   // Deduplicate by match.id (should not be needed, but defensive)
-  const uniqueMatches = Array.from(new Map(matches.map(m => [m.id, m])).values());
+  const uniqueMatches = Array.from(new Map(matches.map((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => [m.id, m])).values());
   // Defensive: filter out any matches missing required relations
-  return uniqueMatches.filter(m => m.invite && m.availability).map(toMatchDTO);
+  return uniqueMatches.filter((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => m.invite && m.availability).map(toMatchDTO);
 }
 
 // Additional service methods for new routes
@@ -117,8 +118,8 @@ export async function listUpcomingMatchesForUser(userId: string): Promise<MatchD
     include: { invite: true, availability: true },
     orderBy: { scheduledAt: 'asc' },
   });
-  const uniqueMatches = Array.from(new Map(matches.map(m => [m.id, m])).values());
-  return uniqueMatches.filter(m => m.invite && m.availability).map(toMatchDTO);
+  const uniqueMatches = Array.from(new Map(matches.map((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => [m.id, m])).values());
+  return uniqueMatches.filter((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => m.invite && m.availability).map(toMatchDTO);
 }
 
 
@@ -144,8 +145,8 @@ export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]
     include: { invite: true, availability: true },
     orderBy: { scheduledAt: 'desc' },
   });
-  const uniqueMatches = Array.from(new Map(matches.map(m => [m.id, m])).values());
-  return uniqueMatches.filter(m => m.invite && m.availability).map(toMatchDTO);
+  const uniqueMatches = Array.from(new Map(matches.map((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => [m.id, m])).values());
+  return uniqueMatches.filter((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => m.invite && m.availability).map(toMatchDTO);
 }
 
 
@@ -158,7 +159,7 @@ export async function listMatchesForVenue(venueId: string): Promise<MatchDTO[]> 
     include: { invite: true, availability: true },
     orderBy: { scheduledAt: 'desc' },
   });
-  return matches.filter(m => m.invite && m.availability).map(toMatchDTO);
+  return matches.filter((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => m.invite && m.availability).map(toMatchDTO);
 }
 
 
@@ -185,7 +186,7 @@ export async function listRecentMatches(limit: number, userId?: string): Promise
     orderBy: { scheduledAt: 'desc' },
     take: limit,
   });
-  return matches.filter(m => m.invite && m.availability).map(toMatchDTO);
+  return matches.filter((m: PrismaMatch & { invite: PrismaInvite; availability: PrismaAvailability }) => m.invite && m.availability).map(toMatchDTO);
 }
 
 // Helper: convert DB Match to API MatchDTO

@@ -6,7 +6,7 @@
 // It does NOT handle social (friends) or matchmaking logic.
 
 import { Player } from '@prisma/client';
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types';
 
@@ -27,9 +27,9 @@ export class PlayersService {
    */
   static async listPlayers(): Promise<PlayerDTO[]> {
     const players = await prisma.player.findMany();
-    return Promise.all(players.map(async player => {
+    return Promise.all(players.map(async (player: Player) => {
       const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-      return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+      return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
     }));
   }
 
@@ -38,9 +38,9 @@ export class PlayersService {
    */
   static async listPlayersByCity(city: string): Promise<PlayerDTO[]> {
     const players = await prisma.player.findMany({ where: { defaultCity: city } });
-    return Promise.all(players.map(async player => {
+    return Promise.all(players.map(async (player: Player) => {
       const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-      return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+      return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
     }));
   }
 
@@ -114,7 +114,7 @@ export class PlayersService {
     // Fetch actual surfaces
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
     // Return PlayerDTO
-    return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+    return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**
@@ -124,7 +124,7 @@ export class PlayersService {
     const player = await prisma.player.findUnique({ where: { id: playerId } });
     if (!player) throw new AppError('Player not found', 404);
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId } });
-    return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+    return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**
@@ -134,7 +134,7 @@ export class PlayersService {
     const player = await prisma.player.findUnique({ where: { userId } });
     if (!player) throw new AppError('Player not found', 404);
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-    return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+    return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**
@@ -161,7 +161,7 @@ export class PlayersService {
     }
     // Fetch current surfaces
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId } });
-    return PlayersService.toDTO(updatedPlayer, surfaces.map(s => s.surface));
+    return PlayersService.toDTO(updatedPlayer, surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**

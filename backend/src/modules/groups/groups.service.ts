@@ -3,21 +3,9 @@
 // GuestContacts are excluded by design.
 
 import { AppError } from '../../shared/errors/AppError';
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { GroupDTO } from './groups.types';
-
-/**
- * Converts a Group and its members to GroupDTO
- */
-function toGroupDTO(group: any, members: any[]): GroupDTO {
-  return {
-    id: group.id,
-    name: group.name,
-    ownerUserId: group.ownerUserId,
-    memberUserIds: members.map((m) => m.userId),
-    createdAt: group.createdAt.toISOString(),
-  };
-}
+import type { Group, GroupMember } from '@prisma/client';
 
 /**
  * Create a new group. Owner is always a member.
@@ -92,4 +80,15 @@ export async function listGroupsForUser(userId: string): Promise<GroupDTO[]> {
   return memberships.map((m) => toGroupDTO(m.group, m.group.members));
 }
 
-// Defensive: No GuestContacts, no hidden permissions, owner always a member.
+/**
+ * Converts a Group and its members to GroupDTO
+ */
+function toGroupDTO(group: Group, members: GroupMember[]): GroupDTO {
+  return {
+    id: group.id,
+    name: group.name,
+    ownerUserId: group.ownerUserId,
+    memberUserIds: members.map((m: GroupMember) => m.userId),
+    createdAt: group.createdAt.toISOString(),
+  };
+}

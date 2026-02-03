@@ -56,3 +56,23 @@ export async function cacheSet(key: string, value: string, ttlSeconds?: number) 
     await client!.set(key, value);
   }
 }
+
+export async function deleteKeysByPattern(pattern: string) {
+  const client = getRedisClient();
+  if (!client) return;
+
+  let cursor = '0';
+
+  do {
+    const { cursor: nextCursor, keys } = await client.scan(cursor, {
+      MATCH: pattern,
+      COUNT: 100,
+    });
+
+    cursor = nextCursor;
+
+    if (keys.length > 0) {
+      await client.del(keys);
+    }
+  } while (cursor !== '0');
+}

@@ -2,118 +2,103 @@
 // All business logic here. Throws AppError on error.
 // Guest-first: users may exist forever as guests.
 
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
-import { User } from './users.types';
+import { UserDTO } from './users.types';
+import type { User as PrismaUser } from '@prisma/client';
 
 /**
  * Retrieve all users from the database.
- * @returns Array of User objects
+ * @returns Array of UserDTO objects
  */
-export async function findAllUsers(): Promise<User[]> {
-  const users = await prisma.user.findMany();
-  return users.map(user => ({
-    ...user,
-    name: user.name ?? undefined,
-    phone: user.phone ?? undefined,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  }));
+export async function findAllUsers(): Promise<UserDTO[]> {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      isGuest: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  return users.map(toDTO);
 }
 
 /**
  * Find a user by their unique ID.
  * @param id User ID
- * @returns User object
+ * @returns UserDTO object
  * @throws AppError if user not found
  */
-export async function findUserById(id: string): Promise<User> {
+export async function findUserById(id: string): Promise<UserDTO> {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError('User not found', 404);
-  return {
-    ...user,
-    name: user.name ?? undefined,
-    phone: user.phone ?? undefined,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  };
+  return toDTO(user);
 }
 
 /**
  * Find a user by their phone number.
  * @param phone User phone number
- * @returns User object
+ * @returns UserDTO object
  * @throws AppError if user not found
  */
-export async function findUserByPhone(phone: string): Promise<User> {
+export async function findUserByPhone(phone: string): Promise<UserDTO> {
   const user = await prisma.user.findUnique({ where: { phone } });
   if (!user) throw new AppError('User not found', 404);
-  return {
-    ...user,
-    name: user.name ?? undefined,
-    phone: user.phone ?? undefined,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  };
+  return toDTO(user);
 }
 
 /**
  * Create a new non-guest user.
  * @param name User name
+ * @param email Optional email
  * @param phone Optional phone number
- * @returns Created User object
- * @throws AppError if phone already exists or creation fails
+ * @returns Created UserDTO object
+ * @throws AppError if phone or email already exists or creation fails
  */
-export async function createUser(name: string, phone?: string): Promise<User> {
+export async function createUser(name: string, email?: string, phone?: string): Promise<UserDTO> {
   try {
     const user = await prisma.user.create({
       data: {
         name,
+        email,
         phone,
         isGuest: false,
       },
     });
-    return {
-      ...user,
-      name: user.name ?? undefined,
-      phone: user.phone ?? undefined,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-    };
+    return toDTO(user);
   } catch (err: unknown) {
     if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2002') {
-      throw new AppError('Phone already exists', 409);
+      throw new AppError('Phone or email already exists', 409);
     }
     throw new AppError('Failed to create user', 500);
   }
 }
 
 /**
- * Create a new guest user. Phone is optional.
+ * Create a new guest user. Phone and email are optional.
  * @param name Optional user name
+ * @param email Optional email
  * @param phone Optional phone number
- * @returns Created guest User object
- * @throws AppError if phone already exists or creation fails
+ * @returns Created guest UserDTO object
+ * @throws AppError if phone or email already exists or creation fails
  */
-export async function createGuestUser(name?: string, phone?: string): Promise<User> {
+export async function createGuestUser(name?: string, email?: string, phone?: string): Promise<UserDTO> {
   try {
     const user = await prisma.user.create({
       data: {
         name,
+        email,
         phone,
         isGuest: true,
       },
     });
-    return {
-      ...user,
-      name: user.name ?? undefined,
-      phone: user.phone ?? undefined,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-    };
+    return toDTO(user);
   } catch (err: unknown) {
     if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2002') {
-      throw new AppError('Phone already exists', 409);
+      throw new AppError('Phone or email already exists', 409);
     }
     throw new AppError('Failed to create guest user', 500);
   }
@@ -123,30 +108,25 @@ export async function createGuestUser(name?: string, phone?: string): Promise<Us
  * Update an existing user by ID.
  * @param id User ID
  * @param name Optional new name
+ * @param email Optional new email
  * @param phone Optional new phone number
- * @returns Updated User object
- * @throws AppError if user not found, phone exists, or update fails
+ * @returns Updated UserDTO object
+ * @throws AppError if user not found, phone/email exists, or update fails
  */
-export async function updateUser(id: string, name?: string, phone?: string): Promise<User> {
+export async function updateUser(id: string, name?: string, email?: string, phone?: string): Promise<UserDTO> {
   try {
     const user = await prisma.user.update({
       where: { id },
-      data: { name, phone },
+      data: { name, email, phone },
     });
-    return {
-      ...user,
-      name: user.name ?? undefined,
-      phone: user.phone ?? undefined,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-    };
+    return toDTO(user);
   } catch (err: unknown) {
     if (typeof err === 'object' && err !== null && 'code' in err) {
       if ((err as { code?: string }).code === 'P2025') {
         throw new AppError('User not found', 404);
       }
       if ((err as { code?: string }).code === 'P2002') {
-        throw new AppError('Phone already exists', 409);
+        throw new AppError('Phone or email already exists', 409);
       }
     }
     throw new AppError('Failed to update user', 500);
@@ -167,4 +147,17 @@ export async function deleteUser(id: string): Promise<void> {
     }
     throw new AppError('Failed to delete user', 500);
   }
+}
+
+// Convert Prisma user object to API UserDTO type
+function toDTO(user: Pick<PrismaUser, 'id' | 'name' | 'email' | 'phone' | 'isGuest' | 'createdAt' | 'updatedAt'>): UserDTO {
+  return {
+    id: user.id,
+    name: user.name ?? undefined,
+    email: user.email ?? undefined,
+    phone: user.phone ?? undefined,
+    isGuest: user.isGuest,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+  };
 }

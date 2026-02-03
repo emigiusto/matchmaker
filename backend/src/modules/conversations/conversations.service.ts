@@ -13,8 +13,9 @@
 // - Add conversation metadata (topic, lastMessage, etc)
 // - Add soft-delete/archiving
 
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { ConversationDTO } from './chat.types';
+import type { Conversation } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 
 /**
@@ -59,7 +60,7 @@ export async function createConversation(type: 'direct' | 'group' | 'match', mat
 /**
  * Convert a Conversation to ConversationDTO
  */
-function toConversationDTO(conversation: any): ConversationDTO {
+function toConversationDTO(conversation: Conversation): ConversationDTO {
   return {
     id: conversation.id,
     type: conversation.type,

@@ -1,8 +1,9 @@
 // venues.service.ts
 // Service layer for venues (CRUD, simple filtering)
 
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { VenueDTO, CreateVenueInput, VenueFilters } from './venues.types';
+import type { Venue } from '@prisma/client';
 
 export async function createVenue(data: CreateVenueInput): Promise<VenueDTO> {
   const venue = await prisma.venue.create({ data });
@@ -51,7 +52,7 @@ export async function deleteVenue(id: string): Promise<boolean> {
   }
 }
 
-function toVenueDTO(venue: any): VenueDTO {
+function toVenueDTO(venue: Venue): VenueDTO {
   return {
     id: venue.id,
     name: venue.name,

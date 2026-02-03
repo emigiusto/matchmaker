@@ -12,7 +12,7 @@
 // - Add message metadata (edited, deleted, etc)
 // - Add permissions/roles for private/group chats
 
-import { prisma } from '../../shared/prisma';
+import { prisma } from '../../prisma';
 import { MessageDTO } from '../conversations/chat.types';
 import { AppError } from '../../shared/errors/AppError';
 
