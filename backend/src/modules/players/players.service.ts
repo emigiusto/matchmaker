@@ -105,6 +105,8 @@ export class PlayersService {
         levelValue: data.levelValue,
         levelConfidence: data.levelConfidence,
         defaultCity: data.defaultCity,
+        latitude: data.latitude,
+        longitude: data.longitude,
       },
     });
     // Replace all PlayerSurface entries (no duplicates)
@@ -177,6 +179,8 @@ export class PlayersService {
       levelConfidence: player.levelConfidence ?? undefined,
       preferredSurfaces: preferredSurfaces ?? [],
       defaultCity: player.defaultCity ?? undefined,
+      latitude: player.latitude ?? undefined,
+      longitude: player.longitude ?? undefined,
     };
   }
 }

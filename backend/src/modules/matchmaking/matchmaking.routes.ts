@@ -8,6 +8,8 @@ import { MatchmakingController } from './matchmaking.controller';
 const router = Router();
 
 
+// Visual test endpoint (HTML table)
+router.get('/test', MatchmakingController.getSuggestionsHtml);
 
 /**
  * @openapi
@@ -41,5 +43,6 @@ const router = Router();
  *                 $ref: '#/components/schemas/MatchSuggestion'
  */
 router.get('/', MatchmakingController.getSuggestions);
+
 
 export default router;

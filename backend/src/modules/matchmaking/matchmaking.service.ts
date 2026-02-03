@@ -125,8 +125,14 @@ export async function findMatchCandidates(userId: string, availabilityId: string
         : (requesterLevel != null && candidateLevel != null ? 1 : 0.3);
 
     // Location (optional)
-    const requesterLocation = null;
-    const candidateLocation = null;
+    const requesterLocation =
+      requesterPlayer && requesterPlayer.latitude != null && requesterPlayer.longitude != null
+        ? { latitude: requesterPlayer.latitude, longitude: requesterPlayer.longitude }
+        : null;
+    const candidateLocation =
+      candidatePlayer && candidatePlayer.latitude != null && candidatePlayer.longitude != null
+        ? { latitude: candidatePlayer.latitude, longitude: candidatePlayer.longitude }
+        : null;
 
     // --- Lightweight surface heuristics ---
     let surfaceBonus = 0;
@@ -137,6 +143,13 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     const reasons: string[] = [];
     let totalScore = 0;
 
+    // Calculate overlap range as two date objects (ISO strings)
+    const overlapStart = new Date(Math.max(candidateAvail.startTime.getTime(), availability.startTime.getTime()));
+    const overlapEnd = new Date(Math.min(candidateAvail.endTime.getTime(), availability.endTime.getTime()));
+    // Enforce minimum overlap duration
+    const overlapMinutes = (overlapEnd.getTime() - overlapStart.getTime()) / 60000;
+    if (overlapMinutes < MatchmakingConstants.MIN_OVERLAP_MINUTES) continue;
+
     // Availability overlap (mandatory, always explained)
     const overlapScore = Rules.scoreAvailabilityOverlap(
       { start: candidateAvail.startTime, end: candidateAvail.endTime },
@@ -146,31 +159,36 @@ export async function findMatchCandidates(userId: string, availabilityId: string
       reasons.push(overlapScore.reason || 'No overlap');
       continue; // skip incompatible
     }
-    totalScore += overlapScore.score;
     if (overlapScore.reason) reasons.push(overlapScore.reason);
 
     // Social proximity (always explained)
     const socialScore = Rules.scoreSocialProximity({ isFriend, isPreviousOpponent });
-    totalScore += socialScore.score;
     if (socialScore.reason) reasons.push(socialScore.reason);
 
     // Level compatibility (always explained)
     const levelScore = Rules.scoreLevelCompatibility({ requesterLevel, candidateLevel, confidence });
-    totalScore += levelScore.score;
     if (levelScore.reason) reasons.push(levelScore.reason);
 
-    // Location proximity (always explained, includes city match logic)
+    // Location proximity (always explained, includes city and lat/lng logic)
     const locationScore = Rules.scoreLocationProximity({
       requesterLocation,
       candidateLocation,
       requesterCity: requesterPlayer?.defaultCity,
       candidateCity: candidatePlayer?.defaultCity
     });
-    totalScore += locationScore.score;
     if (locationScore.reason) reasons.push(locationScore.reason);
 
     if (surfaceBonus > 0 && surfaceReason) reasons.push(surfaceReason);
-    totalScore += surfaceBonus;
+
+    // Score breakdown
+    const scoreBreakdown = {
+      availability: overlapScore.score,
+      social: socialScore.score,
+      level: levelScore.score,
+      location: locationScore.score,
+      surface: surfaceBonus
+    };
+    totalScore = scoreBreakdown.availability + scoreBreakdown.social + scoreBreakdown.level + scoreBreakdown.location + scoreBreakdown.surface;
 
     if (totalScore < MatchmakingConstants.MIN_SCORE) continue;
 
@@ -178,7 +196,14 @@ export async function findMatchCandidates(userId: string, availabilityId: string
       candidateUserId: candidateUser.id,
       candidatePlayerId: candidatePlayer?.id ?? null,
       score: totalScore,
-      reasons
+      scoreBreakdown,
+      reasons,
+      overlapRange: {
+        start: overlapStart.toISOString(),
+        end: overlapEnd.toISOString()
+      },
+      requesterAvailabilityId: availabilityId,
+      candidateAvailabilityId: candidateAvail.id
     });
   }
 

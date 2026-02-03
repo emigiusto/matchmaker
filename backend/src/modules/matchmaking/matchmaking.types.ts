@@ -28,6 +28,19 @@ export interface MatchmakingCandidate {
   candidatePlayerId: string | null;
   score: number;
   reasons: string[];
+  scoreBreakdown?: {
+    availability?: number;
+    social?: number;
+    level?: number;
+    location?: number;
+    surface?: number;
+  };
+  overlapRange?: {
+    start: string;
+    end: string;
+  };
+  requesterAvailabilityId?: string;
+  candidateAvailabilityId?: string;
 }
 
 /**
