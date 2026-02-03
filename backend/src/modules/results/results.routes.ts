@@ -7,22 +7,155 @@ import { ResultsController } from './results.controller';
 
 const router = Router();
 
-// POST /results - Create a result for a match
-router.post('/', ResultsController.createResult);
 
-// POST /results/:id/sets - Add a set result to a result
+
+// ...existing code with tags, descriptions, and schemas already present...
+
+
+
+/**
+ * @openapi
+ * /results/{id}/sets:
+ *   post:
+ *     summary: Add a set result to a result
+ *     description: Adds a set result to an existing match result.
+ *     tags:
+ *       - Results
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Result ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SetResultInput'
+ *     responses:
+ *       201:
+ *         description: The added set result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SetResult'
+ */
 router.post('/:id/sets', ResultsController.addSetResult);
 
-// GET /results/by-match/:matchId - Fetch result for a match
+
+
+/**
+ * @openapi
+ * /results/by-match/{matchId}:
+ *   get:
+ *     summary: Fetch result for a match
+ *     description: Retrieves the result for a specific match.
+ *     tags:
+ *       - Results
+ *     parameters:
+ *       - in: path
+ *         name: matchId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Match ID
+ *     responses:
+ *       200:
+ *         description: Result for match
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Result'
+ */
 router.get('/by-match/:matchId', ResultsController.getResultByMatch);
 
-// GET /results/by-player/:playerId - Fetch all results for a player
+
+
+/**
+ * @openapi
+ * /results/by-player/{playerId}:
+ *   get:
+ *     summary: Fetch all results for a player
+ *     description: Retrieves all results for a specific player.
+ *     tags:
+ *       - Results
+ *     parameters:
+ *       - in: path
+ *         name: playerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Player ID
+ *     responses:
+ *       200:
+ *         description: Results for player
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Result'
+ */
 router.get('/by-player/:playerId', ResultsController.getResultsByPlayer);
 
-// GET /results/by-user/:userId - Fetch all results for a user
+
+
+/**
+ * @openapi
+ * /results/by-user/{userId}:
+ *   get:
+ *     summary: Fetch all results for a user
+ *     description: Retrieves all results for a specific user.
+ *     tags:
+ *       - Results
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Results for user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Result'
+ */
 router.get('/by-user/:userId', ResultsController.getResultsByUser);
 
-// GET /results/recent?limit=10 - Fetch recent results
+
+
+/**
+ * @openapi
+ * /results/recent:
+ *   get:
+ *     summary: Fetch recent results
+ *     description: Retrieves a list of recent results.
+ *     tags:
+ *       - Results
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Maximum number of results to return
+ *     responses:
+ *       200:
+ *         description: Recent results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Result'
+ */
 router.get('/recent', ResultsController.getRecentResults);
 
 export default router;

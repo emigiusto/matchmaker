@@ -1,13 +1,16 @@
-
 import express from 'express';
 import routes from './routes';
 
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './swagger';
 
 const app = express();
 
-
 // Parse JSON bodies
 app.use(express.json());
+
+// Swagger/OpenAPI setup
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Feature flag for jobs
 if (process.env.JOBS_ENABLED === 'true') {

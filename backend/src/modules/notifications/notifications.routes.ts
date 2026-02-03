@@ -7,25 +7,175 @@ import { NotificationsController } from './notifications.controller';
 
 const router = Router();
 
-// POST /notifications - Create a notification for a user
+
+
+/**
+ * @openapi
+ * /notifications:
+ *   post:
+ *     summary: Create a notification for a user
+ *     description: Creates a notification for a user.
+ *     tags:
+ *       - Notifications
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/NotificationInput'
+ *     responses:
+ *       201:
+ *         description: Notification created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Notification'
+ */
 router.post('/', NotificationsController.createNotification);
 
-// GET /notifications - List notifications for a user
+
+
+/**
+ * @openapi
+ * /notifications:
+ *   get:
+ *     summary: List notifications for a user
+ *     description: Retrieves notifications for a user.
+ *     tags:
+ *       - Notifications
+ *     responses:
+ *       200:
+ *         description: List of notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Notification'
+ */
 router.get('/', NotificationsController.listNotificationsForUser);
 
-// POST /notifications/:id/read - Mark a notification as read
+
+
+/**
+ * @openapi
+ * /notifications/{id}/read:
+ *   post:
+ *     summary: Mark a notification as read
+ *     description: Marks a notification as read by its ID.
+ *     tags:
+ *       - Notifications
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Notification ID
+ *     responses:
+ *       200:
+ *         description: Notification marked as read
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Notification'
+ */
 router.post('/:id/read', NotificationsController.markAsRead);
 
-// GET /notifications/:id - Get notification by ID
+
+
+/**
+ * @openapi
+ * /notifications/{id}:
+ *   get:
+ *     summary: Get notification by ID
+ *     description: Retrieves a notification by its ID.
+ *     tags:
+ *       - Notifications
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Notification ID
+ *     responses:
+ *       200:
+ *         description: Notification details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Notification'
+ */
 router.get('/:id', NotificationsController.getNotificationById);
 
-// GET /notifications/unread - List unread notifications for a user
+
+
+/**
+ * @openapi
+ * /notifications/unread:
+ *   get:
+ *     summary: List unread notifications for a user
+ *     description: Retrieves unread notifications for a user.
+ *     tags:
+ *       - Notifications
+ *     responses:
+ *       200:
+ *         description: List of unread notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Notification'
+ */
 router.get('/unread', NotificationsController.listUnreadNotificationsForUser);
 
-// GET /notifications/count - Count notifications for a user
+
+
+/**
+ * @openapi
+ * /notifications/count:
+ *   get:
+ *     summary: Count notifications for a user
+ *     description: Returns the count of notifications for a user.
+ *     tags:
+ *       - Notifications
+ *     responses:
+ *       200:
+ *         description: Notification count
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                   description: Number of notifications
+ */
 router.get('/count', NotificationsController.countNotificationsForUser);
 
-// DELETE /notifications/:id - Delete a notification by ID
+
+
+/**
+ * @openapi
+ * /notifications/{id}:
+ *   delete:
+ *     summary: Delete a notification by ID
+ *     description: Deletes a notification by its ID.
+ *     tags:
+ *       - Notifications
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Notification ID
+ *     responses:
+ *       204:
+ *         description: Notification deleted
+ */
 router.delete('/:id', NotificationsController.deleteNotification);
 
 export default router;

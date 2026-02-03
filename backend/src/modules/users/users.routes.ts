@@ -6,22 +6,161 @@ import { createGuestUserController, createUserController, findUserByIdController
 
 const router = Router();
 
-// Guest-first: create guest user (no Player)
+
+
+/**
+ * @openapi
+ * /users/guest:
+ *   post:
+ *     summary: Create a guest user (no Player)
+ *     description: Creates a guest user (no Player).
+ *     tags:
+ *       - Users
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserInput'
+ *     responses:
+ *       201:
+ *         description: Guest user created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ */
 router.post('/guest', createGuestUserController);
 
-// Create non-guest user
+
+
+/**
+ * @openapi
+ * /users:
+ *   post:
+ *     summary: Create a non-guest user
+ *     description: Creates a non-guest user.
+ *     tags:
+ *       - Users
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserInput'
+ *     responses:
+ *       201:
+ *         description: User created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ */
 router.post('/', createUserController);
 
-// Get all users
+
+
+/**
+ * @openapi
+ * /users:
+ *   get:
+ *     summary: Get all users
+ *     description: Retrieves all users in the system.
+ *     tags:
+ *       - Users
+ *     responses:
+ *       200:
+ *         description: List of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/User'
+ */
 router.get('/', findAllUsersController);
 
-// Get user by id
+
+
+/**
+ * @openapi
+ * /users/{id}:
+ *   get:
+ *     summary: Get user by id
+ *     description: Retrieves a user by their ID.
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ */
 router.get('/:id', findUserByIdController);
 
-// Update user
+
+
+/**
+ * @openapi
+ * /users/{id}:
+ *   put:
+ *     summary: Update user
+ *     description: Updates a user by their ID.
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserInput'
+ *     responses:
+ *       200:
+ *         description: User updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ */
 router.put('/:id', updateUserController);
 
-// Delete user
+
+
+/**
+ * @openapi
+ * /users/{id}:
+ *   delete:
+ *     summary: Delete user
+ *     description: Deletes a user by their ID.
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       204:
+ *         description: User deleted
+ */
 router.delete('/:id', deleteUserController);
 
 export default router;
