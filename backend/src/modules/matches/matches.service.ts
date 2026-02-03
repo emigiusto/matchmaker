@@ -3,12 +3,10 @@
 // Matches are derived and immutable: they are only created via Invite confirmation (see Invites module) and never modified directly.
 // No creation or mutation logic here. No WhatsApp or external messaging logic.
 // Guest fallback: playerA/playerB may be null for guest users or incomplete data.
-
-
 import { prisma } from '../../shared/prisma';
 import { MatchDTO } from './matches.types';
 import { AppError } from '../../shared/errors/AppError';
-
+import { Match as PrismaMatch } from '@prisma/client';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -97,7 +95,7 @@ export async function listMatchesForPlayer(playerId: string): Promise<MatchDTO[]
 
 // Helper: convert DB Match to API MatchDTO
 // Defensive: expects match.invite and match.availability to be present
-function toMatchDTO(match: any): MatchDTO {
+function toMatchDTO(match: PrismaMatch): MatchDTO {
   return {
     id: match.id,
     inviteId: match.inviteId,
@@ -105,7 +103,7 @@ function toMatchDTO(match: any): MatchDTO {
     venueId: match.venueId,
     playerAId: match.playerAId,
     playerBId: match.playerBId,
-    scheduledAt: match.scheduledAt.toISOString(),
-    createdAt: match.createdAt.toISOString(),
+    scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
+    createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
   };
 }

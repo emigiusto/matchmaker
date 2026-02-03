@@ -63,6 +63,38 @@ export async function markAsRead(notificationId: string): Promise<NotificationDT
 }
 
 // --- Helpers ---
+/**
+ * Get a notification by ID
+ */
+export async function getNotificationById(notificationId: string): Promise<NotificationDTO | null> {
+  const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
+  return notification ? toNotificationDTO(notification) : null;
+}
+
+/**
+ * List unread notifications for a user
+ */
+export async function listUnreadNotificationsForUser(userId: string): Promise<NotificationDTO[]> {
+  const notifications = await prisma.notification.findMany({
+    where: { userId, readAt: null },
+    orderBy: { createdAt: 'desc' },
+  });
+  return notifications.map(toNotificationDTO);
+}
+
+/**
+ * Count notifications for a user
+ */
+export async function countNotificationsForUser(userId: string): Promise<number> {
+  return prisma.notification.count({ where: { userId } });
+}
+
+/**
+ * Delete a notification by ID
+ */
+export async function deleteNotification(notificationId: string): Promise<void> {
+  await prisma.notification.delete({ where: { id: notificationId } });
+}
 function toNotificationDTO(notification: Notification): NotificationDTO {
   return {
     id: notification.id,

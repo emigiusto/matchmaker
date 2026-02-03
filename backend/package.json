@@ -4,7 +4,7 @@
   "description": "AceUp is an app to organize sports matches by managing player availability, sending invites, and confirming participation through unique links. WhatsApp is used only as a delivery channel for notifications and links.",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "ts-node-dev --respawn --transpile-only --watch src src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },

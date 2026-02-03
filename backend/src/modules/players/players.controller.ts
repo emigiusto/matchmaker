@@ -16,6 +16,62 @@ import {
 // - Return clean JSON or forward error
 
 export class PlayersController {
+    /**
+     * GET /players
+     * List all players
+     */
+    static async listPlayers(req: Request, res: Response, next: NextFunction) {
+      try {
+        const players = await PlayersService.listPlayers();
+        res.json(players);
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * GET /players/by-city/:city
+     * List players by city
+     */
+    static async listPlayersByCity(req: Request, res: Response, next: NextFunction) {
+      try {
+        const cityParam = req.params.city;
+        const city = Array.isArray(cityParam) ? cityParam[0] : cityParam;
+        const players = await PlayersService.listPlayersByCity(city);
+        res.json(players);
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * GET /players/count/by-city/:city
+     * Count players by city
+     */
+    static async countPlayersByCity(req: Request, res: Response, next: NextFunction) {
+      try {
+        const cityParam = req.params.city;
+        const city = Array.isArray(cityParam) ? cityParam[0] : cityParam;
+        const count = await PlayersService.countPlayersByCity(city);
+        res.json({ city, count });
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * DELETE /players/:id
+     * Delete player (soft-delete stub)
+     */
+    static async deletePlayer(req: Request, res: Response, next: NextFunction) {
+      try {
+        const { playerId } = playerIdParamSchema.parse({ playerId: req.params.id });
+        await PlayersService.deletePlayer(playerId);
+        res.status(204).send();
+      } catch (error) {
+        next(error);
+      }
+    }
   /**
    * POST /players
    * Create a Player for a User (upgrade)

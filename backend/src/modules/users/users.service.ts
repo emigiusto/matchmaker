@@ -80,8 +80,8 @@ export async function createUser(name: string, phone?: string): Promise<User> {
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };
-  } catch (err: any) {
-    if (err.code === 'P2002') {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2002') {
       throw new AppError('Phone already exists', 409);
     }
     throw new AppError('Failed to create user', 500);
@@ -111,8 +111,8 @@ export async function createGuestUser(name?: string, phone?: string): Promise<Us
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };
-  } catch (err: any) {
-    if (err.code === 'P2002') {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2002') {
       throw new AppError('Phone already exists', 409);
     }
     throw new AppError('Failed to create guest user', 500);
@@ -140,12 +140,14 @@ export async function updateUser(id: string, name?: string, phone?: string): Pro
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };
-  } catch (err: any) {
-    if (err.code === 'P2025') {
-      throw new AppError('User not found', 404);
-    }
-    if (err.code === 'P2002') {
-      throw new AppError('Phone already exists', 409);
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'code' in err) {
+      if ((err as { code?: string }).code === 'P2025') {
+        throw new AppError('User not found', 404);
+      }
+      if ((err as { code?: string }).code === 'P2002') {
+        throw new AppError('Phone already exists', 409);
+      }
     }
     throw new AppError('Failed to update user', 500);
   }
@@ -159,8 +161,8 @@ export async function updateUser(id: string, name?: string, phone?: string): Pro
 export async function deleteUser(id: string): Promise<void> {
   try {
     await prisma.user.delete({ where: { id } });
-  } catch (err: any) {
-    if (err.code === 'P2025') {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2025') {
       throw new AppError('User not found', 404);
     }
     throw new AppError('Failed to delete user', 500);

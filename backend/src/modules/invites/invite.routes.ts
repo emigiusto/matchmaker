@@ -21,4 +21,16 @@ router.post('/:token/confirm', InviteController.confirmInvite);
 // POST /:token/decline - Decline invite by token
 router.post('/:token/decline', InviteController.declineInvite);
 
+// GET /by-id/:id - Get invite by ID
+router.get('/by-id/:id', InviteController.getInviteById);
+
+// GET /by-user/:userId - List all invites sent or received by a user
+router.get('/by-user/:userId', InviteController.listInvitesByUser);
+
+// GET /by-availability/:availabilityId - List all invites for an availability
+router.get('/by-availability/:availabilityId', InviteController.listInvitesByAvailability);
+
+// GET /count/:userId - Count invites for a user
+router.get('/count/:userId', InviteController.countInvitesByUser);
+
 export default router;

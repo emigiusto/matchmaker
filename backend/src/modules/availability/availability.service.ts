@@ -14,6 +14,7 @@
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 import { AvailabilityDTO, CreateAvailabilityInput } from './availability.types';
+import { Availability as PrismaAvailability } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -39,6 +40,34 @@ export class AvailabilityService {
       },
     });
     return AvailabilityService.toDTO(availability);
+  }
+
+  /**
+   * Get a single availability by ID
+   */
+  static async getAvailabilityById(availabilityId: string): Promise<AvailabilityDTO | null> {
+    const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
+    if (!availability) return null;
+    return AvailabilityService.toDTO(availability);
+  }
+
+  /**
+   * List availabilities by date (optionally filtered by userId)
+   */
+  static async listAvailabilitiesByDate(date: string, userId?: string): Promise<AvailabilityDTO[]> {
+    const where: { date: string; userId?: string } = { date };
+    if (userId) where.userId = userId;
+    const availabilities = await prisma.availability.findMany({ where });
+    return availabilities.map(AvailabilityService.toDTO);
+  }
+
+  /**
+   * Count availabilities for a user
+   */
+  static async countAvailabilitiesByUser(userId: string): Promise<number> {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError('User not found', 404);
+    return prisma.availability.count({ where: { userId } });
   }
 
   /**
@@ -72,13 +101,13 @@ export class AvailabilityService {
   /**
    * Convert Availability to DTO (API shape)
    */
-  private static toDTO(availability: any): AvailabilityDTO {
+  private static toDTO(availability: PrismaAvailability): AvailabilityDTO {
     return {
       id: availability.id,
       userId: availability.userId,
-      date: availability.date,
-      startTime: availability.startTime,
-      endTime: availability.endTime,
+      date: typeof availability.date === 'string' ? availability.date : availability.date.toISOString().slice(0, 10),
+      startTime: typeof availability.startTime === 'string' ? availability.startTime : availability.startTime.toISOString(),
+      endTime: typeof availability.endTime === 'string' ? availability.endTime : availability.endTime.toISOString(),
       locationText: availability.locationText,
       minLevel: availability.minLevel ?? null,
       maxLevel: availability.maxLevel ?? null,

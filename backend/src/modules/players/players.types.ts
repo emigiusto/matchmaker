@@ -13,15 +13,28 @@
  * PlayerDTO
  * API-facing shape of a Player. Does NOT expose internal Prisma model directly.
  * Represents the tennis persona of a User.
+ *
+ * Additional endpoints for richer UI/admin support:
+ * - GET /players: List all players
+ * - GET /players/by-city/:city: List players by city
+ * - GET /players/count/by-city/:city: Count players by city
+ * - DELETE /players/:id: Delete player (soft-delete stub)
  */
 export interface PlayerDTO {
+  /** Unique player ID */
   id: string;
+  /** User ID for this player */
   userId: string;
+  /** Display name for tennis persona */
   displayName: string;
-  levelValue?: number; // Optional: Player's skill level (may be unset)
-  levelConfidence?: number; // Optional: Confidence in level assessment
-  preferredSurfaces?: string[]; // Optional: Preferred court surfaces
-  defaultCity?: string; // Optional: Default city for matches
+  /** Player's skill level (may be unset) */
+  levelValue?: number;
+  /** Confidence in level assessment */
+  levelConfidence?: number;
+  /** Preferred court surfaces */
+  preferredSurfaces?: string[];
+  /** Default city for matches */
+  defaultCity?: string;
 }
 
 /**

@@ -25,6 +25,62 @@ const notificationIdParamSchema = z.object({
 });
 
 export class NotificationsController {
+    /**
+     * GET /notifications/:id
+     * Get notification by ID
+     */
+    static async getNotificationById(req: Request, res: Response, next: NextFunction) {
+      try {
+        const { id } = req.params;
+        const notification = await NotificationsService.getNotificationById(Array.isArray(id) ? id[0] : id);
+        if (!notification) return res.status(404).json({ error: 'Notification not found' });
+        res.status(200).json(notification);
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * GET /notifications/unread?userId=...
+     * List unread notifications for a user
+     */
+    static async listUnreadNotificationsForUser(req: Request, res: Response, next: NextFunction) {
+      try {
+        const { userId } = userIdQuerySchema.parse(req.query);
+        const notifications = await NotificationsService.listUnreadNotificationsForUser(userId);
+        res.status(200).json(notifications);
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * GET /notifications/count?userId=...
+     * Count notifications for a user
+     */
+    static async countNotificationsForUser(req: Request, res: Response, next: NextFunction) {
+      try {
+        const { userId } = userIdQuerySchema.parse(req.query);
+        const count = await NotificationsService.countNotificationsForUser(userId);
+        res.status(200).json({ userId, count });
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * DELETE /notifications/:id
+     * Delete a notification by ID
+     */
+    static async deleteNotification(req: Request, res: Response, next: NextFunction) {
+      try {
+        const { id } = notificationIdParamSchema.parse(req.params);
+        await NotificationsService.deleteNotification(id);
+        res.status(204).send();
+      } catch (error) {
+        next(error);
+      }
+    }
   /**
    * POST /notifications
    * Create a notification for a user

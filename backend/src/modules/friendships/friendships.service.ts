@@ -14,6 +14,7 @@
 import { prisma } from '../../shared/prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { FriendshipDTO } from './friendships.types';
+import { Friendship as PrismaFriendship, User as PrismaUser, GuestContact as PrismaGuestContact } from '@prisma/client';
 
 /**
  * Normalized friend output type for listFriends
@@ -24,6 +25,48 @@ export type Friend =
 
 
 export class FriendshipsService {
+    /**
+     * Get a specific friendship by ID
+     */
+    static async getFriendshipById(friendshipId: string): Promise<FriendshipDTO | null> {
+      const friendship = await prisma.friendship.findUnique({ where: { id: friendshipId } });
+      return friendship ? FriendshipsService.toDTO(friendship) : null;
+    }
+
+    /**
+     * List mutual friends between two users
+     */
+    static async listMutualFriends(userId: string, otherUserId: string): Promise<Friend[]> {
+      const friendsA = await FriendshipsService.listFriends(userId);
+      const friendsB = await FriendshipsService.listFriends(otherUserId);
+      const key = (f: Friend) => `${f.type}:${f.id}`;
+      const setA = new Set(friendsA.map(key));
+      return friendsB.filter(f => setA.has(key(f)));
+    }
+
+    /**
+     * List incoming/outgoing friend requests (future extension)
+     * Currently returns empty array (no status field yet)
+     */
+    static async listFriendRequests(userId: string): Promise<any[]> {
+      return [];
+    }
+
+    /**
+     * Check if two users are friends
+     */
+    static async isFriend(userId: string, otherUserId: string): Promise<boolean> {
+      const friends = await FriendshipsService.listFriends(userId);
+      return friends.some(f => f.type === 'user' && f.id === otherUserId);
+    }
+
+    /**
+     * Get friend count for a user
+     */
+    static async countFriends(userId: string): Promise<number> {
+      const friends = await FriendshipsService.listFriends(userId);
+      return friends.length;
+    }
   /**
    * Add a friendship to a registered user
    * - No self-friendship
@@ -110,28 +153,30 @@ export class FriendshipsService {
     });
 
     // Normalize outgoing
-    const outgoingNormalized = outgoing.map(f => {
-      if (f.friendUserId && f.friendUser) {
-        // User: prefer displayName, fallback to name, then email, then id
-        const name = (f.friendUser as any).displayName || (f.friendUser as any).name || (f.friendUser as any).email || f.friendUser.id;
-        return { type: 'user', id: f.friendUserId, name, phone: (f.friendUser as any).phone ?? undefined };
-      } else if (f.guestContactId && f.guestContact) {
-        // GuestContact: prefer name, fallback to phone, then id
-        const name = f.guestContact.name || f.guestContact.phone || f.guestContact.id;
-        return { type: 'guestContact', id: f.guestContactId, name, phone: f.guestContact.phone ?? undefined };
-      }
-      return null;
-    }).filter(Boolean) as Friend[];
+    const outgoingNormalized: Friend[] = outgoing
+      .filter(f => (f.friendUserId && f.friendUser) || (f.guestContactId && f.guestContact))
+      .map(f => {
+        if (f.friendUserId && f.friendUser) {
+          const friendUser = f.friendUser as PrismaUser;
+          const name = friendUser.name ?? friendUser.id;
+          return { type: 'user', id: f.friendUserId, name, phone: friendUser.phone ?? undefined };
+        } else if (f.guestContactId && f.guestContact) {
+          const guestContact = f.guestContact as PrismaGuestContact;
+          const name = guestContact.name ?? guestContact.id;
+          return { type: 'guestContact', id: f.guestContactId, name, phone: guestContact.phone ?? undefined };
+        }
+        // Should never reach here due to filter
+        throw new Error('Invalid friendship normalization');
+      });
 
     // Normalize incoming (only users)
-    const incomingNormalized = incoming.map(f => {
-      if (f.user) {
-        // User: prefer displayName, fallback to name, then email, then id
-        const name = (f.user as any).displayName || (f.user as any).name || (f.user as any).email || f.user.id;
-        return { type: 'user', id: f.user.id, name, phone: (f.user as any).phone ?? undefined };
-      }
-      return null;
-    }).filter(Boolean) as Friend[];
+    const incomingNormalized: Friend[] = incoming
+      .filter(f => !!f.user)
+      .map(f => {
+        const user = f.user as PrismaUser;
+        const name = user.name ?? user.id;
+        return { type: 'user', id: user.id, name, phone: user.phone ?? undefined };
+      });
 
     // Merge and dedupe by (type, id)
     const seen = new Set<string>();
@@ -149,13 +194,13 @@ export class FriendshipsService {
    * Ensures only one of friendUserId/guestContactId is set
    */
 
-  private static toDTO(friendship: any): FriendshipDTO {
+  private static toDTO(friendship: PrismaFriendship): FriendshipDTO {
     return {
       id: friendship.id,
       userId: friendship.userId,
       friendUserId: friendship.friendUserId ?? null,
       guestContactId: friendship.guestContactId ?? null,
-      createdAt: friendship.createdAt.toISOString(),
+      createdAt: friendship.createdAt instanceof Date ? friendship.createdAt.toISOString() : String(friendship.createdAt),
     };
   }
 }

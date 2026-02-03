@@ -10,7 +10,6 @@ import { prisma } from '../../shared/prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types';
 
-
 /**
  * Player vs User:
  * - User: Represents a registered account. Can exist without a Player forever.
@@ -23,6 +22,49 @@ import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types
  */
 
 export class PlayersService {
+  /**
+   * List all players (for admin or UI)
+   */
+  static async listPlayers(): Promise<PlayerDTO[]> {
+    const players = await prisma.player.findMany();
+    return Promise.all(players.map(async player => {
+      const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
+      return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+    }));
+  }
+
+  /**
+   * List players by city
+   */
+  static async listPlayersByCity(city: string): Promise<PlayerDTO[]> {
+    const players = await prisma.player.findMany({ where: { defaultCity: city } });
+    return Promise.all(players.map(async player => {
+      const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
+      return PlayersService.toDTO(player, surfaces.map(s => s.surface));
+    }));
+  }
+
+  /**
+   * Count players by city
+   */
+  static async countPlayersByCity(city: string): Promise<number> {
+    return prisma.player.count({ where: { defaultCity: city } });
+  }
+
+  /**
+   * Soft-delete player: set deletedAt timestamp
+   * Player is not removed from DB, but marked as deleted
+   */
+  static async deletePlayer(playerId: string): Promise<void> {
+    const player = await prisma.player.findUnique({ where: { id: playerId } });
+    if (!player) throw new AppError('Player not found', 404);
+    if ((player as any).deletedAt) throw new AppError('Player already deleted', 410);
+    await prisma.player.update({
+      where: { id: playerId },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   /**
    * Helper: Replace all PlayerSurface entries for a player (no duplicates)
    * Uses the shared prisma instance directly. Not transactional with Player changes.
@@ -120,14 +162,6 @@ export class PlayersService {
     // Fetch current surfaces
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId } });
     return PlayersService.toDTO(updatedPlayer, surfaces.map(s => s.surface));
-  }
-
-  /**
-   * Soft-delete Player (future TODO)
-   */
-  static async deletePlayer(playerId: string): Promise<void> {
-    // TODO: Implement soft-delete logic (e.g., set deletedAt)
-    throw new AppError('Soft-delete not implemented yet', 501);
   }
 
   /**

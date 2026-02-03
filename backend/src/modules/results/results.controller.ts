@@ -25,9 +25,9 @@ export class ResultsController {
       const parsed = createResultSchema.parse(req.body);
       const result = await ResultsService.createResult(parsed.matchId, parsed.winnerPlayerId);
       res.status(201).json(result);
-    } catch (error: any) {
-      if (error.status === 409) {
-        res.status(409).json({ error: error.message });
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'status' in error && (error as { status?: number }).status === 409) {
+        res.status(409).json({ error: (error as { message?: string }).message });
       } else {
         next(error);
       }

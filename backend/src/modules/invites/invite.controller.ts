@@ -19,6 +19,66 @@ import {
 // - POST /invites/:token/decline: Decline invite via link (token)
 
 export class InviteController {
+    /**
+     * GET /invites/by-id/:id
+     * Get invite by ID
+     */
+    static async getInviteById(req: Request, res: Response, next: NextFunction) {
+      try {
+        const idParam = req.params.id;
+        const id = Array.isArray(idParam) ? idParam[0] : idParam;
+        const invite = await InviteService.getInviteById(id);
+        if (!invite) return res.status(404).json({ error: 'Invite not found' });
+        res.status(200).json(invite);
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * GET /invites/by-user/:userId
+     * List all invites sent or received by a user
+     */
+    static async listInvitesByUser(req: Request, res: Response, next: NextFunction) {
+      try {
+        const userIdParam = req.params.userId;
+        const userId = Array.isArray(userIdParam) ? userIdParam[0] : userIdParam;
+        const invites = await InviteService.listInvitesByUser(userId);
+        res.status(200).json(invites);
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * GET /invites/by-availability/:availabilityId
+     * List all invites for an availability
+     */
+    static async listInvitesByAvailability(req: Request, res: Response, next: NextFunction) {
+      try {
+        const availabilityIdParam = req.params.availabilityId;
+        const availabilityId = Array.isArray(availabilityIdParam) ? availabilityIdParam[0] : availabilityIdParam;
+        const invites = await InviteService.listInvitesByAvailability(availabilityId);
+        res.status(200).json(invites);
+      } catch (error) {
+        next(error);
+      }
+    }
+
+    /**
+     * GET /invites/count/:userId
+     * Count invites for a user
+     */
+    static async countInvitesByUser(req: Request, res: Response, next: NextFunction) {
+      try {
+        const userIdParam = req.params.userId;
+        const userId = Array.isArray(userIdParam) ? userIdParam[0] : userIdParam;
+        const count = await InviteService.countInvitesByUser(userId);
+        res.status(200).json({ userId, count });
+      } catch (error) {
+        next(error);
+      }
+    }
   /**
    * POST /invites
    * Create a new invite
@@ -57,9 +117,12 @@ export class InviteController {
       confirmInviteSchema.parse(req.body); // body must be empty
       const invite = await InviteService.confirmInvite(token);
       res.status(200).json(invite);
-    } catch (error: any) {
-      if (error.status === 409 || error.status === 410) {
-        res.status(error.status).json({ error: error.message });
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' && error !== null && 'status' in error &&
+        ((error as { status?: number }).status === 409 || (error as { status?: number }).status === 410)
+      ) {
+        res.status((error as { status: number }).status).json({ error: (error as { message?: string }).message });
       } else {
         next(error);
       }
@@ -76,9 +139,12 @@ export class InviteController {
       declineInviteSchema.parse(req.body); // body must be empty
       const invite = await InviteService.declineInvite(token);
       res.status(200).json(invite);
-    } catch (error: any) {
-      if (error.status === 409 || error.status === 410) {
-        res.status(error.status).json({ error: error.message });
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' && error !== null && 'status' in error &&
+        ((error as { status?: number }).status === 409 || (error as { status?: number }).status === 410)
+      ) {
+        res.status((error as { status: number }).status).json({ error: (error as { message?: string }).message });
       } else {
         next(error);
       }

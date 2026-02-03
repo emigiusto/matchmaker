@@ -20,13 +20,21 @@ export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'expired';
  * API-facing shape for an invite.
  */
 export interface InviteDTO {
+  /** Unique invite ID */
   id: string;
-  token: string; // Opaque, never parsed
+  /** Opaque token, never parsed */
+  token: string;
+  /** Invite status */
   status: InviteStatus;
-  expiresAt: string; // ISO datetime string
-  createdAt: string; // ISO datetime string
+  /** ISO datetime string */
+  expiresAt: string;
+  /** ISO datetime string */
+  createdAt: string;
+  /** Availability this invite is for */
   availabilityId: string;
+  /** User who sent the invite */
   inviterUserId: string;
+  /** Match created from this invite, if any */
   matchId?: string | null;
 }
 

@@ -32,6 +32,51 @@ export class AvailabilityController {
   }
 
   /**
+   * GET /availability/:id
+   * Get a single availability by ID
+   */
+  static async getAvailabilityById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { availabilityId } = availabilityIdParamSchema.parse({ availabilityId: req.params.id });
+      const availability = await AvailabilityService.getAvailabilityById(availabilityId);
+      if (!availability) return res.status(404).json({ error: 'Availability not found' });
+      res.json(availability);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /availability/by-date?date=YYYY-MM-DD&userId=
+   * List availabilities by date (optionally filtered by userId)
+   */
+  static async listAvailabilitiesByDate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { date, userId } = listAvailabilitiesQuerySchema.parse(req.query);
+      if (!date) return res.status(400).json({ error: 'date is required' });
+      const availabilities = await AvailabilityService.listAvailabilitiesByDate(date, userId);
+      res.json(availabilities);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /availability/count?userId=
+   * Count availabilities for a user
+   */
+  static async countAvailabilitiesByUser(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = listAvailabilitiesQuerySchema.parse(req.query);
+      if (!userId) return res.status(400).json({ error: 'userId is required' });
+      const count = await AvailabilityService.countAvailabilitiesByUser(userId);
+      res.json({ userId, count });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /availability?userId=
    * List all availabilities for a user
    */

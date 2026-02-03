@@ -16,4 +16,16 @@ router.get('/', NotificationsController.listNotificationsForUser);
 // POST /notifications/:id/read - Mark a notification as read
 router.post('/:id/read', NotificationsController.markAsRead);
 
+// GET /notifications/:id - Get notification by ID
+router.get('/:id', NotificationsController.getNotificationById);
+
+// GET /notifications/unread - List unread notifications for a user
+router.get('/unread', NotificationsController.listUnreadNotificationsForUser);
+
+// GET /notifications/count - Count notifications for a user
+router.get('/count', NotificationsController.countNotificationsForUser);
+
+// DELETE /notifications/:id - Delete a notification by ID
+router.delete('/:id', NotificationsController.deleteNotification);
+
 export default router;

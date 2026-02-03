@@ -20,6 +20,60 @@ import { createNotification } from '../notifications/notifications.service';
 import { logger } from '../../config/logger';
 
 export class InviteService {
+    /**
+     * Get invite by ID
+     */
+    static async getInviteById(inviteId: string): Promise<InviteDTO | null> {
+      const invite = await prisma.invite.findUnique({ where: { id: inviteId } });
+      if (!invite) return null;
+      return InviteService.toDTO(invite);
+    }
+
+    /**
+     * List all invites sent or received by a user
+     * - Sent: inviterUserId
+     * - Received: availability.userId
+     */
+    static async listInvitesByUser(userId: string): Promise<InviteDTO[]> {
+      // Defensive: fetch invites where user is inviter or owns the availability
+      const invites = await prisma.invite.findMany({
+        where: {
+          OR: [
+            { inviterUserId: userId },
+            { availability: { userId } },
+          ],
+        },
+        include: { availability: true, match: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return invites.map(InviteService.toDTO);
+    }
+
+    /**
+     * List all invites for an availability
+     */
+    static async listInvitesByAvailability(availabilityId: string): Promise<InviteDTO[]> {
+      const invites = await prisma.invite.findMany({
+        where: { availabilityId },
+        include: { match: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return invites.map(InviteService.toDTO);
+    }
+
+    /**
+     * Count invites for a user (sent or received)
+     */
+    static async countInvitesByUser(userId: string): Promise<number> {
+      return prisma.invite.count({
+        where: {
+          OR: [
+            { inviterUserId: userId },
+            { availability: { userId } },
+          ],
+        },
+      });
+    }
   /**
    * Create an invite for an availability, by a user
    * - Only a User can create an invite
