@@ -53,6 +53,8 @@ model Player {
   defaultCity     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
 
   user              User            @relation(fields: [userId], references: [id])
   preferredSurfaces PlayerSurface[]
