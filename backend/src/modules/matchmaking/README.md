@@ -27,13 +27,31 @@ http://localhost:3000/matchmaking/test?userId=2580e2e0-04ae-4bc1-bd5e-bd126fcbcd
 To find pairs of availabilities that overlap (for use in testing), you can use the following SQL query:
 
 ```sql
-SELECT a1.id AS avail1, a2.id AS avail2, a1.userId AS user1, a2.userId AS user2, a1.date, a1.startTime, a1.endTime, a2.startTime, a2.endTime
+SELECT
+  a1.id AS avail1,
+  a2.id AS avail2,
+  a1.userId AS user1,
+  a2.userId AS user2,
+  a1.date,
+  a1.startTime,
+  a1.endTime,
+  a2.startTime,
+  a2.endTime,
+  TIMESTAMPDIFF(MINUTE, 
+    GREATEST(a1.startTime, a2.startTime),
+    LEAST(a1.endTime, a2.endTime)
+  ) AS overlap_minutes
 FROM matchmaker.availability a1
 JOIN matchmaker.availability a2
   ON a1.date = a2.date
   AND a1.userId <> a2.userId
-  AND ABS(TIMESTAMPDIFF(MINUTE, a1.startTime, a2.endTime)) < 120
-  AND ABS(TIMESTAMPDIFF(MINUTE, a2.startTime, a1.endTime)) < 120
+  AND a1.startTime < a2.endTime
+  AND a1.endTime > a2.startTime
+WHERE
+  TIMESTAMPDIFF(MINUTE, 
+    GREATEST(a1.startTime, a2.startTime),
+    LEAST(a1.endTime, a2.endTime)
+  ) >= 60
 LIMIT 20;
 ```
 
