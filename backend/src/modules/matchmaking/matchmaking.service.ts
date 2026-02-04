@@ -1,5 +1,4 @@
 // matchmaking.service.ts
-
 // Core matchmaking suggestion engine (read-only, pure)
 //
 // INVARIANTS & CONSTRAINTS:
@@ -12,11 +11,14 @@
 // This service takes a user and an availability, finds compatible candidates, and returns ranked, explainable suggestions.
 // It never mutates state, creates invites, or sends notifications. Guest users are supported (no Player required).
 import { MatchmakingResult, MatchmakingCandidate } from './matchmaking.types';
-import * as Rules from './matchmaking.rules';
 import * as MatchmakingConstants from './matchmaking.constants';
 import { cacheGet, cacheSet } from '../../shared/cache/redis';
 import { deleteKeysByPattern } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
+import { scoreAvailabilityOverlap } from './scoreComponents/scoreAvailability';
+import { scoreSocialProximity } from './scoreComponents/scoreSocialProximity';
+import { scoreLevelCompatibility } from './scoreComponents/scoreLevelCloseness';
+import { scoreLocationProximity } from './scoreComponents/scoreGeolocation';
 
 /**
  * findMatchCandidates
@@ -151,7 +153,7 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     if (overlapMinutes < MatchmakingConstants.MIN_OVERLAP_MINUTES) continue;
 
     // Availability overlap (mandatory, always explained)
-    const overlapScore = Rules.scoreAvailabilityOverlap(
+    const overlapScore = scoreAvailabilityOverlap(
       { start: candidateAvail.startTime, end: candidateAvail.endTime },
       { start: availability.startTime, end: availability.endTime }
     );
@@ -162,21 +164,29 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     if (overlapScore.reason) reasons.push(overlapScore.reason);
 
     // Social proximity (always explained)
-    const socialScore = Rules.scoreSocialProximity({ isFriend, isPreviousOpponent });
+    const socialScore = scoreSocialProximity({ isFriend, isPreviousOpponent });
     if (socialScore.reason) reasons.push(socialScore.reason);
 
     // Level compatibility (always explained)
-    const levelScore = Rules.scoreLevelCompatibility({ requesterLevel, candidateLevel, confidence });
+    const levelScore = scoreLevelCompatibility({ requesterLevel, candidateLevel, confidence });
     if (levelScore.reason) reasons.push(levelScore.reason);
 
     // Location proximity (always explained, includes city and lat/lng logic)
-    const locationScore = Rules.scoreLocationProximity({
+    const locationScore = scoreLocationProximity({
       requesterLocation,
       candidateLocation,
       requesterCity: requesterPlayer?.defaultCity,
       candidateCity: candidatePlayer?.defaultCity
     });
     if (locationScore.reason) reasons.push(locationScore.reason);
+
+    // Recent activity (future expansion)
+    const recentActivityScore = require('./scoreComponents/scoreRecentActivity').scoreRecentActivity({ candidateUserId: candidateUser.id });
+    if (recentActivityScore.reason) reasons.push(recentActivityScore.reason);
+
+    // Reliability (future expansion)
+    const reliabilityScore = require('./scoreComponents/scoreReliability').scoreReliability({ candidateUserId: candidateUser.id });
+    if (reliabilityScore.reason) reasons.push(reliabilityScore.reason);
 
     if (surfaceBonus > 0 && surfaceReason) reasons.push(surfaceReason);
 
@@ -186,9 +196,11 @@ export async function findMatchCandidates(userId: string, availabilityId: string
       social: socialScore.score,
       level: levelScore.score,
       location: locationScore.score,
+      recentActivity: recentActivityScore.score,
+      reliability: reliabilityScore.score,
       surface: surfaceBonus
     };
-    totalScore = scoreBreakdown.availability + scoreBreakdown.social + scoreBreakdown.level + scoreBreakdown.location + scoreBreakdown.surface;
+    totalScore = scoreBreakdown.availability + scoreBreakdown.social + scoreBreakdown.level + scoreBreakdown.location + scoreBreakdown.recentActivity + scoreBreakdown.reliability + scoreBreakdown.surface;
 
     if (totalScore < MatchmakingConstants.MIN_SCORE) continue;
 
