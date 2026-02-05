@@ -9,6 +9,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import * as MatchmakingService from './matchmaking.service';
+import * as constants from './matchmaking.constants';
 
 export class MatchmakingController {
   /**
@@ -50,7 +51,6 @@ export class MatchmakingController {
       html += `<div style='margin-bottom:1em;padding:0.5em 1em;background:#f8f8f8;border:1px solid #ddd;'>`;
       html += `<b>How is the score calculated?</b><br/>`;
       html += `<ul style='margin:0.5em 0 0.5em 1.5em;'>`;
-      const constants = require('./matchmaking.constants');
       html += `<li><b>Availability Overlap</b>: Minutes of overlap × <b>WEIGHT_AVAILABILITY_OVERLAP</b> (${constants.WEIGHT_AVAILABILITY_OVERLAP})</li>`;
       html += `<li><b>Social Proximity</b>: Friends (+50), Previous Opponent (+20), None (0) × <b>WEIGHT_SOCIAL_PROXIMITY</b> (${constants.WEIGHT_SOCIAL_PROXIMITY})</li>`;
       html += `<li><b>Level Compatibility</b>: Close (+20), Playable (+5), Far (-5), Unknown (+10) × <b>WEIGHT_LEVEL_COMPATIBILITY</b> (${constants.WEIGHT_LEVEL_COMPATIBILITY})</li>`;
@@ -60,7 +60,7 @@ export class MatchmakingController {
       html += `</div>`;
       html += `<p><b>Availability:</b> ${result.availabilityId}</p>`;
       html += `<table border="1" cellpadding="6" style="border-collapse:collapse;">`;
-      html += `<tr><th>Candidate User ID</th><th>Candidate Player ID</th><th>Total Score</th><th>Avail.</th><th>Social</th><th>Level</th><th>Location</th><th>Surface</th><th>Overlap Range</th><th>Requester Avail ID</th><th>Candidate Avail ID</th><th>Reasons</th></tr>`;
+      html += `<tr><th>Candidate User ID</th><th>Candidate Player ID</th><th>Total Score</th><th>Avail.</th><th>Social</th><th>Level</th><th>Location</th><th>Surface</th><th>Overlap Range</th><th>Candidate Avail ID</th><th>Reasons</th></tr>`;
       for (const c of result.candidates) {
         // Round scores to 3 decimals
         const fmt = (v: unknown) => (typeof v === 'number' ? v.toFixed(3) : v ?? '');
@@ -79,7 +79,6 @@ export class MatchmakingController {
         html += `<td>${fmt(c.scoreBreakdown?.location)}</td>`;
         html += `<td>${fmt(c.scoreBreakdown?.surface)}</td>`;
         html += `<td>${overlapRange}</td>`;
-        html += `<td>${c.requesterAvailabilityId ?? ''}</td>`;
         html += `<td>${c.candidateAvailabilityId ?? ''}</td>`;
         html += `<td><ul>` + c.reasons.map(r => `<li>${r}</li>`).join('') + `</ul></td>`;
         html += `</tr>`;

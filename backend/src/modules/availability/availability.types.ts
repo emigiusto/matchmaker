@@ -21,6 +21,7 @@ export interface AvailabilityDTO {
   locationText: string;
   minLevel?: number | null;
   maxLevel?: number | null;
+  preferredSurface?: string | null;
   createdAt: string; // ISO datetime string
 }
 
@@ -35,4 +36,5 @@ export interface CreateAvailabilityInput {
   locationText: string;
   minLevel?: number | null;
   maxLevel?: number | null;
+  preferredSurface?: string | null;
 }

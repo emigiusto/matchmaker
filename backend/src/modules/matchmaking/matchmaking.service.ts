@@ -19,6 +19,7 @@ import { scoreAvailabilityOverlap } from './scoreComponents/scoreAvailability';
 import { scoreSocialProximity } from './scoreComponents/scoreSocialProximity';
 import { scoreLevelCompatibility } from './scoreComponents/scoreLevelCloseness';
 import { scoreLocationProximity } from './scoreComponents/scoreGeolocation';
+import { scoreSurfacePreference } from './scoreComponents/scoreSurfacePreference';
 
 /**
  * findMatchCandidates
@@ -136,10 +137,13 @@ export async function findMatchCandidates(userId: string, availabilityId: string
         ? { latitude: candidatePlayer.latitude, longitude: candidatePlayer.longitude }
         : null;
 
-    // --- Lightweight surface heuristics ---
-    let surfaceBonus = 0;
-    let surfaceReason = '';
-    // TODO: Add surface preference support if/when schema supports it
+    // --- Surface preference ---
+    // Use preferredSurface from Availability
+    const requesterSurface = availability.preferredSurface ?? null;
+    const candidateSurface = candidateAvail.preferredSurface ?? null;
+    const surfaceScoreObj = scoreSurfacePreference({ requesterSurface, candidateSurface });
+    const surfaceBonus = surfaceScoreObj.score;
+    const surfaceReason = surfaceScoreObj.reason;
 
     // 5. Compute scores using rules, collecting human-readable reasons for each factor
     const reasons: string[] = [];

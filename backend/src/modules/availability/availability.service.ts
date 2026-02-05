@@ -37,6 +37,7 @@ export class AvailabilityService {
         locationText: data.locationText,
         minLevel: data.minLevel ?? null,
         maxLevel: data.maxLevel ?? null,
+        preferredSurface: data.preferredSurface ?? null,
       },
     });
     return AvailabilityService.toDTO(availability);
@@ -111,6 +112,7 @@ export class AvailabilityService {
       locationText: availability.locationText,
       minLevel: availability.minLevel ?? null,
       maxLevel: availability.maxLevel ?? null,
+      preferredSurface: availability.preferredSurface ?? null,
       createdAt: availability.createdAt instanceof Date ? availability.createdAt.toISOString() : availability.createdAt,
     };
   }

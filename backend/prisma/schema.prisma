@@ -130,15 +130,16 @@ model Friendship {
 ////////////////////////////////////////////////////////////
 
 model Availability {
-  id           String   @id @default(uuid())
-  userId       String
-  date         DateTime
-  startTime    DateTime
-  endTime      DateTime
-  locationText String
-  minLevel     Float?
-  maxLevel     Float?
-  createdAt    DateTime @default(now())
+  id              String   @id @default(uuid())
+  userId          String
+  date            DateTime
+  startTime       DateTime
+  endTime         DateTime
+  locationText    String
+  minLevel        Float?
+  maxLevel        Float?
+  preferredSurface String? // NEW: preferred surface for this slot
+  createdAt       DateTime @default(now())
 
   user    User     @relation(fields: [userId], references: [id])
   invites Invite[]
