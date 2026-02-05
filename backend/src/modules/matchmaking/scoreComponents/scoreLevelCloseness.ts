@@ -4,20 +4,13 @@
  * Future: Use dynamic rating systems, recent performance, or confidence intervals.
  */
 import * as MatchmakingConstants from '../matchmaking.constants';
+import { ScoreResult } from '../matchmaking.service';
 
 /**
  * Returns a score and reason for level compatibility.
  * Future: Use ELO, Glicko, or other rating systems.
  */
-export function scoreLevelCompatibility({
-  requesterLevel,
-  candidateLevel,
-  confidence
-}: {
-  requesterLevel?: number | null;
-  candidateLevel?: number | null;
-  confidence: number;
-}) {
+export function scoreLevelCompatibility({requesterLevel, candidateLevel, confidence}: LevelCompatibilityInput): ScoreResult {
   if (requesterLevel == null || candidateLevel == null || confidence < 0.3) {
     return {
       score: 10 * MatchmakingConstants.WEIGHT_LEVEL_COMPATIBILITY,
@@ -41,4 +34,10 @@ export function scoreLevelCompatibility({
     score: -5 * MatchmakingConstants.WEIGHT_LEVEL_COMPATIBILITY,
     reason: `Level difference is significant (Δ${diff.toFixed(1)})`
   };
+}
+
+export interface LevelCompatibilityInput {
+  requesterLevel?: number | null;
+  candidateLevel?: number | null;
+  confidence: number;
 }

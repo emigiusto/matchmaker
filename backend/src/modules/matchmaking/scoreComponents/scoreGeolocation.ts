@@ -4,22 +4,13 @@
  * Future: Add venue preferences, travel time, or dynamic location.
  */
 import * as MatchmakingConstants from '../matchmaking.constants';
+import { ScoreResult } from '../matchmaking.service';
 
 /**
  * Returns a score and reason for location proximity.
  * Future: Add travel time, venue preferences, etc.
  */
-export function scoreLocationProximity({
-  requesterLocation,
-  candidateLocation,
-  requesterCity,
-  candidateCity
-}: {
-  requesterLocation?: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null;
-  candidateLocation?: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null;
-  requesterCity?: string | null;
-  candidateCity?: string | null;
-}) {
+export function scoreLocationProximity({requesterLocation, candidateLocation, requesterCity, candidateCity}: LocationProximityInput): ScoreResult {
   const getLat = (loc: any) => loc?.lat ?? loc?.latitude;
   const getLng = (loc: any) => loc?.lng ?? loc?.longitude;
   const reqLat = getLat(requesterLocation);
@@ -57,4 +48,11 @@ export function scoreLocationProximity({
     return { score: 3 * MatchmakingConstants.WEIGHT_LOCATION_PROXIMITY, reason: 'Same city' };
   }
   return { score: 0, reason: 'Location unknown for one or both users' };
+}
+
+export interface LocationProximityInput {
+  requesterLocation?: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null;
+  candidateLocation?: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null;
+  requesterCity?: string | null;
+  candidateCity?: string | null;
 }

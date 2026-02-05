@@ -20,6 +20,8 @@ import { scoreSocialProximity } from './scoreComponents/scoreSocialProximity';
 import { scoreLevelCompatibility } from './scoreComponents/scoreLevelCloseness';
 import { scoreLocationProximity } from './scoreComponents/scoreGeolocation';
 import { scoreSurfacePreference } from './scoreComponents/scoreSurfacePreference';
+import { scoreRecentActivity } from './scoreComponents/scoreRecentActivity';
+import { scoreReliability } from './scoreComponents/scoreReliability';
 
 /**
  * findMatchCandidates
@@ -141,7 +143,7 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     // Use preferredSurface from Availability
     const requesterSurface = availability.preferredSurface ?? null;
     const candidateSurface = candidateAvail.preferredSurface ?? null;
-    const surfaceScoreObj = scoreSurfacePreference({ requesterSurface, candidateSurface });
+    const surfaceScoreObj: ScoreResult = scoreSurfacePreference({ requesterSurface, candidateSurface });
     const surfaceBonus = surfaceScoreObj.score;
     const surfaceReason = surfaceScoreObj.reason;
 
@@ -157,7 +159,7 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     if (overlapMinutes < MatchmakingConstants.MIN_OVERLAP_MINUTES) continue;
 
     // Availability overlap (mandatory, always explained)
-    const overlapScore = scoreAvailabilityOverlap(
+    const overlapScore: ScoreResult = scoreAvailabilityOverlap(
       { start: candidateAvail.startTime, end: candidateAvail.endTime },
       { start: availability.startTime, end: availability.endTime }
     );
@@ -168,15 +170,15 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     if (overlapScore.reason) reasons.push(overlapScore.reason);
 
     // Social proximity (always explained)
-    const socialScore = scoreSocialProximity({ isFriend, isPreviousOpponent });
+    const socialScore: ScoreResult = scoreSocialProximity({ isFriend, isPreviousOpponent });
     if (socialScore.reason) reasons.push(socialScore.reason);
 
     // Level compatibility (always explained)
-    const levelScore = scoreLevelCompatibility({ requesterLevel, candidateLevel, confidence });
+    const levelScore: ScoreResult = scoreLevelCompatibility({ requesterLevel, candidateLevel, confidence });
     if (levelScore.reason) reasons.push(levelScore.reason);
 
     // Location proximity (always explained, includes city and lat/lng logic)
-    const locationScore = scoreLocationProximity({
+    const locationScore: ScoreResult = scoreLocationProximity({
       requesterLocation,
       candidateLocation,
       requesterCity: requesterPlayer?.defaultCity,
@@ -185,11 +187,11 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     if (locationScore.reason) reasons.push(locationScore.reason);
 
     // Recent activity (future expansion)
-    const recentActivityScore = require('./scoreComponents/scoreRecentActivity').scoreRecentActivity({ candidateUserId: candidateUser.id });
+    const recentActivityScore: ScoreResult = scoreRecentActivity({ candidateUserId: candidateUser.id });
     if (recentActivityScore.reason) reasons.push(recentActivityScore.reason);
 
     // Reliability (future expansion)
-    const reliabilityScore = require('./scoreComponents/scoreReliability').scoreReliability({ candidateUserId: candidateUser.id });
+    const reliabilityScore: ScoreResult = scoreReliability({ candidateUserId: candidateUser.id });
     if (reliabilityScore.reason) reasons.push(reliabilityScore.reason);
 
     if (surfaceBonus > 0 && surfaceReason) reasons.push(surfaceReason);
@@ -263,4 +265,11 @@ async function tryCacheSet(cacheKey: string, value: any, ttlSeconds: number) {
 export async function clearMatchmakingCache(userId?: string): Promise<void> {
   const pattern = userId ? `matchmaking:${userId}:*` : 'matchmaking:*';
   await deleteKeysByPattern(pattern);
+}
+
+
+// Common interface for all score results
+export interface ScoreResult {
+  score: number;
+  reason: string;
 }

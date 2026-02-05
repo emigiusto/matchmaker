@@ -4,13 +4,14 @@
  * Future: Consider venue, surface, or recurring patterns.
  */
 import * as MatchmakingConstants from '../matchmaking.constants';
+import { ScoreResult } from '../matchmaking.service';
 
 /**
  * Returns a score and reason for the overlap between two availabilities.
  * If no overlap, returns negative score and reason.
  * Future: Add venue/surface logic, recurring slots, etc.
  */
-export function scoreAvailabilityOverlap(candidateSlot: { start: Date; end: Date }, requestSlot: { start: Date; end: Date }) {
+export function scoreAvailabilityOverlap(candidateSlot: AvailabilitySlot, requestSlot: AvailabilitySlot): ScoreResult {
   // If no overlap, return negative score
   if (candidateSlot.end <= requestSlot.start || candidateSlot.start >= requestSlot.end) {
     return { score: -100, reason: 'No overlapping availability' };
@@ -23,4 +24,9 @@ export function scoreAvailabilityOverlap(candidateSlot: { start: Date; end: Date
     score: Math.round(overlapMinutes * MatchmakingConstants.WEIGHT_AVAILABILITY_OVERLAP),
     reason: `Overlapping availability: ${overlapMinutes} minutes`
   };
+}
+
+export interface AvailabilitySlot {
+  start: Date;
+  end: Date;
 }

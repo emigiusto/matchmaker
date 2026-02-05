@@ -39,8 +39,8 @@ export interface MatchmakingCandidate {
     start: string;
     end: string;
   };
-  requesterAvailabilityId?: string;
-  candidateAvailabilityId?: string;
+  requesterAvailabilityId: string;
+  candidateAvailabilityId: string;
 }
 
 /**
