@@ -16,6 +16,8 @@ import { AppError } from '../../shared/errors/AppError';
 import { AvailabilityDTO, CreateAvailabilityInput } from './availability.types';
 import { Availability as PrismaAvailability } from '@prisma/client';
 import { AcceptAvailabilityResult } from '../../shared/types';
+import { createNotification } from '../notifications/notifications.service';
+import { logger } from '../../config/logger';
 
 const prisma = new PrismaClient();
 
@@ -26,51 +28,71 @@ export class AvailabilityService {
    * - No overlap detection yet
    */
   static async createAvailability(userId: string, data: CreateAvailabilityInput): Promise<AvailabilityDTO> {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new AppError('User not found', 404);
-    // Future: Overlap detection will be added here
-    const availability = await prisma.availability.create({
-      data: {
-        userId,
-        date: data.date,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        locationText: data.locationText,
-        minLevel: data.minLevel ?? null,
-        maxLevel: data.maxLevel ?? null,
-        preferredSurface: data.preferredSurface ?? null,
-        status: data.status ?? 'open',
-      },
-    });
-    return AvailabilityService.toDTO(availability);
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new AppError('User not found', 404);
+      // Future: Overlap detection will be added here
+      const availability = await prisma.availability.create({
+        data: {
+          userId,
+          date: data.date,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          locationText: data.locationText,
+          minLevel: data.minLevel ?? null,
+          maxLevel: data.maxLevel ?? null,
+          preferredSurface: data.preferredSurface ?? null,
+          status: data.status ?? 'open',
+        },
+      });
+      return AvailabilityService.toDTO(availability);
+    } catch (err) {
+      logger.error('Error in createAvailability', { userId, error: err instanceof Error ? err.message : err });
+      throw err;
+    }
   }
 
   /**
    * Get a single availability by ID
    */
   static async getAvailabilityById(availabilityId: string): Promise<AvailabilityDTO | null> {
-    const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
-    if (!availability) return null;
-    return AvailabilityService.toDTO(availability);
+    try {
+      const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
+      if (!availability) return null;
+      return AvailabilityService.toDTO(availability);
+    } catch (err) {
+      logger.error('Error in getAvailabilityById', { availabilityId, error: err instanceof Error ? err.message : err });
+      throw err;
+    }
   }
 
   /**
    * List availabilities by date (optionally filtered by userId)
    */
   static async listAvailabilitiesByDate(date: string, userId?: string): Promise<AvailabilityDTO[]> {
-    const where: { date: string; userId?: string } = { date };
-    if (userId) where.userId = userId;
-    const availabilities = await prisma.availability.findMany({ where });
-    return availabilities.map(AvailabilityService.toDTO);
+    try {
+      const where: { date: string; userId?: string } = { date };
+      if (userId) where.userId = userId;
+      const availabilities = await prisma.availability.findMany({ where });
+      return availabilities.map(AvailabilityService.toDTO);
+    } catch (err) {
+      logger.error('Error in listAvailabilitiesByDate', { date, userId, error: err instanceof Error ? err.message : err });
+      throw err;
+    }
   }
 
   /**
    * Count availabilities for a user
    */
   static async countAvailabilitiesByUser(userId: string): Promise<number> {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new AppError('User not found', 404);
-    return prisma.availability.count({ where: { userId } });
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new AppError('User not found', 404);
+      return prisma.availability.count({ where: { userId } });
+    } catch (err) {
+      logger.error('Error in countAvailabilitiesByUser', { userId, error: err instanceof Error ? err.message : err });
+      throw err;
+    }
   }
 
   /**
@@ -78,11 +100,16 @@ export class AvailabilityService {
    * - User-scoped: only returns availabilities for the given userId
    */
   static async listAvailabilitiesByUser(userId: string): Promise<AvailabilityDTO[]> {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new AppError('User not found', 404);
-    const availabilities = await prisma.availability.findMany({ where: { userId } });
-    // Always returns array (empty if none)
-    return availabilities.map(AvailabilityService.toDTO);
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new AppError('User not found', 404);
+      const availabilities = await prisma.availability.findMany({ where: { userId } });
+      // Always returns array (empty if none)
+      return availabilities.map(AvailabilityService.toDTO);
+    } catch (err) {
+      logger.error('Error in listAvailabilitiesByUser', { userId, error: err instanceof Error ? err.message : err });
+      throw err;
+    }
   }
 
   /**
@@ -92,13 +119,18 @@ export class AvailabilityService {
    *   (For now, this method only deletes if found; add userId check in future if needed)
    */
   static async deleteAvailability(availabilityId: string, userId?: string): Promise<void> {
-    const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
-    if (!availability) return; // Idempotent: no error if not found
-    if (userId && availability.userId !== userId) {
-      // Defensive: do not allow deleting another user's availability
-      throw new AppError('Cannot delete availability of another user', 403);
+    try {
+      const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
+      if (!availability) return; // Idempotent: no error if not found
+      if (userId && availability.userId !== userId) {
+        // Defensive: do not allow deleting another user's availability
+        throw new AppError('Cannot delete availability of another user', 403);
+      }
+      await prisma.availability.delete({ where: { id: availabilityId } });
+    } catch (err) {
+      logger.error('Error in deleteAvailability', { availabilityId, userId, error: err instanceof Error ? err.message : err });
+      throw err;
     }
-    await prisma.availability.delete({ where: { id: availabilityId } });
   }
 
   /**
@@ -107,14 +139,19 @@ export class AvailabilityService {
  * - Throws if not found
  */
   static async markAvailabilityAsMatched(availabilityId: string): Promise<AvailabilityDTO> {
-    const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
-    if (!availability) throw new AppError('Availability not found', 404);
-    if (availability.status === 'matched') return AvailabilityService.toDTO(availability);
-    const updated = await prisma.availability.update({
-      where: { id: availabilityId },
-      data: { status: 'matched' },
-    });
-    return AvailabilityService.toDTO(updated);
+    try {
+      const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
+      if (!availability) throw new AppError('Availability not found', 404);
+      if (availability.status === 'matched') return AvailabilityService.toDTO(availability);
+      const updated = await prisma.availability.update({
+        where: { id: availabilityId },
+        data: { status: 'matched' },
+      });
+      return AvailabilityService.toDTO(updated);
+    } catch (err) {
+      logger.error('Error in markAvailabilityAsMatched', { availabilityId, error: err instanceof Error ? err.message : err });
+      throw err;
+    }
   }
 
   /**
@@ -136,39 +173,75 @@ export class AvailabilityService {
     playerBId: string;
     scheduledAt: Date;
   }): Promise<AcceptAvailabilityResult> {
-    // Defensive: ensure all entities exist
-    const [availability, playerA, playerB] = await Promise.all([
-      prisma.availability.findUnique({ where: { id: availabilityId } }),
-      prisma.player.findUnique({ where: { id: playerAId } }),
-      prisma.player.findUnique({ where: { id: playerBId } })
-    ]);
-    if (!availability) throw new AppError('Availability not found', 404);
-    if (!playerA) throw new AppError('Player A not found', 404);
-    if (!playerB) throw new AppError('Player B not found', 404);
+    try {
+      // Defensive: ensure all entities exist
+      const [availability, playerA, playerB] = await Promise.all([
+        prisma.availability.findUnique({ where: { id: availabilityId } }),
+        prisma.player.findUnique({ where: { id: playerAId } }),
+        prisma.player.findUnique({ where: { id: playerBId } })
+      ]);
+      if (!availability) throw new AppError('Availability not found', 404);
+      if (!playerA) throw new AppError('Player A not found', 404);
+      if (!playerB) throw new AppError('Player B not found', 404);
 
-    // Transaction: mark as matched and create match
-    const result = await prisma.$transaction(async (tx) => {
-      // Mark availability as matched
-      const updatedAvailability = await tx.availability.update({
-        where: { id: availabilityId },
-        data: { status: 'matched' }
+      // Transaction: mark as matched and create match
+      const result = await prisma.$transaction(async (tx) => {
+        // Mark availability as matched
+        const updatedAvailability = await tx.availability.update({
+          where: { id: availabilityId },
+          data: { status: 'matched' }
+        });
+        // Create match (do not include inviteId at all if not present)
+        const match = await tx.match.create({
+          data: {
+            inviteId: undefined,
+            availabilityId: availability.id,
+            playerAId,
+            playerBId,
+            scheduledAt
+          }
+        });
+        return { updatedAvailability, matchId: match.id };
       });
-      // Create match (do not include inviteId at all if not present)
-      const match = await tx.match.create({
-        data: {
-          inviteId: undefined,
+
+      const dto = AvailabilityService.toDTO(result.updatedAvailability);
+      await AvailabilityService.notifyAvailabilityAccepted(dto, result.matchId);
+      return {
+        availability: dto,
+        matchId: result.matchId
+      };
+    } catch (err) {
+      logger.error('Error in acceptAvailability', {
+        availabilityId,
+        playerAId,
+        playerBId,
+        scheduledAt,
+        error: err instanceof Error ? err.message : err
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Notify the user that their availability was accepted and a match was created
+  */
+  private static async notifyAvailabilityAccepted(availability: AvailabilityDTO, matchId: string): Promise<void> {
+    try {
+      await createNotification(
+        availability.userId,
+        'availability.accepted',
+        {
           availabilityId: availability.id,
-          playerAId,
-          playerBId,
-          scheduledAt
+          matchId,
+          scheduledAt: availability.startTime
         }
+      );
+    } catch (err) {
+      logger.error('Failed to create availability.accepted notification', {
+        availabilityId: availability.id,
+        error: err instanceof Error ? err.message : err
       });
-      return { updatedAvailability, matchId: match.id };
-    });
-    return {
-      availability: AvailabilityService.toDTO(result.updatedAvailability),
-      matchId: result.matchId
-    };
+    }
   }
 
   /**
