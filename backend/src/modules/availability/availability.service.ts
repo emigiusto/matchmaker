@@ -11,15 +11,13 @@
 //
 // Future: Overlap detection, Player-based availability, and integration with invites/matchmaking.
 
-import { PrismaClient } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 import { AvailabilityDTO, CreateAvailabilityInput } from './availability.types';
 import { Availability as PrismaAvailability } from '@prisma/client';
 import { AcceptAvailabilityResult } from '../../shared/types';
 import { createNotification } from '../notifications/notifications.service';
 import { logger } from '../../config/logger';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../prisma';
 
 export class AvailabilityService {
   /**
