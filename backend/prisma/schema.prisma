@@ -138,7 +138,8 @@ model Availability {
   locationText    String
   minLevel        Float?
   maxLevel        Float?
-  preferredSurface String? // NEW: preferred surface for this slot
+  preferredSurface String?
+  status          AvailabilityStatus @default(open)
   createdAt       DateTime @default(now())
 
   user    User     @relation(fields: [userId], references: [id])
@@ -147,6 +148,14 @@ model Availability {
 
   @@index([userId])
   @@index([date])
+  @@index([status])
+}
+
+enum AvailabilityStatus {
+  open        // Open to find matches
+  invited     // Has an invite sent
+  matched     // Match already confirmed
+  closed      // Canceled or closed by user
 }
 
 ////////////////////////////////////////////////////////////

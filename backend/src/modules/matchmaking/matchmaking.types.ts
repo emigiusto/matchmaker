@@ -41,6 +41,11 @@ export interface MatchmakingCandidate {
   };
   requesterAvailabilityId: string;
   candidateAvailabilityId: string;
+  candidateLevel: number;
+  candidateLocation: {
+    latitude: number;
+    longitude: number;
+  } | null;
 }
 
 /**

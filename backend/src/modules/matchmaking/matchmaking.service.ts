@@ -22,6 +22,76 @@ import { scoreLocationProximity } from './scoreComponents/scoreGeolocation';
 import { scoreSurfacePreference } from './scoreComponents/scoreSurfacePreference';
 import { scoreRecentActivity } from './scoreComponents/scoreRecentActivity';
 import { scoreReliability } from './scoreComponents/scoreReliability';
+import { findUsersByIdsCached } from '../users/users.service';
+import { PlayersService } from '../players/players.service';
+
+/**
+ * Finds all candidate availabilities for all of a user's open, future availabilities.
+ * Returns top N candidates, sorted by score descending, with caching and filtering.
+ * @param userId - the user requesting candidates
+ * @param options - { topN?: number, minScore?: number, forceRefresh?: boolean }
+ */
+export async function findAllMatchCandidatesForUser(
+  userId: string,
+  options?: {
+    topN?: number;
+    minScore?: number;
+    forceRefresh?: boolean;
+    maxDistanceKm?: number;
+    minLevel?: number;
+    maxLevel?: number;
+  }
+): Promise<MatchmakingCandidate[]> {
+  const topN = options?.topN ?? 10;
+  const forceRefresh = options?.forceRefresh ?? false;
+  const cacheKey = `matchmaking:allCandidates:${userId}:top${topN}:minScore${options?.minScore ?? ''}:maxDist${options?.maxDistanceKm ?? ''}:minLevel${options?.minLevel ?? ''}:maxLevel${options?.maxLevel ?? ''}`;
+  if (!forceRefresh) {
+    const cached = await tryCacheGet(cacheKey);
+    if (cached) return cached;
+  }
+  
+  const now = new Date();
+  // 1. Get all own availabilities that are open and in the future
+  const availabilities = await prisma.availability.findMany({
+    where: {
+      userId,
+      status: 'open',
+      endTime: { gt: now }
+    }
+  });
+  const allCandidates: MatchmakingCandidate[] = [];
+  for (const avail of availabilities) {
+    if (avail.userId !== userId) continue;
+    const result = await findMatchCandidates(userId, avail.id, {
+      minScore: options?.minScore,
+      maxDistanceKm: options?.maxDistanceKm,
+      minLevel: options?.minLevel,
+      maxLevel: options?.maxLevel
+    });
+    for (const candidate of result.candidates) {
+      allCandidates.push({ ...candidate, requesterAvailabilityId: avail.id });
+    }
+  }
+  // Sort all candidates by score descending
+  allCandidates.sort((a, b) => b.score - a.score);
+  // Return only top N
+  const topCandidates = allCandidates.slice(0, topN);
+  await tryCacheSet(cacheKey, topCandidates, 60 * 60 * 12); // cache for 12 hours
+  return topCandidates;
+}
+
+// Helper: Haversine formula for distance in km
+function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 /**
  * findMatchCandidates
@@ -30,11 +100,28 @@ import { scoreReliability } from './scoreComponents/scoreReliability';
  * @param availabilityId - the availability slot to match for
  * @returns MatchmakingResult (ranked, explainable suggestions)
  */
-export async function findMatchCandidates(userId: string, availabilityId: string): Promise<MatchmakingResult> {
+export async function findMatchCandidates(
+  userId: string,
+  availabilityId: string,
+  filters?: {
+    minScore?: number;
+    maxDistanceKm?: number;
+    minLevel?: number;
+    maxLevel?: number;
+    forceRefresh?: boolean;
+  }
+): Promise<MatchmakingResult> {
   // 0. Try cache first
-  const cacheKey = `matchmaking:${userId}:${availabilityId}`;
-  const cachedResult = await tryCacheGet(cacheKey);
-  if (cachedResult) return cachedResult;
+  const cacheKey = `matchmaking:${userId}:${availabilityId}` +
+    `:minScore${filters?.minScore ?? ''}` +
+    `:maxDist${filters?.maxDistanceKm ?? ''}` +
+    `:minLevel${filters?.minLevel ?? ''}` +
+    `:maxLevel${filters?.maxLevel ?? ''}`;
+    
+  if (!filters?.forceRefresh) {
+    const cachedResult = await tryCacheGet(cacheKey);
+    if (cachedResult) return cachedResult;
+  }
 
   // 1. Load user and availability
   const [user, availability] = await Promise.all([
@@ -55,17 +142,17 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     }
   });
 
-  // Preload all candidate users
+  // Preload all candidate users and players using cached methods
   const candidateUserIds = overlappingAvailabilities.map(a => a.userId);
-  const candidateUsersArr = await prisma.user.findMany({ where: { id: { in: candidateUserIds } } });
+
+  const candidateUsersArr = await findUsersByIdsCached(candidateUserIds);
   const candidateUsers = new Map(candidateUsersArr.map(u => [u.id, u]));
 
-  // Preload all candidate players
-  const candidatePlayersArr = await prisma.player.findMany({ where: { userId: { in: candidateUserIds } } });
+  const candidatePlayersArr = await PlayersService.findPlayersByUserIdsCached(candidateUserIds);
   const candidatePlayers = new Map(candidatePlayersArr.map(p => [p.userId, p]));
 
   // Preload requester player
-  const requesterPlayer = await prisma.player.findUnique({ where: { userId } });
+  const requesterPlayer = await PlayersService.findPlayerByUserIdCached(userId);
 
   // Preload all friendships (bidirectional)
   const friendships = await prisma.friendship.findMany({
@@ -208,8 +295,17 @@ export async function findMatchCandidates(userId: string, availabilityId: string
     };
     totalScore = scoreBreakdown.availability + scoreBreakdown.social + scoreBreakdown.level + scoreBreakdown.location + scoreBreakdown.recentActivity + scoreBreakdown.reliability + scoreBreakdown.surface;
 
+    // Apply filters
     if (totalScore < MatchmakingConstants.MIN_SCORE) continue;
-
+    if (filters) {
+      if (filters.minScore != null && totalScore < filters.minScore) continue;
+      if (filters.minLevel != null && candidateLevel != null && candidateLevel < filters.minLevel) continue;
+      if (filters.maxLevel != null && candidateLevel != null && candidateLevel > filters.maxLevel) continue;
+      if (filters.maxDistanceKm != null && requesterLocation && candidateLocation) {
+        const dist = haversineDistanceKm(requesterLocation.latitude, requesterLocation.longitude, candidateLocation.latitude, candidateLocation.longitude);
+        if (dist > filters.maxDistanceKm) continue;
+      }
+    }
     candidates.push({
       candidateUserId: candidateUser.id,
       candidatePlayerId: candidatePlayer?.id ?? null,
@@ -221,7 +317,9 @@ export async function findMatchCandidates(userId: string, availabilityId: string
         end: overlapEnd.toISOString()
       },
       requesterAvailabilityId: availabilityId,
-      candidateAvailabilityId: candidateAvail.id
+      candidateAvailabilityId: candidateAvail.id,
+      candidateLevel: candidateLevel ?? 0,
+      candidateLocation
     });
   }
 
@@ -239,13 +337,12 @@ export async function findMatchCandidates(userId: string, availabilityId: string
 }
 
 // Private cache helpers
-async function tryCacheGet(cacheKey: string): Promise<MatchmakingResult | null> {
+async function tryCacheGet(cacheKey: string): Promise<any | null> {
   try {
     const cached = await cacheGet(cacheKey);
     if (cached) return JSON.parse(cached);
   } catch (err) {
     console.log('Matchmaking cache get error:', err);
-    // Cache unavailable or error, ignore
   }
   return null;
 }
@@ -260,11 +357,17 @@ async function tryCacheSet(cacheKey: string, value: any, ttlSeconds: number) {
 
 /**
  * Clears the matchmaking cache for all users or a specific user.
+ * Should be called when any user publishes a new availability, as this can affect candidate results.
  * @param userId Optional userId to clear only that user's cache. If omitted, clears all matchmaking cache.
  */
 export async function clearMatchmakingCache(userId?: string): Promise<void> {
-  const pattern = userId ? `matchmaking:${userId}:*` : 'matchmaking:*';
-  await deleteKeysByPattern(pattern);
+  // Clear both single and allCandidates cache
+  const patterns = userId
+    ? [`matchmaking:${userId}:*`, `matchmaking:allCandidates:${userId}:*`]
+    : ['matchmaking:*', 'matchmaking:allCandidates:*'];
+  for (const pattern of patterns) {
+    await deleteKeysByPattern(pattern);
+  }
 }
 
 

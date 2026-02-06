@@ -45,4 +45,33 @@ router.get('/test', MatchmakingController.getSuggestionsHtml);
 router.get('/', MatchmakingController.getSuggestions);
 
 
+
+/**
+ * @openapi
+ * /matchmaking/all:
+ *   get:
+ *     summary: Get matchmaking suggestions for all availabilities of a user
+ *     description: Returns matchmaking suggestions for all availabilities of a user, grouped by availabilityId.
+ *     tags:
+ *       - Matchmaking
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Suggestions for all availabilities
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties:
+ *                 $ref: '#/components/schemas/MatchmakingResult'
+ */
+// Get all suggestions for all availabilities of a user
+router.get('/all', MatchmakingController.getAllSuggestions);
+
 export default router;

@@ -6,6 +6,7 @@
 // It does NOT handle social (friends) or matchmaking logic.
 
 import { Player } from '@prisma/client';
+import { cacheGet, cacheSet } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types';
@@ -22,6 +23,80 @@ import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types
  */
 
 export class PlayersService {
+  /**
+   * Fetch PlayerDTO for a single userId using Redis cache.
+   * @param userId User ID
+   * @returns PlayerDTO or throws if not found
+   */
+  static async findPlayerByUserIdCached(userId: string): Promise<PlayerDTO> {
+    const cacheKey = `playerdto:${userId}`;
+    try {
+      const cached = await cacheGet(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (err) {
+      // Ignore cache errors
+    }
+    const player = await prisma.player.findUnique({ where: { userId } });
+    if (!player) throw new AppError('Player not found', 404);
+    const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
+    const dto = PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+    try {
+      await cacheSet(cacheKey, JSON.stringify(dto), 60 * 60 * 24); // cache for 24 hours
+    } catch (err) {
+      // Ignore cache set errors
+    }
+    return dto;
+  }
+
+  /**
+   * Fetch PlayerDTOs for a list of user IDs using Redis cache.
+   * @param userIds Array of user IDs
+   * @returns Array of PlayerDTOs
+   */
+  static async findPlayersByUserIdsCached(userIds: string[]): Promise<PlayerDTO[]> {
+    const result: PlayerDTO[] = [];
+    for (const userId of userIds) {
+      try {
+        const dto = await PlayersService.findPlayerByUserIdCached(userId);
+        result.push(dto);
+      } catch (err) {
+        // Optionally skip or handle missing players
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Fetch PlayerDTOs for an array of userIds, using a local cache if available.
+   * @param userIds Array of user IDs
+   * @param cache Optional Map<string, PlayerDTO> for local caching
+   * @returns Array of PlayerDTOs
+   */
+  static async findPlayersByUserIds(userIds: string[], cache?: Map<string, PlayerDTO>): Promise<PlayerDTO[]> {
+    const result: PlayerDTO[] = [];
+    const uncachedIds: string[] = [];
+    for (const id of userIds) {
+      if (cache && cache.has(id)) {
+        result.push(cache.get(id)!);
+      } else {
+        uncachedIds.push(id);
+      }
+    }
+    if (uncachedIds.length > 0) {
+      const players = await prisma.player.findMany({ where: { userId: { in: uncachedIds } } });
+      for (const player of players) {
+        const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
+        const dto = PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+        if (cache) {
+          cache.set(player.userId, dto);
+        }
+        result.push(dto);
+      }
+    }
+    return result;
+  }
   /**
    * List all players (for admin or UI)
    */

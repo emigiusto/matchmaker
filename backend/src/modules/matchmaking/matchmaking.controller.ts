@@ -5,13 +5,28 @@
 //   - GET /matchmaking?userId=...&availabilityId=...
 //     → Returns ranked, explainable suggestions for who to play with for a given user and availability.
 //
-// No auth logic, no side effects, no caching (yet).
-
 import { Request, Response, NextFunction } from 'express';
 import * as MatchmakingService from './matchmaking.service';
 import * as constants from './matchmaking.constants';
 
 export class MatchmakingController {
+  /**
+ * GET /matchmaking/all?userId=
+ * Returns all matchmaking suggestions for all availabilities of a user.
+ */
+  static async getAllSuggestions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.query;
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'Missing or invalid userId' });
+      }
+      const results = await MatchmakingService.findAllMatchCandidatesForUser(userId);
+      return res.status(200).json(results);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * GET /matchmaking?userId=&availabilityId=
    * Returns ranked, explainable suggestions for a user and availability.

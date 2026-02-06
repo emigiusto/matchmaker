@@ -12,6 +12,8 @@
  * AvailabilityDTO
  * API-facing shape for an availability slot.
  */
+export type AvailabilityStatus = 'open' | 'invited' | 'matched' | 'closed';
+
 export interface AvailabilityDTO {
   id: string;
   userId: string;
@@ -22,6 +24,7 @@ export interface AvailabilityDTO {
   minLevel?: number | null;
   maxLevel?: number | null;
   preferredSurface?: string | null;
+  status: AvailabilityStatus;
   createdAt: string; // ISO datetime string
 }
 
@@ -37,4 +40,5 @@ export interface CreateAvailabilityInput {
   minLevel?: number | null;
   maxLevel?: number | null;
   preferredSurface?: string | null;
+  status?: AvailabilityStatus;
 }

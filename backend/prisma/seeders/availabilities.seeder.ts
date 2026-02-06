@@ -13,6 +13,7 @@ type AvailabilitySeed = {
   minLevel: number;
   maxLevel: number;
   preferredSurface?: string | null;
+  status?: 'open' | 'invited' | 'matched' | 'closed';
 };
 
 export async function seedAvailabilities(users: { id: string }[]) {
@@ -45,6 +46,7 @@ export async function seedAvailabilities(users: { id: string }[]) {
         minLevel: faker.number.float({ min: 1, max: 5, fractionDigits: 1 }),
         maxLevel: faker.number.float({ min: 5, max: 7, fractionDigits: 1 }),
         preferredSurface: faker.helpers.arrayElement(['clay', 'grass', 'hard', null]),
+        status: 'open',
       });
     }
   }
@@ -72,6 +74,7 @@ export async function seedAvailabilities(users: { id: string }[]) {
         minLevel: faker.number.float({ min: 1, max: 5, fractionDigits: 1 }),
         maxLevel: faker.number.float({ min: 5, max: 7, fractionDigits: 1 }),
         preferredSurface: faker.helpers.arrayElement(['clay', 'grass', 'hard', null]),
+        status: 'open',
       });
     }
   }

@@ -1,7 +1,7 @@
 // users.service.ts
 // All business logic here. Throws AppError on error.
 // Guest-first: users may exist forever as guests.
-
+import { cacheGet, cacheSet } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { UserDTO } from './users.types';
@@ -149,7 +149,55 @@ export async function deleteUser(id: string): Promise<void> {
   }
 }
 
-// Convert Prisma user object to API UserDTO type
+/**
+ * Find a user by their unique ID, using a cache if provided.
+ * @param id User ID
+ * @param cache Optional Map<string, UserDTO> for local caching
+ * @returns UserDTO object
+ * @throws AppError if user not found
+ */
+export async function findUserByIdCached(id: string): Promise<UserDTO> {
+  const cacheKey = `userdto:${id}`;
+  try {
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (err) {
+    // Ignore cache errors, fallback to DB
+  }
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new AppError('User not found', 404);
+  const dto = toDTO(user);
+  try {
+    await cacheSet(cacheKey, JSON.stringify(dto), 60 * 60 * 24); // cache for 24 hours
+  } catch (err) {
+    // Ignore cache set errors
+  }
+  return dto;
+}
+
+/**
+ * Fetch UserDTOs for a list of user IDs using findUserByIdCached.
+ * @param userIds Array of user IDs
+ * @returns Array of UserDTOs
+ */
+export async function findUsersByIdsCached(userIds: string[]): Promise<UserDTO[]> {
+  const result: UserDTO[] = [];
+  for (const id of userIds) {
+    try {
+      const dto = await findUserByIdCached(id);
+      result.push(dto);
+    } catch (err) {
+      // Optionally skip or handle missing users
+    }
+  }
+  return result;
+}
+
+/**
+ * Convert Prisma user object to API UserDTO type
+ */
 function toDTO(user: Pick<PrismaUser, 'id' | 'name' | 'email' | 'phone' | 'isGuest' | 'createdAt' | 'updatedAt'>): UserDTO {
   return {
     id: user.id,
