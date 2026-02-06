@@ -194,7 +194,7 @@ enum InviteStatus {
 
 model Match {
   id             String   @id @default(uuid())
-  inviteId       String   @unique
+  inviteId       String?  @unique
   availabilityId String
   venueId        String?
   playerAId      String?
@@ -202,11 +202,11 @@ model Match {
   scheduledAt    DateTime
   createdAt      DateTime @default(now())
 
-  invite       Invite        @relation(fields: [inviteId], references: [id])
-  availability Availability  @relation(fields: [availabilityId], references: [id])
-  venue        Venue?        @relation(fields: [venueId], references: [id])
-  playerA      Player?       @relation("PlayerA", fields: [playerAId], references: [id])
-  playerB      Player?       @relation("PlayerB", fields: [playerBId], references: [id])
+  invite       Invite?        @relation(fields: [inviteId], references: [id])
+  availability Availability   @relation(fields: [availabilityId], references: [id])
+  venue        Venue?         @relation(fields: [venueId], references: [id])
+  playerA      Player?        @relation("PlayerA", fields: [playerAId], references: [id])
+  playerB      Player?        @relation("PlayerB", fields: [playerBId], references: [id])
   result       Result?
   conversation Conversation?
 

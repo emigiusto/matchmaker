@@ -15,6 +15,7 @@ import { PrismaClient } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 import { AvailabilityDTO, CreateAvailabilityInput } from './availability.types';
 import { Availability as PrismaAvailability } from '@prisma/client';
+import { AcceptAvailabilityResult } from '../../shared/types';
 
 const prisma = new PrismaClient();
 
@@ -98,6 +99,76 @@ export class AvailabilityService {
       throw new AppError('Cannot delete availability of another user', 403);
     }
     await prisma.availability.delete({ where: { id: availabilityId } });
+  }
+
+  /**
+ * Mark an availability as matched (used when an invite is accepted or a match is created)
+ * - Sets status to 'matched' if not already
+ * - Throws if not found
+ */
+  static async markAvailabilityAsMatched(availabilityId: string): Promise<AvailabilityDTO> {
+    const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
+    if (!availability) throw new AppError('Availability not found', 404);
+    if (availability.status === 'matched') return AvailabilityService.toDTO(availability);
+    const updated = await prisma.availability.update({
+      where: { id: availabilityId },
+      data: { status: 'matched' },
+    });
+    return AvailabilityService.toDTO(updated);
+  }
+
+  /**
+ * Accept an availability: marks as matched and creates a match between two players at a given time
+ * @param availabilityId - The availability to accept
+ * @param playerAId - The first player's ID (usually the owner of the availability)
+ * @param playerBId - The second player's ID (the one accepting)
+ * @param scheduledAt - The Date/time for the match
+ * @returns The created match object
+ */
+  static async acceptAvailability({
+    availabilityId,
+    playerAId,
+    playerBId,
+    scheduledAt
+  }: {
+    availabilityId: string;
+    playerAId: string;
+    playerBId: string;
+    scheduledAt: Date;
+  }): Promise<AcceptAvailabilityResult> {
+    // Defensive: ensure all entities exist
+    const [availability, playerA, playerB] = await Promise.all([
+      prisma.availability.findUnique({ where: { id: availabilityId } }),
+      prisma.player.findUnique({ where: { id: playerAId } }),
+      prisma.player.findUnique({ where: { id: playerBId } })
+    ]);
+    if (!availability) throw new AppError('Availability not found', 404);
+    if (!playerA) throw new AppError('Player A not found', 404);
+    if (!playerB) throw new AppError('Player B not found', 404);
+
+    // Transaction: mark as matched and create match
+    const result = await prisma.$transaction(async (tx) => {
+      // Mark availability as matched
+      const updatedAvailability = await tx.availability.update({
+        where: { id: availabilityId },
+        data: { status: 'matched' }
+      });
+      // Create match (do not include inviteId at all if not present)
+      const match = await tx.match.create({
+        data: {
+          inviteId: undefined,
+          availabilityId: availability.id,
+          playerAId,
+          playerBId,
+          scheduledAt
+        }
+      });
+      return { updatedAvailability, matchId: match.id };
+    });
+    return {
+      availability: AvailabilityService.toDTO(result.updatedAvailability),
+      matchId: result.matchId
+    };
   }
 
   /**

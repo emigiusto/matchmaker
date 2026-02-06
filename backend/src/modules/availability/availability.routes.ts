@@ -7,10 +7,6 @@ import { Router } from 'express';
 import { AvailabilityController } from './availability.controller';
 
 const router = Router();
-
-
-
-
 /**
  * @openapi
  * /availability:
@@ -35,8 +31,6 @@ const router = Router();
  */
 router.post('/', AvailabilityController.createAvailability);
 
-
-
 /**
  * @openapi
  * /availability:
@@ -56,8 +50,6 @@ router.post('/', AvailabilityController.createAvailability);
  *                 $ref: '#/components/schemas/Availability'
  */
 router.get('/', AvailabilityController.listAvailabilities);
-
-
 
 /**
  * @openapi
@@ -79,8 +71,6 @@ router.get('/', AvailabilityController.listAvailabilities);
  *         description: Availability deleted
  */
 router.delete('/:id', AvailabilityController.deleteAvailability);
-
-
 
 /**
  * @openapi
@@ -106,8 +96,6 @@ router.delete('/:id', AvailabilityController.deleteAvailability);
  *               $ref: '#/components/schemas/Availability'
  */
 router.get('/:id', AvailabilityController.getAvailabilityById);
-
-
 
 /**
  * @openapi
@@ -135,8 +123,6 @@ router.get('/:id', AvailabilityController.getAvailabilityById);
  *                 $ref: '#/components/schemas/Availability'
  */
 router.get('/by-date', AvailabilityController.listAvailabilitiesByDate);
-
-
 
 /**
  * @openapi
@@ -166,5 +152,61 @@ router.get('/by-date', AvailabilityController.listAvailabilitiesByDate);
  *                   description: Number of availabilities
  */
 router.get('/count', AvailabilityController.countAvailabilitiesByUser);
+
+
+/**
+ * @openapi
+ * /availability/{id}/accept:
+ *   post:
+ *     summary: Accept an availability and create a match
+ *     description: Accepts an availability, marks it as matched, and creates a match between two players.
+ *     tags:
+ *       - Availability
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Availability ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               playerAId:
+ *                 type: string
+ *               playerBId:
+ *                 type: string
+ *               scheduledAt:
+ *                 type: string
+ *                 format: date-time
+ *             required:
+ *               - playerAId
+ *               - playerBId
+ *               - scheduledAt
+ *     responses:
+ *       201:
+ *         description: The created match
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 playerAId:
+ *                   type: string
+ *                 playerBId:
+ *                   type: string
+ *                 scheduledAt:
+ *                   type: string
+ *                   format: date-time
+ *                 availabilityId:
+ *                   type: string
+ */
+router.post('/:id/accept', AvailabilityController.acceptAvailability);
 
 export default router;

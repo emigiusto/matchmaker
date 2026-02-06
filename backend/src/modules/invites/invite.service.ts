@@ -12,13 +12,13 @@
 
 import { prisma } from '../../prisma';
 import type { Invite, Match } from '@prisma/client';
-import type { Prisma } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 import { InviteDTO } from './invite.types';
 import { generateInviteToken, getInviteExpiration, isInviteExpired } from './invite.token';
 import { isPending } from './invite.model';
 import { createNotification } from '../notifications/notifications.service';
 import { logger } from '../../config/logger';
+import { AvailabilityService } from '../availability/availability.service';
 
 export class InviteService {
     /**
@@ -134,6 +134,7 @@ export class InviteService {
     // Notification creation is a pure side effect and always happens strictly after the transaction completes.
     // No notification logic is ever run inside a Prisma transaction.
     let scheduledAt: Date | string | undefined;
+    let availabilityId: string | undefined;
     const updatedInviteDTO = await prisma.$transaction(async (tx) => {
       const invite = await tx.invite.findUnique({ where: { token } });
       if (!invite) throw new AppError('Invite not found', 404);
@@ -151,6 +152,7 @@ export class InviteService {
       const availability = await tx.availability.findUnique({ where: { id: invite.availabilityId } });
       if (!availability) throw new AppError('Availability not found', 404);
       scheduledAt = availability.startTime;
+      availabilityId = availability.id;
       const match = await tx.match.create({
         data: {
           inviteId: invite.id,
@@ -169,6 +171,18 @@ export class InviteService {
       });
       return InviteService.toDTO(updatedInvite);
     });
+
+    // --- Mark the related availability as matched ---
+    if (availabilityId) {
+      try {
+        await AvailabilityService.markAvailabilityAsMatched(availabilityId);
+      } catch (err) {
+        logger.error('Failed to mark availability as matched', {
+          availabilityId,
+          error: err instanceof Error ? err.message : err
+        });
+      }
+    }
 
     // --- Notification is a side effect, not domain state ---
     // All notification logic MUST happen strictly after the transaction completes.

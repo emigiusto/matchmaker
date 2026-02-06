@@ -106,4 +106,27 @@ export class AvailabilityController {
       next(error);
     }
   }
+
+    /**
+   * POST /availability/:id/accept
+   * Accept an availability: marks as matched and creates a match
+   */
+  static async acceptAvailability(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { availabilityId } = availabilityIdParamSchema.parse({ availabilityId: req.params.id });
+      const { playerAId, playerBId, scheduledAt } = req.body;
+      if (!playerAId || !playerBId || !scheduledAt) {
+        return res.status(400).json({ error: 'playerAId, playerBId, and scheduledAt are required' });
+      }
+      const acceptedAvailabilityResult = await AvailabilityService.acceptAvailability({
+        availabilityId,
+        playerAId,
+        playerBId,
+        scheduledAt: new Date(scheduledAt)
+      });
+      res.status(201).json(acceptedAvailabilityResult);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

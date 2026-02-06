@@ -1,3 +1,9 @@
 // src/shared/types/index.ts
 // Shared TypeScript types
-// TODO: Add shared types and interfaces here
+
+import type { AvailabilityDTO } from '../../modules/availability/availability.types';
+
+export type AcceptAvailabilityResult = {
+	availability: AvailabilityDTO;
+	matchId: string;
+};
