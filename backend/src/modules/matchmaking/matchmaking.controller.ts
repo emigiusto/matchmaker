@@ -1,10 +1,6 @@
 // matchmaking.controller.ts
 // Read-only API controller for matchmaking suggestions.
-//
-// Expected frontend usage:
-//   - GET /matchmaking?userId=...&availabilityId=...
-//     → Returns ranked, explainable suggestions for who to play with for a given user and availability.
-//
+// Note: all business logic is in matchmaking.service.ts. This controller only handles request validation and response formatting.
 import { Request, Response, NextFunction } from 'express';
 import * as MatchmakingService from './matchmaking.service';
 import * as constants from './matchmaking.constants';
@@ -16,11 +12,18 @@ export class MatchmakingController {
  */
   static async getAllSuggestions(req: Request, res: Response, next: NextFunction) {
     try {
-      const { userId } = req.query;
+      const { userId, topN, minScore, forceRefresh, maxDistanceKm, minLevel, maxLevel } = req.query;
       if (!userId || typeof userId !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid userId' });
       }
-      const results = await MatchmakingService.findAllMatchCandidatesForUser(userId);
+      const options: any = {};
+      if (topN !== undefined) options.topN = Number(topN);
+      if (minScore !== undefined) options.minScore = Number(minScore);
+      if (forceRefresh !== undefined) options.forceRefresh = forceRefresh === 'true' || forceRefresh === '1';
+      if (maxDistanceKm !== undefined) options.maxDistanceKm = Number(maxDistanceKm);
+      if (minLevel !== undefined) options.minLevel = Number(minLevel);
+      if (maxLevel !== undefined) options.maxLevel = Number(maxLevel);
+      const results = await MatchmakingService.findAllMatchCandidatesForUser(userId, options);
       return res.status(200).json(results);
     } catch (error) {
       next(error);

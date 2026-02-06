@@ -91,5 +91,4 @@ Server runs on `http://localhost:3000`
 
 ## TODO (Future Phases)
 - Authentication & authorization
-- Advanced matchmaking
 - Admin dashboard & analytics

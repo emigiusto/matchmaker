@@ -39,7 +39,7 @@ export function scoreLocationProximity({requesterLocation, candidateLocation, re
     } else if (distanceKm < 35) {
       score = -10 - ((distanceKm - 20) / 15) * 90;
     } else {
-      score = -100;
+      score = -500;
     }
     score = score * MatchmakingConstants.WEIGHT_LOCATION_PROXIMITY;
     return { score, reason: `Distance: ${distanceKm.toFixed(1)} km` };

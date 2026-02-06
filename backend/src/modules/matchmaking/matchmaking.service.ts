@@ -80,19 +80,6 @@ export async function findAllMatchCandidatesForUser(
   return topCandidates;
 }
 
-// Helper: Haversine formula for distance in km
-function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
 /**
  * findMatchCandidates
  * Main entry point for matchmaking suggestions.
@@ -294,7 +281,6 @@ export async function findMatchCandidates(
       surface: surfaceBonus
     };
     totalScore = scoreBreakdown.availability + scoreBreakdown.social + scoreBreakdown.level + scoreBreakdown.location + scoreBreakdown.recentActivity + scoreBreakdown.reliability + scoreBreakdown.surface;
-
     // Apply filters
     if (totalScore < MatchmakingConstants.MIN_SCORE) continue;
     if (filters) {
@@ -368,6 +354,19 @@ export async function clearMatchmakingCache(userId?: string): Promise<void> {
   for (const pattern of patterns) {
     await deleteKeysByPattern(pattern);
   }
+}
+
+// Helper: Haversine formula for distance in km
+function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 

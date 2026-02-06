@@ -1,3 +1,70 @@
+# Matchmaking Testing Guide
+
+## 1. Prepare the Database
+
+- **Run the seeders** to ensure all users with availabilities also have player records:
+
+  ```sh
+  npm run seed
+  ```
+
+## 2. Get User IDs for Testing
+
+- To find users who have open, future availabilities and at least one candidate (i.e., users who will get matchmaking suggestions), run this SQL query:
+
+  ```sql
+  SELECT DISTINCT u.id AS user_id
+  FROM matchmaker.user u
+  JOIN matchmaker.availability a1 ON a1.userId = u.id
+  WHERE a1.status = 'open'
+    AND a1.endTime > NOW()
+    AND EXISTS (
+      SELECT 1
+      FROM matchmaker.availability a2
+      WHERE a2.status = 'open'
+        AND a2.endTime > NOW()
+        AND a2.userId <> u.id
+        AND a2.date = a1.date
+        AND a2.startTime < a1.endTime
+        AND a2.endTime > a1.startTime
+    )
+  LIMIT 10;
+  ```
+
+- This will return user IDs that are likely to have matchmaking candidates.
+
+## 3. Call the Matchmaking Endpoint
+
+- Use the following endpoint to get all matchmaking suggestions for a user:
+
+  ```sh
+  curl "http://localhost:3000/matchmaking/all?userId=<USER_ID>"
+  ```
+  Replace `<USER_ID>` with one of the IDs from the query above.
+
+- You can add optional query parameters:
+  - `topN` (number of candidates to return)
+  - `minScore`, `maxDistanceKm`, `minLevel`, `maxLevel`, `forceRefresh`
+
+  Example:
+  ```sh
+  curl "http://localhost:3000/matchmaking/all?userId=<USER_ID>&topN=5&minScore=10&forceRefresh=true"
+  ```
+
+## 4. What to Expect
+
+- The response will be a JSON array of candidate suggestions for each open, future availability of the user.
+- Each candidate includes:
+  - `candidateUserId`, `candidatePlayerId`, `score`, `scoreBreakdown`, `reasons`, and overlap/time info.
+- If there are no candidates, the array will be empty.
+- If you see `candidateLevel: 0`, it means the candidate user does not have a player record (should not happen if you ran the seeder and cleaned up old data).
+
+## 5. Troubleshooting
+
+- If you get errors about missing locations or levels, make sure you:
+  - Ran the seeder after cleaning out old data.
+  - Only use user IDs from the SQL query above.
+- If you change the seeder, always re-run it and clear old data for consistent results.
 # Matchmaking Module: Testing Guide
 
 This document explains how to test the matchmaking engine and inspect its results using the provided API and database queries.
