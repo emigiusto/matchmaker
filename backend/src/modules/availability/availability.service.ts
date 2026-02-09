@@ -1,9 +1,22 @@
+
 // availability.service.ts
 // ----------------------
 // Core logic for Availability management
 //
-// This module manages availabilities for Users (not Players).
+// DESIGN RULES (Invite-First Architecture):
 //
+// - Availability represents intent, not commitment.
+// - Availability NEVER creates a Match directly.
+// - Matches are created ONLY via Invite acceptance.
+// - Even when a user "accepts an availability" from the UI, the backend must:
+//     Invite → Accept Invite → Create Match
+// - AvailabilityService must NOT:
+//     - create matches
+//     - send notifications
+//     - reference Player entities
+//     - contain matchmaking logic
+//
+// This module manages availabilities for Users (not Players).
 // - Each Availability belongs to exactly one User (user-scoped, not player-scoped).
 // - No overlap detection yet (handled in future logic).
 // - No Invite or Matchmaking logic here.
@@ -14,8 +27,7 @@
 import { AppError } from '../../shared/errors/AppError';
 import { AvailabilityDTO, CreateAvailabilityInput } from './availability.types';
 import { Availability as PrismaAvailability } from '@prisma/client';
-import { AcceptAvailabilityResult } from '../../shared/types';
-import { createNotification } from '../notifications/notifications.service';
+// No AcceptAvailabilityResult import (Invite-first design)
 import { logger } from '../../config/logger';
 import { prisma } from '../../prisma';
 
@@ -132,10 +144,11 @@ export class AvailabilityService {
   }
 
   /**
- * Mark an availability as matched (used when an invite is accepted or a match is created)
- * - Sets status to 'matched' if not already
- * - Throws if not found
- */
+   * Mark an availability as matched (used ONLY as a side-effect of Invite acceptance)
+   *
+   * This method may be called ONLY from InviteService or MatchService.
+   * It is a side-effect of Invite acceptance, not a user action.
+   */
   static async markAvailabilityAsMatched(availabilityId: string): Promise<AvailabilityDTO> {
     try {
       const availability = await prisma.availability.findUnique({ where: { id: availabilityId } });
@@ -152,95 +165,7 @@ export class AvailabilityService {
     }
   }
 
-  /**
- * Accept an availability: marks as matched and creates a match between two players at a given time
- * @param availabilityId - The availability to accept
- * @param playerAId - The first player's ID (usually the owner of the availability)
- * @param playerBId - The second player's ID (the one accepting)
- * @param scheduledAt - The Date/time for the match
- * @returns The created match object
- */
-  static async acceptAvailability({
-    availabilityId,
-    playerAId,
-    playerBId,
-    scheduledAt
-  }: {
-    availabilityId: string;
-    playerAId: string;
-    playerBId: string;
-    scheduledAt: Date;
-  }): Promise<AcceptAvailabilityResult> {
-    try {
-      // Defensive: ensure all entities exist
-      const [availability, playerA, playerB] = await Promise.all([
-        prisma.availability.findUnique({ where: { id: availabilityId } }),
-        prisma.player.findUnique({ where: { id: playerAId } }),
-        prisma.player.findUnique({ where: { id: playerBId } })
-      ]);
-      if (!availability) throw new AppError('Availability not found', 404);
-      if (!playerA) throw new AppError('Player A not found', 404);
-      if (!playerB) throw new AppError('Player B not found', 404);
 
-      // Transaction: mark as matched and create match
-      const result = await prisma.$transaction(async (tx) => {
-        // Mark availability as matched
-        const updatedAvailability = await tx.availability.update({
-          where: { id: availabilityId },
-          data: { status: 'matched' }
-        });
-        // Create match (do not include inviteId at all if not present)
-        const match = await tx.match.create({
-          data: {
-            inviteId: undefined,
-            availabilityId: availability.id,
-            playerAId,
-            playerBId,
-            scheduledAt
-          }
-        });
-        return { updatedAvailability, matchId: match.id };
-      });
-
-      const dto = AvailabilityService.toDTO(result.updatedAvailability);
-      await AvailabilityService.notifyAvailabilityAccepted(dto, result.matchId);
-      return {
-        availability: dto,
-        matchId: result.matchId
-      };
-    } catch (err) {
-      logger.error('Error in acceptAvailability', {
-        availabilityId,
-        playerAId,
-        playerBId,
-        scheduledAt,
-        error: err instanceof Error ? err.message : err
-      });
-      throw err;
-    }
-  }
-
-  /**
-   * Notify the user that their availability was accepted and a match was created
-  */
-  private static async notifyAvailabilityAccepted(availability: AvailabilityDTO, matchId: string): Promise<void> {
-    try {
-      await createNotification(
-        availability.userId,
-        'availability.accepted',
-        {
-          availabilityId: availability.id,
-          matchId,
-          scheduledAt: availability.startTime
-        }
-      );
-    } catch (err) {
-      logger.error('Failed to create availability.accepted notification', {
-        availabilityId: availability.id,
-        error: err instanceof Error ? err.message : err
-      });
-    }
-  }
 
   /**
    * Convert Availability to DTO (API shape)
