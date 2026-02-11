@@ -2,16 +2,54 @@
 // -----------------
 // Core domain logic for Invite management
 //
-// DESIGN PRINCIPLES:
-// - Invites are the source of truth for all match creation and status transitions.
-// - Notifications are always side effects, never domain state, and never block core logic.
-// - No delivery logic (push, email, WhatsApp, etc) exists here—only storage of notification events.
-// - No WhatsApp or messaging channel assumptions: all actions are explicit and auditable via API only.
-// - No Player creation, no user registration, no side effects except Match creation (and explicit notifications).
-// - Comments and code document all domain invariants and design decisions for clarity and maintainability.
+// FINAL DOMAIN RULES & DESIGN PRINCIPLES:
+//
+// 1. Availability ownership
+//    - Every Availability has exactly ONE owner (availability.userId).
+//    - The availability owner is ALWAYS the inviter / host.
+//    - This is NOT optional and must be documented clearly in comments.
+//
+// 2. Invite semantics
+//    - An Invite is NOT "between two users".
+//    - An Invite is a claim token for an Availability.
+//    - The inviterUserId on Invite MUST always equal availability.userId.
+//    - The invitee is NOT known at invite creation time.
+//
+// 3. Invitee definition (CRITICAL)
+//    - The invitee is WHOEVER clicks the invite link and confirms it.
+//    - The invitee may be:
+//        - a guest
+//        - a registered user
+//        - a user with a Player
+//    - The invitee is NOT the availability owner.
+//
+// 4. Match creation
+//    - A Match is created ONLY by accepting an Invite.
+//    - No Match is ever created directly from Availability.
+//    - One Match per Invite. Never more.
+//
+// 5. Player attachment is BEST-EFFORT and NON-BLOCKING
+//    - Never create Players implicitly.
+//    - Never fail match creation due to missing Players.
+//
+// 6. Player roles in Match
+//    - playerAId = Player of the availability owner (host), if exists
+//    - playerBId = Player of the invite acceptor (opponent), if known
+//    - At most ONE of playerAId / playerBId may be null
+//    - Both may be null only in guest-vs-guest scenarios
+//
+// 7. Current limitation (IMPORTANT)
+//    - The system does NOT yet track who accepted the invite.
+//    - Therefore:
+//        - playerAId MAY be attached (availability owner)
+//        - playerBId will often be null
+//    - This is EXPECTED and CORRECT.
+//    - Document this explicitly in comments to avoid future confusion.
+//
+// 8. Comments and code document all domain invariants and design decisions for clarity and maintainability.
 
 import { prisma } from '../../prisma';
-import type { Invite, Match } from '@prisma/client';
+import type { Invite, Match, Player } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 import { InviteDTO } from './invite.types';
 import { generateInviteToken, getInviteExpiration, isInviteExpired } from './invite.token';
@@ -32,11 +70,12 @@ export class InviteService {
 
     /**
      * List all invites sent or received by a user
-     * - Sent: inviterUserId
-     * - Received: availability.userId
+     * - Sent: inviterUserId (user is the host/owner of the availability)
+     * - Received: user is the owner of an availability for which an invite exists
+     *   (Note: Invitee is not known until invite is accepted)
      */
     static async listInvitesByUser(userId: string): Promise<InviteDTO[]> {
-      // Defensive: fetch invites where user is inviter or owns the availability
+      // Defensive: fetch invites where user is inviter (host) or owns the availability
       const invites = await prisma.invite.findMany({
         where: {
           OR: [
@@ -123,16 +162,39 @@ export class InviteService {
   }
 
   /**
-   * Confirm an invite (via token only)
-   * - Invariant: A Match is never created twice for the same Invite
-   * - All status transitions are explicit and safe (pending → accepted only)
-   * - Transactional: prevents race conditions
+   * Confirm an invite (via token and optional acceptor identity)
+   *
+   * DOMAIN LIFECYCLE: Availability → Invite → Match
+   *
+   * - The availability owner (availability.userId) is ALWAYS the host and the inviterUserId on the Invite.
+   * - The invite acceptor (opponent) is WHOEVER clicks the invite link and confirms it (may be guest or registered user).
+   * - A Match is created ONLY by accepting an Invite. No Match is ever created directly from Availability.
+   * - One Match per Invite. Never more.
+   *
+   * PARTICIPANT IDENTITY & GUEST-FIRST BEHAVIOR:
+   * - hostUserId: Always the availability owner (host). Known at invite creation.
+   * - opponentUserId: Always the invite acceptor (opponent). Known ONLY at confirmation time.
+   *   - If acceptorUserId is provided, it is validated and used as opponentUserId.
+   *   - If not provided, a new guest User is created (isGuest = true) and used as opponentUserId.
+   * - This ensures every Match always has both hostUserId and opponentUserId (never null).
+   *
+   * PLAYER ATTACHMENT (BEST-EFFORT, NON-BLOCKING):
+   * - playerAId = Player of the host (availability owner), if exists
+   * - playerBId = Player of the invite acceptor (opponent), if exists
+   * - Players are OPTIONAL and never created implicitly.
+   * - Never block match creation due to missing Players.
+   *
+   * This design enables explicit, auditable, and guest-friendly flows:
+   * - All matches are between two Users (host and opponent), even if one or both are guests.
+   * - Player attachment is best-effort and optional.
+   * - No authentication or endpoint changes are required.
+   *
+   * All domain state changes (match creation, invite status) MUST happen inside the transaction.
+   * No notification logic is allowed inside the $transaction callback. This ensures atomicity and prevents side effects from leaking into domain state.
+   * Notification creation is a pure side effect and always happens strictly after the transaction completes.
+   * No notification logic is ever run inside a Prisma transaction.
    */
-  static async confirmInvite(token: string): Promise<InviteDTO> {
-    // All domain state changes (match creation, invite status) MUST happen inside the transaction.
-    // No notification logic is allowed inside the $transaction callback. This ensures atomicity and prevents side effects from leaking into domain state.
-    // Notification creation is a pure side effect and always happens strictly after the transaction completes.
-    // No notification logic is ever run inside a Prisma transaction.
+  static async confirmInvite(token: string, acceptorUserId?: string): Promise<InviteDTO> {
     let scheduledAt: Date | string | undefined;
     let availabilityId: string | undefined;
     const updatedInviteDTO = await prisma.$transaction(async (tx) => {
@@ -153,11 +215,55 @@ export class InviteService {
       if (!availability) throw new AppError('Availability not found', 404);
       scheduledAt = availability.startTime;
       availabilityId = availability.id;
+
+      // --- Resolve invite acceptor (opponent) at USER level ---
+      // If acceptorUserId is provided, validate it. Otherwise, create a new guest User.
+      let resolvedOpponentUserId: string;
+      if (acceptorUserId) {
+        const acceptorUser = await tx.user.findUnique({ where: { id: acceptorUserId } });
+        if (!acceptorUser) throw new AppError('Invite acceptor user not found', 404);
+        resolvedOpponentUserId = acceptorUser.id;
+      } else {
+        const guestUser = await tx.user.create({
+          data: {
+            isGuest: true,
+            name: null,
+            phone: null,
+          },
+        });
+        resolvedOpponentUserId = guestUser.id;
+      }
+
+      // --- Player Attachment Logic (Best-Effort, Guest-First Safe) ---
+      // playerAId = Player of the host (availability owner), if exists
+      // playerBId = Player of the invite acceptor (opponent), if exists
+      // At most ONE of playerAId / playerBId may be null; both may be null only in guest-vs-guest scenarios
+      // Never create Players implicitly. Never fail match creation due to missing Players.
+      let playerAId: string | null = null;
+      let playerBId: string | null = null;
+
+      // Attach Player of the host (availability owner) if exists
+      const hostPlayer: Player | null = availability.userId
+        ? await tx.player.findFirst({ where: { userId: availability.userId } })
+        : null;
+      if (hostPlayer) playerAId = hostPlayer.id;
+
+      // Attach Player of the invite acceptor (opponent) if exists
+      const opponentPlayer: Player | null = resolvedOpponentUserId
+        ? await tx.player.findFirst({ where: { userId: resolvedOpponentUserId } })
+        : null;
+      if (opponentPlayer) playerBId = opponentPlayer.id;
+
+      // --- Create the Match with explicit host/opponent user IDs ---
       const match = await tx.match.create({
         data: {
           inviteId: invite.id,
           availabilityId: invite.availabilityId,
           scheduledAt: availability.startTime,
+          hostUserId: availability.userId,
+          opponentUserId: resolvedOpponentUserId,
+          playerAId,
+          playerBId,
         },
       });
       // Update invite status and link match (use match relation, not matchId field)

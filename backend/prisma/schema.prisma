@@ -38,6 +38,10 @@ model User {
   // Chat
   sentMessages Message[] @relation("SenderMessages")
 
+  // Match participation (host and opponent)
+  matchesAsHost     Match[] @relation("HostUser")
+  matchesAsOpponent Match[] @relation("OpponentUser")
+
   @@index([createdAt])
 }
 
@@ -191,24 +195,38 @@ enum InviteStatus {
 ////////////////////////////////////////////////////////////
 // MATCH
 ////////////////////////////////////////////////////////////
-
+/// - hostUserId: REQUIRED, always the owner of the availability (the host)
+/// - opponentUserId: REQUIRED, always the user who accepted the invite (the opponent)
+/// - Both reference User(id) and are indexed. ON DELETE RESTRICT.
+/// - playerAId/playerBId: OPTIONAL enrichments (tennis persona), may be null for guests
+///   (Player relations are optional and not required for match creation)
+///
 model Match {
-  id             String   @id @default(uuid())
-  inviteId       String?  @unique
-  availabilityId String
-  venueId        String?
-  playerAId      String?
-  playerBId      String?
-  scheduledAt    DateTime
-  createdAt      DateTime @default(now())
+  id               String   @id @default(uuid())
+  inviteId         String?  @unique
+  availabilityId   String
+  venueId          String?
+  playerAId        String?
+  playerBId        String?
+  scheduledAt      DateTime
+  createdAt        DateTime @default(now())
 
-  invite       Invite?        @relation(fields: [inviteId], references: [id])
-  availability Availability   @relation(fields: [availabilityId], references: [id])
-  venue        Venue?         @relation(fields: [venueId], references: [id])
-  playerA      Player?        @relation("PlayerA", fields: [playerAId], references: [id])
-  playerB      Player?        @relation("PlayerB", fields: [playerBId], references: [id])
-  result       Result?
-  conversation Conversation?
+  /// REQUIRED: always the owner of the availability (host)
+  hostUserId       String
+  /// REQUIRED: always the user who accepted the invite (opponent)
+  opponentUserId   String
+
+  invite         Invite?        @relation(fields: [inviteId], references: [id])
+  availability   Availability   @relation(fields: [availabilityId], references: [id])
+  venue          Venue?         @relation(fields: [venueId], references: [id])
+  playerA        Player?        @relation("PlayerA", fields: [playerAId], references: [id])
+  playerB        Player?        @relation("PlayerB", fields: [playerBId], references: [id])
+  result         Result?
+  conversation   Conversation?
+
+  /// User relations (host and opponent)
+  hostUser       User           @relation("HostUser", fields: [hostUserId], references: [id], onDelete: Restrict)
+  opponentUser   User           @relation("OpponentUser", fields: [opponentUserId], references: [id], onDelete: Restrict)
 
   @@index([availabilityId])
   @@index([venueId])
@@ -216,6 +234,8 @@ model Match {
   @@index([playerBId])
   @@index([scheduledAt])
   @@index([createdAt])
+  @@index([hostUserId])
+  @@index([opponentUserId])
 }
 
 ////////////////////////////////////////////////////////////

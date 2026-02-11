@@ -15,8 +15,8 @@
  */
 export interface MatchDTO {
   id: string;
-  inviteId: string;
-  availabilityId: string;
+  inviteId: string | null;
+  availabilityId: string | null;
   venueId: string | null;
   playerAId: string | null;
   playerBId: string | null;
