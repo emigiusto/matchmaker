@@ -7,7 +7,6 @@ import { prisma } from '../../prisma';
 import { MatchDTO } from './matches.types';
 import { AppError } from '../../shared/errors/AppError';
 import { Match as PrismaMatch } from '@prisma/client';
-import type { Invite as PrismaInvite, Availability as PrismaAvailability } from '@prisma/client';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -199,6 +198,8 @@ function toMatchDTO(match: PrismaMatch): MatchDTO {
     venueId: match.venueId,
     playerAId: match.playerAId,
     playerBId: match.playerBId,
+    hostUserId: match.hostUserId,
+    opponentUserId: match.opponentUserId,
     scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
   };

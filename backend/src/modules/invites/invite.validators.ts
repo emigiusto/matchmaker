@@ -31,7 +31,9 @@ export const inviteTokenParamSchema = z.object({
 /**
  * Schema for confirming an invite (empty body, token-only)
  */
-export const confirmInviteSchema = z.object({});
+export const confirmInviteSchema = z.object({
+  acceptorUserId: z.string().uuid({ message: 'acceptorUserId must be a valid UUID' })
+});
 
 /**
  * Schema for declining an invite (empty body, token-only)

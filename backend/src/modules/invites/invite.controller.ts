@@ -114,8 +114,11 @@ export class InviteController {
   static async confirmInvite(req: Request, res: Response, next: NextFunction) {
     try {
       const { token } = inviteTokenParamSchema.parse(req.params);
-      confirmInviteSchema.parse(req.body); // body must be empty
-      const invite = await InviteService.confirmInvite(token);
+      const { acceptorUserId } = confirmInviteSchema.parse(req.body);
+      if (!acceptorUserId) {
+        return res.status(400).json({ error: 'acceptorUserId is required' });
+      }
+      const invite = await InviteService.confirmInvite(token, acceptorUserId);
       res.status(200).json(invite);
     } catch (error: unknown) {
       if (

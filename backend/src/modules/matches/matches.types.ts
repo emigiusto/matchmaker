@@ -20,6 +20,8 @@ export interface MatchDTO {
   venueId: string | null;
   playerAId: string | null;
   playerBId: string | null;
+  hostUserId: string;
+  opponentUserId: string;
   scheduledAt: string; // ISO string
   createdAt: string;   // ISO string
 }

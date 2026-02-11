@@ -194,7 +194,7 @@ export class InviteService {
    * Notification creation is a pure side effect and always happens strictly after the transaction completes.
    * No notification logic is ever run inside a Prisma transaction.
    */
-  static async confirmInvite(token: string, acceptorUserId?: string): Promise<InviteDTO> {
+  static async confirmInvite(token: string, acceptorUserId: string): Promise<InviteDTO> {
     let scheduledAt: Date | string | undefined;
     let availabilityId: string | undefined;
     const updatedInviteDTO = await prisma.$transaction(async (tx) => {
@@ -217,22 +217,10 @@ export class InviteService {
       availabilityId = availability.id;
 
       // --- Resolve invite acceptor (opponent) at USER level ---
-      // If acceptorUserId is provided, validate it. Otherwise, create a new guest User.
-      let resolvedOpponentUserId: string;
-      if (acceptorUserId) {
-        const acceptorUser = await tx.user.findUnique({ where: { id: acceptorUserId } });
-        if (!acceptorUser) throw new AppError('Invite acceptor user not found', 404);
-        resolvedOpponentUserId = acceptorUser.id;
-      } else {
-        const guestUser = await tx.user.create({
-          data: {
-            isGuest: true,
-            name: null,
-            phone: null,
-          },
-        });
-        resolvedOpponentUserId = guestUser.id;
-      }
+      // acceptorUserId is required and must be validated
+      const acceptorUser = await tx.user.findUnique({ where: { id: acceptorUserId } });
+      if (!acceptorUser) throw new AppError('Invite acceptor user not found', 404);
+      const resolvedOpponentUserId = acceptorUser.id;
 
       // --- Player Attachment Logic (Best-Effort, Guest-First Safe) ---
       // playerAId = Player of the host (availability owner), if exists
