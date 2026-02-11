@@ -11,6 +11,8 @@ type MatchSeed = {
   playerAId: string;
   playerBId: string;
   scheduledAt: Date;
+  hostUserId: string;
+  opponentUserId: string;
 };
 
 export async function seedMatches(invites: { id: string; availabilityId: string }[], availabilities: { id: string; userId: string }[], players: { id: string; userId: string }[], venues: { id: string }[]) {
@@ -29,9 +31,22 @@ export async function seedMatches(invites: { id: string; availabilityId: string 
       playerAId: ownerPlayer.id,
       playerBId: inviterPlayer.id,
       scheduledAt: faker.date.soon({ days: 10 }),
+      hostUserId: availability.userId,
+      opponentUserId: (invite as any).inviterUserId,
     });
   }
   return batchInsert(matches, 20, (match) =>
-    prisma.match.create({ data: match })
+    prisma.match.create({
+      data: {
+        inviteId: match.inviteId,
+        availabilityId: match.availabilityId,
+        venueId: match.venueId,
+        playerAId: match.playerAId,
+        playerBId: match.playerBId,
+        scheduledAt: match.scheduledAt,
+        hostUserId: match.hostUserId,
+        opponentUserId: match.opponentUserId,
+      }
+    })
   );
 }
