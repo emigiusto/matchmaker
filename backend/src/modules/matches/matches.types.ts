@@ -13,6 +13,8 @@
  * - Dates are ISO strings.
  * - No WhatsApp or external messaging logic.
  */
+export type MatchStatus = 'scheduled' | 'completed' | 'cancelled';
+
 export interface MatchDTO {
   id: string;
   inviteId: string | null;
@@ -24,4 +26,5 @@ export interface MatchDTO {
   opponentUserId: string;
   scheduledAt: string; // ISO string
   createdAt: string;   // ISO string
+  status: MatchStatus;
 }

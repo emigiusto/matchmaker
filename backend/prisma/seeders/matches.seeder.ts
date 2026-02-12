@@ -46,6 +46,8 @@ export async function seedMatches(invites: { id: string; availabilityId: string 
         scheduledAt: match.scheduledAt,
         hostUserId: match.hostUserId,
         opponentUserId: match.opponentUserId,
+        status: 'scheduled',
+        createdAt: new Date(),
       }
     })
   );

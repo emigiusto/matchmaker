@@ -179,4 +179,68 @@ router.get('/:id', MatchesController.getMatchById);
  */
 router.get('/', MatchesController.listMatchesForUser);
 
+/**
+ * @openapi
+ * /matches/{id}/complete:
+ *   post:
+ *     summary: Complete a match (scheduled -> completed)
+ *     tags:
+ *       - Matches
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Match ID
+ *     responses:
+ *       200:
+ *         description: Match completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Match'
+ *       409:
+ *         description: Invalid transition
+ */
+router.post('/:id/complete', MatchesController.completeMatch);
+
+/**
+ * @openapi
+ * /matches/{id}/cancel:
+ *   post:
+ *     summary: Cancel a match (scheduled -> cancelled)
+ *     tags:
+ *       - Matches
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Match ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: Host user ID
+ *     responses:
+ *       200:
+ *         description: Match cancelled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Match'
+ *       403:
+ *         description: Only host can cancel
+ *       409:
+ *         description: Invalid transition
+ */
+router.post('/:id/cancel', MatchesController.cancelMatch);
+
 export default router;

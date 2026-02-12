@@ -220,6 +220,9 @@ model Match {
   scheduledAt      DateTime
   createdAt        DateTime @default(now())
 
+  /// Match lifecycle status
+  status           MatchStatus @default(scheduled)
+
   /// REQUIRED: always the owner of the availability (host)
   hostUserId       String
   /// REQUIRED: always the user who accepted the invite (opponent)
@@ -245,6 +248,13 @@ model Match {
   @@index([createdAt])
   @@index([hostUserId])
   @@index([opponentUserId])
+  @@index([status])
+}
+
+enum MatchStatus {
+  scheduled
+  completed
+  cancelled
 }
 
 ////////////////////////////////////////////////////////////

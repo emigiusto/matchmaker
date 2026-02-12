@@ -6,7 +6,7 @@
 import { prisma } from '../../prisma';
 import { MatchDTO } from './matches.types';
 import { AppError } from '../../shared/errors/AppError';
-import { Match as PrismaMatch } from '@prisma/client';
+import { Match, MatchStatus } from '@prisma/client';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -190,7 +190,7 @@ export async function listRecentMatches(limit: number, userId?: string): Promise
 
 // Helper: convert DB Match to API MatchDTO
 // Defensive: expects match.invite and match.availability to be present
-function toMatchDTO(match: PrismaMatch): MatchDTO {
+function toMatchDTO(match: Match): MatchDTO {
   return {
     id: match.id,
     inviteId: match.inviteId,
@@ -202,5 +202,102 @@ function toMatchDTO(match: PrismaMatch): MatchDTO {
     opponentUserId: match.opponentUserId,
     scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
+    status: match.status as 'scheduled' | 'completed' | 'cancelled',
   };
+}
+
+/**
+ * Complete a match (scheduled -> completed)
+ * Only allowed if:
+ *   - Match exists
+ *   - status is scheduled
+ *   - scheduledAt is in the past
+ *   - Result exists and has at least 1 SetResult
+ * Throws AppError on invalid transition.
+ */
+export async function completeMatch(matchId: string): Promise<MatchDTO> {
+  return await prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({
+      where: { id: matchId }
+    });
+
+    if (!match) {
+      throw new AppError('Match not found', 404);
+    }
+
+    if (match.status !== 'scheduled') {
+      throw new AppError('Match cannot be completed from current state', 409);
+    }
+
+    const now = new Date();
+    if (match.scheduledAt > now) {
+      throw new AppError('Match cannot be completed before scheduled time', 409);
+    }
+
+    const result = await tx.result.findUnique({
+      where: { matchId: match.id },
+      include: { sets: true }
+    });
+
+    if (!result) {
+      throw new AppError('Cannot complete match: Result does not exist', 409);
+    }
+
+    if (!result.sets || result.sets.length === 0) {
+      throw new AppError('Cannot complete match: Result has no set results', 409);
+    }
+
+    // Atomic transition protection
+    const updateResult = await tx.match.updateMany({
+      where: {
+        id: match.id,
+        status: 'scheduled'
+      },
+      data: {
+        status: 'completed'
+      }
+    });
+
+    if (updateResult.count === 0) {
+      throw new AppError('Match already completed or invalid state', 409);
+    }
+
+    const updated = await tx.match.findUnique({
+      where: { id: match.id }
+    });
+
+    return toMatchDTO(updated!);
+  });
+}
+
+
+/**
+ * Cancel a match (scheduled -> cancelled)
+ * Only allowed if:
+ *   - Match exists
+ *   - Only hostUserId can cancel
+ *   - status is scheduled
+ *   - Now is before scheduledAt
+ * Throws AppError on invalid transition.
+ */
+export async function cancelMatch(matchId: string, userId: string): Promise<MatchDTO> {
+  return await prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new AppError('Match not found', 404);
+    if (!('status' in match)) throw new AppError('Match missing status field (migration not applied)', 500);
+    if (match.status !== 'scheduled') {
+      throw new AppError('Match cannot be cancelled: not in scheduled state', 409);
+    }
+    if (match.hostUserId !== userId) {
+      throw new AppError('Only the host can cancel this match', 403);
+    }
+    const now = new Date();
+    if (now >= match.scheduledAt) {
+      throw new AppError('Cannot cancel match after scheduled time', 409);
+    }
+    // Update status
+    const updated = await tx.match.update({ where: { id: match.id }, data: { status: 'cancelled' as MatchStatus } });
+    // TODO: Trigger notifications as side effect (after commit)
+    return toMatchDTO(updated);
+  });
 }

@@ -1,14 +1,3 @@
-// matches.controller.ts
-// HTTP layer for matches. No business logic here.
-//
-// Matches are derived entities: they are only created via Invite confirmation and are immutable.
-// No POST/PUT/DELETE: matches are read-only. No WhatsApp or external messaging logic here.
-//
-// Expected frontend usage:
-// - GET /matches/:id                → Fetch a single match by ID
-// - GET /matches?userId=...         → List matches for a user
-// - GET /matches/by-player/:playerId → List matches for a player
-
 import { Request, Response, NextFunction } from 'express';
 import * as MatchesService from './matches.service';
 
@@ -127,6 +116,39 @@ export class MatchesController {
       }
       const matches = await MatchesService.listMatchesForPlayer(playerId);
       res.json(matches);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /matches/:id/complete
+   * Complete a match (scheduled -> completed)
+   */
+  static async completeMatch(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      if (!id || typeof id !== 'string') return res.status(400).json({ error: 'Missing or invalid match id' });
+      const match = await MatchesService.completeMatch(id);
+      res.json(match);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /matches/:id/cancel
+   * Cancel a match (scheduled -> cancelled)
+   * Only hostUserId can cancel
+   */
+  static async cancelMatch(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { userId } = req.body;
+      if (!id || typeof id !== 'string') return res.status(400).json({ error: 'Missing or invalid match id' });
+      if (!userId || typeof userId !== 'string') return res.status(400).json({ error: 'Missing or invalid userId' });
+      const match = await MatchesService.cancelMatch(id, userId);
+      res.json(match);
     } catch (err) {
       next(err);
     }
