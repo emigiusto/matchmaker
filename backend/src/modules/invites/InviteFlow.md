@@ -118,11 +118,17 @@ curl -X POST http://localhost:3000/invites/INVITE_TOKEN/confirm \
 ```json
 {
   "status": "accepted",
-  "matchId": "MATCH_ID"
+  "matchId": "MATCH_ID",
+  "minLevel": 2.5,
+  "maxLevel": 4.0,
+  "radiusKm": 10,
+  "visibility": "private"
 }
 ```
+*Note: minLevel, maxLevel, radiusKm, and visibility reflect the new Invite model fields and will match the values set on the invite.*
+
 **What Happens Atomically:**
-- Invite → accepted
+- Invite → accepted (with minLevel, maxLevel, radiusKm, visibility retained)
 - Match created
 - Availability marked as matched
 

@@ -59,61 +59,61 @@ import { logger } from '../../config/logger';
 import { AvailabilityService } from '../availability/availability.service';
 
 export class InviteService {
-    /**
-     * Get invite by ID
-     */
-    static async getInviteById(inviteId: string): Promise<InviteDTO | null> {
-      const invite = await prisma.invite.findUnique({ where: { id: inviteId } });
-      if (!invite) return null;
-      return InviteService.toDTO(invite);
-    }
+  /**
+   * Get invite by ID
+   */
+  static async getInviteById(inviteId: string): Promise<InviteDTO | null> {
+    const invite = await prisma.invite.findUnique({ where: { id: inviteId } });
+    if (!invite) return null;
+    return InviteService.toDTO(invite);
+  }
 
-    /**
-     * List all invites sent or received by a user
-     * - Sent: inviterUserId (user is the host/owner of the availability)
-     * - Received: user is the owner of an availability for which an invite exists
-     *   (Note: Invitee is not known until invite is accepted)
-     */
-    static async listInvitesByUser(userId: string): Promise<InviteDTO[]> {
-      // Defensive: fetch invites where user is inviter (host) or owns the availability
-      const invites = await prisma.invite.findMany({
-        where: {
-          OR: [
-            { inviterUserId: userId },
-            { availability: { userId } },
-          ],
-        },
-        include: { availability: true, match: true },
-        orderBy: { createdAt: 'desc' },
-      });
-      return invites.map(InviteService.toDTO);
-    }
+  /**
+   * List all invites sent or received by a user
+   * - Sent: inviterUserId (user is the host/owner of the availability)
+   * - Received: user is the owner of an availability for which an invite exists
+   *   (Note: Invitee is not known until invite is accepted)
+   */
+  static async listInvitesByUser(userId: string): Promise<InviteDTO[]> {
+    // Defensive: fetch invites where user is inviter (host) or owns the availability
+    const invites = await prisma.invite.findMany({
+      where: {
+        OR: [
+          { inviterUserId: userId },
+          { availability: { userId } },
+        ],
+      },
+      include: { availability: true, match: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return invites.map(InviteService.toDTO);
+  }
 
-    /**
-     * List all invites for an availability
-     */
-    static async listInvitesByAvailability(availabilityId: string): Promise<InviteDTO[]> {
-      const invites = await prisma.invite.findMany({
-        where: { availabilityId },
-        include: { match: true },
-        orderBy: { createdAt: 'desc' },
-      });
-      return invites.map(InviteService.toDTO);
-    }
+  /**
+   * List all invites for an availability
+   */
+  static async listInvitesByAvailability(availabilityId: string): Promise<InviteDTO[]> {
+    const invites = await prisma.invite.findMany({
+      where: { availabilityId },
+      include: { match: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return invites.map(InviteService.toDTO);
+  }
 
-    /**
-     * Count invites for a user (sent or received)
-     */
-    static async countInvitesByUser(userId: string): Promise<number> {
-      return prisma.invite.count({
-        where: {
-          OR: [
-            { inviterUserId: userId },
-            { availability: { userId } },
-          ],
-        },
-      });
-    }
+  /**
+   * Count invites for a user (sent or received)
+   */
+  static async countInvitesByUser(userId: string): Promise<number> {
+    return prisma.invite.count({
+      where: {
+        OR: [
+          { inviterUserId: userId },
+          { availability: { userId } },
+        ],
+      },
+    });
+  }
   /**
    * Create an invite for an availability, by a user
    * - Only a User can create an invite
@@ -162,37 +162,11 @@ export class InviteService {
   }
 
   /**
-   * Confirm an invite (via token and optional acceptor identity)
-   *
-   * DOMAIN LIFECYCLE: Availability → Invite → Match
-   *
-   * - The availability owner (availability.userId) is ALWAYS the host and the inviterUserId on the Invite.
-   * - The invite acceptor (opponent) is WHOEVER clicks the invite link and confirms it (may be guest or registered user).
-   * - A Match is created ONLY by accepting an Invite. No Match is ever created directly from Availability.
-   * - One Match per Invite. Never more.
-   *
-   * PARTICIPANT IDENTITY & GUEST-FIRST BEHAVIOR:
-   * - hostUserId: Always the availability owner (host). Known at invite creation.
-   * - opponentUserId: Always the invite acceptor (opponent). Known ONLY at confirmation time.
-   *   - If acceptorUserId is provided, it is validated and used as opponentUserId.
-   *   - If not provided, a new guest User is created (isGuest = true) and used as opponentUserId.
-   * - This ensures every Match always has both hostUserId and opponentUserId (never null).
-   *
-   * PLAYER ATTACHMENT (BEST-EFFORT, NON-BLOCKING):
-   * - playerAId = Player of the host (availability owner), if exists
-   * - playerBId = Player of the invite acceptor (opponent), if exists
-   * - Players are OPTIONAL and never created implicitly.
-   * - Never block match creation due to missing Players.
-   *
-   * This design enables explicit, auditable, and guest-friendly flows:
-   * - All matches are between two Users (host and opponent), even if one or both are guests.
-   * - Player attachment is best-effort and optional.
-   * - No authentication or endpoint changes are required.
-   *
-   * All domain state changes (match creation, invite status) MUST happen inside the transaction.
-   * No notification logic is allowed inside the $transaction callback. This ensures atomicity and prevents side effects from leaking into domain state.
-   * Notification creation is a pure side effect and always happens strictly after the transaction completes.
-   * No notification logic is ever run inside a Prisma transaction.
+   * Confirm an invite (via token and acceptor identity)
+   * - Validates invite, user, and invite conditions (level, distance, etc).
+   * - Guest users without a player cannot accept invites with level/distance conditions.
+   * - Creates a match and updates invite/availability atomically.
+   * - Emits notification after transaction.
    */
   static async confirmInvite(token: string, acceptorUserId: string): Promise<InviteDTO> {
     let scheduledAt: Date | string | undefined;
@@ -202,47 +176,36 @@ export class InviteService {
       if (!invite) throw new AppError('Invite not found', 404);
       if (!isPending(invite)) throw new AppError('Invite is not pending', 409);
       if (isInviteExpired(invite.expiresAt)) {
-        // Defensive: auto-expire and prevent match creation
         if (invite.status !== 'expired') {
           await tx.invite.update({ where: { id: invite.id }, data: { status: 'expired' } });
         }
         throw new AppError('Invite has expired', 410);
       }
-      // Invariant: A Match must not already exist for this invite
-      // Defensive: Match creation is only allowed for valid, pending, unexpired invites
-      // Use the startTime from the linked Availability for scheduledAt
       const availability = await tx.availability.findUnique({ where: { id: invite.availabilityId } });
       if (!availability) throw new AppError('Availability not found', 404);
       scheduledAt = availability.startTime;
       availabilityId = availability.id;
 
-      // --- Resolve invite acceptor (opponent) at USER level ---
-      // acceptorUserId is required and must be validated
+      // Validate acceptor user
       const acceptorUser = await tx.user.findUnique({ where: { id: acceptorUserId } });
       if (!acceptorUser) throw new AppError('Invite acceptor user not found', 404);
       const resolvedOpponentUserId = acceptorUser.id;
 
-      // --- Player Attachment Logic (Best-Effort, Guest-First Safe) ---
-      // playerAId = Player of the host (availability owner), if exists
-      // playerBId = Player of the invite acceptor (opponent), if exists
-      // At most ONE of playerAId / playerBId may be null; both may be null only in guest-vs-guest scenarios
-      // Never create Players implicitly. Never fail match creation due to missing Players.
+      // Attach players
       let playerAId: string | null = null;
       let playerBId: string | null = null;
-
-      // Attach Player of the host (availability owner) if exists
       const hostPlayer: Player | null = availability.userId
         ? await tx.player.findFirst({ where: { userId: availability.userId } })
         : null;
       if (hostPlayer) playerAId = hostPlayer.id;
-
-      // Attach Player of the invite acceptor (opponent) if exists
       const opponentPlayer: Player | null = resolvedOpponentUserId
         ? await tx.player.findFirst({ where: { userId: resolvedOpponentUserId } })
         : null;
       if (opponentPlayer) playerBId = opponentPlayer.id;
 
-      // --- Create the Match with explicit host/opponent user IDs ---
+      // --- Invite condition validation ---
+      InviteService.validateInviteConditions(invite, hostPlayer, opponentPlayer);
+
       const match = await tx.match.create({
         data: {
           inviteId: invite.id,
@@ -254,7 +217,6 @@ export class InviteService {
           playerBId,
         },
       });
-      // Update invite status and link match (use match relation, not matchId field)
       const updatedInvite = await tx.invite.update({
         where: { id: invite.id },
         data: {
@@ -304,14 +266,14 @@ export class InviteService {
     return updatedInviteDTO;
   }
 
-    /**
-   * Cancel an invite (by inviter only)
-   * - Only inviterUserId can cancel
-   * - Only pending invites can be cancelled
-   * - Idempotent: if already cancelled, returns as is
-   * - No match is created
-   * - No notifications are sent
-   */
+  /**
+ * Cancel an invite (by inviter only)
+ * - Only inviterUserId can cancel
+ * - Only pending invites can be cancelled
+ * - Idempotent: if already cancelled, returns as is
+ * - No match is created
+ * - No notifications are sent
+ */
   static async cancelInvite(inviteId: string, userId: string): Promise<InviteDTO> {
     const invite = await prisma.invite.findUnique({ where: { id: inviteId } });
     if (!invite) throw new AppError('Invite not found', 404);
@@ -366,6 +328,52 @@ export class InviteService {
       maxLevel: typeof invite.maxLevel === 'number' ? invite.maxLevel : null,
       radiusKm: typeof invite.radiusKm === 'number' ? invite.radiusKm : null,
     };
+  }
+
+  /**
+   * Validate invite conditions (level, distance, etc) for the acceptor and opponent player.
+   * Throws AppError if any condition is not met.
+   *
+   * - If invite has minLevel/maxLevel, opponent must have a player with levelValue in range
+   * - If invite has radiusKm, opponent must have a player with location
+   * - Guests without a player cannot accept invites with level/distance conditions
+   */
+  private static validateInviteConditions(invite: Invite, hostPlayer: Player | null, opponentPlayer: Player | null) {
+    // Level conditions
+    if ((invite.minLevel != null || invite.maxLevel != null) && !opponentPlayer) {
+      throw new AppError('A guest user without a player cannot accept an invite with level conditions', 403);
+    }
+    if (opponentPlayer && (invite.minLevel != null || invite.maxLevel != null)) {
+      const level = opponentPlayer.levelValue;
+      if (invite.minLevel != null && (level == null || level < invite.minLevel)) {
+        throw new AppError('Player level is below the minimum required', 403);
+      }
+      if (invite.maxLevel != null && (level == null || level > invite.maxLevel)) {
+        throw new AppError('Player level is above the maximum allowed', 403);
+      }
+    }
+    // Distance conditions
+    if (invite.radiusKm != null && !opponentPlayer) {
+      throw new AppError('A guest user without a player cannot accept an invite with distance conditions', 403);
+    }
+    if (opponentPlayer && invite.radiusKm != null) {
+      if (hostPlayer && opponentPlayer.latitude != null && opponentPlayer.longitude != null && hostPlayer.latitude != null && hostPlayer.longitude != null) {
+        const toRad = (v: number) => (v * Math.PI) / 180;
+        const R = 6371; // Earth radius in km
+        const dLat = toRad(opponentPlayer.latitude - hostPlayer.latitude);
+        const dLon = toRad(opponentPlayer.longitude - hostPlayer.longitude);
+        const lat1 = toRad(hostPlayer.latitude);
+        const lat2 = toRad(opponentPlayer.latitude);
+        const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+        if (distance > invite.radiusKm) {
+          throw new AppError('Player is outside the allowed distance', 403);
+        }
+      } else {
+        throw new AppError('Player location is required for distance validation', 403);
+      }
+    }
   }
 }
 
