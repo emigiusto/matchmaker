@@ -30,6 +30,9 @@ export class ResultsController {
       if (!parsed.success) {
         return res.status(400).json({ error: 'Invalid request body', details: parsed.error.issues });
       }
+      if (parsed.data.matchId == null || parsed.data.winnerPlayerId == null) {
+        return res.status(400).json({ error: 'matchId and winnerPlayerId must not be null' });
+      }
       const result = await ResultsService.createResult(parsed.data.matchId, parsed.data.winnerPlayerId);
       return res.status(201).json(result);
     } catch (error: unknown) {
@@ -76,23 +79,6 @@ export class ResultsController {
       }
       const result = await ResultsService.getResultByMatch(params.data.matchId);
       return res.status(200).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-    /**
-   * GET /results/by-player/:playerId
-   * Fetch all results for a player
-   */
-  static async getResultsByPlayer(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { playerId } = req.params;
-      if (!playerId || typeof playerId !== 'string') {
-        return res.status(400).json({ error: 'Missing or invalid playerId' });
-      }
-      const results = await ResultsService.getResultsByPlayer(playerId);
-      return res.status(200).json(results);
     } catch (error) {
       next(error);
     }

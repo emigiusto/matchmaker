@@ -75,35 +75,6 @@ router.get('/by-match/:matchId', ResultsController.getResultByMatch);
 
 /**
  * @openapi
- * /results/by-player/{playerId}:
- *   get:
- *     summary: Fetch all results for a player
- *     description: Retrieves all results for a specific player.
- *     tags:
- *       - Results
- *     parameters:
- *       - in: path
- *         name: playerId
- *         required: true
- *         schema:
- *           type: string
- *         description: Player ID
- *     responses:
- *       200:
- *         description: Results for player
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Result'
- */
-router.get('/by-player/:playerId', ResultsController.getResultsByPlayer);
-
-
-
-/**
- * @openapi
  * /results/by-user/{userId}:
  *   get:
  *     summary: Fetch all results for a user

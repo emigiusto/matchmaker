@@ -25,9 +25,9 @@ export interface SetResultDTO {
 export interface ResultDTO {
   id: string;
   matchId: string;
-  winnerPlayerId: string | null;
   createdAt: string; // ISO string
   sets: SetResultDTO[];
+    winnerUserId: string;
 }
 
 /**
