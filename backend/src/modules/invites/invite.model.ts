@@ -32,8 +32,8 @@ export function canBeConfirmed(invite: Pick<InviteDTO, 'status'>): boolean {
 }
 
 /**
- * Returns true if the invite can be declined (pending only).
+ * Returns true if the invite can be cancelled (pending only).
  */
-export function canBeDeclined(invite: Pick<InviteDTO, 'status'>): boolean {
+export function canBeCancelled(invite: Pick<InviteDTO, 'status'>): boolean {
   return invite.status === 'pending';
 }

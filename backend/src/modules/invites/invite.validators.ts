@@ -1,8 +1,7 @@
+import { z } from 'zod';
 // invite.validators.ts
 // --------------------
 // Zod schemas for Invite module
-
-import { z } from 'zod';
 
 /**
  * Confirmation is link-based:
@@ -36,6 +35,8 @@ export const confirmInviteSchema = z.object({
 });
 
 /**
- * Schema for declining an invite (empty body, token-only)
+ * Schema for cancelling an invite
  */
-export const declineInviteSchema = z.object({});
+export const cancelInviteSchema = z.object({
+  userId: z.string().uuid({ message: 'userId must be a valid UUID' })
+});

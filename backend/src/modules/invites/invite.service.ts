@@ -51,7 +51,7 @@
 import { prisma } from '../../prisma';
 import type { Invite, Match, Player } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
-import { InviteDTO } from './invite.types';
+import { CreateInviteInput, InviteDTO } from './invite.types';
 import { generateInviteToken, getInviteExpiration, isInviteExpired } from './invite.token';
 import { isPending } from './invite.model';
 import { createNotification } from '../notifications/notifications.service';
@@ -119,11 +119,11 @@ export class InviteService {
    * - Only a User can create an invite
    * - Token is generated and is the source of truth
    */
-  static async createInvite(inviterUserId: string, availabilityId: string): Promise<InviteDTO> {
+  static async createInvite(createInviteInput: CreateInviteInput): Promise<InviteDTO> {
     // Validate inviter and availability
     const [user, availability] = await Promise.all([
-      prisma.user.findUnique({ where: { id: inviterUserId } }),
-      prisma.availability.findUnique({ where: { id: availabilityId } }),
+      prisma.user.findUnique({ where: { id: createInviteInput.inviterUserId } }),
+      prisma.availability.findUnique({ where: { id: createInviteInput.availabilityId } }),
     ]);
     if (!user) throw new AppError('Inviter user not found', 404);
     if (!availability) throw new AppError('Availability not found', 404);
@@ -136,8 +136,8 @@ export class InviteService {
         token,
         status: 'pending',
         expiresAt,
-        availabilityId,
-        inviterUserId,
+        availabilityId: createInviteInput.availabilityId,
+        inviterUserId: createInviteInput.inviterUserId,
       },
     });
     return InviteService.toDTO(invite);
@@ -304,51 +304,27 @@ export class InviteService {
     return updatedInviteDTO;
   }
 
-  /**
-   * Decline an invite (via token only)
-   * - Invariant: Only pending invites can be declined (pending → declined)
+    /**
+   * Cancel an invite (by inviter only)
+   * - Only inviterUserId can cancel
+   * - Only pending invites can be cancelled
+   * - Idempotent: if already cancelled, returns as is
    * - No match is created
-   * - Transactional safety not strictly required, but could be added if needed
+   * - No notifications are sent
    */
-  static async declineInvite(token: string): Promise<InviteDTO> {
-    // All domain state changes (invite status) MUST happen before any notification logic.
-    // No notification logic is allowed inside the transaction or before status update.
-    // Notification creation is a pure side effect and always happens strictly after the status update completes.
-    // No notification logic is ever run inside a Prisma transaction.
-    const invite = await prisma.invite.findUnique({ where: { token } });
+  static async cancelInvite(inviteId: string, userId: string): Promise<InviteDTO> {
+    const invite = await prisma.invite.findUnique({ where: { id: inviteId } });
     if (!invite) throw new AppError('Invite not found', 404);
-    if (!isPending(invite)) throw new AppError('Invite is not pending', 409);
-    if (isInviteExpired(invite.expiresAt)) throw new AppError('Invite has expired', 410);
-    // Invariant: Only pending → declined allowed
+    if (invite.inviterUserId !== userId) throw new AppError('Only the inviter can cancel this invite', 403);
+    if (invite.status === 'cancelled') return InviteService.toDTO(invite);
+    if (invite.status !== 'pending') return InviteService.toDTO(invite); // Only pending can be cancelled
     const updatedInvite = await prisma.invite.update({
-      where: { id: invite.id },
-      data: { status: 'declined' },
+      where: { id: inviteId },
+      data: { status: 'cancelled' },
     });
-
-    // --- Optional notification side effect ---
-    // All notification logic MUST happen strictly after the status update completes.
-    // Decline notifications are not required for core domain correctness,
-    // but can be useful for user feedback. They are optional and must not block
-    // the decline flow. No match is created, and only the inviter is notified.
-    // The invitee is NOT notified of their own decline.
-    // No WhatsApp, push, or delivery logic is present—only event storage.
-    // Fire-and-forget async IIFEs are avoided for clarity and error visibility.
-    // Notification is still non-blocking and does not affect domain state.
-    try {
-      await createNotification(
-        updatedInvite.inviterUserId,
-        'invite.declined',
-        buildInviteNotificationPayload({ inviteId: updatedInvite.id })
-      );
-    } catch (err) {
-      logger.error('Failed to create invite.declined notification', {
-        inviteId: updatedInvite.id,
-        error: err instanceof Error ? err.message : err
-      });
-    }
-
     return InviteService.toDTO(updatedInvite);
   }
+
 
   /**
    * Expire an invite (sets status to expired)
@@ -385,6 +361,10 @@ export class InviteService {
       availabilityId: invite.availabilityId,
       inviterUserId: invite.inviterUserId,
       matchId: invite.match?.id ?? null,
+      visibility: invite.visibility,
+      minLevel: typeof invite.minLevel === 'number' ? invite.minLevel : null,
+      maxLevel: typeof invite.maxLevel === 'number' ? invite.maxLevel : null,
+      radiusKm: typeof invite.radiusKm === 'number' ? invite.radiusKm : null,
     };
   }
 }

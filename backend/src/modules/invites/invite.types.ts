@@ -13,7 +13,9 @@
  * InviteStatus
  * Allowed status values for an invite.
  */
-export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+export type InviteStatus = 'pending' | 'accepted' | 'cancelled' | 'expired';
+
+export type InviteVisibility = 'private' | 'community';
 
 /**
  * InviteDTO
@@ -36,6 +38,14 @@ export interface InviteDTO {
   inviterUserId: string;
   /** Match created from this invite, if any */
   matchId?: string | null;
+  /** Visibility: private or community */
+  visibility: InviteVisibility;
+  /** Optional minimum level filter */
+  minLevel?: number | null;
+  /** Optional maximum level filter */
+  maxLevel?: number | null;
+  /** Optional distance radius in km */
+  radiusKm?: number | null;
 }
 
 /**

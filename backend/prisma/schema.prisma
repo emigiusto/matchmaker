@@ -165,15 +165,18 @@ enum AvailabilityStatus {
 ////////////////////////////////////////////////////////////
 // INVITE
 ////////////////////////////////////////////////////////////
-
 model Invite {
-  id             String       @id @default(uuid())
-  token          String       @unique
+  id             String           @id @default(uuid())
+  token          String           @unique
   inviterUserId  String
   availabilityId String
-  status         InviteStatus @default(pending)
+  status         InviteStatus     @default(pending)
+  visibility     InviteVisibility @default(private)
+  minLevel       Float?
+  maxLevel       Float?
+  radiusKm       Float?
   expiresAt      DateTime
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime         @default(now())
 
   inviter      User         @relation("InvitesSent", fields: [inviterUserId], references: [id])
   availability Availability @relation(fields: [availabilityId], references: [id])
@@ -181,6 +184,7 @@ model Invite {
 
   @@index([inviterUserId])
   @@index([availabilityId])
+  @@index([visibility, status])
   @@index([status, expiresAt])
   @@index([createdAt])
 }
@@ -188,8 +192,13 @@ model Invite {
 enum InviteStatus {
   pending
   accepted
-  declined
+  cancelled
   expired
+}
+
+enum InviteVisibility {
+  private
+  community
 }
 
 ////////////////////////////////////////////////////////////

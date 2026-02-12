@@ -96,29 +96,41 @@ router.post('/:token/confirm', InviteController.confirmInvite);
 
 /**
  * @openapi
- * /invites/{token}/decline:
+ * /invites/{id}/cancel:
  *   post:
- *     summary: Decline invite by token
+ *     summary: Cancel invite by ID (inviter only)
  *     tags:
  *       - Invites
  *     parameters:
  *       - in: path
- *         name: token
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: Invite token
+ *         description: Invite ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: User ID of the inviter
  *     responses:
  *       200:
- *         description: Invite declined
+ *         description: Invite cancelled
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Invite'
+ *       403:
+ *         description: Only inviter can cancel
  *       404:
- *         description: Invite not found or already declined
+ *         description: Invite not found or already cancelled
  */
-router.post('/:token/decline', InviteController.declineInvite);
+router.post('/:id/cancel', InviteController.cancelInvite);
 
 
 /**
