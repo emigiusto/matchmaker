@@ -28,3 +28,14 @@ export interface MatchDTO {
   createdAt: string;   // ISO string
   status: MatchStatus;
 }
+
+export interface CreateMatchInput {
+  hostUserId: string;
+  opponentUserId: string;
+  scheduledAt: string; // ISO string
+  venueId?: string | null;
+  playerAId?: string | null;
+  playerBId?: string | null;
+  inviteId?: string | null;
+  availabilityId?: string | null;
+}

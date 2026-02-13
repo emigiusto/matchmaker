@@ -6,6 +6,39 @@ import * as MatchesService from './matches.service';
  * All methods are static and stateless.
  */
 export class MatchesController {
+
+      /**
+       * POST /matches/:matchId/submit-result
+       * Unified endpoint to submit result and sets
+       */
+      static async submitMatchResult(req: Request, res: Response, next: NextFunction) {
+        try {
+          const { matchId } = req.params;
+          if (!matchId || typeof matchId !== 'string') {
+            return res.status(400).json({ error: 'Missing or invalid matchId' });
+          }
+          // Validate request body
+          const winnerUserId = req.body.winnerUserId ?? null;
+          const sets = req.body.sets;
+          if (!Array.isArray(sets) || sets.length === 0) {
+            return res.status(400).json({ error: 'Missing or invalid sets array' });
+          }
+          const currentUserId = req.user?.id;
+          if (!currentUserId) {
+            return res.status(401).json({ error: 'Unauthorized: missing user id' });
+          }
+          // Call service
+          const result = await MatchesService.submitMatchResult({
+            matchId,
+            winnerUserId,
+            sets,
+            currentUserId
+          });
+          return res.status(201).json(result);
+        } catch (error) {
+          next(error);
+        }
+      }
     /**
      * GET /matches/upcoming?userId=...
      * List upcoming matches for a user (scheduledAt > now)
@@ -151,6 +184,24 @@ export class MatchesController {
       res.json(match);
     } catch (err) {
       next(err);
+    }
+  }
+
+  /**
+   * POST /matches
+   * Directly create a match (bypassing invite flow)
+   */
+  static async createMatch(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = req.body;
+      // Basic validation (expand as needed)
+      if (!input.hostUserId || !input.opponentUserId || !input.scheduledAt) {
+        return res.status(400).json({ error: 'Missing required fields: hostUserId, opponentUserId, scheduledAt' });
+      }
+      const match = await MatchesService.createMatch(input);
+      return res.status(201).json(match);
+    } catch (error) {
+      next(error);
     }
   }
 }

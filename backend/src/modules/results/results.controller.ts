@@ -30,15 +30,19 @@ export class ResultsController {
       if (!parsed.success) {
         return res.status(400).json({ error: 'Invalid request body', details: parsed.error.issues });
       }
-      if (parsed.data.matchId == null || parsed.data.winnerPlayerId == null) {
-        return res.status(400).json({ error: 'matchId and winnerPlayerId must not be null' });
+      const { matchId, winnerUserId } = parsed.data;
+      if (matchId == null || winnerUserId == null) {
+        return res.status(400).json({ error: 'matchId and winnerUserId must not be null' });
       }
-      const result = await ResultsService.createResult(parsed.data.matchId, parsed.data.winnerPlayerId);
+      // Type assertion for req.user (assume authentication middleware attaches user)
+      const currentUserId = req.user?.id;
+      const isAdmin = !!req.user?.isAdmin;
+      if (!currentUserId) {
+        return res.status(401).json({ error: 'Unauthorized: missing user id' });
+      }
+      const result = await ResultsService.createResult(matchId, winnerUserId, currentUserId, isAdmin);
       return res.status(201).json(result);
-    } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'status' in error && (error as { status?: number }).status === 409) {
-        return res.status(409).json({ error: (error as { message?: string }).message });
-      }
+    } catch (error) {
       next(error);
     }
   }
@@ -59,10 +63,7 @@ export class ResultsController {
       }
       const set = await ResultsService.addSetResult(params.data.resultId, setData.data);
       return res.status(201).json(set);
-    } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'status' in error && (error as { status?: number }).status === 409) {
-        return res.status(409).json({ error: (error as { message?: string }).message });
-      }
+    } catch (error) {
       next(error);
     }
   }

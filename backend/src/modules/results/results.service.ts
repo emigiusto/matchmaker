@@ -23,7 +23,7 @@
 
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
-import { ResultDTO, SetResultDTO, AddSetResultInput } from './results.types';
+import { ResultDTO, SetResultDTO, AddSetResultInput, CreateResultInput } from './results.types';
 import { MatchStatus, Result, SetResult } from '@prisma/client';
 
 ////////////////////////////////////////////////////////////
@@ -56,7 +56,9 @@ import { MatchStatus, Result, SetResult } from '@prisma/client';
  */
 export async function createResult(
   matchId: string,
-  winnerUserId: string
+  winnerUserId: string | null,
+  currentUserId: string,
+  isAdmin: boolean
 ): Promise<ResultDTO> {
   return prisma.$transaction(async (tx) => {
     const match = await tx.match.findUnique({
@@ -79,17 +81,21 @@ export async function createResult(
       throw new AppError('Result already exists for this match', 409);
     }
 
-    if (
-      winnerUserId !== match.hostUserId &&
-      winnerUserId !== match.opponentUserId
-    ) {
-      throw new AppError('Winner must be a participant of the match', 400);
+    if (winnerUserId) {
+      if (
+        winnerUserId !== match.hostUserId &&
+        winnerUserId !== match.opponentUserId
+      ) {
+        throw new AppError('Winner must be a participant of the match', 400);
+      }
     }
+
+    assertCanCreateResult(currentUserId, match.hostUserId, match.opponentUserId, isAdmin);
 
     const result = await tx.result.create({
       data: {
         matchId,
-        winnerUserId
+        winnerUserId: winnerUserId !== null ? winnerUserId : undefined
       },
       include: { sets: true }
     });
@@ -209,25 +215,18 @@ export async function getResultByMatch(matchId: string): Promise<ResultDTO> {
  * @returns ResultDTO[]
  */
 export async function getResultsByUser(userId: string): Promise<ResultDTO[]> {
-  const matches = await prisma.match.findMany({
-    where: {
-      OR: [
-        { hostUserId: userId },
-        { opponentUserId: userId }
-      ]
-    },
-    select: { id: true }
-  });
-
-  const matchIds = matches.map(m => m.id);
-  if (matchIds.length === 0) return [];
-
   const results = await prisma.result.findMany({
-    where: { matchId: { in: matchIds } },
+    where: {
+      match: {
+        OR: [
+          { hostUserId: userId },
+          { opponentUserId: userId }
+        ]
+      }
+    },
     include: { sets: true },
     orderBy: { createdAt: 'desc' }
   });
-
   return results.map(toResultDTO);
 }
 
@@ -275,7 +274,7 @@ export async function getRecentResults(limit = 10): Promise<ResultDTO[]> {
  * - Super tiebreak formats
  * - Tournament-specific rules
  */
-function validateSetScore(input: AddSetResultInput) {
+export function validateSetScore(input: AddSetResultInput) {
   const {
     playerAScore,
     playerBScore,
@@ -310,7 +309,7 @@ function toResultDTO(result: Result & { sets?: SetResult[] }): ResultDTO {
   return {
     id: result.id,
     matchId: result.matchId,
-    winnerUserId: result.winnerUserId,
+    winnerUserId: result.winnerUserId ?? null,
     createdAt: result.createdAt.toISOString(),
     sets: (result.sets ?? [])
       .slice()
@@ -331,4 +330,59 @@ function toSetResultDTO(set: SetResult): SetResultDTO {
     tiebreakScoreA: set.tiebreakScoreA,
     tiebreakScoreB: set.tiebreakScoreB
   };
+}
+
+/**
+ * Checks if a user is authorized to create a result for a match.
+ * Allows host, opponent, or admin.
+ * @param currentUserId - ID of the user attempting to create the result
+ * @param hostUserId - ID of the match host
+ * @param opponentUserId - ID of the match opponent
+ * @param isAdmin - Whether the user is an admin
+ * @throws AppError if unauthorized
+ */
+export function assertCanCreateResult(
+  currentUserId: string,
+  hostUserId: string,
+  opponentUserId: string,
+  isAdmin: boolean
+) {
+  if (
+    currentUserId !== hostUserId &&
+    currentUserId !== opponentUserId &&
+    !isAdmin
+  ) {
+    throw new AppError('Only match participants or admin can create the result', 403);
+  }
+}
+
+/**
+ * Validates that the declared winnerUserId matches the actual winner derived from set scores.
+ * Throws AppError(400) if inconsistent or tie.
+ *
+ * @param sets - Array of AddSetResultInput
+ * @param winnerUserId - Declared winner user ID
+ * @param hostUserId - User ID of host
+ * @param opponentUserId - User ID of opponent
+ */
+export function validateWinnerConsistency(
+  sets: AddSetResultInput[],
+  winnerUserId: string | null,
+  hostUserId: string,
+  opponentUserId: string
+) {
+  if (!winnerUserId || sets.length === 0) return;
+  let setsWonA = 0;
+  let setsWonB = 0;
+  for (const set of sets) {
+    if (set.playerAScore > set.playerBScore) setsWonA++;
+    else if (set.playerBScore > set.playerAScore) setsWonB++;
+  }
+  let actualWinnerUserId: string | null = null;
+  if (setsWonA > setsWonB) actualWinnerUserId = hostUserId;
+  else if (setsWonB > setsWonA) actualWinnerUserId = opponentUserId;
+  else throw new AppError('Set results are tied: no winner can be determined', 400);
+  if (winnerUserId !== actualWinnerUserId) {
+    throw new AppError('Winner does not match set results', 400);
+  }
 }

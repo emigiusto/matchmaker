@@ -3,10 +3,13 @@
 // Matches are derived and immutable: they are only created via Invite confirmation (see Invites module) and never modified directly.
 // No creation or mutation logic here. No WhatsApp or external messaging logic.
 // Guest fallback: playerA/playerB may be null for guest users or incomplete data.
-import { prisma } from '../../prisma';
-import { MatchDTO } from './matches.types';
+
 import { AppError } from '../../shared/errors/AppError';
-import { Match, MatchStatus } from '@prisma/client';
+import { prisma } from '../../prisma';
+import { ResultDTO, AddSetResultInput } from '../results/results.types';
+import { MatchDTO, CreateMatchInput } from './matches.types';
+import { Match, MatchStatus, Prisma } from '@prisma/client';
+import { validateSetScore, validateWinnerConsistency } from '../results/results.service';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -300,4 +303,131 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
     // TODO: Trigger notifications as side effect (after commit)
     return toMatchDTO(updated);
   });
+}
+
+/**
+ * Submit the result for a match, including set scores and winner.
+ *
+ * Transactionally creates a Result and associated SetResults for the given match.
+ * Validates that the match exists, is scheduled, and the current user is a participant.
+ * Optionally validates that the winnerUserId is a participant. Validates set scores and winner consistency.
+ * Throws AppError on invalid input, unauthorized user, or domain violations.
+ *
+ * @param input - The result submission input, including matchId, winnerUserId, sets, and currentUserId.
+ * @returns The created ResultDTO with all set results, sorted by set number.
+ * @throws AppError if the match is not found, not scheduled, user is not a participant, or validation fails.
+ */
+export async function submitMatchResult(input: SubmitMatchResultInput): Promise<ResultDTO> {
+  const { matchId, winnerUserId, sets, currentUserId } = input;
+  return prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({ where: { id: matchId } });
+    if (!match) {
+      throw new AppError('Match not found', 404);
+    }
+    if (match.status !== MatchStatus.scheduled) {
+      throw new AppError('Cannot submit result: Match is not scheduled', 409);
+    }
+    if (currentUserId !== match.hostUserId && currentUserId !== match.opponentUserId) {
+      throw new AppError('Only match participants can submit result', 403);
+    }
+    // Validate winnerUserId if provided
+    if (winnerUserId) {
+      if (
+        winnerUserId !== match.hostUserId &&
+        winnerUserId !== match.opponentUserId
+      ) {
+        throw new AppError('Winner must be a participant of the match', 400);
+      }
+    }
+    // Create Result
+    const result = await tx.result.create({
+      data: {
+        matchId,
+        winnerUserId: winnerUserId !== null ? winnerUserId : undefined
+      }
+    });
+    // Insert sets
+    for (const setInput of sets) {
+      validateSetScore(setInput);
+      await tx.setResult.create({
+        data: {
+          resultId: result.id,
+          setNumber: setInput.setNumber,
+          playerAScore: setInput.playerAScore,
+          playerBScore: setInput.playerBScore,
+          tiebreakScoreA: setInput.tiebreakScoreA ?? null,
+          tiebreakScoreB: setInput.tiebreakScoreB ?? null
+        }
+      });
+    }
+    // Winner consistency validation (optional domain upgrade)
+    validateWinnerConsistency(sets, winnerUserId, match.hostUserId, match.opponentUserId);
+    // Return full ResultDTO
+    const fullResult = await tx.result.findUnique({
+      where: { id: result.id },
+      include: { sets: true }
+    });
+    // Defensive: fallback if not found
+    if (!fullResult) throw new AppError('Result not found after creation', 500);
+    // Convert to DTO
+    return {
+      id: fullResult.id,
+      matchId: fullResult.matchId,
+      winnerUserId: fullResult.winnerUserId ?? null,
+      createdAt: fullResult.createdAt.toISOString(),
+      sets: (fullResult.sets ?? [])
+        .slice()
+        .sort((a, b) => a.setNumber - b.setNumber)
+        .map(set => ({
+          id: set.id,
+          setNumber: set.setNumber,
+          playerAScore: set.playerAScore,
+          playerBScore: set.playerBScore,
+          tiebreakScoreA: set.tiebreakScoreA,
+          tiebreakScoreB: set.tiebreakScoreB
+        }))
+    };
+  });
+}
+
+
+/**
+ * Create a new match with the provided input data.
+ *
+ * Requires hostUserId, opponentUserId, scheduledAt, and availabilityId. Optionally connects venue, playerA, playerB, and invite if provided.
+ * Throws AppError if required fields are missing. Uses Prisma's checked MatchCreateInput with nested connect for all relations.
+ *
+ * @param input - The match creation input, including user IDs, scheduled time, and relation IDs.
+ * @returns The created MatchDTO.
+ * @throws AppError if required fields are missing or validation fails.
+ */
+export async function createMatch(input: CreateMatchInput): Promise<MatchDTO> {
+  // Basic validation (should be expanded for production)
+  if (!input.hostUserId || !input.opponentUserId || !input.scheduledAt) {
+    throw new AppError('Missing required fields: hostUserId, opponentUserId, scheduledAt', 400);
+  }
+  // Use Prisma MatchCreateInput with nested connect for relations
+  if (!input.availabilityId) {
+    throw new AppError('Missing required field: availabilityId', 400);
+  }
+  const data: Prisma.MatchCreateInput = {
+    hostUser: { connect: { id: input.hostUserId } },
+    opponentUser: { connect: { id: input.opponentUserId } },
+    scheduledAt: new Date(input.scheduledAt),
+    status: 'scheduled',
+    availability: { connect: { id: input.availabilityId } },
+  };
+  if (input.venueId) data.venue = { connect: { id: input.venueId } };
+  if (input.playerAId) data.playerA = { connect: { id: input.playerAId } };
+  if (input.playerBId) data.playerB = { connect: { id: input.playerBId } };
+  if (input.inviteId) data.invite = { connect: { id: input.inviteId } };
+  const match = await prisma.match.create({ data });
+  return toMatchDTO(match);
+}
+
+export interface SubmitMatchResultInput {
+  matchId: string;
+  winnerUserId: string | null;
+  sets: AddSetResultInput[];
+  currentUserId: string;
 }

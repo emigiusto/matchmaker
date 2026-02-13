@@ -19,7 +19,7 @@ export interface SetResultDTO {
 /**
  * ResultDTO represents the result of a match.
  * - sets: Array of SetResultDTO
- * - winnerPlayerId may be null if undecided
+ * - winnerUserId is the user ID of the winner (not player ID, since we want to display winner info without joining players)
  * - createdAt is an ISO string
  */
 export interface ResultDTO {
@@ -27,7 +27,7 @@ export interface ResultDTO {
   matchId: string;
   createdAt: string; // ISO string
   sets: SetResultDTO[];
-    winnerUserId: string;
+  winnerUserId: string | null;
 }
 
 /**
@@ -35,7 +35,7 @@ export interface ResultDTO {
  */
 export interface CreateResultInput {
   matchId: string;
-  winnerPlayerId: string | null;
+  winnerUserId: string | null;
   sets: AddSetResultInput[];
 }
 

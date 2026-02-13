@@ -26,6 +26,5 @@ export const addSetResultSchema = z.object({
 
 export const createResultSchema = z.object({
   matchId: uuidSchema,
-  winnerPlayerId: uuidSchema.nullable(),
-  sets: z.array(addSetResultSchema),
+  winnerUserId: uuidSchema.nullable(),
 });

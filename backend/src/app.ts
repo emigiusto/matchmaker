@@ -3,6 +3,7 @@ import routes from './routes';
 
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger';
+import { errorHandler } from './shared/errors/errorHandler';
 
 const app = express();
 
@@ -22,8 +23,8 @@ if (process.env.JOBS_ENABLED === 'true') {
 // Mount main routes
 app.use('/', routes);
 
+
 // Global error handler (must be last)
-import { errorHandler } from './shared/errors/errorHandler';
 app.use(errorHandler);
 
 export default app;

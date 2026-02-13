@@ -265,11 +265,11 @@ enum MatchStatus {
 model Result {
   id             String   @id @default(uuid())
   matchId        String   @unique
-  winnerUserId   String
+  winnerUserId   String?
   createdAt      DateTime @default(now())
 
   match        Match       @relation(fields: [matchId], references: [id])
-  winnerUser   User        @relation("WinnerUser", fields: [winnerUserId], references: [id], onDelete: Restrict)
+  winnerUser   User?       @relation("WinnerUser", fields: [winnerUserId], references: [id], onDelete: Restrict)
   sets         SetResult[]
 
   @@index([matchId])
