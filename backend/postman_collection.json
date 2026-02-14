@@ -548,24 +548,38 @@
       "name": "Matches",
       "item": [
         {
+          "name": "Create Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/matches",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostUserId\": \"<userId>\",\n  \"opponentUserId\": \"<userId>\",\n  \"scheduledAt\": \"2026-02-14T10:00:00.000Z\",\n  \"availabilityId\": \"<availabilityId>\",\n  \"venueId\": \"<venueId>\",\n  \"playerAId\": \"<playerId>\",\n  \"playerBId\": \"<playerId>\",\n  \"inviteId\": \"<inviteId>\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Get Match by ID",
           "request": {
             "method": "GET",
             "url": {
               "raw": "http://localhost:3000/matches/:id",
               "protocol": "http",
-              "host": [
-                "localhost"
-              ],
+              "host": ["localhost"],
               "port": "3000",
-              "path": [
-                "matches",
-                ":id"
-              ],
+              "path": ["matches", ":id"],
               "variable": [
-                {
-                  "key": "id"
-                }
+                { "key": "id" }
               ]
             }
           },
@@ -578,13 +592,9 @@
             "url": {
               "raw": "http://localhost:3000/matches",
               "protocol": "http",
-              "host": [
-                "localhost"
-              ],
+              "host": ["localhost"],
               "port": "3000",
-              "path": [
-                "matches"
-              ]
+              "path": ["matches"]
             }
           },
           "response": []
@@ -596,20 +606,145 @@
             "url": {
               "raw": "http://localhost:3000/matches/by-player/:playerId",
               "protocol": "http",
-              "host": [
-                "localhost"
-              ],
+              "host": ["localhost"],
               "port": "3000",
-              "path": [
-                "matches",
-                "by-player",
-                ":playerId"
-              ],
+              "path": ["matches", "by-player", ":playerId"],
               "variable": [
-                {
-                  "key": "playerId"
-                }
+                { "key": "playerId" }
               ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Upcoming Matches",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/matches/upcoming?userId=<userId>",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches", "upcoming"],
+              "query": [
+                { "key": "userId", "value": "<userId>" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Past Matches",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/matches/past?userId=<userId>",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches", "past"],
+              "query": [
+                { "key": "userId", "value": "<userId>" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Matches for Venue",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/matches/for-venue/:venueId",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches", "for-venue", ":venueId"],
+              "variable": [
+                { "key": "venueId" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Recent Matches",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/matches/recent?limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches", "recent"],
+              "query": [
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Match",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "http://localhost:3000/matches/:id/complete",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches", ":id", "complete"],
+              "variable": [
+                { "key": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/matches/:id/cancel",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches", ":id", "cancel"],
+              "variable": [
+                { "key": "id" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"<hostUserId>\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Match Result",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/matches/:matchId/submit-result",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["matches", ":matchId", "submit-result"],
+              "variable": [
+                { "key": "matchId" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"winnerUserId\": \"<userId or null>\",\n  \"sets\": [\n    {\n      \"setNumber\": 1,\n      \"playerAScore\": 6,\n      \"playerBScore\": 4\n    },\n    {\n      \"setNumber\": 2,\n      \"playerAScore\": 3,\n      \"playerBScore\": 6\n    }\n  ]\n}"
             }
           },
           "response": []
@@ -619,34 +754,6 @@
     {
       "name": "Results",
       "item": [
-        {
-          "name": "Create Result",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "http://localhost:3000/results",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3000",
-              "path": [
-                "results"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"matchId\": \"<matchId>\"\n}"
-            }
-          },
-          "response": []
-        },
         {
           "name": "Add Set Result",
           "request": {
@@ -660,19 +767,11 @@
             "url": {
               "raw": "http://localhost:3000/results/:id/sets",
               "protocol": "http",
-              "host": [
-                "localhost"
-              ],
+              "host": ["localhost"],
               "port": "3000",
-              "path": [
-                "results",
-                ":id",
-                "sets"
-              ],
+              "path": ["results", ":id", "sets"],
               "variable": [
-                {
-                  "key": "id"
-                }
+                { "key": "id" }
               ]
             },
             "body": {
@@ -689,19 +788,45 @@
             "url": {
               "raw": "http://localhost:3000/results/by-match/:matchId",
               "protocol": "http",
-              "host": [
-                "localhost"
-              ],
+              "host": ["localhost"],
               "port": "3000",
-              "path": [
-                "results",
-                "by-match",
-                ":matchId"
-              ],
+              "path": ["results", "by-match", ":matchId"],
               "variable": [
-                {
-                  "key": "matchId"
-                }
+                { "key": "matchId" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Results by User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/results/by-user/:userId",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["results", "by-user", ":userId"],
+              "variable": [
+                { "key": "userId" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Recent Results",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/results/recent?limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["results", "recent"],
+              "query": [
+                { "key": "limit", "value": "10" }
               ]
             }
           },
