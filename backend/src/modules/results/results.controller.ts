@@ -116,4 +116,35 @@ export class ResultsController {
       next(error);
     }
   }
+
+  /**
+  * POST /matches/:matchId/submit-result
+  * Unified endpoint to submit result and sets
+  */
+  static async submitMatchResult(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { matchId } = req.params;
+      if (!matchId || typeof matchId !== 'string') {
+        return res.status(400).json({ error: 'Missing or invalid matchId' });
+      }
+      // Validate request body
+      const sets = req.body.sets;
+      if (!Array.isArray(sets) || sets.length === 0) {
+        return res.status(400).json({ error: 'Missing or invalid sets array' });
+      }
+      const currentUserId = req.user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ error: 'Unauthorized: missing user id' });
+      }
+      // Call service (winnerUserId will be computed server-side)
+      const result = await ResultsService.submitMatchResult({
+        matchId,
+        sets,
+        currentUserId
+      });
+      return res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

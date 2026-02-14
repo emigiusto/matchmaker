@@ -6,104 +6,71 @@ import * as MatchesService from './matches.service';
  * All methods are static and stateless.
  */
 export class MatchesController {
-
-      /**
-       * POST /matches/:matchId/submit-result
-       * Unified endpoint to submit result and sets
-       */
-      static async submitMatchResult(req: Request, res: Response, next: NextFunction) {
-        try {
-          const { matchId } = req.params;
-          if (!matchId || typeof matchId !== 'string') {
-            return res.status(400).json({ error: 'Missing or invalid matchId' });
-          }
-          // Validate request body
-          const winnerUserId = req.body.winnerUserId ?? null;
-          const sets = req.body.sets;
-          if (!Array.isArray(sets) || sets.length === 0) {
-            return res.status(400).json({ error: 'Missing or invalid sets array' });
-          }
-          const currentUserId = req.user?.id;
-          if (!currentUserId) {
-            return res.status(401).json({ error: 'Unauthorized: missing user id' });
-          }
-          // Call service
-          const result = await MatchesService.submitMatchResult({
-            matchId,
-            winnerUserId,
-            sets,
-            currentUserId
-          });
-          return res.status(201).json(result);
-        } catch (error) {
-          next(error);
-        }
+  /**
+   * GET /matches/upcoming?userId=...
+   * List upcoming matches for a user (scheduledAt > now)
+   */
+  static async listUpcomingMatchesForUser(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.query;
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'Missing or invalid userId' });
       }
-    /**
-     * GET /matches/upcoming?userId=...
-     * List upcoming matches for a user (scheduledAt > now)
-     */
-    static async listUpcomingMatchesForUser(req: Request, res: Response, next: NextFunction) {
-      try {
-        const { userId } = req.query;
-        if (!userId || typeof userId !== 'string') {
-          return res.status(400).json({ error: 'Missing or invalid userId' });
-        }
-        const matches = await MatchesService.listUpcomingMatchesForUser(userId);
-        res.json(matches);
-      } catch (err) {
-        next(err);
-      }
+      const matches = await MatchesService.listUpcomingMatchesForUser(userId);
+      res.json(matches);
+    } catch (err) {
+      next(err);
     }
+  }
 
-    /**
-     * GET /matches/past?userId=...
-     * List past matches for a user (scheduledAt < now)
-     */
-    static async listPastMatchesForUser(req: Request, res: Response, next: NextFunction) {
-      try {
-        const { userId } = req.query;
-        if (!userId || typeof userId !== 'string') {
-          return res.status(400).json({ error: 'Missing or invalid userId' });
-        }
-        const matches = await MatchesService.listPastMatchesForUser(userId);
-        res.json(matches);
-      } catch (err) {
-        next(err);
+  /**
+   * GET /matches/past?userId=...
+   * List past matches for a user (scheduledAt < now)
+   */
+  static async listPastMatchesForUser(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.query;
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'Missing or invalid userId' });
       }
+      const matches = await MatchesService.listPastMatchesForUser(userId);
+      res.json(matches);
+    } catch (err) {
+      next(err);
     }
+  }
 
-    /**
-     * GET /matches/for-venue/:venueId
-     * List matches scheduled at a specific venue
-     */
-    static async listMatchesForVenue(req: Request, res: Response, next: NextFunction) {
-      try {
-        const { venueId } = req.params;
-        if (!venueId || typeof venueId !== 'string') {
-          return res.status(400).json({ error: 'Missing or invalid venueId' });
-        }
-        const matches = await MatchesService.listMatchesForVenue(venueId);
-        res.json(matches);
-      } catch (err) {
-        next(err);
+  /**
+   * GET /matches/for-venue/:venueId
+   * List matches scheduled at a specific venue
+   */
+  static async listMatchesForVenue(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { venueId } = req.params;
+      if (!venueId || typeof venueId !== 'string') {
+        return res.status(400).json({ error: 'Missing or invalid venueId' });
       }
+      const matches = await MatchesService.listMatchesForVenue(venueId);
+      res.json(matches);
+    } catch (err) {
+      next(err);
     }
+  }
 
-    /**
-     * GET /matches/recent?limit=10
-     * List the most recent matches (optionally filtered by user)
-     */
-    static async listRecentMatches(req: Request, res: Response, next: NextFunction) {
-      try {
-        const { limit, userId } = req.query;
-        const parsedLimit = limit && typeof limit === 'string' ? parseInt(limit, 10) : 10;
-        const matches = await MatchesService.listRecentMatches(parsedLimit, typeof userId === 'string' ? userId : undefined);
-        res.json(matches);
-      } catch (err) {
-        next(err);
-      }
+  /**
+   * GET /matches/recent?limit=10
+   * List the most recent matches (optionally filtered by user)
+   */
+  static async listRecentMatches(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { limit, userId } = req.query;
+      const parsedLimit = limit && typeof limit === 'string' ? parseInt(limit, 10) : 10;
+      const matches = await MatchesService.listRecentMatches(parsedLimit, typeof userId === 'string' ? userId : undefined);
+      res.json(matches);
+    } catch (err) {
+      next(err);
     }
+  }
   /**
    * GET /matches/:id
    * Fetch a single match by ID

@@ -23,7 +23,7 @@
 
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
-import { ResultDTO, SetResultDTO, AddSetResultInput, CreateResultInput } from './results.types';
+import { ResultDTO, SetResultDTO, AddSetResultInput, SubmitMatchResultInput } from './results.types';
 import { MatchStatus, Result, SetResult } from '@prisma/client';
 
 ////////////////////////////////////////////////////////////
@@ -254,6 +254,93 @@ export async function getRecentResults(limit = 10): Promise<ResultDTO[]> {
   return results.map(toResultDTO);
 }
 
+/**
+ * Submit the result for a match, including set scores and winner.
+ *
+ * Transactionally creates a Result and associated SetResults for the given match.
+ * Validates that the match exists, is scheduled, and the current user is a participant.
+ * Optionally validates that the winnerUserId is a participant. Validates set scores and winner consistency.
+ * Throws AppError on invalid input, unauthorized user, or domain violations.
+ *
+ * @param input - The result submission input, including matchId, winnerUserId, sets, and currentUserId.
+ * @returns The created ResultDTO with all set results, sorted by set number.
+ * @throws AppError if the match is not found, not scheduled, user is not a participant, or validation fails.
+ */
+export async function submitMatchResult(input: SubmitMatchResultInput): Promise<ResultDTO> {
+  const { matchId, sets, currentUserId } = input;
+
+  return prisma.$transaction(async (tx) => {
+
+    const match = await tx.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new AppError('Match not found', 404);
+
+    if (match.status !== MatchStatus.scheduled) {
+      throw new AppError('Cannot submit result: Match is not scheduled', 409);
+    }
+
+    if (
+      currentUserId !== match.hostUserId &&
+      currentUserId !== match.opponentUserId
+    ) {
+      throw new AppError('Only match participants can submit result', 403);
+    }
+
+    const existing = await tx.result.findUnique({ where: { matchId } });
+    if (existing) {
+      throw new AppError('Result already exists for this match', 409);
+    }
+
+    if (!sets || sets.length === 0) {
+      throw new AppError('At least one set is required', 400);
+    }
+
+    // Validate set scores
+    for (const set of sets) {
+      validateSetScore(set);
+    }
+
+    // Compute winner server-side
+    const winnerUserId = computeWinnerFromSets(
+      sets,
+      match.hostUserId,
+      match.opponentUserId
+    );
+
+    // Create result
+    const result = await tx.result.create({
+      data: {
+        matchId,
+        winnerUserId
+      }
+    });
+
+    // Insert sets
+    for (const set of sets) {
+      await tx.setResult.create({
+        data: {
+          resultId: result.id,
+          setNumber: set.setNumber,
+          playerAScore: set.playerAScore,
+          playerBScore: set.playerBScore,
+          tiebreakScoreA: set.tiebreakScoreA ?? null,
+          tiebreakScoreB: set.tiebreakScoreB ?? null
+        }
+      });
+    }
+
+    const fullResult = await tx.result.findUnique({
+      where: { id: result.id },
+      include: { sets: true }
+    });
+
+    if (!fullResult) {
+      throw new AppError('Result not found after creation', 500);
+    }
+
+    return toResultDTO(fullResult);
+  });
+}
+
 ////////////////////////////////////////////////////////////
 // HELPERS
 ////////////////////////////////////////////////////////////
@@ -357,32 +444,54 @@ export function assertCanCreateResult(
 }
 
 /**
- * Validates that the declared winnerUserId matches the actual winner derived from set scores.
- * Throws AppError(400) if inconsistent or tie.
+ * Computes the winner user ID based on submitted set results.
+ *
+ * Assumptions:
+ * - playerAScore corresponds to match.hostUserId
+ * - playerBScore corresponds to match.opponentUserId
+ *
+ * Rules:
+ * - At least one set must exist
+ * - Each set must have a clear winner
+ * - Total sets won cannot be tied
  *
  * @param sets - Array of AddSetResultInput
- * @param winnerUserId - Declared winner user ID
- * @param hostUserId - User ID of host
- * @param opponentUserId - User ID of opponent
+ * @param hostUserId - Match host user ID
+ * @param opponentUserId - Match opponent user ID
+ * @returns winnerUserId
+ * @throws AppError if no winner can be determined
  */
-export function validateWinnerConsistency(
+export function computeWinnerFromSets(
   sets: AddSetResultInput[],
-  winnerUserId: string | null,
   hostUserId: string,
   opponentUserId: string
-) {
-  if (!winnerUserId || sets.length === 0) return;
-  let setsWonA = 0;
-  let setsWonB = 0;
+): string {
+  if (!sets || sets.length === 0) {
+    throw new AppError('Cannot compute winner: no sets provided', 400);
+  }
+
+  let hostSetsWon = 0;
+  let opponentSetsWon = 0;
+
   for (const set of sets) {
-    if (set.playerAScore > set.playerBScore) setsWonA++;
-    else if (set.playerBScore > set.playerAScore) setsWonB++;
+    if (set.playerAScore > set.playerBScore) {
+      hostSetsWon++;
+    } else if (set.playerBScore > set.playerAScore) {
+      opponentSetsWon++;
+    } else {
+      // Should never happen due to validateSetScore
+      throw new AppError('Invalid set: tie score detected', 400);
+    }
   }
-  let actualWinnerUserId: string | null = null;
-  if (setsWonA > setsWonB) actualWinnerUserId = hostUserId;
-  else if (setsWonB > setsWonA) actualWinnerUserId = opponentUserId;
-  else throw new AppError('Set results are tied: no winner can be determined', 400);
-  if (winnerUserId !== actualWinnerUserId) {
-    throw new AppError('Winner does not match set results', 400);
+
+  if (hostSetsWon === opponentSetsWon) {
+    throw new AppError(
+      'Cannot determine winner: total sets are tied',
+      400
+    );
   }
+
+  return hostSetsWon > opponentSetsWon
+    ? hostUserId
+    : opponentUserId;
 }

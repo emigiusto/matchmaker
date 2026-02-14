@@ -49,3 +49,10 @@ export interface AddSetResultInput {
   tiebreakScoreA?: number | null;
   tiebreakScoreB?: number | null;
 }
+
+
+export interface SubmitMatchResultInput {
+  matchId: string;
+  sets: AddSetResultInput[];
+  currentUserId: string;
+}

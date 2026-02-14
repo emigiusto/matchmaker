@@ -245,45 +245,6 @@ router.post('/:id/cancel', MatchesController.cancelMatch);
 
 /**
  * @openapi
- * /matches/{matchId}/submit-result:
- *   post:
- *     summary: Submit match result and sets
- *     description: Unified endpoint to submit result and sets for a match.
- *     tags:
- *       - Matches
- *     parameters:
- *       - in: path
- *         name: matchId
- *         required: true
- *         schema:
- *           type: string
- *         description: Match ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               winnerUserId:
- *                 type: string
- *                 nullable: true
- *               sets:
- *                 type: array
- *                 items:
- *                   $ref: '#/components/schemas/SetResultInput'
- *     responses:
- *       201:
- *         description: The submitted match result
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Result'
- */
-router.post('/matches/:matchId/submit-result', MatchesController.submitMatchResult);
-
-/**
- * @openapi
  * /matches:
  *   post:
  *     summary: Create a match directly
