@@ -724,7 +724,12 @@
             }
           },
           "response": []
-        },
+        }
+      ]
+    },
+    {
+      "name": "Results",
+      "item": [
         {
           "name": "Submit Match Result",
           "request": {
@@ -733,27 +738,22 @@
               { "key": "Content-Type", "value": "application/json" }
             ],
             "url": {
-              "raw": "http://localhost:3000/matches/:matchId/submit-result",
+              "raw": "http://localhost:3000/results/:matchId/submit-result",
               "protocol": "http",
               "host": ["localhost"],
               "port": "3000",
-              "path": ["matches", ":matchId", "submit-result"],
+              "path": ["results", ":matchId", "submit-result"],
               "variable": [
                 { "key": "matchId" }
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"winnerUserId\": \"<userId or null>\",\n  \"sets\": [\n    {\n      \"setNumber\": 1,\n      \"playerAScore\": 6,\n      \"playerBScore\": 4\n    },\n    {\n      \"setNumber\": 2,\n      \"playerAScore\": 3,\n      \"playerBScore\": 6\n    }\n  ]\n}"
+              "raw": "{\n  \"sets\": [\n    {\n      \"setNumber\": 1,\n      \"playerAScore\": 6,\n      \"playerBScore\": 4\n    },\n    {\n      \"setNumber\": 2,\n      \"playerAScore\": 3,\n      \"playerBScore\": 6\n    }\n  ]\n}"
             }
           },
           "response": []
-        }
-      ]
-    },
-    {
-      "name": "Results",
-      "item": [
+        },
         {
           "name": "Add Set Result",
           "request": {
