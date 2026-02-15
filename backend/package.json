@@ -7,14 +7,17 @@
     "dev": "ts-node-dev --respawn --transpile-only --watch src src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed": "npx tsx prisma/seeders/seed.ts"
+    "seed": "npx tsx prisma/seeders/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@faker-js/faker": "^10.2.0",
+    "@faker-js/faker": "^10.3.0",
     "@prisma/client": "^6.19.2",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
@@ -26,13 +29,17 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^25.2.0",
+    "@types/node": "^25.2.3",
     "@types/node-cron": "^3.0.11",
     "@types/redis": "^4.0.10",
+    "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "@vitest/coverage-v8": "^4.0.18",
     "prisma": "^6.19.2",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

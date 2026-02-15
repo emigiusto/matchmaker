@@ -26,8 +26,12 @@ export class DeterministicRatingAlgorithm implements RatingAlgorithm {
       delta = Math.min(delta, c.maxDelta);
     } else {
       delta = c.baseGain - (ratingDiff * 0.05);
-      delta = Math.max(delta, c.minExpectedGain);
     }
+
+    // Clamp delta to at least minExpectedGain after all calculations
+    delta = Math.max(delta, c.minExpectedGain);
+    // Round to 8 decimals to avoid floating-point issues
+    delta = Math.round(delta * 1e8) / 1e8;
 
     const winnerNewRating = winner.rating + delta;
     const loserNewRating = loser.rating - (delta * c.lossFactor);
