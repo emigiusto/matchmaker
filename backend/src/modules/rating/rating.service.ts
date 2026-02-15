@@ -18,6 +18,28 @@ export const defaultConfig: RatingConfig = {
   enableHistoryTracking: true,
 };
 
+export type RatingTx = {
+  match: Pick<
+    Prisma.TransactionClient['match'],
+    'findUnique'
+  >;
+
+  result: Pick<
+    Prisma.TransactionClient['result'],
+    'findUnique'
+  >;
+
+  player: Pick<
+    Prisma.TransactionClient['player'],
+    'findUnique' | 'update'
+  >;
+
+  ratingHistory: Pick<
+    Prisma.TransactionClient['ratingHistory'],
+    'create'
+  >;
+};
+
 
 export class RatingService {
   // Pluggable algorithm (default: Deterministic)
@@ -34,7 +56,7 @@ export class RatingService {
    * Throws only if winner is missing.
    */
   static async updateRatingsForCompletedMatch(
-    tx: Prisma.TransactionClient,
+    tx: RatingTx,
     matchId: string
   ): Promise<void> {
     // 1. Load Match

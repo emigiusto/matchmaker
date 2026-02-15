@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RatingService, defaultConfig } from '../rating.service';
 import { DeterministicRatingAlgorithm } from '../algorithms/deterministic.algorithm';
-import { EloRatingAlgorithm } from '../algorithms/elo.algorithm';
 import { AppError } from '../../../shared/errors/AppError';
 
 // Helper: create a mock Prisma TransactionClient
