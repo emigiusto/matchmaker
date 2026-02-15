@@ -8,6 +8,7 @@ import { AppError } from '../../shared/errors/AppError';
 import { prisma } from '../../prisma';
 import { MatchDTO, CreateMatchInput } from './matches.types';
 import { Match, MatchStatus, Prisma } from '@prisma/client';
+import { RatingService } from '../rating/rating.service';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -264,9 +265,7 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
     }
 
     // Update ratings for both players after match is completed
-    await import('../rating/rating.service').then(({ RatingService }) =>
-      RatingService.updateRatingsForCompletedMatch(tx, match.id)
-    );
+    await RatingService.updateRatingsForCompletedMatch(tx, match.id);
 
     const updated = await tx.match.findUnique({
       where: { id: match.id }
