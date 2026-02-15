@@ -64,6 +64,7 @@ model Player {
   updatedAt       DateTime @updatedAt
   isDeleted       Boolean  @default(false)
   deletedAt       DateTime?
+  lastMatchAt     DateTime?
 
   user              User            @relation(fields: [userId], references: [id])
   preferredSurfaces PlayerSurface[]

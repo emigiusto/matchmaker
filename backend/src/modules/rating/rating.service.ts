@@ -1,5 +1,6 @@
-import { PlayerSnapshot, RatingConfig } from './algorithms/domain.types';
+import { PlayerSnapshot, EloPlayerSnapshot, RatingConfig } from './algorithms/domain.types';
 import { RatingAlgorithm } from './algorithms/algorithm.types';
+import { EloRatingAlgorithm } from './algorithms/elo.algorithm';
 import { DeterministicRatingAlgorithm } from './algorithms/deterministic.algorithm';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
@@ -19,20 +20,44 @@ export const defaultConfig: RatingConfig = {
 };
 
 export type RatingTx = {
-  match: Pick<
-    Prisma.TransactionClient['match'],
-    'findUnique'
-  >;
+  match: {
+    findUnique: (args: { where: { id: string } }) => Promise<{
+      id: string;
+      inviteId: string | null;
+      availabilityId: string;
+      venueId: string | null;
+      playerAId: string | null;
+      playerBId: string | null;
+      scheduledAt: Date;
+      createdAt: Date;
+      status: string;
+      hostUserId: string;
+      opponentUserId: string;
+    } | null>;
+  };
 
   result: Pick<
     Prisma.TransactionClient['result'],
     'findUnique'
   >;
 
-  player: Pick<
-    Prisma.TransactionClient['player'],
-    'findUnique' | 'update'
-  >;
+  player: {
+    findUnique: (args: { where: { id: string } }) => Promise<{
+      id: string;
+      userId: string;
+      levelValue: number | null;
+      levelConfidence: number | null;
+      lastMatchAt?: Date | null;
+    } | null>;
+    update: (args: {
+      where: { id: string };
+      data: {
+        levelValue?: number;
+        levelConfidence?: number;
+        lastMatchAt?: Date;
+      };
+    }) => Promise<any>;
+  };
 
   ratingHistory: Pick<
     Prisma.TransactionClient['ratingHistory'],
@@ -89,39 +114,82 @@ export class RatingService {
       throw new AppError('Cannot update ratings: winner does not match players', 500);
     }
 
-    const winnerSnapshot: PlayerSnapshot = {
-      rating: winnerPlayer.levelValue ?? defaultConfig.defaultRating,
-      confidence: winnerPlayer.levelConfidence ?? defaultConfig.defaultConfidence,
-    };
-    const loserSnapshot: PlayerSnapshot = {
-      rating: loserPlayer.levelValue ?? defaultConfig.defaultRating,
-      confidence: loserPlayer.levelConfidence ?? defaultConfig.defaultConfidence,
-    };
-
-    // Delegate full update to algorithm
-    const updateResult = this.algorithm.compute({
-      winner: winnerSnapshot,
-      loser: loserSnapshot
-    });
+    let updateResult;
+    let winnerSnapshot: PlayerSnapshot | EloPlayerSnapshot;
+    let loserSnapshot: PlayerSnapshot | EloPlayerSnapshot;
+    // Use scheduledAt as the match date for ratings
+    let matchDate: Date = match.scheduledAt ?? new Date();
+    if (this.algorithm instanceof EloRatingAlgorithm) {
+      // ELO requires lastMatchAt (non-null)
+      winnerSnapshot = {
+        rating: winnerPlayer.levelValue ?? defaultConfig.defaultRating,
+        confidence: winnerPlayer.levelConfidence ?? defaultConfig.defaultConfidence,
+        lastMatchAt: winnerPlayer.lastMatchAt ?? matchDate,
+      };
+      loserSnapshot = {
+        rating: loserPlayer.levelValue ?? defaultConfig.defaultRating,
+        confidence: loserPlayer.levelConfidence ?? defaultConfig.defaultConfidence,
+        lastMatchAt: loserPlayer.lastMatchAt ?? matchDate,
+      };
+      updateResult = this.algorithm.compute({
+        winner: winnerSnapshot as EloPlayerSnapshot,
+        loser: loserSnapshot as EloPlayerSnapshot
+      });
+    } else {
+      // Deterministic or other algorithms
+      winnerSnapshot = {
+        rating: winnerPlayer.levelValue ?? defaultConfig.defaultRating,
+        confidence: winnerPlayer.levelConfidence ?? defaultConfig.defaultConfidence,
+      };
+      loserSnapshot = {
+        rating: loserPlayer.levelValue ?? defaultConfig.defaultRating,
+        confidence: loserPlayer.levelConfidence ?? defaultConfig.defaultConfidence,
+      };
+      updateResult = this.algorithm.compute({
+        winner: winnerSnapshot,
+        loser: loserSnapshot
+      });
+    }
 
     // 15. Persist updates
 
-    await Promise.all([
-      tx.player.update({
-        where: { id: winnerPlayer.id },
-        data: {
-          levelValue: updateResult.winnerNewRating,
-          levelConfidence: updateResult.winnerNewConfidence,
-        },
-      }),
-      tx.player.update({
-        where: { id: loserPlayer.id },
-        data: {
-          levelValue: updateResult.loserNewRating,
-          levelConfidence: updateResult.loserNewConfidence,
-        },
-      })
-    ]);
+    if (this.algorithm instanceof EloRatingAlgorithm) {
+      await Promise.all([
+        tx.player.update({
+          where: { id: winnerPlayer.id },
+          data: {
+            levelValue: updateResult.winnerNewRating,
+            levelConfidence: updateResult.winnerNewConfidence,
+            lastMatchAt: matchDate,
+          },
+        }),
+        tx.player.update({
+          where: { id: loserPlayer.id },
+          data: {
+            levelValue: updateResult.loserNewRating,
+            levelConfidence: updateResult.loserNewConfidence,
+            lastMatchAt: matchDate,
+          },
+        })
+      ]);
+    } else {
+      await Promise.all([
+        tx.player.update({
+          where: { id: winnerPlayer.id },
+          data: {
+            levelValue: updateResult.winnerNewRating,
+            levelConfidence: updateResult.winnerNewConfidence,
+          },
+        }),
+        tx.player.update({
+          where: { id: loserPlayer.id },
+          data: {
+            levelValue: updateResult.loserNewRating,
+            levelConfidence: updateResult.loserNewConfidence,
+          },
+        })
+      ]);
+    }
 
     // 16. Optionally track rating history
     if (defaultConfig.enableHistoryTracking) {
@@ -152,7 +220,3 @@ export class RatingService {
     }
   }
 }
-
-
-// Optionally export for testing
-// export { DeterministicRatingAlgorithm };

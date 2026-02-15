@@ -4,6 +4,11 @@ export interface PlayerSnapshot {
   confidence: number;
 }
 
+// For ELO algorithm only: require lastMatchAt
+export interface EloPlayerSnapshot extends PlayerSnapshot {
+  lastMatchAt: Date;
+}
+
 export interface RatingUpdateResult {
   winnerNewRating: number;
   loserNewRating: number;
