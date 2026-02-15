@@ -2,7 +2,7 @@
 import { Router } from 'express';
 
 import userRoutes from './modules/users/users.routes';
-import availabilityRoutes from './modules/availability/availability.routes';
+import availabilityRoutes from './modules/availabilities/availability.routes';
 import inviteRoutes from './modules/invites/invite.routes';
 import playersRoutes from './modules/players/players.routes';
 import matchmakingRoutes from './modules/matchmaking/matchmaking.routes';

@@ -1,6 +1,6 @@
 // src/shared/types/index.ts
 // Shared TypeScript types
-import type { AvailabilityDTO } from '../../modules/availability/availability.types';
+import type { AvailabilityDTO } from '../../modules/availabilities/availability.types';
 
 export type AcceptAvailabilityResult = {
 	availability: AvailabilityDTO;

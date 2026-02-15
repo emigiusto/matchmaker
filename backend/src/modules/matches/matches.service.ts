@@ -263,10 +263,14 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
       throw new AppError('Match already completed or invalid state', 409);
     }
 
+    // Update ratings for both players after match is completed
+    await import('../rating/rating.service').then(({ RatingService }) =>
+      RatingService.updateRatingsForCompletedMatch(tx, match.id)
+    );
+
     const updated = await tx.match.findUnique({
       where: { id: match.id }
     });
-
     return toMatchDTO(updated!);
   });
 }

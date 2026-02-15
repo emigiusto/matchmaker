@@ -4,8 +4,12 @@ import routes from './routes';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger';
 import { errorHandler } from './shared/errors/errorHandler';
+import { configureRatingSystem } from './modules/rating/rating.bootstrap';
 
 const app = express();
+
+// Configure rating system before handling requests
+configureRatingSystem();
 
 // Parse JSON bodies
 app.use(express.json());

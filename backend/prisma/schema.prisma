@@ -69,6 +69,7 @@ model Player {
   preferredSurfaces PlayerSurface[]
   matchesA          Match[]         @relation("PlayerA")
   matchesB          Match[]         @relation("PlayerB")
+  ratingHistory     RatingHistory[]   // <--- Add this line
 
   @@index([userId])
   @@index([levelValue])
@@ -400,4 +401,25 @@ model Message {
 
   @@index([conversationId])
   @@index([senderUserId])
+}
+
+////////////////////////////////////////////////////////////
+// RATING HISTORY
+////////////////////////////////////////////////////////////
+
+model RatingHistory {
+  id             String   @id @default(uuid())
+  playerId       String
+  matchId        String
+  oldRating      Float
+  newRating      Float
+  delta          Float
+  oldConfidence  Float
+  newConfidence  Float
+  createdAt      DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@index([playerId])
+  @@index([matchId])
 }

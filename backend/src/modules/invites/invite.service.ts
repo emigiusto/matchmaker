@@ -56,7 +56,7 @@ import { generateInviteToken, getInviteExpiration, isInviteExpired } from './inv
 import { isPending } from './invite.model';
 import { createNotification } from '../notifications/notifications.service';
 import { logger } from '../../config/logger';
-import { AvailabilityService } from '../availability/availability.service';
+import { AvailabilityService } from '../availabilities/availability.service';
 
 export class InviteService {
   /**
