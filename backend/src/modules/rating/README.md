@@ -1,4 +1,4 @@
-🎾 Rating System Overview
+# 🎾 Rating System Overview
 
 This module provides a flexible, extensible player rating engine for
 match-based games such as a tennis community platform.
@@ -14,7 +14,7 @@ match.
 
 ------------------------------------------------------------------------
 
-🧠 How It Works
+# 🧠 How It Works
 
 When a match is completed:
 
@@ -33,7 +33,7 @@ All operations run inside a provided Prisma transaction (RatingTx).
 
 ------------------------------------------------------------------------
 
-🧩 Architecture
+# 🧩 Architecture
 
     rating/
      ├── rating.service.ts
@@ -54,9 +54,9 @@ Key Design Principles
 
 ------------------------------------------------------------------------
 
-⚙️ Algorithms
+# ⚙️ Algorithms
 
-1️⃣ Deterministic Algorithm (Default)
+## 1️⃣ Deterministic Algorithm (Default)
 
 A predictable, tunable rating system.
 
@@ -73,12 +73,12 @@ This makes it stable and easy to tune for community play.
 
 ------------------------------------------------------------------------
 
-2️⃣ ELO Algorithm (Confidence-Driven Volatility + Inactivity Decay)
+## 2️⃣ ELO Algorithm (Confidence-Driven Volatility + Inactivity Decay)
 
 An enhanced ELO-based rating system designed specifically for
 competitive communities.
 
-⭐ Core Idea
+### ⭐ Core Idea
 
 Each player’s confidence independently affects how much their rating
 changes.
@@ -87,7 +87,7 @@ This is not classic chess ELO.
 
 ------------------------------------------------------------------------
 
-🧠 Confidence-Driven Volatility (Per Player)
+### 🧠 Confidence-Driven Volatility (Per Player)
 
 For each player:
 
@@ -110,7 +110,7 @@ This is intentional and improves realism in evolving skill systems.
 
 ------------------------------------------------------------------------
 
-📉 Inactivity Decay
+### 📉 Inactivity Decay
 
 Confidence decays over time if a player stops competing.
 
@@ -126,7 +126,7 @@ Lower confidence caused by inactivity increases volatility on return.
 
 ------------------------------------------------------------------------
 
-📐 Mathematical Overview
+### 📐 Mathematical Overview
 
 Expected Score
 
@@ -139,7 +139,7 @@ Rating Updates (Per Player)
 
 ------------------------------------------------------------------------
 
-📊 Detailed Examples
+## 📊 Detailed Examples
 
 
 ### Example 1 — Equal Ratings, Equal Confidence
@@ -224,7 +224,7 @@ Rating Updates (Per Player)
 
 ------------------------------------------------------------------------
 
-🔁 Switching Algorithms
+## 🔁 Switching Algorithms
 
 Environment configuration:
 
@@ -240,7 +240,7 @@ Bootstrap example:
 
 ------------------------------------------------------------------------
 
-🗄 Rating History
+## 🗄 Rating History
 
 If enableHistoryTracking = true, the system stores:
 
@@ -254,7 +254,7 @@ If enableHistoryTracking = true, the system stores:
 
 ------------------------------------------------------------------------
 
-🧪 Testing
+## 🧪 Testing
 
 The rating module is fully unit-tested using Vitest:
 
@@ -266,7 +266,7 @@ The rating module is fully unit-tested using Vitest:
 
 ------------------------------------------------------------------------
 
-🚀 Extending the System
+## 🚀 Extending the System
 
 To add a new rating algorithm:
 
@@ -278,7 +278,7 @@ No changes to RatingService are required.
 
 ------------------------------------------------------------------------
 
-🎾 Why This Works for a Tennis Community
+## 🎾 Why This Works for a Tennis Community
 
 -   New players converge quickly to their real level
 -   Established players stabilize naturally
