@@ -2,6 +2,19 @@ import { DeterministicRatingAlgorithm } from '../deterministic.algorithm';
 import { RatingConfig, PlayerSnapshot } from '../domain.types';
 
 describe('DeterministicRatingAlgorithm', () => {
+    it('Monotonicity: delta decreases as winner rating increases (vs same opponent)', () => {
+      const opponent = makeSnapshot(3.0, 0.3);
+      const weakWinner = makeSnapshot(3.0, 0.3);
+      const mediumWinner = makeSnapshot(4.0, 0.3);
+      const strongWinner = makeSnapshot(6.0, 0.3);
+
+      const d1 = algo.compute({ winner: weakWinner, loser: opponent }).winnerNewRating - weakWinner.rating;
+      const d2 = algo.compute({ winner: mediumWinner, loser: opponent }).winnerNewRating - mediumWinner.rating;
+      const d3 = algo.compute({ winner: strongWinner, loser: opponent }).winnerNewRating - strongWinner.rating;
+
+      expect(d1).toBeGreaterThanOrEqual(d2);
+      expect(d2).toBeGreaterThanOrEqual(d3);
+    });
   const config: RatingConfig = {
     baseGain: 0.1,
     upsetMultiplier: 1.5,

@@ -2,6 +2,19 @@ import { EloRatingAlgorithm } from '../elo.algorithm';
 import { PlayerSnapshot } from '../domain.types';
 
 describe('EloRatingAlgorithm', () => {
+    it('Monotonicity: delta decreases as winner rating increases (vs same opponent)', () => {
+      const opponent = makeSnapshot(1200, 0.5);
+      const weakWinner = makeSnapshot(1200, 0.5);
+      const mediumWinner = makeSnapshot(1400, 0.5);
+      const strongWinner = makeSnapshot(1800, 0.5);
+
+      const d1 = algo.compute({ winner: weakWinner, loser: opponent }).winnerNewRating - weakWinner.rating;
+      const d2 = algo.compute({ winner: mediumWinner, loser: opponent }).winnerNewRating - mediumWinner.rating;
+      const d3 = algo.compute({ winner: strongWinner, loser: opponent }).winnerNewRating - strongWinner.rating;
+
+      expect(d1).toBeGreaterThanOrEqual(d2);
+      expect(d2).toBeGreaterThanOrEqual(d3);
+    });
   const kFactor = 32;
   const confidenceIncrement = 0.02;
   const confidenceMax = 1;

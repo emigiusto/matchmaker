@@ -24,30 +24,73 @@ describe('Rating Algorithm Invariants', () => {
       name: 'Deterministic',
       instance: new DeterministicRatingAlgorithm(config),
       makeSnapshot: (rating: number, confidence: number) => ({ rating, confidence }),
+      zeroSum: false,
     },
     {
       name: 'ELO',
       instance: new EloRatingAlgorithm(kFactor, confidenceIncrement, confidenceMax),
       makeSnapshot: (rating: number, confidence: number) => ({ rating, confidence }),
+      zeroSum: true,
     },
   ];
 
-  algorithms.forEach(({ name, instance, makeSnapshot }) => {
+  algorithms.forEach(({ name, instance, makeSnapshot, zeroSum }) => {
     describe(`${name}RatingAlgorithm`, () => {
+      it('Fuzz: random ratings/confidence do not break invariants', () => {
+        for (let i = 0; i < 200; i++) {
+          const winnerRating = Math.random() * 3000;
+          const loserRating = Math.random() * 3000;
+          const winnerConfidence = Math.random();
+          const loserConfidence = Math.random();
+          const winner = makeSnapshot(winnerRating, winnerConfidence);
+          const loser = makeSnapshot(loserRating, loserConfidence);
+          const result = instance.compute({ winner, loser });
+          // Ratings remain finite
+          expect(Number.isFinite(result.winnerNewRating)).toBe(true);
+          expect(Number.isFinite(result.loserNewRating)).toBe(true);
+          // Confidence remains in [0, 1]
+          expect(result.winnerNewConfidence).toBeGreaterThanOrEqual(0);
+          expect(result.winnerNewConfidence).toBeLessThanOrEqual(1);
+          expect(result.loserNewConfidence).toBeGreaterThanOrEqual(0);
+          expect(result.loserNewConfidence).toBeLessThanOrEqual(1);
+          // No NaN
+          expect(!Number.isNaN(result.winnerNewRating)).toBe(true);
+          expect(!Number.isNaN(result.loserNewRating)).toBe(true);
+        }
+      });
+      it('Symmetry: reversing winner/loser mirrors rating delta appropriately', () => {
+        const a = makeSnapshot(1500, 0.5);
+        const b = makeSnapshot(1400, 0.5);
+        const win = instance.compute({ winner: a, loser: b });
+        const reverse = instance.compute({ winner: b, loser: a });
+        const deltaA = win.winnerNewRating - a.rating;
+        const deltaB = win.loserNewRating - b.rating;
+        const reverseDeltaA = reverse.loserNewRating - a.rating;
+        const reverseDeltaB = reverse.winnerNewRating - b.rating;
+        const total = deltaA + deltaB + reverseDeltaA + reverseDeltaB;
+        if (zeroSum) {
+          // For zero-sum, the sum of all deltas for both match directions should be zero
+          expect(total).toBeCloseTo(0, 8);
+        } else {
+          // For non-zero-sum, allow a larger epsilon due to loss factor and clamping
+          const epsilon = 0.25;
+          expect(Math.abs(total)).toBeLessThanOrEqual(epsilon);
+        }
+      });
       it('Zero-sum property: winnerNewRating + loserNewRating ≈ winnerOldRating + loserOldRating', () => {
         const winner = makeSnapshot(1500, 0.5);
         const loser = makeSnapshot(1400, 0.5);
         const result = instance.compute({ winner, loser });
         const oldSum = winner.rating + loser.rating;
         const newSum = result.winnerNewRating + result.loserNewRating;
-        if (name === 'Deterministic') {
+        if (zeroSum) {
+          expect(newSum).toBeCloseTo(oldSum, 8);
+        } else {
           // Allow for lossFactor < 1 (not strictly zero-sum)
           const expectedSum = oldSum - (result.winnerNewRating - winner.rating) * (1 - config.lossFactor);
           // Allow up to minExpectedGain + small margin for floating-point
           const epsilon = config.minExpectedGain + 1e-4;
           expect(Math.abs(newSum - expectedSum)).toBeLessThanOrEqual(epsilon);
-        } else {
-          expect(newSum).toBeCloseTo(oldSum, 8);
         }
       });
 

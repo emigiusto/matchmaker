@@ -5,12 +5,8 @@ import { PlayerSnapshot, RatingConfig, RatingUpdateResult } from './domain.types
  * Pure deterministic rating algorithm.
  * Owns all rating/confidence update logic.
  */
+
 export class DeterministicRatingAlgorithm implements RatingAlgorithm {
-  // Algorithm constants
-  private static readonly BASE_GAIN = 0.1;
-  private static readonly UPSET_MULTIPLIER = 1.5;
-  private static readonly MAX_DELTA = 0.25;
-  private static readonly MIN_EXPECTED_GAIN = 0.03;
 
   constructor(private readonly config: RatingConfig) {}
 
