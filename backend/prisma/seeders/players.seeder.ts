@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { batchInsert } from './batchInsert.util';
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -12,63 +13,110 @@ type PlayerSeed = {
   defaultCity: string;
   latitude: number;
   longitude: number;
+  lastMatchAt?: Date | null;
 };
 
-export async function seedPlayers(users: { id: string; name: string | null }[]) {
-  // Ensure every user gets a player (1:1 with availabilities)
-  const playerUsers = users;
-  const usedUserIds = new Set<string>();
-  const players: PlayerSeed[] = [];
-  // Use 3 fixed cities with real coordinates (e.g., Paris, Berlin, Madrid)
-  const cityCenters: { [city: string]: { lat: number; lng: number } } = {
-    Paris: { lat: 48.8566, lng: 2.3522 },
-    Berlin: { lat: 52.52, lng: 13.405 },
-    Madrid: { lat: 40.4168, lng: -3.7038 }
-  };
-  const cityList = Object.keys(cityCenters);
+const cityCenters: Record<
+  string,
+  { lat: number; lng: number }
+> = {
+  Paris: { lat: 48.8566, lng: 2.3522 },
+  Berlin: { lat: 52.52, lng: 13.405 },
+  Madrid: { lat: 40.4168, lng: -3.7038 },
+};
 
-  // Helper to generate a random coordinate within 30-40km of a center point
-  function randomNearbyCoordinate(centerLat: number, centerLng: number, minDistanceKm: number, maxDistanceKm: number) {
-    const R = 6371; // Earth radius in km
-    const distance = minDistanceKm + Math.random() * (maxDistanceKm - minDistanceKm);
-    const angle = Math.random() * 2 * Math.PI;
-    const dLat = (distance / R) * (180 / Math.PI);
-    const dLng = (distance / R) * (180 / Math.PI) / Math.cos(centerLat * Math.PI / 180);
-    return {
-      latitude: centerLat + dLat * Math.cos(angle),
-      longitude: centerLng + dLng * Math.sin(angle)
-    };
+const cityList = Object.keys(cityCenters);
+
+/**
+ * Generates a coordinate within X km radius from a center point.
+ */
+function randomNearbyCoordinate(
+  centerLat: number,
+  centerLng: number,
+  radiusKm: number
+) {
+  const R = 6371; // Earth radius km
+
+  const distance = Math.random() * radiusKm;
+  const angle = Math.random() * 2 * Math.PI;
+
+  const dLat = (distance / R) * (180 / Math.PI);
+  const dLng =
+    (distance / R) *
+    (180 / Math.PI) /
+    Math.cos(centerLat * (Math.PI / 180));
+
+  return {
+    latitude: centerLat + dLat * Math.cos(angle),
+    longitude: centerLng + dLng * Math.sin(angle),
+  };
+}
+
+/**
+ * Generate realistic tennis level distribution.
+ * Most players between 3.0 and 5.0.
+ */
+function generateLevel() {
+  const bucket = faker.helpers.weightedArrayElement([
+    { weight: 2, value: 'beginner' },
+    { weight: 6, value: 'intermediate' },
+    { weight: 2, value: 'advanced' },
+  ]);
+
+  if (bucket === 'beginner') {
+    return faker.number.float({ min: 1.5, max: 2.9, multipleOf: 0.1 });
   }
-  for (const user of playerUsers) {
-    if (usedUserIds.has(user.id)) continue;
-    usedUserIds.add(user.id);
-    // Assign a city from the 3 fixed cities
+
+  if (bucket === 'advanced') {
+    return faker.number.float({ min: 5.1, max: 7.0, multipleOf: 0.1 });
+  }
+
+  return faker.number.float({ min: 3.0, max: 5.0, multipleOf: 0.1 });
+}
+
+export async function seedPlayers(
+  users: { id: string; name: string | null }[]
+) {
+  if (!users.length) {
+    throw new Error('No users provided to seedPlayers');
+  }
+
+  const players: PlayerSeed[] = [];
+
+  for (const user of users) {
     const defaultCity = faker.helpers.arrayElement(cityList);
     const center = cityCenters[defaultCity];
-    // Place player within 30-40km of city center
-    const coord = randomNearbyCoordinate(center.lat, center.lng, 30, 40);
-    // Ensure coordinates are always numbers
-    if (
-      typeof coord.latitude === 'number' &&
-      typeof coord.longitude === 'number' &&
-      !isNaN(coord.latitude) &&
-      !isNaN(coord.longitude)
-    ) {
-      players.push({
-        userId: user.id,
-        displayName: user.name ?? undefined,
-        levelValue: faker.number.float({ min: 1, max: 7, multipleOf: 0.1 }),
-        levelConfidence: faker.number.float({ min: 0.5, max: 1, multipleOf: 0.01 }),
-        defaultCity,
-        latitude: coord.latitude,
-        longitude: coord.longitude,
-      });
-    }
+
+    const { latitude, longitude } = randomNearbyCoordinate(
+      center.lat,
+      center.lng,
+      40 // within 40km
+    );
+
+    const levelValue = generateLevel();
+
+    // Confidence correlates loosely with recent activity
+    const isActive = faker.datatype.boolean({ probability: 0.7 });
+
+    players.push({
+      userId: user.id,
+      displayName: user.name ?? undefined,
+      levelValue,
+      levelConfidence: faker.number.float({
+        min: isActive ? 0.7 : 0.4,
+        max: 1,
+        multipleOf: 0.01,
+      }),
+      defaultCity,
+      latitude,
+      longitude,
+      lastMatchAt: isActive
+        ? faker.date.recent({ days: 60 })
+        : null,
+    });
   }
-  if (players.length === 0) {
-    throw new Error('No players generated with valid coordinates.');
-  }
-  return batchInsert(players, 20, (player) =>
+
+  return batchInsert(players, 50, (player) =>
     prisma.player.create({ data: player })
   );
 }

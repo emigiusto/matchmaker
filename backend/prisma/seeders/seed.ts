@@ -60,14 +60,15 @@ async function main() {
   const matchesRaw = await seedMatches(invites, availabilities, players, venues);
   // Only pass matches with non-null hostUserId/opponentUserId to results seeder
   const matches = matchesRaw
-    .filter((m: any) => m && m.hostUserId && m.opponentUserId)
+    .filter((m: any) => m && m.hostUserId && m.opponentUserId && m.scheduledAt)
     .map((m: any) => ({
       id: m.id,
       hostUserId: m.hostUserId,
       opponentUserId: m.opponentUserId,
-    })) as { id: string; hostUserId: string; opponentUserId: string }[];
+      scheduledAt: m.scheduledAt,
+    })) as { id: string; hostUserId: string; opponentUserId: string; scheduledAt: Date }[];
   // 8. Results (for matches)
-  const results = await seedResults(matches);
+  await seedResults(matches);
 
   console.log('Seeded:', {
     users: users.length,
@@ -77,7 +78,7 @@ async function main() {
     groups: groups.length,
     invites: invites.length,
     matches: matches.length,
-    results: results.length,
+    results: matches.length, 
   });
 }
 

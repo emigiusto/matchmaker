@@ -1,40 +1,51 @@
+
 import { faker } from '@faker-js/faker';
 import { batchInsert } from './batchInsert.util';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-type MatchSeed = {
-  inviteId: string;
-  availabilityId: string;
-  venueId: string;
-  playerAId: string;
-  playerBId: string;
-  scheduledAt: Date;
-  hostUserId: string;
-  opponentUserId: string;
-};
-
-export async function seedMatches(invites: { id: string; availabilityId: string }[], availabilities: { id: string; userId: string }[], players: { id: string; userId: string }[], venues: { id: string }[]) {
-  const matches: MatchSeed[] = [];
+export async function seedMatches(
+  invites: { id: string; availabilityId: string; inviterUserId: string; status: string }[],
+  availabilities: { id: string; userId: string }[],
+  players: { id: string; userId: string }[],
+  venues: { id: string }[]
+) {
+  const matches = [];
   for (const invite of invites) {
+    // 1. Only accepted invites
+    if (invite.status !== 'accepted') continue;
+    // 2. Find availability and ensure host/opponent logic
     const availability = availabilities.find((a) => a.id === invite.availabilityId);
     if (!availability) continue;
-    const ownerPlayer = players.find((p) => p.userId === availability.userId);
-    const inviterPlayer = players.find((p) => p.userId === (invite as any).inviterUserId);
-    if (!ownerPlayer || !inviterPlayer || ownerPlayer.id === inviterPlayer.id) continue;
+    const hostUserId = availability.userId;
+    const opponentUserId = invite.inviterUserId;
+    if (!hostUserId || !opponentUserId) continue;
+    // 2. Find playerA/playerB
+    const playerA = players.find((p) => p.userId === hostUserId);
+    const playerB = players.find((p) => p.userId === opponentUserId);
+    if (!playerA || !playerB || playerA.id === playerB.id) continue;
+    // 3. Venue
     const venue = faker.helpers.arrayElement(venues);
+    // 4. scheduledAt: 60% past, 40% future
+    const isPast = faker.datatype.boolean({ probability: 0.6 });
+    const scheduledAt = isPast
+      ? faker.date.recent({ days: 30 })
+      : faker.date.soon({ days: 10 });
+    // 5. Always status: 'scheduled'
     matches.push({
       inviteId: invite.id,
       availabilityId: availability.id,
       venueId: venue.id,
-      playerAId: ownerPlayer.id,
-      playerBId: inviterPlayer.id,
-      scheduledAt: faker.date.soon({ days: 10 }),
-      hostUserId: availability.userId,
-      opponentUserId: (invite as any).inviterUserId,
+      playerAId: playerA.id,
+      playerBId: playerB.id,
+      scheduledAt,
+      hostUserId,
+      opponentUserId,
+      status: 'scheduled',
     });
   }
+
   return batchInsert(matches, 20, (match) =>
     prisma.match.create({
       data: {
@@ -47,7 +58,6 @@ export async function seedMatches(invites: { id: string; availabilityId: string 
         hostUserId: match.hostUserId,
         opponentUserId: match.opponentUserId,
         status: 'scheduled',
-        createdAt: new Date(),
       }
     })
   );

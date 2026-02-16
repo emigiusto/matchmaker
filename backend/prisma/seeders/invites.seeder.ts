@@ -32,11 +32,17 @@ export async function seedInvites(users: { id: string }[], availabilities: { id:
     // Generate minLevel and maxLevel (min <= max)
     const minLevel = faker.number.float({ min: 1, max: 4, multipleOf: 0.1 });
     const maxLevel = faker.number.float({ min: minLevel, max: 5, multipleOf: 0.1 });
+    const status = faker.helpers.weightedArrayElement([
+      { weight: 6, value: InviteStatus.accepted },
+      { weight: 3, value: InviteStatus.pending },
+      { weight: 1, value: InviteStatus.cancelled },
+    ]);
+
     invites.push({
       token: faker.string.uuid(),
       inviterUserId: inviter.id,
       availabilityId: availability.id,
-      status: InviteStatus.pending,
+      status: status,
       expiresAt: faker.date.soon({ days: 10 }),
       minLevel,
       maxLevel,
