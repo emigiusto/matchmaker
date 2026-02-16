@@ -128,10 +128,13 @@ describe('Rating Algorithm Invariants', () => {
       return { rating, confidence, lastMatchAt: lastMatchAt ?? now };
     }
 
-    it('Fuzz: random inputs remain valid', () => {
+    it('Fuzz: random inputs remain valid (with valid lastMatchAt)', () => {
       for (let i = 0; i < 300; i++) {
-        const winner = makeSnapshot(Math.random() * 3000, Math.random());
-        const loser = makeSnapshot(Math.random() * 3000, Math.random());
+        // Always use a lastMatchAt within threshold for both
+        const daysAgo = Math.floor(Math.random() * (inactivityThresholdDays + 1));
+        const lastMatchAt = new Date(now.getTime() - daysAgo * msPerDay);
+        const winner = makeSnapshot(Math.random() * 3000, Math.random(), lastMatchAt);
+        const loser = makeSnapshot(Math.random() * 3000, Math.random(), lastMatchAt);
 
         const result = elo.compute({ winner, loser });
 
@@ -184,16 +187,24 @@ describe('Rating Algorithm Invariants', () => {
       expect(deltaInactive).toBeGreaterThan(deltaActive);
     });
 
-    it('Confidence always respects bounds', () => {
-      const winner = makeSnapshot(1500, 0.99);
-      const loser = makeSnapshot(1400, 0.99);
-
+    it('Confidence always respects bounds (minConfidence only if decay applies)', () => {
+      // No decay: lastMatchAt within threshold
+      const winner = makeSnapshot(1500, 0.99, now);
+      const loser = makeSnapshot(1400, 0.99, now);
       const result = elo.compute({ winner, loser });
-
       expect(result.winnerNewConfidence).toBeLessThanOrEqual(1);
       expect(result.loserNewConfidence).toBeLessThanOrEqual(1);
       expect(result.winnerNewConfidence).toBeGreaterThanOrEqual(0);
       expect(result.loserNewConfidence).toBeGreaterThanOrEqual(0);
+
+      // With decay: lastMatchAt far in the past
+      const daysOver = 100;
+      const decayedLastMatchAt = new Date(now.getTime() - (inactivityThresholdDays + daysOver) * msPerDay);
+      const winnerDecay = makeSnapshot(1500, 0.2, decayedLastMatchAt);
+      const loserDecay = makeSnapshot(1400, 0.2, decayedLastMatchAt);
+      const resultDecay = elo.compute({ winner: winnerDecay, loser: loserDecay });
+      expect(resultDecay.winnerNewConfidence).toBeGreaterThanOrEqual(minConfidence);
+      expect(resultDecay.loserNewConfidence).toBeGreaterThanOrEqual(minConfidence);
     });
 
     it('Ratings remain stable after many matches', () => {

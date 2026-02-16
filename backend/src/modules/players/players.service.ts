@@ -10,6 +10,8 @@ import { cacheGet, cacheSet } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types';
+import { computeDecayedConfidence } from '../rating/utils/confidence.utils';
+import { EloRatingAlgorithm } from '../rating/algorithms/elo.algorithm';
 
 /**
  * Player vs User:
@@ -246,12 +248,29 @@ export class PlayersService {
    * Never exposes internal PlayerSurface model.
    */
   private static toDTO(player: Player, preferredSurfaces?: string[]): PlayerDTO {
+    // Elo config for decay (should match runtime config)
+    const eloConfig = new EloRatingAlgorithm();
+    const storedConfidence = player.levelConfidence ?? undefined;
+    const lastMatchAt = player.lastMatchAt ?? null;
+    let effectiveConfidence: number | undefined = undefined;
+    if (typeof storedConfidence === 'number') {
+      effectiveConfidence = computeDecayedConfidence(
+        storedConfidence,
+        lastMatchAt,
+        new Date(),
+        (eloConfig as any).confidenceDecayRate,
+        (eloConfig as any).inactivityThresholdDays,
+        (eloConfig as any).minConfidence
+      );
+    }
     return {
       id: player.id,
       userId: player.userId,
       displayName: player.displayName ?? '',
       levelValue: player.levelValue ?? undefined,
-      levelConfidence: player.levelConfidence ?? undefined,
+      levelConfidence: storedConfidence,
+      effectiveConfidence,
+      lastMatchAt: lastMatchAt ?? undefined,
       preferredSurfaces: preferredSurfaces ?? [],
       defaultCity: player.defaultCity ?? undefined,
       latitude: player.latitude ?? undefined,

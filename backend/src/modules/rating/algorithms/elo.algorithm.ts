@@ -1,5 +1,6 @@
 import { RatingAlgorithm } from './algorithm.types';
 import { EloPlayerSnapshot, RatingUpdateResult } from './domain.types';
+import { computeDecayedConfidence } from '../utils/confidence.utils';
 
 /**
  * Pure ELO rating algorithm (future-ready, not yet active).
@@ -19,17 +20,22 @@ export class EloRatingAlgorithm implements RatingAlgorithm {
   compute(input: { winner: EloPlayerSnapshot; loser: EloPlayerSnapshot }): RatingUpdateResult {
     // Apply confidence decay to both players BEFORE volatility calculation
     const now = new Date();
-    const decayConfidence = (confidence: number, lastMatchAt: Date): number => {
-      const daysSince = Math.floor((now.getTime() - lastMatchAt.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSince > this.inactivityThresholdDays) {
-        const daysOver = daysSince - this.inactivityThresholdDays;
-        return Math.max(this.minConfidence, confidence - daysOver * this.confidenceDecayRate);
-      }
-      return confidence;
-    };
-
-    const winnerConfidenceDecayed = decayConfidence(input.winner.confidence, input.winner.lastMatchAt);
-    const loserConfidenceDecayed = decayConfidence(input.loser.confidence, input.loser.lastMatchAt);
+    const winnerConfidenceDecayed = computeDecayedConfidence(
+      input.winner.confidence,
+      input.winner.lastMatchAt,
+      now,
+      this.confidenceDecayRate,
+      this.inactivityThresholdDays,
+      this.minConfidence
+    );
+    const loserConfidenceDecayed = computeDecayedConfidence(
+      input.loser.confidence,
+      input.loser.lastMatchAt,
+      now,
+      this.confidenceDecayRate,
+      this.inactivityThresholdDays,
+      this.minConfidence
+    );
 
     // 1. Compute volatility multipliers for both players (lower confidence = higher volatility)
     const winnerVolatility = 1 + (1 - winnerConfidenceDecayed); // 0.0 → 2.0, 1.0 → 1.0

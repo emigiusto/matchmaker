@@ -31,6 +31,10 @@ export interface PlayerDTO {
   levelValue?: number;
   /** Confidence in level assessment */
   levelConfidence?: number;
+  /** Effective confidence after inactivity decay (read-only, derived) */
+  effectiveConfidence?: number;
+  /** Last match date (for UI, derived) */
+  lastMatchAt?: Date;
   /** Preferred court surfaces */
   preferredSurfaces?: string[];
   /** Default city for matches */
