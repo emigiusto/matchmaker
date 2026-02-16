@@ -21,7 +21,6 @@ export const swaggerOptions = {
             email: { type: 'string', description: 'User email' },
             createdAt: { type: 'string', format: 'date-time', description: 'Created at' },
             updatedAt: { type: 'string', format: 'date-time', description: 'Updated at' },
-            // ...other user fields
           },
           required: ['id', 'name', 'email', 'createdAt', 'updatedAt']
         },
@@ -39,21 +38,22 @@ export const swaggerOptions = {
           properties: {
             id: { type: 'string', description: 'Player ID' },
             userId: { type: 'string', description: 'User ID' },
-            rating: { type: 'number', description: 'Player rating' },
+            levelValue: { type: 'number', nullable: true, description: 'Player level value' },
+            levelConfidence: { type: 'number', nullable: true, description: 'Player level confidence' },
             isActive: { type: 'boolean', description: 'Is active' },
             createdAt: { type: 'string', format: 'date-time', description: 'Created at' },
             updatedAt: { type: 'string', format: 'date-time', description: 'Updated at' },
-            // ...other player fields
           },
-          required: ['id', 'userId', 'rating', 'isActive', 'createdAt', 'updatedAt']
+          required: ['id', 'userId', 'isActive', 'createdAt', 'updatedAt']
         },
         PlayerInput: {
           type: 'object',
           properties: {
             userId: { type: 'string', description: 'User ID' },
-            rating: { type: 'number', description: 'Player rating' }
+            levelValue: { type: 'number', nullable: true, description: 'Player level value' },
+            levelConfidence: { type: 'number', nullable: true, description: 'Player level confidence' },
           },
-          required: ['userId', 'rating']
+          required: ['userId']
         },
         Notification: {
           type: 'object',
@@ -78,23 +78,39 @@ export const swaggerOptions = {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Invite ID' },
-            groupId: { type: 'string', description: 'Group ID' },
-            senderId: { type: 'string', description: 'Sender User ID' },
-            recipientId: { type: 'string', description: 'Recipient User ID' },
-            status: { type: 'string', enum: ['pending', 'accepted', 'declined'], description: 'Invite status' },
-            token: { type: 'string', description: 'Invite token' },
+            token: { type: 'string', description: 'Opaque invite token' },
+            status: { type: 'string', enum: ['pending', 'accepted', 'cancelled', 'expired'], description: 'Invite status' },
+            expiresAt: { type: 'string', format: 'date-time', description: 'Expiration datetime (ISO8601)' },
             createdAt: { type: 'string', format: 'date-time', description: 'Created at' },
-            updatedAt: { type: 'string', format: 'date-time', description: 'Updated at' },
+            availabilityId: { type: 'string', description: 'Availability ID' },
+            inviterUserId: { type: 'string', description: 'User who sent the invite' },
+            matchId: { type: 'string', nullable: true, description: 'Match created from this invite, if any' },
+            visibility: { type: 'string', enum: ['private', 'community'], description: 'Visibility' },
+            minLevel: { type: 'number', nullable: true, description: 'Minimum level filter' },
+            maxLevel: { type: 'number', nullable: true, description: 'Maximum level filter' },
+            radiusKm: { type: 'number', nullable: true, description: 'Distance radius in km' },
+            matchType: { type: 'string', enum: ['competitive', 'practice'], description: 'Match type (competitive or practice)' },
           },
-          required: ['id', 'groupId', 'senderId', 'recipientId', 'status', 'token', 'createdAt', 'updatedAt']
+          required: [
+            'id',
+            'token',
+            'status',
+            'expiresAt',
+            'createdAt',
+            'availabilityId',
+            'inviterUserId',
+            'visibility',
+            'matchType'
+          ]
         },
         InviteInput: {
           type: 'object',
           properties: {
-            groupId: { type: 'string', description: 'Group ID' },
-            recipientId: { type: 'string', description: 'Recipient User ID' }
+            availabilityId: { type: 'string', format: 'uuid', description: 'Availability ID' },
+            inviterUserId: { type: 'string', format: 'uuid', description: 'User who sends the invite' },
+            matchType: { type: 'string', enum: ['competitive', 'practice'], description: 'Optional. Defaults to competitive.' },
           },
-          required: ['groupId', 'recipientId']
+          required: ['availabilityId', 'inviterUserId']
         },
         Group: {
           type: 'object',
@@ -120,14 +136,27 @@ export const swaggerOptions = {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Match ID' },
-            groupId: { type: 'string', description: 'Group ID' },
-            venueId: { type: 'string', description: 'Venue ID' },
+            inviteId: { type: 'string', nullable: true, description: 'Invite ID' },
+            availabilityId: { type: 'string', nullable: true, description: 'Availability ID' },
+            venueId: { type: 'string', nullable: true, description: 'Venue ID' },
+            playerAId: { type: 'string', nullable: true, description: 'Player A ID' },
+            playerBId: { type: 'string', nullable: true, description: 'Player B ID' },
+            hostUserId: { type: 'string', description: 'Host user ID' },
+            opponentUserId: { type: 'string', description: 'Opponent user ID' },
             scheduledAt: { type: 'string', format: 'date-time', description: 'Scheduled date/time' },
-            status: { type: 'string', enum: ['scheduled', 'completed', 'cancelled'], description: 'Match status' },
             createdAt: { type: 'string', format: 'date-time', description: 'Created at' },
-            updatedAt: { type: 'string', format: 'date-time', description: 'Updated at' },
+            status: { type: 'string', enum: ['scheduled', 'awaiting_confirmation', 'completed', 'cancelled', 'disputed'], description: 'Match status' },
+            type: { type: 'string', enum: ['competitive', 'practice'], description: 'Match type (competitive or practice)' },
           },
-          required: ['id', 'groupId', 'venueId', 'scheduledAt', 'status', 'createdAt', 'updatedAt']
+          required: [
+            'id',
+            'hostUserId',
+            'opponentUserId',
+            'scheduledAt',
+            'createdAt',
+            'status',
+            'type'
+          ]
         },
         MatchInput: {
           type: 'object',

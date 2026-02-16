@@ -57,6 +57,7 @@ import { isPending } from './invite.model';
 import { createNotification } from '../notifications/notifications.service';
 import { logger } from '../../config/logger';
 import { AvailabilityService } from '../availabilities/availability.service';
+import { MatchType } from '../matches/matches.types';
 
 export class InviteService {
   /**
@@ -127,6 +128,14 @@ export class InviteService {
     ]);
     if (!user) throw new AppError('Inviter user not found', 404);
     if (!availability) throw new AppError('Availability not found', 404);
+    // Validate matchType (if provided)
+    let matchType: MatchType = 'competitive';
+    if (createInviteInput.matchType) {
+      if (createInviteInput.matchType !== 'competitive' && createInviteInput.matchType !== 'practice') {
+        throw new AppError('Invalid matchType', 400);
+      }
+      matchType = createInviteInput.matchType;
+    }
     // Generate token and expiration
     const token = generateInviteToken();
     const expiresAt = getInviteExpiration();
@@ -138,6 +147,7 @@ export class InviteService {
         expiresAt,
         availabilityId: createInviteInput.availabilityId,
         inviterUserId: createInviteInput.inviterUserId,
+        matchType,
       },
     });
     return InviteService.toDTO(invite);
@@ -206,6 +216,11 @@ export class InviteService {
       // --- Invite condition validation ---
       InviteService.validateInviteConditions(invite, hostPlayer, opponentPlayer);
 
+      // Propagate matchType from invite to match
+      // Defensive: ensure invite.matchType is present and valid
+      if (!invite.matchType || (invite.matchType !== 'competitive' && invite.matchType !== 'practice')) {
+        throw new AppError('Invite matchType missing or invalid', 500);
+      }
       const match = await tx.match.create({
         data: {
           inviteId: invite.id,
@@ -215,6 +230,7 @@ export class InviteService {
           opponentUserId: resolvedOpponentUserId,
           playerAId,
           playerBId,
+          type: invite.matchType as MatchType,
         },
       });
       const updatedInvite = await tx.invite.update({
@@ -327,6 +343,7 @@ export class InviteService {
       minLevel: typeof invite.minLevel === 'number' ? invite.minLevel : null,
       maxLevel: typeof invite.maxLevel === 'number' ? invite.maxLevel : null,
       radiusKm: typeof invite.radiusKm === 'number' ? invite.radiusKm : null,
+      matchType: invite.matchType as 'competitive' | 'practice',
     };
   }
 

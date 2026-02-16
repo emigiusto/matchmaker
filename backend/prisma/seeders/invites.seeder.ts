@@ -14,6 +14,7 @@ type InviteSeed = {
   maxLevel?: number;
   radiusKm?: number;
   visibility: 'private' | 'community';
+  matchType: 'competitive' | 'practice';
 };
 
 export async function seedInvites(users: { id: string }[], availabilities: { id: string; userId: string }[]) {
@@ -38,6 +39,9 @@ export async function seedInvites(users: { id: string }[], availabilities: { id:
       { weight: 1, value: InviteStatus.cancelled },
     ]);
 
+    // Randomly assign matchType: 80% competitive, 20% practice
+    const matchType = faker.datatype.boolean({ probability: 0.8 }) ? 'competitive' : 'practice';
+
     invites.push({
       token: faker.string.uuid(),
       inviterUserId: inviter.id,
@@ -48,6 +52,7 @@ export async function seedInvites(users: { id: string }[], availabilities: { id:
       maxLevel,
       radiusKm: faker.number.float({ min: 1, max: 50, multipleOf: 0.1 }),
       visibility: faker.helpers.arrayElement(['private', 'community']),
+      matchType, // <-- add matchType to seed
     });
   }
   return batchInsert(invites, 20, (invite) =>

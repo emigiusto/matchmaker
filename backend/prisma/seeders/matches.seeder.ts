@@ -1,4 +1,3 @@
-
 import { faker } from '@faker-js/faker';
 import { batchInsert } from './batchInsert.util';
 import { PrismaClient } from '@prisma/client';
@@ -6,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export async function seedMatches(
-  invites: { id: string; availabilityId: string; inviterUserId: string; status: string }[],
+  invites: { id: string; availabilityId: string; inviterUserId: string; status: string; matchType?: 'competitive' | 'practice' }[],
   availabilities: { id: string; userId: string }[],
   players: { id: string; userId: string }[],
   venues: { id: string }[]
@@ -32,8 +31,8 @@ export async function seedMatches(
     const scheduledAt = isPast
       ? faker.date.recent({ days: 30 })
       : faker.date.soon({ days: 10 });
-    // 5. Random match type: 70% competitive, 30% practice
-    const type = faker.datatype.boolean({ probability: 0.7 }) ? 'competitive' : 'practice';
+    // 5. Match type: must come from invite.matchType
+    const type = invite.matchType === 'practice' ? 'practice' : 'competitive';
     // 6. Always status: 'scheduled', persist type
     matches.push({
       inviteId: invite.id,

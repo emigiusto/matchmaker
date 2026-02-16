@@ -88,7 +88,11 @@ export class InviteController {
   static async createInvite(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = createInviteSchema.parse(req.body);
-      const createInviteInput: CreateInviteInput = { availabilityId: parsed.availabilityId, inviterUserId: parsed.inviterUserId, };
+      const createInviteInput: CreateInviteInput = {
+        availabilityId: parsed.availabilityId,
+        inviterUserId: parsed.inviterUserId,
+        matchType: parsed.matchType,
+      };
       const invite = await InviteService.createInvite(createInviteInput);
       res.status(201).json(invite);
     } catch (error) {

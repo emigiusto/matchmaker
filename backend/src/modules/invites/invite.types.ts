@@ -2,6 +2,9 @@
 // ---------------
 // API-facing types for Invite module (no Prisma models exposed)
 
+import { MatchType } from "../matches/matches.types";
+
+
 /**
  * Invite-first flow:
  * - Invites are the entry point for joining a match or availability.
@@ -21,6 +24,7 @@ export type InviteVisibility = 'private' | 'community';
  * InviteDTO
  * API-facing shape for an invite.
  */
+
 export interface InviteDTO {
   /** Unique invite ID */
   id: string;
@@ -46,6 +50,8 @@ export interface InviteDTO {
   maxLevel?: number | null;
   /** Optional distance radius in km */
   radiusKm?: number | null;
+  /** Match type: competitive or practice */
+  matchType: MatchType;
 }
 
 /**
@@ -54,5 +60,6 @@ export interface InviteDTO {
 export interface CreateInviteInput {
   availabilityId: string;
   inviterUserId: string;
+  matchType?: MatchType;
   // Additional fields (e.g., invitee info) can be added as needed
 }

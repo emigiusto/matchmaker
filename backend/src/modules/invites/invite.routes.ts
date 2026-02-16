@@ -25,6 +25,19 @@ const router = Router();
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/InviteInput'
+ * InviteInput:
+ *   type: object
+ *   properties:
+ *     availabilityId:
+ *       type: string
+ *       format: uuid
+ *     inviterUserId:
+ *       type: string
+ *       format: uuid
+ *     matchType:
+ *       type: string
+ *       enum: [competitive, practice]
+ *       description: Optional. Defaults to 'competitive'.
  *     responses:
  *       201:
  *         description: The created invite

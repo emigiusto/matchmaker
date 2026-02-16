@@ -185,11 +185,14 @@ model Invite {
   availability Availability @relation(fields: [availabilityId], references: [id])
   match        Match?
 
+  matchType    MatchType    @default(competitive)
+
   @@index([inviterUserId])
   @@index([availabilityId])
   @@index([visibility, status])
   @@index([status, expiresAt])
   @@index([createdAt])
+  @@index([matchType])
 }
 
 enum InviteStatus {
