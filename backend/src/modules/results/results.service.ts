@@ -23,6 +23,7 @@
 
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
+import { RatingService } from '../rating/rating.service';
 import { ResultDTO, SetResultDTO, AddSetResultInput, SubmitMatchResultInput } from './results.types';
 import { MatchStatus, Result, SetResult } from '@prisma/client';
 
@@ -92,11 +93,17 @@ export async function createResult(
 
     assertCanCreateResult(currentUserId, match.hostUserId, match.opponentUserId, isAdmin);
 
+    // Set status = draft (default) for new results
     const result = await tx.result.create({
       data: {
         matchId,
-        winnerUserId: winnerUserId !== null ? winnerUserId : undefined
-      },
+        winnerUserId: winnerUserId !== null ? winnerUserId : undefined,
+        status: 'draft' as any,
+        confirmedByHostAt: null as any,
+        confirmedByOpponentAt: null as any,
+        disputedByHostAt: null as any,
+        disputedByOpponentAt: null as any,
+      } as any,
       include: { sets: true }
     });
 
@@ -144,6 +151,10 @@ export async function addSetResult(
 
     if (!result) {
       throw new AppError('Result not found', 404);
+    }
+
+    if (result.status === 'confirmed') {
+      throw new AppError('Cannot edit confirmed result', 409);
     }
 
     if (!result.match) {
@@ -341,6 +352,200 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
   });
 }
 
+/**
+ * Submits a result for confirmation by the other player.
+ * - Sets Result.status = 'submitted'
+ * - Sets Result.submittedByUserId = userId
+ * - Sets Match.status = 'awaiting_confirmation'
+ * - Throws if Result.status === 'confirmed'
+ * - Returns updated ResultDTO
+ */
+export async function submitResult(resultId: string, userId: string): Promise<ResultDTO> {
+  return await prisma.$transaction(async (tx) => {
+    // Fetch result and match
+    const result = await tx.result.findUnique({ where: { id: resultId }, include: { match: true, sets: true } });
+    if (!result) throw new AppError('Result not found', 404);
+    if (!result.match) throw new AppError('Result missing match', 500);
+    if (result.status === 'confirmed') {
+      throw new AppError('Result already confirmed', 409);
+    }
+    // Update result status and submittedByUserId
+    await tx.result.update({
+      where: { id: resultId },
+      data: {
+        status: 'submitted',
+        submittedByUserId: userId,
+      },
+    });
+    // Update match status to awaiting_confirmation
+    await tx.match.update({
+      where: { id: result.matchId },
+      data: { status: 'awaiting_confirmation' },
+    });
+    // Return updated result
+    const updated = await tx.result.findUnique({ where: { id: resultId }, include: { sets: true } });
+    if (!updated) throw new AppError('Result not found after update', 500);
+    return toResultDTO(updated);
+  });
+}
+
+/**
+ * Confirms a submitted result by a user (host or opponent).
+ * - Both players must confirm before finalization.
+ * - Idempotent: does not double-update ratings or status.
+ * - Only allowed if Result.status === 'submitted'.
+ * - Sets confirmedByHostAt or confirmedByOpponentAt as appropriate.
+ * - If both confirmations present, marks Result as confirmed, Match as completed, and triggers rating update.
+ *
+ * @param resultId - ID of the Result
+ * @param userId - ID of the confirming user
+ * @returns Updated ResultDTO
+ * @throws AppError on invalid state or unauthorized
+ */
+export async function confirmResult(resultId: string, userId: string): Promise<ResultDTO> {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Load Result and Match
+    const result = await tx.result.findUnique({
+      where: { id: resultId },
+      include: { match: true },
+    });
+    if (!result) throw new AppError('Result not found', 404);
+    const match = result.match;
+    if (!match) throw new AppError('Match not found for result', 404);
+
+    // 2. Only allow if status is 'submitted'
+    if (result.status !== 'submitted') {
+      throw new AppError('Result is not awaiting confirmation', 400);
+    }
+
+    // 3. Determine if user is host or opponent
+    const isHost = userId === match.hostUserId;
+    const isOpponent = userId === match.opponentUserId;
+    if (!isHost && !isOpponent) {
+      throw new AppError('User is not a participant in this match', 403);
+    }
+
+    // 4. Prepare update fields (idempotent)
+    const now = new Date();
+    let updateData: any = {};
+    if (isHost && !result.confirmedByHostAt) {
+      updateData.confirmedByHostAt = now;
+    }
+    if (isOpponent && !result.confirmedByOpponentAt) {
+      updateData.confirmedByOpponentAt = now;
+    }
+
+    // If already confirmed by this user, do nothing (idempotent)
+    if (Object.keys(updateData).length === 0) {
+      // Already confirmed by this user, return current state
+      const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
+      // Ensure all required fields are present and not undefined
+      return toResultDTO({
+        id: result.id,
+        matchId: result.matchId,
+        winnerUserId: result.winnerUserId,
+        createdAt: result.createdAt,
+        status: result.status,
+        submittedByUserId: result.submittedByUserId ?? null,
+        confirmedByHostAt: result.confirmedByHostAt,
+        confirmedByOpponentAt: result.confirmedByOpponentAt,
+        disputedByHostAt: result.disputedByHostAt,
+        disputedByOpponentAt: result.disputedByOpponentAt,
+        sets: sets
+      } as Result & { sets: SetResult[] });
+    }
+
+    // 5. Update confirmation field(s)
+    const updatedResult = await tx.result.update({
+      where: { id: resultId },
+      data: updateData,
+    });
+
+    // 6. Check if both confirmations are now set (after update)
+    const confirmedResult = await tx.result.findUnique({ where: { id: resultId } });
+    const bothConfirmed = !!confirmedResult?.confirmedByHostAt && !!confirmedResult?.confirmedByOpponentAt;
+
+    if (bothConfirmed) {
+      // 7. Mark Result as confirmed, Match as completed (if not already)
+      if (confirmedResult.status !== 'confirmed') {
+        await tx.result.update({
+          where: { id: resultId },
+          data: { status: 'confirmed' },
+        });
+      }
+      if (match.status !== 'completed') {
+        await tx.match.update({
+          where: { id: match.id },
+          data: { status: 'completed' },
+        });
+        // 8. Trigger rating update (idempotent in RatingService)
+        await RatingService.updateRatingsForCompletedMatch(tx as any, match.id);
+      }
+    }
+
+    // 9. Return updated ResultDTO
+    const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
+    const finalResult = await tx.result.findUnique({ where: { id: resultId } });
+    if (!finalResult) throw new AppError('Result not found after confirmation', 500);
+    return toResultDTO({
+      id: finalResult.id,
+      matchId: finalResult.matchId,
+      winnerUserId: finalResult.winnerUserId,
+      createdAt: finalResult.createdAt,
+      status: finalResult.status,
+      submittedByUserId: finalResult.submittedByUserId ?? null,
+      confirmedByHostAt: finalResult.confirmedByHostAt,
+      confirmedByOpponentAt: finalResult.confirmedByOpponentAt,
+      disputedByHostAt: finalResult.disputedByHostAt,
+      disputedByOpponentAt: finalResult.disputedByOpponentAt,
+      sets: sets
+    } as Result & { sets: SetResult[] });
+  });
+}
+
+/**
+ * Disputes a result, marking both the result and its match as disputed.
+ *
+ * - If Result.status === 'confirmed', throws error.
+ * - Sets Result.status = 'disputed'
+ * - Sets Match.status = 'disputed'
+ * - Does NOT update rankings or delete result.
+ *
+ * @param resultId - ID of the Result
+ * @param userId - ID of the disputing user (for future audit, not used here)
+ * @returns Updated ResultDTO
+ * @throws AppError if already confirmed or not found
+ */
+export async function disputeResult(resultId: string, userId: string): Promise<ResultDTO> {
+  return await prisma.$transaction(async (tx) => {
+    // Load Result and Match
+    const result = await tx.result.findUnique({
+      where: { id: resultId },
+      include: { match: true },
+    });
+    if (!result) throw new AppError('Result not found', 404);
+    if (!result.match) throw new AppError('Match not found for result', 404);
+    if (result.status === 'confirmed') {
+      throw new AppError('Cannot dispute a confirmed result', 409);
+    }
+
+    // Update Result and Match status to disputed
+    await tx.result.update({
+      where: { id: resultId },
+      data: { status: 'disputed' },
+    });
+    await tx.match.update({
+      where: { id: result.matchId },
+      data: { status: 'disputed' },
+    });
+
+    // Return updated ResultDTO
+    const updated = await tx.result.findUnique({ where: { id: resultId }, include: { sets: true } });
+    if (!updated) throw new AppError('Result not found after dispute', 500);
+    return toResultDTO(updated);
+  });
+}
+
 ////////////////////////////////////////////////////////////
 // HELPERS
 ////////////////////////////////////////////////////////////
@@ -398,6 +603,11 @@ function toResultDTO(result: Result & { sets?: SetResult[] }): ResultDTO {
     matchId: result.matchId,
     winnerUserId: result.winnerUserId ?? null,
     createdAt: result.createdAt.toISOString(),
+    status: result.status ?? 'draft',
+    confirmedByHostAt: result.confirmedByHostAt ? result.confirmedByHostAt.toISOString() : null,
+    confirmedByOpponentAt: result.confirmedByOpponentAt ? result.confirmedByOpponentAt.toISOString() : null,
+    disputedByHostAt: result.disputedByHostAt ? result.disputedByHostAt.toISOString() : null,
+    disputedByOpponentAt: result.disputedByOpponentAt ? result.disputedByOpponentAt.toISOString() : null,
     sets: (result.sets ?? [])
       .slice()
       .sort((a, b) => a.setNumber - b.setNumber)

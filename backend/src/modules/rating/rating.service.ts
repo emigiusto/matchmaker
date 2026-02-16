@@ -87,7 +87,10 @@ export class RatingService {
     // 1. Load Match
     const match = await tx.match.findUnique({ where: { id: matchId } });
     if (!match) return;
-    if (match.status !== 'completed') return;
+    // Strict guard: Only update ratings if match is completed
+    if (match.status !== 'completed') {
+      return;
+    }
 
     // 4. Load Result
     const result = await tx.result.findUnique({ where: { matchId } });
@@ -101,6 +104,19 @@ export class RatingService {
       tx.player.findUnique({ where: { id: match.playerBId } })
     ]);
     if (!playerA || !playerB) return;
+
+    // Idempotency: check if ratingHistory already exists for both players for this match
+    // @ts-ignore: ratingHistory.findMany may not be typed on RatingTx, but is available on Prisma client
+    const histories = await (tx.ratingHistory.findMany?.({
+      where: {
+        matchId: match.id,
+        playerId: { in: [playerA.id, playerB.id] },
+      },
+    }) ?? []);
+    if (histories.length === 2) {
+      // Both players already have rating history for this match; skip update
+      return;
+    }
 
     // 9. Determine winner/loser
     let winnerPlayer, loserPlayer;

@@ -28,6 +28,11 @@ export interface ResultDTO {
   createdAt: string; // ISO string
   sets: SetResultDTO[];
   winnerUserId: string | null;
+  status: 'draft' | 'submitted' | 'confirmed' | 'disputed';
+  confirmedByHostAt: string | null;
+  confirmedByOpponentAt: string | null;
+  disputedByHostAt: string | null;
+  disputedByOpponentAt: string | null;
 }
 
 /**

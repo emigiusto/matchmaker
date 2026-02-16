@@ -229,6 +229,12 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
     const result = await tx.result.findUnique({ where: { matchId: match.id }, include: { sets: true } });
     if (!result) throw new AppError('Cannot complete match: Result does not exist', 409);
     if (!result.sets || result.sets.length === 0) throw new AppError('Cannot complete match: Result has no set results', 409);
+
+    // Only allow completion if result.status === 'confirmed'
+    if (result.status !== 'confirmed') {
+      throw new AppError('Match cannot be completed until result is confirmed by both players', 409);
+    }
+
     // Atomic transition protection
     const updateResult = await tx.match.updateMany({
       where: { id: match.id, status: 'scheduled' },

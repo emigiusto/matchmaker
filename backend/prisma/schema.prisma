@@ -256,8 +256,10 @@ model Match {
 
 enum MatchStatus {
   scheduled
+  awaiting_confirmation
   completed
   cancelled
+  disputed
 }
 
 ////////////////////////////////////////////////////////////
@@ -269,6 +271,16 @@ model Result {
   matchId        String   @unique
   winnerUserId   String?
   createdAt      DateTime @default(now())
+  submittedByUserId String?
+
+  /// Result lifecycle status
+  status         ResultStatus @default(draft)
+
+  /// Confirmation/dispute tracking
+  confirmedByHostAt     DateTime?
+  confirmedByOpponentAt DateTime?
+  disputedByHostAt      DateTime?
+  disputedByOpponentAt  DateTime?
 
   match        Match       @relation(fields: [matchId], references: [id])
   winnerUser   User?       @relation("WinnerUser", fields: [winnerUserId], references: [id], onDelete: Restrict)
@@ -277,6 +289,14 @@ model Result {
   @@index([matchId])
   @@index([winnerUserId])
   @@index([createdAt])
+  @@index([status])
+}
+
+enum ResultStatus {
+  draft
+  submitted
+  confirmed
+  disputed
 }
 
 ////////////////////////////////////////////////////////////
