@@ -10,27 +10,29 @@ export async function seedResults(
     hostUserId: string;
     opponentUserId: string;
     scheduledAt: Date;
+    type: 'competitive' | 'practice';
   }[]
 ) {
   for (const match of matches) {
-    if (match.scheduledAt >= new Date()) continue; // Only past matches
+    // Only create results for competitive matches scheduled in the past
+    if (match.scheduledAt >= new Date()) continue;
+    if (match.type !== 'competitive') continue;
 
-    // 7. Randomly generate lifecycle distribution
+    // Randomly generate lifecycle distribution
     const lifecycleType = faker.helpers.weightedArrayElement([
       { weight: 6, value: 'confirmed' },
       { weight: 3, value: 'submitted' },
       { weight: 1, value: 'draft' },
     ]);
 
-    // 8. Always create 2–3 realistic tennis sets
+    // Always create 2–3 realistic tennis sets
     const sets = generateTennisSets(match.hostUserId, match.opponentUserId);
 
-    // 9. Ensure winnerUserId matches the majority of sets won
+    // Ensure winnerUserId matches the majority of sets won
     const winnerUserId = computeWinnerFromSets(sets, match.hostUserId, match.opponentUserId);
 
-    // 4-6. Set result/match status and timestamps according to lifecycleType
+    // Set result/match status and timestamps according to lifecycleType
     await prisma.$transaction(async (tx) => {
-      // Create Result
       const now = new Date();
       let resultData: any = {
         matchId: match.id,

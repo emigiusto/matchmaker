@@ -33,6 +33,7 @@ export type RatingTx = {
       status: string;
       hostUserId: string;
       opponentUserId: string;
+      type: string; // Added for match type guard
     } | null>;
   };
 
@@ -84,9 +85,17 @@ export class RatingService {
     tx: RatingTx,
     matchId: string
   ): Promise<void> {
+
     // 1. Load Match
     const match = await tx.match.findUnique({ where: { id: matchId } });
     if (!match) return;
+    // Defensive: Only update ratings for competitive matches
+    if (match.type !== 'competitive') {
+      // Option 1: throw (strict)
+      // throw new AppError('Rating update attempted for non-competitive match', 500);
+      // Option 2: silent skip (recommended for seeder/tests)
+      return;
+    }
     // Strict guard: Only update ratings if match is completed
     if (match.status !== 'completed') {
       return;

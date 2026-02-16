@@ -82,6 +82,7 @@ const baseMatch = {
   playerAId: 'playerA',
   playerBId: 'playerB',
   scheduledAt: new Date(Date.now() - 10000),
+  type: 'competitive',
 };
 
 // ------------------------------------------------------

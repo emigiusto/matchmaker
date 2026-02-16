@@ -256,7 +256,47 @@ router.post('/:id/cancel', MatchesController.cancelMatch);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateMatchInput'
+ *             type: object
+ *             required:
+ *               - hostUserId
+ *               - opponentUserId
+ *               - scheduledAt
+ *               - type
+ *             properties:
+ *               hostUserId:
+ *                 type: string
+ *                 description: Host user ID
+ *               opponentUserId:
+ *                 type: string
+ *                 description: Opponent user ID
+ *               scheduledAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Scheduled date/time (ISO8601)
+ *               venueId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Venue ID (optional)
+ *               playerAId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Player A ID (optional)
+ *               playerBId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Player B ID (optional)
+ *               inviteId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Invite ID (optional)
+ *               availabilityId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Availability ID (optional)
+ *               type:
+ *                 type: string
+ *                 enum: [competitive, practice]
+ *                 description: Match type (competitive or practice)
  *     responses:
  *       201:
  *         description: The created match

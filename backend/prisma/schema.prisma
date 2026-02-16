@@ -223,6 +223,9 @@ model Match {
   scheduledAt      DateTime
   createdAt        DateTime @default(now())
 
+  /// Match type (competitive or practice)
+  type             MatchType   @default(competitive)
+
   /// Match lifecycle status
   status           MatchStatus @default(scheduled)
 
@@ -252,6 +255,7 @@ model Match {
   @@index([hostUserId])
   @@index([opponentUserId])
   @@index([status])
+  @@index([type])
 }
 
 enum MatchStatus {
@@ -260,6 +264,11 @@ enum MatchStatus {
   completed
   cancelled
   disputed
+}
+
+enum MatchType {
+  competitive
+  practice
 }
 
 ////////////////////////////////////////////////////////////

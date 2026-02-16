@@ -28,7 +28,7 @@ describe('RatingService.updateRatingsForCompletedMatch', () => {
   const matchId = 'match-elo';
   const playerA = { id: 'a', userId: 'ua', levelValue: 1500, levelConfidence: 0.5, lastMatchAt: null };
   const playerB = { id: 'b', userId: 'ub', levelValue: 1400, levelConfidence: 0.4, lastMatchAt: null };
-  const completedMatch = { id: matchId, status: 'completed', playerAId: 'a', playerBId: 'b', scheduledAt: matchDate };
+  const completedMatch = { id: matchId, status: 'completed', playerAId: 'a', playerBId: 'b', scheduledAt: matchDate, type: 'competitive' };
   const result = { matchId, winnerUserId: 'ua', status: 'confirmed' };
 
   it('updates lastMatchAt for both players (ELO)', async () => {

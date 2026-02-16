@@ -32,7 +32,9 @@ export async function seedMatches(
     const scheduledAt = isPast
       ? faker.date.recent({ days: 30 })
       : faker.date.soon({ days: 10 });
-    // 5. Always status: 'scheduled'
+    // 5. Random match type: 70% competitive, 30% practice
+    const type = faker.datatype.boolean({ probability: 0.7 }) ? 'competitive' : 'practice';
+    // 6. Always status: 'scheduled', persist type
     matches.push({
       inviteId: invite.id,
       availabilityId: availability.id,
@@ -43,6 +45,7 @@ export async function seedMatches(
       hostUserId,
       opponentUserId,
       status: 'scheduled',
+      type,
     });
   }
 
@@ -58,6 +61,7 @@ export async function seedMatches(
         hostUserId: match.hostUserId,
         opponentUserId: match.opponentUserId,
         status: 'scheduled',
+        type: match.type as 'competitive' | 'practice',
       }
     })
   );

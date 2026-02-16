@@ -16,6 +16,8 @@
  */
 export type MatchStatus = 'scheduled' | 'awaiting_confirmation' | 'completed' | 'cancelled' | 'disputed';
 
+export type MatchType = 'competitive' | 'practice';
+
 export interface MatchDTO {
   id: string;
   inviteId: string | null;
@@ -28,6 +30,7 @@ export interface MatchDTO {
   scheduledAt: string; // ISO string
   createdAt: string;   // ISO string
   status: MatchStatus;
+  type: MatchType;
 }
 
 export interface CreateMatchInput {
@@ -39,4 +42,5 @@ export interface CreateMatchInput {
   playerBId?: string | null;
   inviteId?: string | null;
   availabilityId?: string | null;
+  type: MatchType;
 }

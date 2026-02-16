@@ -67,6 +67,11 @@ export async function createResult(
   return prisma.$transaction(async (tx) => {
     const match = await findMatchOrThrow(tx, matchId);
     ensureMatchScheduled(match);
+    
+    // Block manual result creation for practice matches
+    if (match.type === 'practice') {
+      throw new AppError('Cannot create result for practice match', 400);
+    }
     await ensureNoExistingResult(tx, matchId);
     if (winnerUserId) {
       ensureWinnerIsParticipant(winnerUserId, match.hostUserId, match.opponentUserId);
@@ -76,12 +81,12 @@ export async function createResult(
       data: {
         matchId,
         winnerUserId: winnerUserId !== null ? winnerUserId : undefined,
-        status: 'draft' as any,
-        confirmedByHostAt: null as any,
-        confirmedByOpponentAt: null as any,
-        disputedByHostAt: null as any,
-        disputedByOpponentAt: null as any,
-      } as any,
+        status: 'draft',
+        confirmedByHostAt: null,
+        confirmedByOpponentAt: null,
+        disputedByHostAt: null,
+        disputedByOpponentAt: null,
+      },
       include: { sets: true }
     });
     return toResultDTO(result);
@@ -238,7 +243,7 @@ export async function getRecentResults(limit = 10): Promise<ResultDTO[]> {
  * - Runs inside a transaction
  * - Does NOT trigger ranking updates, complete match, or send notifications
  */
-export async function submitMatchResult(input: SubmitMatchResultInput): Promise<ResultDTO> {
+export async function submitMatchResult(input: SubmitMatchResultInput): Promise<ResultDTO | null> {
   const { matchId, sets, currentUserId } = input;
 
   return prisma.$transaction(async (tx) => {
@@ -252,6 +257,16 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       currentUserId !== match.opponentUserId
     ) {
       throw new AppError('Only match participants can submit result', 403);
+    }
+
+    // PRACTICE MATCH: result is optional, allow empty sets
+    if (!match.type) {
+      throw new AppError('Match type missing', 500);
+    }
+    const matchType = match.type;
+    if (matchType === 'practice' && (!sets || sets.length === 0)) {
+      // No-op: allow submission with no sets, do not create result
+      return null;
     }
 
     // Idempotency: If a result already exists, return it (do not re-insert sets or update status)
@@ -312,11 +327,13 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       });
     }
 
-    // Update match status to awaiting_confirmation
-    await tx.match.update({
-      where: { id: matchId },
-      data: { status: MatchStatus.awaiting_confirmation },
-    });
+    // Update match status to awaiting_confirmation (only for competitive)
+    if (matchType === 'competitive') {
+      await tx.match.update({
+        where: { id: matchId },
+        data: { status: MatchStatus.awaiting_confirmation },
+      });
+    }
 
     // Return full result with sets
     const fullResult = await tx.result.findUnique({
@@ -347,6 +364,10 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
   let matchCompletedPayload: { matchId: string; winnerId: string | null } | null = null;
   let playerAUserId: string | null = null;
   let playerBUserId: string | null = null;
+  let completedMatchType: string | null = null;
+  let completedMatchId: string | null = null;
+
+  // Short-circuit for practice matches: no lifecycle, rating, or notifications
   const resultDTO = await prisma.$transaction(async (tx) => {
     // 1. Load Result and Match
     const result = await tx.result.findUnique({ where: { id: resultId }, include: { match: true } });
@@ -354,8 +375,17 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
     const match = result.match;
     if (!match) throw new AppError('Match not found for result', 404);
 
+    if (!match.type) {
+      throw new AppError('Match type missing', 500);
+    }
+    if (match.type === 'practice') {
+      // For practice, just return current state, no lifecycle, rating, or notifications
+      const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
+      return toResultDTO({ ...result, sets });
+    }
+
     // Defensive: Enforce lifecycle consistency
-    validateResultMatchConsistency(result, match);
+    validateResultMatchConsistency(result, { status: match.status, type: match.type });
 
     // Preconditions: block disputed first
     if ((result.status as string) === 'disputed' || (match.status as string) === 'disputed') {
@@ -393,13 +423,15 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
     const bothConfirmed = !!confirmedResult.confirmedByHostAt && !!confirmedResult.confirmedByOpponentAt;
 
     if (bothConfirmed) {
-      // 4. Finalize: set result.status = 'confirmed', match.status = 'completed', trigger rating and notifications
+      // 4. Finalize: set result.status = 'confirmed', match.status = 'completed'
       if (confirmedResult.status !== 'confirmed') {
         await tx.result.update({ where: { id: resultId }, data: { status: 'confirmed' } });
       }
       if ((match.status as string) !== 'completed') {
         await tx.match.update({ where: { id: match.id }, data: { status: 'completed' } });
         transitionedToCompleted = true;
+        completedMatchType = match.type;
+        completedMatchId = match.id;
       }
       // Defensive: After transition, check consistency
       const finalResult = await tx.result.findUnique({ where: { id: resultId } });
@@ -417,19 +449,20 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
       playerBUserId = match.playerBId ? (await tx.player.findUnique({ where: { id: match.playerBId } }))?.userId ?? null : null;
     }
 
-    // 6. Trigger rating update ONLY if match transitioned to completed
-    if (transitionedToCompleted) {
-      await RatingService.updateRatingsForCompletedMatch(tx as any, match.id);
-    }
-
-    // 7. Return updated ResultDTO
+    // 6. Return updated ResultDTO
     const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
     const finalResult = await tx.result.findUnique({ where: { id: resultId } });
     if (!finalResult) throw new AppError('Result not found after confirmation', 500);
     return toResultDTO({ ...finalResult, sets });
   });
 
+  // 7. Trigger rating update ONLY if match transitioned to completed and is competitive
+  if (transitionedToCompleted && completedMatchType === 'competitive' && completedMatchId) {
+    await RatingService.updateRatingsForCompletedMatch(prisma, completedMatchId);
+  }
+
   // 8. Send notifications as a side effect (outside transaction)
+  // Never send notifications for practice matches
   if (transitionedToCompleted && matchCompletedPayload) {
     // Notify both players (if userId is available)
     if (playerAUserId) {
@@ -464,7 +497,7 @@ export async function disputeResult(resultId: string, userId: string): Promise<R
     });
     if (!result) throw new AppError('Result not found', 404);
     if (!result.match) throw new AppError('Match not found for result', 404);
-    validateResultMatchConsistency(result, result.match);
+    validateResultMatchConsistency(result, { status: result.match.status, type: result.match.type });
     if (result.status === 'confirmed') {
       throw new AppError('Cannot dispute a confirmed result', 409);
     }
@@ -670,7 +703,11 @@ export function computeWinnerFromSets(
  * - confirmResult: awaiting_confirmation → completed (result: submitted → confirmed)
  * - completeMatch: confirmed → completed (admin override only)
  */
-export function validateResultMatchConsistency(result: { status: string }, match: { status: string }) {
+export function validateResultMatchConsistency(result: { status: string }, match: { status: string, type: string | null }) {
+  // Only enforce lifecycle mapping for competitive matches
+  if (match.type !== 'competitive') {
+    return;
+  }
   const allowed: Record<string, string> = {
     draft: 'scheduled',
     submitted: 'awaiting_confirmation',

@@ -156,6 +156,10 @@ export class ResultsController {
         sets,
         currentUserId
       });
+      if (result === null) {
+        // Practice match with no sets: no result created
+        return res.status(204).send();
+      }
       return res.status(201).json(result);
     } catch (error) {
       next(error);

@@ -229,36 +229,58 @@ export async function completeMatch(matchId: string, currentUserId: string, isAd
     const now = new Date();
     if (match.scheduledAt > now) throw new AppError('Match cannot be completed before scheduled time', 409);
 
-    const result = await tx.result.findUnique({ where: { matchId: match.id }, include: { sets: true } });
-    if (!result) throw new AppError('Cannot complete match: Result does not exist', 409);
-    if (!result.sets || result.sets.length === 0) throw new AppError('Cannot complete match: Result has no set results', 409);
-
-    // Only allow completion if result.status === 'confirmed'
-    if (result.status !== 'confirmed') {
-      throw new AppError('Match cannot be completed until result is confirmed by both players', 409);
+    // Require match.type to be present
+    if (!match.type) {
+      throw new AppError('Match type missing', 500);
     }
 
-    // Defensive: Enforce lifecycle consistency
-    validateResultMatchConsistency(result, match);
-
-    // Atomic transition protection
-    const updateResult = await tx.match.updateMany({
-      where: { id: match.id, status: 'scheduled' },
-      data: { status: 'completed' }
-    });
-    if (updateResult.count === 0) throw new AppError('Match already completed or invalid state', 409);
-
-    const updated = await tx.match.findUnique({ where: { id: match.id } });
-    // Defensive: After transition, check consistency
-    const finalResult = await tx.result.findUnique({ where: { matchId: match.id } });
-    const finalMatch = updated;
-    if (finalResult?.status === 'confirmed' && finalMatch?.status !== 'completed') {
-      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
+    if (match.type === 'practice') {
+      // Practice: allow completion without requiring result
+      const updateResult = await tx.match.updateMany({
+        where: { id: match.id, status: 'scheduled' },
+        data: { status: 'completed' }
+      });
+      if (updateResult.count === 0) throw new AppError('Match already completed or invalid state', 409);
+      const updated = await tx.match.findUnique({ where: { id: match.id } });
+      return updated!;
     }
-    if (finalResult?.status !== 'confirmed' && finalMatch?.status === 'completed') {
-      throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
+
+    if (match.type === 'competitive') {
+      // Competitive: strict validation
+      const result = await tx.result.findUnique({ where: { matchId: match.id }, include: { sets: true } });
+      if (!result) throw new AppError('Cannot complete match: Result does not exist', 409);
+      if (!result.sets || result.sets.length === 0) throw new AppError('Cannot complete match: Result has no set results', 409);
+
+      // Only allow completion if result.status === 'confirmed'
+      if (result.status !== 'confirmed') {
+        throw new AppError('Match cannot be completed until result is confirmed by both players', 409);
+      }
+
+      // Defensive: Enforce lifecycle consistency
+      validateResultMatchConsistency(result, match);
+
+      // Atomic transition protection
+      const updateResult = await tx.match.updateMany({
+        where: { id: match.id, status: 'scheduled' },
+        data: { status: 'completed' }
+      });
+      if (updateResult.count === 0) throw new AppError('Match already completed or invalid state', 409);
+
+      const updated = await tx.match.findUnique({ where: { id: match.id } });
+      // Defensive: After transition, check consistency
+      const finalResult = await tx.result.findUnique({ where: { matchId: match.id } });
+      const finalMatch = updated;
+      if (finalResult?.status === 'confirmed' && finalMatch?.status !== 'completed') {
+        throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
+      }
+      if (finalResult?.status !== 'confirmed' && finalMatch?.status === 'completed') {
+        throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
+      }
+      return updated!;
     }
-    return updated!;
+
+    // If match.type is unknown, throw
+    throw new AppError('Unknown match type', 500);
   });
 
   // No rating update or notifications here; handled by mainstream flow (confirmResult)
@@ -316,12 +338,19 @@ export async function createMatch(input: CreateMatchInput): Promise<MatchDTO> {
   if (!input.availabilityId) {
     throw new AppError('Missing required field: availabilityId', 400);
   }
+  // Validate and set match type
+  let matchType = input.type ?? 'competitive';
+  if (matchType !== 'competitive' && matchType !== 'practice') {
+    throw new AppError('Invalid match type. Must be "competitive" or "practice".', 400);
+  }
+  
   const data: Prisma.MatchCreateInput = {
     hostUser: { connect: { id: input.hostUserId } },
     opponentUser: { connect: { id: input.opponentUserId } },
     scheduledAt: new Date(input.scheduledAt),
     status: 'scheduled',
     availability: { connect: { id: input.availabilityId } },
+    type: matchType,
   };
   if (input.venueId) data.venue = { connect: { id: input.venueId } };
   if (input.playerAId) data.playerA = { connect: { id: input.playerAId } };
@@ -348,5 +377,6 @@ function toMatchDTO(match: Match): MatchDTO {
     scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
     status: match.status,
+    type: match.type || 'competitive',
   };
 }

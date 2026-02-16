@@ -63,3 +63,6 @@ export interface SubmitMatchResultInput {
   sets: AddSetResultInput[];
   currentUserId: string;
 }
+
+// Note: submitMatchResult may return null for practice matches with no sets
+// Promise<ResultDTO | null>

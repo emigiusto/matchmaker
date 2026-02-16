@@ -60,13 +60,14 @@ async function main() {
   const matchesRaw = await seedMatches(invites, availabilities, players, venues);
   // Only pass matches with non-null hostUserId/opponentUserId to results seeder
   const matches = matchesRaw
-    .filter((m: any) => m && m.hostUserId && m.opponentUserId && m.scheduledAt)
+    .filter((m: any) => m && m.hostUserId && m.opponentUserId && m.scheduledAt && m.type)
     .map((m: any) => ({
       id: m.id,
       hostUserId: m.hostUserId,
       opponentUserId: m.opponentUserId,
       scheduledAt: m.scheduledAt,
-    })) as { id: string; hostUserId: string; opponentUserId: string; scheduledAt: Date }[];
+      type: m.type,
+    })) as { id: string; hostUserId: string; opponentUserId: string; scheduledAt: Date; type: 'competitive' | 'practice' }[];
   // 8. Results (for matches)
   await seedResults(matches);
 
