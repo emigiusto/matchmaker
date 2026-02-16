@@ -9,6 +9,7 @@ import { prisma } from '../../prisma';
 import { MatchDTO, CreateMatchInput } from './matches.types';
 import { Match, MatchStatus, Prisma } from '@prisma/client';
 import { RatingService } from '../rating/rating.service';
+import { createNotification } from '../notifications/notifications.service';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -218,60 +219,46 @@ function toMatchDTO(match: Match): MatchDTO {
  * Throws AppError on invalid transition.
  */
 export async function completeMatch(matchId: string): Promise<MatchDTO> {
-  return await prisma.$transaction(async (tx) => {
-    const match = await tx.match.findUnique({
-      where: { id: matchId }
-    });
-
-    if (!match) {
-      throw new AppError('Match not found', 404);
-    }
-
-    if (match.status !== 'scheduled') {
-      throw new AppError('Match cannot be completed from current state', 409);
-    }
-
+  // 1. Complete the match and update ratings inside a transaction
+  const updatedMatch = await prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new AppError('Match not found', 404);
+    if (match.status !== 'scheduled') throw new AppError('Match cannot be completed from current state', 409);
     const now = new Date();
-    if (match.scheduledAt > now) {
-      throw new AppError('Match cannot be completed before scheduled time', 409);
-    }
-
-    const result = await tx.result.findUnique({
-      where: { matchId: match.id },
-      include: { sets: true }
-    });
-
-    if (!result) {
-      throw new AppError('Cannot complete match: Result does not exist', 409);
-    }
-
-    if (!result.sets || result.sets.length === 0) {
-      throw new AppError('Cannot complete match: Result has no set results', 409);
-    }
-
+    if (match.scheduledAt > now) throw new AppError('Match cannot be completed before scheduled time', 409);
+    const result = await tx.result.findUnique({ where: { matchId: match.id }, include: { sets: true } });
+    if (!result) throw new AppError('Cannot complete match: Result does not exist', 409);
+    if (!result.sets || result.sets.length === 0) throw new AppError('Cannot complete match: Result has no set results', 409);
     // Atomic transition protection
     const updateResult = await tx.match.updateMany({
-      where: {
-        id: match.id,
-        status: 'scheduled'
-      },
-      data: {
-        status: 'completed'
-      }
+      where: { id: match.id, status: 'scheduled' },
+      data: { status: 'completed' }
     });
-
-    if (updateResult.count === 0) {
-      throw new AppError('Match already completed or invalid state', 409);
-    }
-
+    if (updateResult.count === 0) throw new AppError('Match already completed or invalid state', 409);
     // Update ratings for both players after match is completed
     await RatingService.updateRatingsForCompletedMatch(tx, match.id);
-
-    const updated = await tx.match.findUnique({
-      where: { id: match.id }
-    });
-    return toMatchDTO(updated!);
+    const updated = await tx.match.findUnique({ where: { id: match.id } });
+    return updated!;
   });
+
+  // 2. Send notifications as a side effect (outside transaction)
+  // Defensive: Only notify if both playerAId and playerBId exist
+  if (updatedMatch.playerAId && updatedMatch.playerBId) {
+    // Fetch winnerUserId from result
+    const result = await prisma.result.findUnique({ where: { matchId: updatedMatch.id } });
+    const winnerUserId = result?.winnerUserId ?? null;
+    const notificationPayload = { matchId: updatedMatch.id, winnerId: winnerUserId };
+    // Notify both players (if userId is available)
+    const playerA = await prisma.player.findUnique({ where: { id: updatedMatch.playerAId } });
+    const playerB = await prisma.player.findUnique({ where: { id: updatedMatch.playerBId } });
+    if (playerA?.userId) {
+      await createNotification(playerA.userId, 'match.completed', notificationPayload);
+    }
+    if (playerB?.userId && playerB.userId !== playerA?.userId) {
+      await createNotification(playerB.userId, 'match.completed', notificationPayload);
+    }
+  }
+  return toMatchDTO(updatedMatch);
 }
 
 
