@@ -191,24 +191,6 @@ export async function listRecentMatches(limit: number, userId?: string): Promise
   return matches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
 }
 
-// Helper: convert DB Match to API MatchDTO
-// Defensive: expects match.invite and match.availability to be present
-function toMatchDTO(match: Match): MatchDTO {
-  return {
-    id: match.id,
-    inviteId: match.inviteId,
-    availabilityId: match.availabilityId,
-    venueId: match.venueId,
-    playerAId: match.playerAId,
-    playerBId: match.playerBId,
-    hostUserId: match.hostUserId,
-    opponentUserId: match.opponentUserId,
-    scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
-    createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
-    status: match.status as 'scheduled' | 'completed' | 'cancelled',
-  };
-}
-
 /**
  * Complete a match (scheduled -> completed)
  * Only allowed if:
@@ -223,6 +205,10 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
   const updatedMatch = await prisma.$transaction(async (tx) => {
     const match = await tx.match.findUnique({ where: { id: matchId } });
     if (!match) throw new AppError('Match not found', 404);
+    // Block completion if match is disputed
+    if (match.status === 'disputed') {
+      throw new AppError('Cannot complete a disputed match', 400);
+    }
     if (match.status !== 'scheduled') throw new AppError('Match cannot be completed from current state', 409);
     const now = new Date();
     if (match.scheduledAt > now) throw new AppError('Match cannot be completed before scheduled time', 409);
@@ -235,6 +221,10 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
       throw new AppError('Match cannot be completed until result is confirmed by both players', 409);
     }
 
+    // Defensive: Enforce lifecycle consistency
+    if (result.status === 'confirmed' && match.status !== 'scheduled') {
+      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not in scheduled state for completion', 409);
+    }
     // Atomic transition protection
     const updateResult = await tx.match.updateMany({
       where: { id: match.id, status: 'scheduled' },
@@ -244,6 +234,15 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
     // Update ratings for both players after match is completed
     await RatingService.updateRatingsForCompletedMatch(tx, match.id);
     const updated = await tx.match.findUnique({ where: { id: match.id } });
+    // Defensive: After transition, check consistency
+    const finalResult = await tx.result.findUnique({ where: { matchId: match.id } });
+    const finalMatch = updated;
+    if (finalResult?.status === 'confirmed' && finalMatch?.status !== 'completed') {
+      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
+    }
+    if (finalResult?.status !== 'confirmed' && finalMatch?.status === 'completed') {
+      throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
+    }
     return updated!;
   });
 
@@ -333,3 +332,22 @@ export async function createMatch(input: CreateMatchInput): Promise<MatchDTO> {
   return toMatchDTO(match);
 }
 
+
+
+// Helper: convert DB Match to API MatchDTO
+// Defensive: expects match.invite and match.availability to be present
+function toMatchDTO(match: Match): MatchDTO {
+  return {
+    id: match.id,
+    inviteId: match.inviteId,
+    availabilityId: match.availabilityId,
+    venueId: match.venueId,
+    playerAId: match.playerAId,
+    playerBId: match.playerBId,
+    hostUserId: match.hostUserId,
+    opponentUserId: match.opponentUserId,
+    scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
+    createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
+    status: match.status,
+  };
+}

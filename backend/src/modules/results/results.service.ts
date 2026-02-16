@@ -366,6 +366,14 @@ export async function submitResult(resultId: string, userId: string): Promise<Re
     const result = await tx.result.findUnique({ where: { id: resultId }, include: { match: true, sets: true } });
     if (!result) throw new AppError('Result not found', 404);
     if (!result.match) throw new AppError('Result missing match', 500);
+    // Defensive: Enforce lifecycle consistency
+    const matchStatus = result.match.status;
+    if (result.status === 'confirmed' && matchStatus !== 'completed') {
+      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
+    }
+    if (result.status !== 'confirmed' && matchStatus === 'completed') {
+      throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
+    }
     if (result.status === 'confirmed') {
       throw new AppError('Result already confirmed', 409);
     }
@@ -413,7 +421,19 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
     const match = result.match;
     if (!match) throw new AppError('Match not found for result', 404);
 
-    // 2. Only allow if status is 'submitted'
+    // Defensive: Enforce lifecycle consistency
+    if (result.status === 'confirmed' && match.status !== 'completed') {
+      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
+    }
+    if (result.status !== 'confirmed' && match.status === 'completed') {
+      throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
+    }
+
+    // 2. Block confirmation if disputed
+    if (result.status === 'disputed') {
+      throw new AppError('Cannot confirm a disputed result', 400);
+    }
+    // Only allow if status is 'submitted'
     if (result.status !== 'submitted') {
       throw new AppError('Result is not awaiting confirmation', 400);
     }
@@ -467,6 +487,7 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
 
     if (bothConfirmed) {
       // 7. Mark Result as confirmed, Match as completed (if not already)
+      let transitionedToCompleted = false;
       if (confirmedResult.status !== 'confirmed') {
         await tx.result.update({
           where: { id: resultId },
@@ -478,8 +499,20 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
           where: { id: match.id },
           data: { status: 'completed' },
         });
-        // 8. Trigger rating update (idempotent in RatingService)
+        transitionedToCompleted = true;
+      }
+      // 8. Trigger rating update ONLY if match transitioned to completed
+      if (transitionedToCompleted) {
         await RatingService.updateRatingsForCompletedMatch(tx as any, match.id);
+      }
+      // Defensive: After transition, check consistency
+      const finalResult = await tx.result.findUnique({ where: { id: resultId } });
+      const finalMatch = await tx.match.findUnique({ where: { id: match.id } });
+      if (finalResult?.status === 'confirmed' && finalMatch?.status !== 'completed') {
+        throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
+      }
+      if (finalResult?.status !== 'confirmed' && finalMatch?.status === 'completed') {
+        throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
       }
     }
 

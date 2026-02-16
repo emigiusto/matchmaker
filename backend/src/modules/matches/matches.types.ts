@@ -12,8 +12,9 @@
  * - All references are by ID only (no embedded objects).
  * - Dates are ISO strings.
  * - No WhatsApp or external messaging logic.
+ * 
  */
-export type MatchStatus = 'scheduled' | 'completed' | 'cancelled';
+export type MatchStatus = 'scheduled' | 'awaiting_confirmation' | 'completed' | 'cancelled' | 'disputed';
 
 export interface MatchDTO {
   id: string;

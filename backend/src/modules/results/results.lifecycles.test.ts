@@ -89,6 +89,54 @@ const baseMatch = {
 // ------------------------------------------------------
 
 describe('Result confirmation lifecycle', () => {
+    it('Disputed result blocks confirmation and ranking', async () => {
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+      mockTx.result.findUnique.mockResolvedValueOnce({
+        ...baseResult,
+        status: 'disputed',
+        match: { ...baseMatch, status: 'disputed' },
+        confirmedByHostAt: null,
+        confirmedByOpponentAt: null,
+      });
+
+      mockTx.setResult.findMany.mockResolvedValue([]);
+
+      await expect(
+        ResultsService.confirmResult('result-1', 'userA')
+      ).rejects.toThrow('Cannot confirm a disputed result');
+      expect(updateRatingsForCompletedMatch).not.toHaveBeenCalled();
+    });
+
+    it('Disputed match blocks completion and ranking', async () => {
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+      mockTx.match.findUnique.mockResolvedValueOnce({
+        ...baseMatch,
+        status: 'disputed',
+      });
+
+      await expect(
+        ResultsService.confirmResult('result-1', 'userA')
+      ).rejects.toThrow();
+      expect(updateRatingsForCompletedMatch).not.toHaveBeenCalled();
+    });
+
+    it('updateRatingsForCompletedMatch does not run for disputed or unconfirmed', async () => {
+      // Simulate the static method directly
+      const tx = mockPrisma;
+      // Disputed match
+      mockTx.match.findUnique.mockResolvedValueOnce({ ...baseMatch, status: 'disputed' });
+      mockTx.result.findUnique.mockResolvedValueOnce({ ...baseResult, status: 'disputed', winnerUserId: 'userA' });
+      const result1 = await RatingService.updateRatingsForCompletedMatch(tx, baseMatch.id);
+      expect(result1).toBeUndefined();
+
+      // Not confirmed
+      mockTx.match.findUnique.mockResolvedValueOnce({ ...baseMatch, status: 'completed' });
+      mockTx.result.findUnique.mockResolvedValueOnce({ ...baseResult, status: 'submitted', winnerUserId: 'userA' });
+      const result2 = await RatingService.updateRatingsForCompletedMatch(tx, baseMatch.id);
+      expect(result2).toBeUndefined();
+    });
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -182,6 +230,7 @@ describe('Result confirmation lifecycle', () => {
   it('Two confirmations complete the match and update ranking once', async () => {
     mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 
+    // 1. Initial findUnique (before any confirmation)
     mockTx.result.findUnique.mockResolvedValueOnce({
       ...baseResult,
       status: 'submitted',
@@ -189,14 +238,14 @@ describe('Result confirmation lifecycle', () => {
       confirmedByHostAt: null,
       confirmedByOpponentAt: null,
     });
-
+    // 2. update() for confirmation
     mockTx.result.update.mockResolvedValueOnce({
       ...baseResult,
       status: 'submitted',
       confirmedByOpponentAt: new Date(),
       match: { ...baseMatch, status: 'awaiting_confirmation' },
     });
-
+    // 3. findUnique after update (both confirmed)
     mockTx.result.findUnique.mockResolvedValueOnce({
       ...baseResult,
       status: 'submitted',
@@ -204,7 +253,7 @@ describe('Result confirmation lifecycle', () => {
       confirmedByOpponentAt: new Date(),
       match: { ...baseMatch, status: 'awaiting_confirmation' },
     });
-
+    // 4. update() to set status to confirmed
     mockTx.result.update.mockResolvedValueOnce({
       ...baseResult,
       status: 'confirmed',
@@ -212,24 +261,30 @@ describe('Result confirmation lifecycle', () => {
       confirmedByOpponentAt: new Date(),
       match: { ...baseMatch, status: 'awaiting_confirmation' },
     });
-
+    // 5. update() to set match to completed
     mockTx.match.update.mockResolvedValueOnce({
       ...baseMatch,
       status: 'completed',
     });
-
+    // 6. setResult.findMany
     mockTx.setResult.findMany.mockResolvedValue([]);
-
-    mockTx.result.findUnique.mockResolvedValueOnce({
+    // 7. findUnique for finalResult (after all updates)
+    const finalConfirmedResult = {
       ...baseResult,
       status: 'confirmed',
       confirmedByHostAt: new Date(),
       confirmedByOpponentAt: new Date(),
       match: { ...baseMatch, status: 'completed' },
+    };
+    mockTx.result.findUnique.mockResolvedValueOnce(finalConfirmedResult);
+    // 8. findUnique for finalMatch (after all updates)
+    mockTx.match.findUnique.mockResolvedValueOnce({
+      ...baseMatch,
+      status: 'completed',
     });
-
+    // 9. findUnique for finalResult (for return value)
+    mockTx.result.findUnique.mockResolvedValueOnce(finalConfirmedResult);
     const res = await ResultsService.confirmResult('result-1', 'userB');
-
     expect(res.status).toBe('confirmed');
     expect(updateRatingsForCompletedMatch).toHaveBeenCalledTimes(1);
   });

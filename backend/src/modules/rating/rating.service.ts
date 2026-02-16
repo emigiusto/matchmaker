@@ -95,6 +95,10 @@ export class RatingService {
     // 4. Load Result
     const result = await tx.result.findUnique({ where: { matchId } });
     if (!result) return;
+    // Defensive: Only update if result is confirmed
+    if (result.status !== 'confirmed') {
+      return;
+    }
     if (!result.winnerUserId) throw new AppError('Cannot update ratings: winner missing', 500);
 
     // 7. Load Player A and Player B

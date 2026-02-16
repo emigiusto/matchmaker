@@ -16,6 +16,8 @@ export interface SetResultDTO {
   tiebreakScoreB: number | null;
 }
 
+export type ResultStatus = 'draft' | 'submitted' | 'confirmed' | 'disputed';
+
 /**
  * ResultDTO represents the result of a match.
  * - sets: Array of SetResultDTO
@@ -28,7 +30,7 @@ export interface ResultDTO {
   createdAt: string; // ISO string
   sets: SetResultDTO[];
   winnerUserId: string | null;
-  status: 'draft' | 'submitted' | 'confirmed' | 'disputed';
+  status: ResultStatus;
   confirmedByHostAt: string | null;
   confirmedByOpponentAt: string | null;
   disputedByHostAt: string | null;
