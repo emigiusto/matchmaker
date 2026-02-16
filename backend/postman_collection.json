@@ -420,7 +420,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"inviterUserId\": \"<userId>\",\n  \"availabilityId\": \"<availabilityId>\"\n}"
+              "raw": "{\n  \"inviterUserId\": \"<userId>\",\n  \"availabilityId\": \"<availabilityId>\",\n  \"matchType\": \"competitive\"\n}"
             },
             "url": {
               "raw": "http://localhost:3000/invites",
@@ -563,10 +563,22 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"hostUserId\": \"<userId>\",\n  \"opponentUserId\": \"<userId>\",\n  \"scheduledAt\": \"2026-02-14T10:00:00.000Z\",\n  \"availabilityId\": \"<availabilityId>\",\n  \"venueId\": \"<venueId>\",\n  \"playerAId\": \"<playerId>\",\n  \"playerBId\": \"<playerId>\",\n  \"inviteId\": \"<inviteId>\"\n}"
+              "raw": "{\n  \"hostUserId\": \"<hostUserId>\",\n  \"opponentUserId\": \"<opponentUserId>\",\n  \"scheduledAt\": \"2026-02-14T10:00:00.000Z\",\n  \"availabilityId\": \"<availabilityId>\",\n  \"venueId\": \"<venueId>\",\n  \"playerAId\": \"<playerAId>\",\n  \"playerBId\": \"<playerBId>\",\n  \"inviteId\": \"<inviteId>\",\n  \"type\": \"competitive\"\n}"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": "{\n  \"id\": \"<matchId>\",\n  \"inviteId\": \"<inviteId>\",\n  \"availabilityId\": \"<availabilityId>\",\n  \"venueId\": \"<venueId>\",\n  \"playerAId\": \"<playerAId>\",\n  \"playerBId\": \"<playerBId>\",\n  \"hostUserId\": \"<hostUserId>\",\n  \"opponentUserId\": \"<opponentUserId>\",\n  \"scheduledAt\": \"2026-02-14T10:00:00.000Z\",\n  \"createdAt\": \"2026-02-14T09:00:00.000Z\",\n  \"status\": \"scheduled\",\n  \"type\": \"competitive\"\n}"
+            }
+          ]
         },
         {
           "name": "Get Match by ID",
@@ -738,21 +750,30 @@
               { "key": "Content-Type", "value": "application/json" }
             ],
             "url": {
-              "raw": "http://localhost:3000/results/:matchId/submit-result",
+              "raw": "http://localhost:3000/results/submit",
               "protocol": "http",
               "host": ["localhost"],
               "port": "3000",
-              "path": ["results", ":matchId", "submit-result"],
-              "variable": [
-                { "key": "matchId" }
-              ]
+              "path": ["results", "submit"]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sets\": [\n    {\n      \"setNumber\": 1,\n      \"playerAScore\": 6,\n      \"playerBScore\": 4\n    },\n    {\n      \"setNumber\": 2,\n      \"playerAScore\": 3,\n      \"playerBScore\": 6\n    }\n  ]\n}"
+              "raw": "{\n  \"matchId\": \"<matchId>\",\n  \"sets\": [\n    {\n      \"setNumber\": 1,\n      \"playerAScore\": 6,\n      \"playerBScore\": 4\n    },\n    {\n      \"setNumber\": 2,\n      \"playerAScore\": 3,\n      \"playerBScore\": 6\n    }\n  ],\n  \"currentUserId\": \"<userId>\"\n}"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": "{\n  \"id\": \"<resultId>\",\n  \"matchId\": \"<matchId>\",\n  \"createdAt\": \"2026-02-14T12:00:00.000Z\",\n  \"sets\": [\n    {\n      \"id\": \"<setId1>\",\n      \"setNumber\": 1,\n      \"playerAScore\": 6,\n      \"playerBScore\": 4,\n      \"tiebreakScoreA\": null,\n      \"tiebreakScoreB\": null\n    },\n    {\n      \"id\": \"<setId2>\",\n      \"setNumber\": 2,\n      \"playerAScore\": 3,\n      \"playerBScore\": 6,\n      \"tiebreakScoreA\": null,\n      \"tiebreakScoreB\": null\n    }\n  ],\n  \"winnerUserId\": \"<userId>\",\n  \"status\": \"submitted\",\n  \"confirmedByHostAt\": null,\n  \"confirmedByOpponentAt\": null,\n  \"disputedByHostAt\": null,\n  \"disputedByOpponentAt\": null\n}"
+            }
+          ]
         },
         {
           "name": "Add Set Result",
