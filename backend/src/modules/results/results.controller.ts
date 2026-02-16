@@ -1,15 +1,17 @@
+
 // results.controller.ts
 // HTTP layer for results. No business logic here.
 //
-// Expected frontend flows:
-// - POST /results: Create a result for a match
+// Result lifecycle:
+// - POST /matches/:matchId/result: Create and submit a result (mainstream flow)
 // - POST /results/:id/sets: Add a set result to a result
+// - POST /results/:id/confirm: Confirm a submitted result (second player)
+// - POST /results/:id/dispute: Dispute a result
 // - GET /results/by-match/:matchId: Fetch result for a match
 
 import { Request, Response, NextFunction } from 'express';
 import * as ResultsService from './results.service';
 import {
-  createResultSchema,
   addSetResultSchema,
   matchIdParamSchema,
   resultIdParamSchema,
@@ -20,32 +22,44 @@ import {
  * All methods are static and stateless.
  */
 export class ResultsController {
-  /**
-   * POST /results
-   * Create a result for a match
-   */
-  static async createResult(req: Request, res: Response, next: NextFunction) {
-    try {
-      const parsed = createResultSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: 'Invalid request body', details: parsed.error.issues });
+    /**
+     * POST /results/:id/confirm
+     * Confirm a submitted result
+     */
+    static async confirmResult(req: Request, res: Response, next: NextFunction) {
+      try {
+        let { id } = req.params;
+        if (Array.isArray(id)) id = id[0];
+        const currentUserId = req.user?.id;
+        if (!currentUserId) {
+          return res.status(401).json({ error: 'Unauthorized: missing user id' });
+        }
+        const result = await ResultsService.confirmResult(id, currentUserId);
+        return res.status(200).json(result);
+      } catch (error) {
+        next(error);
       }
-      const { matchId, winnerUserId } = parsed.data;
-      if (matchId == null || winnerUserId == null) {
-        return res.status(400).json({ error: 'matchId and winnerUserId must not be null' });
-      }
-      // Type assertion for req.user (assume authentication middleware attaches user)
-      const currentUserId = req.user?.id;
-      const isAdmin = !!req.user?.isAdmin;
-      if (!currentUserId) {
-        return res.status(401).json({ error: 'Unauthorized: missing user id' });
-      }
-      const result = await ResultsService.createResult(matchId, winnerUserId, currentUserId, isAdmin);
-      return res.status(201).json(result);
-    } catch (error) {
-      next(error);
     }
-  }
+
+    /**
+     * POST /results/:id/dispute
+     * Dispute a result
+     */
+    static async disputeResult(req: Request, res: Response, next: NextFunction) {
+      try {
+        let { id } = req.params;
+        if (Array.isArray(id)) id = id[0];
+        const currentUserId = req.user?.id;
+        if (!currentUserId) {
+          return res.status(401).json({ error: 'Unauthorized: missing user id' });
+        }
+        const result = await ResultsService.disputeResult(id, currentUserId);
+        return res.status(200).json(result);
+      } catch (error) {
+        next(error);
+      }
+    }
+
 
   /**
    * POST /results/:id/sets

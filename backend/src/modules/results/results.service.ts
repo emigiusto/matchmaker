@@ -3,22 +3,24 @@
  * -------------------------------------------------------------
  * Strict domain logic for recording tennis match results.
  *
- * DESIGN PRINCIPLES:
+ * DESIGN PRINCIPLES (UPDATED):
  *
  * - A Result belongs to exactly one Match.
  * - A Match can have at most one Result.
  * - Winner is always a User (never a Player).
- * - Results are descriptive only — no ranking, statistics, or ELO updates.
- * - No Match lifecycle transitions occur here (completion is handled elsewhere).
+ * - Results are descriptive only — no ranking, statistics, or ELO updates by default.
+ * - Result confirmation now drives Match lifecycle transitions:
+ *     - confirmResult() may transition Match.status to 'completed' if both players confirm.
+ *     - Ranking updates are triggered ONLY when a match transitions to 'completed'.
+ * - The completeMatch() method is now an admin-only override, not part of the normal lifecycle.
  * - All domain invariants are enforced explicitly and transactionally.
  *
  * This module is intentionally isolated from:
- * - Ranking updates
+ * - Direct ranking updates (except via lifecycle transition in confirmResult)
  * - Performance analytics
  * - Notifications
- * - Match status transitions
  *
- * It is purely responsible for storing structured match outcome data.
+ * It is primarily responsible for storing structured match outcome data and orchestrating lifecycle transitions via result confirmation.
  */
 
 import { prisma } from '../../prisma';
@@ -26,6 +28,7 @@ import { AppError } from '../../shared/errors/AppError';
 import { RatingService } from '../rating/rating.service';
 import { ResultDTO, SetResultDTO, AddSetResultInput, SubmitMatchResultInput } from './results.types';
 import { MatchStatus, Result, SetResult } from '@prisma/client';
+import { createNotification } from '../notifications/notifications.service';
 
 ////////////////////////////////////////////////////////////
 // CREATE RESULT
@@ -62,38 +65,13 @@ export async function createResult(
   isAdmin: boolean
 ): Promise<ResultDTO> {
   return prisma.$transaction(async (tx) => {
-    const match = await tx.match.findUnique({
-      where: { id: matchId }
-    });
-
-    if (!match) {
-      throw new AppError('Match not found', 404);
-    }
-
-    if (match.status !== MatchStatus.scheduled) {
-      throw new AppError('Cannot create result: Match is not in scheduled state', 409);
-    }
-
-    const existing = await tx.result.findUnique({
-      where: { matchId }
-    });
-
-    if (existing) {
-      throw new AppError('Result already exists for this match', 409);
-    }
-
+    const match = await findMatchOrThrow(tx, matchId);
+    ensureMatchScheduled(match);
+    await ensureNoExistingResult(tx, matchId);
     if (winnerUserId) {
-      if (
-        winnerUserId !== match.hostUserId &&
-        winnerUserId !== match.opponentUserId
-      ) {
-        throw new AppError('Winner must be a participant of the match', 400);
-      }
+      ensureWinnerIsParticipant(winnerUserId, match.hostUserId, match.opponentUserId);
     }
-
     assertCanCreateResult(currentUserId, match.hostUserId, match.opponentUserId, isAdmin);
-
-    // Set status = draft (default) for new results
     const result = await tx.result.create({
       data: {
         matchId,
@@ -106,7 +84,6 @@ export async function createResult(
       } as any,
       include: { sets: true }
     });
-
     return toResultDTO(result);
   });
 }
@@ -141,36 +118,12 @@ export async function addSetResult(
   input: AddSetResultInput
 ): Promise<SetResultDTO> {
   return prisma.$transaction(async (tx) => {
-    const result = await tx.result.findUnique({
-      where: { id: resultId },
-      include: {
-        sets: true,
-        match: true
-      }
-    });
-
-    if (!result) {
-      throw new AppError('Result not found', 404);
-    }
-
-    if (result.status === 'confirmed') {
-      throw new AppError('Cannot edit confirmed result', 409);
-    }
-
-    if (!result.match) {
-      throw new AppError('Invariant violation: Result has no Match', 500);
-    }
-
-    if (result.match.status !== MatchStatus.scheduled) {
-      throw new AppError('Cannot modify result: Match is not scheduled', 409);
-    }
-
-    if (result.sets.some(s => s.setNumber === input.setNumber)) {
-      throw new AppError('Set number already exists for this result', 409);
-    }
-
+    const result = await findResultWithMatchOrThrow(tx, resultId);
+    ensureResultEditable(result);
+    ensureResultHasMatch(result);
+    ensureMatchScheduled(result.match);
+    ensureSetNumberUnique(result.sets, input.setNumber);
     validateSetScore(input);
-
     const set = await tx.setResult.create({
       data: {
         resultId,
@@ -181,7 +134,6 @@ export async function addSetResult(
         tiebreakScoreB: input.tiebreakScoreB ?? null
       }
     });
-
     return toSetResultDTO(set);
   });
 }
@@ -266,29 +218,35 @@ export async function getRecentResults(limit = 10): Promise<ResultDTO[]> {
 }
 
 /**
- * Submit the result for a match, including set scores and winner.
+ * submitMatchResult: First confirmation step for a match result.
  *
- * Transactionally creates a Result and associated SetResults for the given match.
- * Validates that the match exists, is scheduled, and the current user is a participant.
- * Optionally validates that the winnerUserId is a participant. Validates set scores and winner consistency.
- * Throws AppError on invalid input, unauthorized user, or domain violations.
+ * - Creates the Result (if not already present)
+ * - Inserts SetResults
+ * - Computes winner server-side
+ * - Sets:
+ *     - status = 'submitted'
+ *     - submittedByUserId = currentUserId
+ *     - confirmedByHostAt OR confirmedByOpponentAt = now (depending on who submits)
+ * - Updates Match.status to 'awaiting_confirmation'
  *
- * @param input - The result submission input, including matchId, winnerUserId, sets, and currentUserId.
- * @returns The created ResultDTO with all set results, sorted by set number.
- * @throws AppError if the match is not found, not scheduled, user is not a participant, or validation fails.
+ * Rules:
+ * - If currentUserId === hostUserId → set confirmedByHostAt
+ * - If currentUserId === opponentUserId → set confirmedByOpponentAt
+ * - Match must still be 'scheduled'
+ * - Lifecycle consistency must hold
+ * - Idempotent: If already submitted, returns existing result
+ * - Runs inside a transaction
+ * - Does NOT trigger ranking updates, complete match, or send notifications
  */
 export async function submitMatchResult(input: SubmitMatchResultInput): Promise<ResultDTO> {
   const { matchId, sets, currentUserId } = input;
 
   return prisma.$transaction(async (tx) => {
-
     const match = await tx.match.findUnique({ where: { id: matchId } });
     if (!match) throw new AppError('Match not found', 404);
-
     if (match.status !== MatchStatus.scheduled) {
       throw new AppError('Cannot submit result: Match is not scheduled', 409);
     }
-
     if (
       currentUserId !== match.hostUserId &&
       currentUserId !== match.opponentUserId
@@ -296,16 +254,16 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       throw new AppError('Only match participants can submit result', 403);
     }
 
-    const existing = await tx.result.findUnique({ where: { matchId } });
+    // Idempotency: If a result already exists, return it (do not re-insert sets or update status)
+    const existing = await tx.result.findUnique({ where: { matchId }, include: { sets: true } });
     if (existing) {
-      throw new AppError('Result already exists for this match', 409);
+      // If already submitted, return as DTO
+      return toResultDTO(existing);
     }
 
     if (!sets || sets.length === 0) {
       throw new AppError('At least one set is required', 400);
     }
-
-    // Validate set scores
     for (const set of sets) {
       validateSetScore(set);
     }
@@ -317,12 +275,27 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       match.opponentUserId
     );
 
+    // Set confirmation fields
+    const now = new Date();
+    const confirmationFields: any = {
+      status: 'submitted',
+      submittedByUserId: currentUserId,
+      confirmedByHostAt: null,
+      confirmedByOpponentAt: null,
+    };
+    if (currentUserId === match.hostUserId) {
+      confirmationFields.confirmedByHostAt = now;
+    } else if (currentUserId === match.opponentUserId) {
+      confirmationFields.confirmedByOpponentAt = now;
+    }
+
     // Create result
     const result = await tx.result.create({
       data: {
         matchId,
-        winnerUserId
-      }
+        winnerUserId,
+        ...confirmationFields,
+      },
     });
 
     // Insert sets
@@ -334,66 +307,24 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
           playerAScore: set.playerAScore,
           playerBScore: set.playerBScore,
           tiebreakScoreA: set.tiebreakScoreA ?? null,
-          tiebreakScoreB: set.tiebreakScoreB ?? null
-        }
+          tiebreakScoreB: set.tiebreakScoreB ?? null,
+        },
       });
     }
 
-    const fullResult = await tx.result.findUnique({
-      where: { id: result.id },
-      include: { sets: true }
-    });
-
-    if (!fullResult) {
-      throw new AppError('Result not found after creation', 500);
-    }
-
-    return toResultDTO(fullResult);
-  });
-}
-
-/**
- * Submits a result for confirmation by the other player.
- * - Sets Result.status = 'submitted'
- * - Sets Result.submittedByUserId = userId
- * - Sets Match.status = 'awaiting_confirmation'
- * - Throws if Result.status === 'confirmed'
- * - Returns updated ResultDTO
- */
-export async function submitResult(resultId: string, userId: string): Promise<ResultDTO> {
-  return await prisma.$transaction(async (tx) => {
-    // Fetch result and match
-    const result = await tx.result.findUnique({ where: { id: resultId }, include: { match: true, sets: true } });
-    if (!result) throw new AppError('Result not found', 404);
-    if (!result.match) throw new AppError('Result missing match', 500);
-    // Defensive: Enforce lifecycle consistency
-    const matchStatus = result.match.status;
-    if (result.status === 'confirmed' && matchStatus !== 'completed') {
-      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
-    }
-    if (result.status !== 'confirmed' && matchStatus === 'completed') {
-      throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
-    }
-    if (result.status === 'confirmed') {
-      throw new AppError('Result already confirmed', 409);
-    }
-    // Update result status and submittedByUserId
-    await tx.result.update({
-      where: { id: resultId },
-      data: {
-        status: 'submitted',
-        submittedByUserId: userId,
-      },
-    });
     // Update match status to awaiting_confirmation
     await tx.match.update({
-      where: { id: result.matchId },
-      data: { status: 'awaiting_confirmation' },
+      where: { id: matchId },
+      data: { status: MatchStatus.awaiting_confirmation },
     });
-    // Return updated result
-    const updated = await tx.result.findUnique({ where: { id: resultId }, include: { sets: true } });
-    if (!updated) throw new AppError('Result not found after update', 500);
-    return toResultDTO(updated);
+
+    // Return full result with sets
+    const fullResult = await tx.result.findUnique({
+      where: { id: result.id },
+      include: { sets: true },
+    });
+    if (!fullResult) throw new AppError('Result not found after creation', 500);
+    return toResultDTO(fullResult);
   });
 }
 
@@ -411,99 +342,64 @@ export async function submitResult(resultId: string, userId: string): Promise<Re
  * @throws AppError on invalid state or unauthorized
  */
 export async function confirmResult(resultId: string, userId: string): Promise<ResultDTO> {
-  return await prisma.$transaction(async (tx) => {
+  // Transactional: all logic runs inside a single transaction
+  let transitionedToCompleted = false;
+  let matchCompletedPayload: { matchId: string; winnerId: string | null } | null = null;
+  let playerAUserId: string | null = null;
+  let playerBUserId: string | null = null;
+  const resultDTO = await prisma.$transaction(async (tx) => {
     // 1. Load Result and Match
-    const result = await tx.result.findUnique({
-      where: { id: resultId },
-      include: { match: true },
-    });
+    const result = await tx.result.findUnique({ where: { id: resultId }, include: { match: true } });
     if (!result) throw new AppError('Result not found', 404);
     const match = result.match;
     if (!match) throw new AppError('Match not found for result', 404);
 
     // Defensive: Enforce lifecycle consistency
-    if (result.status === 'confirmed' && match.status !== 'completed') {
-      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not completed', 409);
-    }
-    if (result.status !== 'confirmed' && match.status === 'completed') {
-      throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
-    }
+    validateResultMatchConsistency(result, match);
 
-    // 2. Block confirmation if disputed
-    if (result.status === 'disputed') {
+    // Preconditions: block disputed first
+    if ((result.status as string) === 'disputed' || (match.status as string) === 'disputed') {
       throw new AppError('Cannot confirm a disputed result', 400);
     }
-    // Only allow if status is 'submitted'
-    if (result.status !== 'submitted') {
-      throw new AppError('Result is not awaiting confirmation', 400);
+    // Allow idempotency for already confirmed results
+    if ((result.status as string) === 'confirmed') {
+      const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
+      return toResultDTO({ ...result, sets });
     }
+    if (result.status !== 'submitted') throw new AppError('Result is not awaiting confirmation', 400);
+    if (match.status !== 'awaiting_confirmation') throw new AppError('Match is not awaiting confirmation', 400);
 
-    // 3. Determine if user is host or opponent
+    // Only host or opponent can confirm
     const isHost = userId === match.hostUserId;
     const isOpponent = userId === match.opponentUserId;
-    if (!isHost && !isOpponent) {
-      throw new AppError('User is not a participant in this match', 403);
-    }
+    if (!isHost && !isOpponent) throw new AppError('User is not a participant in this match', 403);
 
-    // 4. Prepare update fields (idempotent)
-    const now = new Date();
-    let updateData: any = {};
-    if (isHost && !result.confirmedByHostAt) {
-      updateData.confirmedByHostAt = now;
-    }
-    if (isOpponent && !result.confirmedByOpponentAt) {
-      updateData.confirmedByOpponentAt = now;
-    }
-
-    // If already confirmed by this user, do nothing (idempotent)
-    if (Object.keys(updateData).length === 0) {
-      // Already confirmed by this user, return current state
+    // Idempotency: If already confirmed by this user, return current state
+    if ((isHost && result.confirmedByHostAt) || (isOpponent && result.confirmedByOpponentAt)) {
       const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
-      // Ensure all required fields are present and not undefined
-      return toResultDTO({
-        id: result.id,
-        matchId: result.matchId,
-        winnerUserId: result.winnerUserId,
-        createdAt: result.createdAt,
-        status: result.status,
-        submittedByUserId: result.submittedByUserId ?? null,
-        confirmedByHostAt: result.confirmedByHostAt,
-        confirmedByOpponentAt: result.confirmedByOpponentAt,
-        disputedByHostAt: result.disputedByHostAt,
-        disputedByOpponentAt: result.disputedByOpponentAt,
-        sets: sets
-      } as Result & { sets: SetResult[] });
+      return toResultDTO({ ...result, sets });
     }
 
-    // 5. Update confirmation field(s)
-    const updatedResult = await tx.result.update({
-      where: { id: resultId },
-      data: updateData,
-    });
+    // 2. Set confirmedByHostAt or confirmedByOpponentAt
+    const now = new Date();
+    const updateData: any = {};
+    if (isHost && !result.confirmedByHostAt) updateData.confirmedByHostAt = now;
+    if (isOpponent && !result.confirmedByOpponentAt) updateData.confirmedByOpponentAt = now;
+    await tx.result.update({ where: { id: resultId }, data: updateData });
 
-    // 6. Check if both confirmations are now set (after update)
-    const confirmedResult = await tx.result.findUnique({ where: { id: resultId } });
-    const bothConfirmed = !!confirmedResult?.confirmedByHostAt && !!confirmedResult?.confirmedByOpponentAt;
+    // 3. Check if both confirmations are now present
+    const confirmedResult = await tx.result.findUnique({ where: { id: resultId }, include: { match: true } });
+    if (!confirmedResult) throw new AppError('Result not found after confirmation', 500);
+    const bothConfirmed = !!confirmedResult.confirmedByHostAt && !!confirmedResult.confirmedByOpponentAt;
 
     if (bothConfirmed) {
-      // 7. Mark Result as confirmed, Match as completed (if not already)
-      let transitionedToCompleted = false;
+      // 4. Finalize: set result.status = 'confirmed', match.status = 'completed', trigger rating and notifications
       if (confirmedResult.status !== 'confirmed') {
-        await tx.result.update({
-          where: { id: resultId },
-          data: { status: 'confirmed' },
-        });
+        await tx.result.update({ where: { id: resultId }, data: { status: 'confirmed' } });
       }
-      if (match.status !== 'completed') {
-        await tx.match.update({
-          where: { id: match.id },
-          data: { status: 'completed' },
-        });
+      if ((match.status as string) !== 'completed') {
+        await tx.match.update({ where: { id: match.id }, data: { status: 'completed' } });
         transitionedToCompleted = true;
-      }
-      // 8. Trigger rating update ONLY if match transitioned to completed
-      if (transitionedToCompleted) {
-        await RatingService.updateRatingsForCompletedMatch(tx as any, match.id);
       }
       // Defensive: After transition, check consistency
       const finalResult = await tx.result.findUnique({ where: { id: resultId } });
@@ -514,26 +410,36 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
       if (finalResult?.status !== 'confirmed' && finalMatch?.status === 'completed') {
         throw new AppError('Lifecycle inconsistency: Match is completed but Result is not confirmed', 409);
       }
+      // 5. Prepare notification payload for after transaction
+      matchCompletedPayload = { matchId: match.id, winnerId: confirmedResult.winnerUserId };
+      // Defensive: Only notify if both playerAId and playerBId exist
+      playerAUserId = match.playerAId ? (await tx.player.findUnique({ where: { id: match.playerAId } }))?.userId ?? null : null;
+      playerBUserId = match.playerBId ? (await tx.player.findUnique({ where: { id: match.playerBId } }))?.userId ?? null : null;
     }
 
-    // 9. Return updated ResultDTO
+    // 6. Trigger rating update ONLY if match transitioned to completed
+    if (transitionedToCompleted) {
+      await RatingService.updateRatingsForCompletedMatch(tx as any, match.id);
+    }
+
+    // 7. Return updated ResultDTO
     const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
     const finalResult = await tx.result.findUnique({ where: { id: resultId } });
     if (!finalResult) throw new AppError('Result not found after confirmation', 500);
-    return toResultDTO({
-      id: finalResult.id,
-      matchId: finalResult.matchId,
-      winnerUserId: finalResult.winnerUserId,
-      createdAt: finalResult.createdAt,
-      status: finalResult.status,
-      submittedByUserId: finalResult.submittedByUserId ?? null,
-      confirmedByHostAt: finalResult.confirmedByHostAt,
-      confirmedByOpponentAt: finalResult.confirmedByOpponentAt,
-      disputedByHostAt: finalResult.disputedByHostAt,
-      disputedByOpponentAt: finalResult.disputedByOpponentAt,
-      sets: sets
-    } as Result & { sets: SetResult[] });
+    return toResultDTO({ ...finalResult, sets });
   });
+
+  // 8. Send notifications as a side effect (outside transaction)
+  if (transitionedToCompleted && matchCompletedPayload) {
+    // Notify both players (if userId is available)
+    if (playerAUserId) {
+      await createNotification(playerAUserId, 'match.completed', matchCompletedPayload);
+    }
+    if (playerBUserId && playerBUserId !== playerAUserId) {
+      await createNotification(playerBUserId, 'match.completed', matchCompletedPayload);
+    }
+  }
+  return resultDTO;
 }
 
 /**
@@ -558,6 +464,7 @@ export async function disputeResult(resultId: string, userId: string): Promise<R
     });
     if (!result) throw new AppError('Result not found', 404);
     if (!result.match) throw new AppError('Match not found for result', 404);
+    validateResultMatchConsistency(result, result.match);
     if (result.status === 'confirmed') {
       throw new AppError('Cannot dispute a confirmed result', 409);
     }
@@ -737,4 +644,98 @@ export function computeWinnerFromSets(
   return hostSetsWon > opponentSetsWon
     ? hostUserId
     : opponentUserId;
+}
+
+/**
+ * Throws if result/match lifecycle states are inconsistent.
+ * Allowed pairs:
+ *   - draft      ↔ scheduled
+ *   - submitted  ↔ awaiting_confirmation
+ *   - confirmed  ↔ completed
+ *   - disputed   ↔ disputed
+ * Throws AppError(500) if mismatch.
+ */
+/**
+ * Enforces strict result/match lifecycle consistency.
+ *
+ * Allowed transitions:
+ *   - draft      ↔ scheduled
+ *   - submitted  ↔ awaiting_confirmation
+ *   - confirmed  ↔ completed
+ *   - disputed   ↔ disputed
+ *
+ * Defensive: No other combinations are allowed.
+ *
+ * - submitMatchResult: scheduled → awaiting_confirmation (result: draft → submitted)
+ * - confirmResult: awaiting_confirmation → completed (result: submitted → confirmed)
+ * - completeMatch: confirmed → completed (admin override only)
+ */
+export function validateResultMatchConsistency(result: { status: string }, match: { status: string }) {
+  const allowed: Record<string, string> = {
+    draft: 'scheduled',
+    submitted: 'awaiting_confirmation',
+    confirmed: 'completed',
+    disputed: 'disputed',
+  };
+  // Defensive: Only allow exact pairs
+  if (allowed[result.status] !== match.status) {
+    throw new AppError(
+      `Inconsistent match/result lifecycle state: result.status='${result.status}' match.status='${match.status}'`,
+      500
+    );
+  }
+}
+
+// PRIVATE HELPERS
+
+async function findMatchOrThrow(tx: any, matchId: string) {
+  const match = await tx.match.findUnique({ where: { id: matchId } });
+  if (!match) throw new AppError('Match not found', 404);
+  return match;
+}
+
+function ensureMatchScheduled(match: { status: string }) {
+  if (match.status !== MatchStatus.scheduled) {
+    throw new AppError('Cannot create result: Match is not in scheduled state', 409);
+  }
+}
+
+async function ensureNoExistingResult(tx: any, matchId: string) {
+  const existing = await tx.result.findUnique({ where: { matchId } });
+  if (existing) {
+    throw new AppError('Result already exists for this match', 409);
+  }
+}
+
+function ensureWinnerIsParticipant(winnerUserId: string, hostUserId: string, opponentUserId: string) {
+  if (winnerUserId !== hostUserId && winnerUserId !== opponentUserId) {
+    throw new AppError('Winner must be a participant of the match', 400);
+  }
+}
+
+async function findResultWithMatchOrThrow(tx: any, resultId: string) {
+  const result = await tx.result.findUnique({
+    where: { id: resultId },
+    include: { sets: true, match: true }
+  });
+  if (!result) throw new AppError('Result not found', 404);
+  return result;
+}
+
+function ensureResultEditable(result: { status: string }) {
+  if (result.status === 'confirmed') {
+    throw new AppError('Cannot edit confirmed result', 409);
+  }
+}
+
+function ensureResultHasMatch(result: { match?: any }) {
+  if (!result.match) {
+    throw new AppError('Invariant violation: Result has no Match', 500);
+  }
+}
+
+function ensureSetNumberUnique(sets: { setNumber: number }[], setNumber: number) {
+  if (sets.some(s => s.setNumber === setNumber)) {
+    throw new AppError('Set number already exists for this result', 409);
+  }
 }

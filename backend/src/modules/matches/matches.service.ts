@@ -10,6 +10,7 @@ import { MatchDTO, CreateMatchInput } from './matches.types';
 import { Match, MatchStatus, Prisma } from '@prisma/client';
 import { RatingService } from '../rating/rating.service';
 import { createNotification } from '../notifications/notifications.service';
+import { validateResultMatchConsistency } from '../results/results.service';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -192,26 +193,42 @@ export async function listRecentMatches(limit: number, userId?: string): Promise
 }
 
 /**
- * Complete a match (scheduled -> completed)
+ * ADMIN-ONLY manual override: Complete a match (scheduled -> completed)
+ *
+ * This is a safety recovery mechanism, not part of the mainstream flow.
  * Only allowed if:
+ *   - Admin privilege (isAdmin === true)
  *   - Match exists
- *   - status is scheduled
- *   - scheduledAt is in the past
- *   - Result exists and has at least 1 SetResult
+ *   - Match status is 'scheduled'
+ *   - Result exists and is 'confirmed'
+ *
+ * Does NOT trigger rating update or notifications if match is already completed.
  * Throws AppError on invalid transition.
  */
-export async function completeMatch(matchId: string): Promise<MatchDTO> {
-  // 1. Complete the match and update ratings inside a transaction
+export async function completeMatch(matchId: string, currentUserId: string, isAdmin: boolean): Promise<MatchDTO> {
+  if (!isAdmin) throw new AppError('Forbidden: Admins only', 403);
+
+  // Admin-only: Complete the match as a recovery override, inside a transaction
   const updatedMatch = await prisma.$transaction(async (tx) => {
     const match = await tx.match.findUnique({ where: { id: matchId } });
     if (!match) throw new AppError('Match not found', 404);
-    // Block completion if match is disputed
     if (match.status === 'disputed') {
       throw new AppError('Cannot complete a disputed match', 400);
     }
-    if (match.status !== 'scheduled') throw new AppError('Match cannot be completed from current state', 409);
+
+    // If already completed, do not trigger rating or notifications, just return
+    if (match.status === 'completed') {
+      return match;
+    }
+
+    // Only allow completion if match.status is 'scheduled'
+    if (match.status !== 'scheduled') {
+      throw new AppError('Match cannot be completed from current state', 409);
+    }
+
     const now = new Date();
     if (match.scheduledAt > now) throw new AppError('Match cannot be completed before scheduled time', 409);
+
     const result = await tx.result.findUnique({ where: { matchId: match.id }, include: { sets: true } });
     if (!result) throw new AppError('Cannot complete match: Result does not exist', 409);
     if (!result.sets || result.sets.length === 0) throw new AppError('Cannot complete match: Result has no set results', 409);
@@ -222,17 +239,15 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
     }
 
     // Defensive: Enforce lifecycle consistency
-    if (result.status === 'confirmed' && match.status !== 'scheduled') {
-      throw new AppError('Lifecycle inconsistency: Result is confirmed but Match is not in scheduled state for completion', 409);
-    }
+    validateResultMatchConsistency(result, match);
+
     // Atomic transition protection
     const updateResult = await tx.match.updateMany({
       where: { id: match.id, status: 'scheduled' },
       data: { status: 'completed' }
     });
     if (updateResult.count === 0) throw new AppError('Match already completed or invalid state', 409);
-    // Update ratings for both players after match is completed
-    await RatingService.updateRatingsForCompletedMatch(tx, match.id);
+
     const updated = await tx.match.findUnique({ where: { id: match.id } });
     // Defensive: After transition, check consistency
     const finalResult = await tx.result.findUnique({ where: { matchId: match.id } });
@@ -246,23 +261,7 @@ export async function completeMatch(matchId: string): Promise<MatchDTO> {
     return updated!;
   });
 
-  // 2. Send notifications as a side effect (outside transaction)
-  // Defensive: Only notify if both playerAId and playerBId exist
-  if (updatedMatch.playerAId && updatedMatch.playerBId) {
-    // Fetch winnerUserId from result
-    const result = await prisma.result.findUnique({ where: { matchId: updatedMatch.id } });
-    const winnerUserId = result?.winnerUserId ?? null;
-    const notificationPayload = { matchId: updatedMatch.id, winnerId: winnerUserId };
-    // Notify both players (if userId is available)
-    const playerA = await prisma.player.findUnique({ where: { id: updatedMatch.playerAId } });
-    const playerB = await prisma.player.findUnique({ where: { id: updatedMatch.playerBId } });
-    if (playerA?.userId) {
-      await createNotification(playerA.userId, 'match.completed', notificationPayload);
-    }
-    if (playerB?.userId && playerB.userId !== playerA?.userId) {
-      await createNotification(playerB.userId, 'match.completed', notificationPayload);
-    }
-  }
+  // No rating update or notifications here; handled by mainstream flow (confirmResult)
   return toMatchDTO(updatedMatch);
 }
 

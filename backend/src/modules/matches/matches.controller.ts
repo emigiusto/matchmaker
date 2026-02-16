@@ -123,13 +123,19 @@ export class MatchesController {
 
   /**
    * POST /matches/:id/complete
-   * Complete a match (scheduled -> completed)
+   * Complete a match (admin override only)
    */
   static async completeMatch(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       if (!id || typeof id !== 'string') return res.status(400).json({ error: 'Missing or invalid match id' });
-      const match = await MatchesService.completeMatch(id);
+      const currentUserId = req.user?.id;
+      const isAdmin = !!req.user?.isAdmin;
+      if (!isAdmin) return res.status(403).json({ error: 'Forbidden: Admins only' });
+      if (!currentUserId || typeof currentUserId !== 'string') {
+        return res.status(401).json({ error: 'Unauthorized: Missing user id' });
+      }
+      const match = await MatchesService.completeMatch(id, currentUserId, isAdmin);
       res.json(match);
     } catch (err) {
       next(err);

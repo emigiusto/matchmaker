@@ -7,12 +7,6 @@ import { ResultsController } from './results.controller';
 
 const router = Router();
 
-
-
-// ...existing code with tags, descriptions, and schemas already present...
-
-
-
 /**
  * @openapi
  * /results/{id}/sets:
@@ -45,6 +39,65 @@ const router = Router();
 router.post('/:id/sets', ResultsController.addSetResult);
 
 
+
+
+/**
+ * @openapi
+ * /results/{id}/confirm:
+ *   post:
+ *     summary: Confirm a submitted result
+ *     description: Confirms a submitted result. Only host or opponent can confirm. Cannot confirm if already confirmed.
+ *     tags:
+ *       - Results
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Result ID
+ *     responses:
+ *       200:
+ *         description: The confirmed result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Result'
+ *       401:
+ *         description: Unauthorized
+ *       409:
+ *         description: Result already confirmed
+ */
+router.post('/:id/confirm', ResultsController.confirmResult);
+
+/**
+ * @openapi
+ * /results/{id}/dispute:
+ *   post:
+ *     summary: Dispute a result
+ *     description: Disputes a result. Only host or opponent can dispute. Cannot dispute if already confirmed.
+ *     tags:
+ *       - Results
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Result ID
+ *     responses:
+ *       200:
+ *         description: The disputed result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Result'
+ *       401:
+ *         description: Unauthorized
+ *       409:
+ *         description: Cannot dispute a confirmed result
+ */
+router.post('/:id/dispute', ResultsController.disputeResult);
 
 /**
  * @openapi
@@ -166,6 +219,6 @@ router.get('/recent', ResultsController.getRecentResults);
  *             schema:
  *               $ref: '#/components/schemas/Result'
  */
-router.post('/results/:matchId/submit-result', ResultsController.submitMatchResult);
+router.post('/:matchId/submit-result', ResultsController.submitMatchResult);
 
 export default router;
