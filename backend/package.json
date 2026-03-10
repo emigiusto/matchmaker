@@ -4,8 +4,8 @@
   "description": "AceUp is an app to organize sports matches by managing player availability, sending invites, and confirming participation through unique links. WhatsApp is used only as a delivery channel for notifications and links.",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only --watch src src/server.ts",
-    "dev:local": "cross-env ENV_FILE=.env.local ts-node-dev --respawn --transpile-only --watch src src/server.ts",
+    "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only --watch src src/server.ts",
+    "dev:local": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only --watch src src/server.ts",
     "dev:prod": "cross-env ENV_FILE=.env.production ts-node-dev --respawn --transpile-only --watch src src/server.ts",
     "test:scheduling": "bash scripts/test-scheduling-flow.sh",
     "test:scheduling:singles": "npx tsx scripts/test-scheduling.ts",
@@ -53,6 +53,7 @@
     "@types/swagger-ui-express": "^4.1.8",
     "@vitest/coverage-v8": "^4.0.18",
     "cross-env": "^7.0.3",
+    "dotenv-cli": "^11.0.0",
     "prisma": "6.19.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",

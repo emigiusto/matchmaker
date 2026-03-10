@@ -16,14 +16,17 @@ import { validateResultMatchConsistency } from '../results/results.service';
  * Fetch a match by its ID. Throws AppError if not found.
  * Invariant: A Match always has a valid Invite and Availability.
  */
+const matchInclude = {
+  invite: true,
+  availability: true,
+  hostUser: true,
+  opponentUser: true,
+} as const;
+
 export async function getMatchById(matchId: string): Promise<MatchDTO> {
-  // Defensive: Always fetch related Invite and Availability to ensure invariants
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    include: {
-      invite: true,
-      availability: true,
-    },
+    include: matchInclude,
   });
   if (!match) throw new AppError('Match not found', 404);
   if (!match.invite) throw new AppError('Invariant violation: Match missing Invite', 500);
@@ -56,13 +59,8 @@ export async function listMatchesForUser(userId: string): Promise<MatchDTO[]> {
 
   // Defensive: Always fetch related Invite and Availability, sort, and deduplicate
   const matches = await prisma.match.findMany({
-    where: {
-      OR: orConditions,
-    },
-    include: {
-      invite: true,
-      availability: true,
-    },
+    where: { OR: orConditions },
+    include: matchInclude,
     orderBy: { scheduledAt: 'desc' },
   });
   // Deduplicate by match.id (in case of overlapping conditions)
@@ -85,10 +83,7 @@ export async function listMatchesForPlayer(playerId: string): Promise<MatchDTO[]
         { playerBId: playerId },
       ],
     },
-    include: {
-      invite: true,
-      availability: true,
-    },
+    include: matchInclude,
     orderBy: { scheduledAt: 'desc' },
   });
   // Deduplicate by match.id (should not be needed, but defensive)
@@ -118,7 +113,7 @@ export async function listUpcomingMatchesForUser(userId: string): Promise<MatchD
       OR: orConditions,
       scheduledAt: { gt: now },
     },
-    include: { invite: true, availability: true },
+    include: matchInclude,
     orderBy: { scheduledAt: 'asc' },
   });
   const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
@@ -145,7 +140,7 @@ export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]
       OR: orConditions,
       scheduledAt: { lt: now },
     },
-    include: { invite: true, availability: true },
+    include: matchInclude,
     orderBy: { scheduledAt: 'desc' },
   });
   const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
@@ -159,7 +154,7 @@ export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]
 export async function listMatchesForVenue(venueId: string): Promise<MatchDTO[]> {
   const matches = await prisma.match.findMany({
     where: { venueId },
-    include: { invite: true, availability: true },
+    include: matchInclude,
     orderBy: { scheduledAt: 'desc' },
   });
   return matches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
@@ -185,7 +180,7 @@ export async function listRecentMatches(limit: number, userId?: string): Promise
   }
   const matches = await prisma.match.findMany({
     where,
-    include: { invite: true, availability: true },
+    include: matchInclude,
     orderBy: { scheduledAt: 'desc' },
     take: limit,
   });
@@ -364,9 +359,16 @@ export async function createMatch(input: CreateMatchInput): Promise<MatchDTO> {
 
 
 
-// Helper: convert DB Match to API MatchDTO
-// Defensive: expects match.invite and match.availability to be present
-function toMatchDTO(match: Match): MatchDTO {
+// Helper: convert DB Match to API MatchDTO (with optional enriched fields)
+type EnrichedMatch = Match & {
+  availability?: { locationText: string; date: Date; startTime: Date } | null;
+  hostUser?: { name: string | null } | null;
+  opponentUser?: { name: string | null } | null;
+};
+
+function toMatchDTO(match: EnrichedMatch): MatchDTO {
+  const av = match.availability;
+  const scheduled = match.scheduledAt instanceof Date ? match.scheduledAt : new Date(match.scheduledAt);
   return {
     id: match.id,
     inviteId: match.inviteId,
@@ -382,5 +384,12 @@ function toMatchDTO(match: Match): MatchDTO {
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
     status: match.status,
     type: match.type || 'competitive',
+    ...(av && {
+      location: av.locationText,
+      date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),
+      time: av.startTime instanceof Date ? av.startTime.toTimeString().slice(0, 5) : String(av.startTime).slice(0, 5),
+    }),
+    hostName: match.hostUser?.name ?? undefined,
+    opponentName: match.opponentUser?.name ?? undefined,
   };
 }

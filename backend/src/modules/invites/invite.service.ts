@@ -159,7 +159,13 @@ export class InviteService {
    * - Defensive: ensures frontend always sees correct status
    */
   static async getInviteByToken(token: string): Promise<InviteDTO> {
-    const invite = await prisma.invite.findUnique({ where: { token } });
+    const invite = await prisma.invite.findUnique({
+      where: { token },
+      include: {
+        availability: true,
+        inviter: { include: { player: true } },
+      },
+    });
     if (!invite) throw new AppError('Invite not found', 404);
     if (isInviteExpired(invite.expiresAt) && invite.status !== 'expired') {
       // Defensive: auto-expire if needed
@@ -168,7 +174,7 @@ export class InviteService {
       const updated = await prisma.invite.update({ where: { id: invite.id }, data: { status: 'expired' } });
       return InviteService.toDTO(updated);
     }
-    return InviteService.toDTO(invite);
+    return InviteService.toDTOWithDetails(invite);
   }
 
   /**
@@ -283,6 +289,26 @@ export class InviteService {
   }
 
   /**
+   * Decline an invite (by invitee via token link)
+   * - Anyone with the token can decline (invitee identity unknown until they act)
+   * - Sets status to cancelled; idempotent if already cancelled/expired/accepted
+   */
+  static async declineInvite(token: string): Promise<InviteDTO> {
+    const invite = await prisma.invite.findUnique({ where: { token } });
+    if (!invite) throw new AppError('Invite not found', 404);
+    if (invite.status !== 'pending') return InviteService.toDTO(invite);
+    if (isInviteExpired(invite.expiresAt)) {
+      const updated = await prisma.invite.update({ where: { id: invite.id }, data: { status: 'expired' } });
+      return InviteService.toDTO(updated);
+    }
+    const updated = await prisma.invite.update({
+      where: { id: invite.id },
+      data: { status: 'cancelled' },
+    });
+    return InviteService.toDTO(updated);
+  }
+
+  /**
  * Cancel an invite (by inviter only)
  * - Only inviterUserId can cancel
  * - Only pending invites can be cancelled
@@ -323,6 +349,34 @@ export class InviteService {
       data: { status: 'expired' },
     });
     return InviteService.toDTO(updatedInvite);
+  }
+
+  /**
+   * Convert Invite to DTO with availability and inviter details (for invite landing page)
+   */
+  private static toDTOWithDetails(invite: Invite & {
+    match?: Match | null;
+    availability?: { locationText: string; date: Date; startTime: Date; endTime: Date } | null;
+    inviter?: { name: string | null; player?: { levelValue: number | null; defaultCity: string | null } | null } | null;
+  }): InviteDTO {
+    const base = InviteService.toDTO(invite);
+    const av = invite.availability;
+    const inv = invite.inviter;
+    return {
+      ...base,
+      ...(av && {
+        location: av.locationText,
+        date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),
+        time: av.startTime instanceof Date
+          ? av.startTime.toTimeString().slice(0, 5)
+          : String(av.startTime).slice(0, 5),
+      }),
+      ...(inv && {
+        fromPlayerName: inv.name || 'Unknown',
+        fromPlayerLevel: inv.player?.levelValue ?? undefined,
+        fromPlayerCity: inv.player?.defaultCity ?? undefined,
+      }),
+    };
   }
 
   /**

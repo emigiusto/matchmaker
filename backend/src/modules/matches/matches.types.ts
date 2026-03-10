@@ -33,6 +33,16 @@ export interface MatchDTO {
   createdAt: string;   // ISO string
   status: MatchStatus;
   type: MatchType;
+  /** Location from availability (when included) */
+  location?: string;
+  /** Date YYYY-MM-DD (when included) */
+  date?: string;
+  /** Time HH:mm (when included) */
+  time?: string;
+  /** Host display name (when included) */
+  hostName?: string;
+  /** Opponent display name (when included) */
+  opponentName?: string;
 }
 
 export interface CreateMatchInput {

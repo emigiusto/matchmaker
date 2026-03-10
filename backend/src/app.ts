@@ -13,8 +13,11 @@ const app = express();
 configureRatingSystem();
 
 // CORS
+const isDev = process.env.ENVIRONMENT === 'DEVELOPMENT';
 const corsOrigin = process.env.CORS_ORIGIN;
-app.use(cors(corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : {}));
+app.use(cors(isDev
+  ? { origin: true } // allow any origin in development
+  : corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : {}));
 
 // Parse JSON bodies
 app.use(express.json());

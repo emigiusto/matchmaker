@@ -140,6 +140,20 @@ export class InviteController {
   }
 
   /**
+   * POST /invites/:token/decline
+   * Decline invite by token (invitee via link)
+   */
+  static async declineInvite(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token } = inviteTokenParamSchema.parse(req.params);
+      const invite = await InviteService.declineInvite(token);
+      res.status(200).json(invite);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
  * POST /invites/:id/cancel
  * Cancel invite by ID (inviter only)
  */

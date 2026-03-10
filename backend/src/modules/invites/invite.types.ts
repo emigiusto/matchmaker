@@ -52,6 +52,18 @@ export interface InviteDTO {
   radiusKm?: number | null;
   /** Match type: competitive or practice */
   matchType: MatchType;
+  /** Location from availability (when included) */
+  location?: string;
+  /** Date from availability YYYY-MM-DD (when included) */
+  date?: string;
+  /** Time from availability HH:mm (when included) */
+  time?: string;
+  /** Inviter display name (when included) */
+  fromPlayerName?: string;
+  /** Inviter player level (when included) */
+  fromPlayerLevel?: number;
+  /** Inviter player city (when included) */
+  fromPlayerCity?: string;
 }
 
 /**

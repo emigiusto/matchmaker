@@ -1,13 +1,16 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-const envFile = process.env.ENV_FILE || '.env';
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
-
+// Resolve env from backend dir so it works when run from repo root or backend/
+const backendDir = path.resolve(__dirname, '..');
+const envFile = process.env.ENV_FILE || '.env.local';
+const envPath = path.resolve(backendDir, envFile);
+dotenv.config({ path: envPath });
 import { ensureDatabaseUrl } from './config/database-url';
 import { ensureRedisUrl } from './config/redis';
 
 ensureDatabaseUrl();
+
 import app from './app';
 import { initRedisCache } from './shared/cache';
 

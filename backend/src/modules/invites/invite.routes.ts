@@ -106,6 +106,27 @@ router.get('/:token', InviteController.getInviteByToken);
  */
 router.post('/:token/confirm', InviteController.confirmInvite);
 
+/**
+ * @openapi
+ * /invites/{token}/decline:
+ *   post:
+ *     summary: Decline invite by token (invitee via link)
+ *     tags:
+ *       - Invites
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Invite token
+ *     responses:
+ *       200:
+ *         description: Invite declined (status set to cancelled)
+ *       404:
+ *         description: Invite not found
+ */
+router.post('/:token/decline', InviteController.declineInvite);
 
 /**
  * @openapi
