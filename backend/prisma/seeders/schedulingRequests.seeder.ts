@@ -4,6 +4,7 @@ import { faker } from '@faker-js/faker';
 import { batchInsert } from './batchInsert.util';
 import { PrismaClient } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
+import { DEV_USER_ID, DEV_USER_2_ID } from './users.seeder';
 
 const prisma = new PrismaClient();
 
@@ -34,12 +35,58 @@ export async function seedSchedulingRequests(
   const usedTokens = new Set<string>();
   const requests: RequestData[] = [];
 
-  const hostsWithPhone = usersWithPhone.filter((u) => u.phone);
+  // Padel is always doubles; tennis can be singles or doubles
+  const pickSportAndFormat = (): { sportType: 'tennis' | 'padel'; format: 'singles' | 'doubles' } => {
+    const sport = faker.helpers.arrayElement(['tennis', 'padel']);
+    return sport === 'padel'
+      ? { sportType: 'padel', format: 'doubles' }
+      : { sportType: 'tennis', format: faker.datatype.boolean({ probability: 0.8 }) ? 'singles' : 'doubles' };
+  };
+
+  // Guarantee 2 active scheduling requests for the dev user (for /play My Requests)
+  const devUser = usersWithPhone.find((u) => u.id === DEV_USER_ID && u.phone);
+  if (devUser) {
+    for (let i = 0; i < 2; i++) {
+      let token: string;
+      do {
+        token = generateInviteToken();
+      } while (usedTokens.has(token));
+      usedTokens.add(token);
+      const date = faker.date.soon({ days: 14 });
+      const startTime = new Date(date);
+      startTime.setHours(faker.number.int({ min: 9, max: 18 }), 0, 0, 0);
+      const endTime = new Date(startTime.getTime() + 90 * 60 * 1000);
+      const { sportType, format } = pickSportAndFormat();
+      let hostPartnerUserId: string | null = null;
+      if (format === 'doubles') {
+        const partner = usersWithPhone.find((u) => u.id !== devUser.id && u.phone);
+        if (partner) hostPartnerUserId = partner.id;
+      }
+      requests.push({
+        hostUserId: devUser.id,
+        hostPartnerUserId,
+        sportType,
+        format,
+        matchType: 'competitive' as const,
+        date,
+        startTime,
+        endTime,
+        locationText: faker.location.streetAddress(),
+        radiusKm: 20,
+        responseWindowMinutes: 240,
+        inviteToken: token,
+        status: 'active',
+      });
+    }
+  }
+
+  // Exclude secondary dev user from being a host so they can test scheduling from scratch
+  const hostsWithPhone = usersWithPhone.filter((u) => u.phone && u.id !== DEV_USER_2_ID);
   const hostCount = Math.min(25, Math.floor(hostsWithPhone.length / 2));
 
   for (let i = 0; i < hostCount; i++) {
     const host = faker.helpers.arrayElement(hostsWithPhone);
-    const format = faker.datatype.boolean({ probability: 0.8 }) ? 'singles' : 'doubles';
+    const { sportType, format } = pickSportAndFormat();
 
     let hostPartnerUserId: string | null = null;
     if (format === 'doubles') {
@@ -68,7 +115,7 @@ export async function seedSchedulingRequests(
     requests.push({
       hostUserId: host.id,
       hostPartnerUserId,
-      sportType: faker.helpers.arrayElement(['tennis', 'padel']),
+      sportType,
       format,
       matchType: faker.datatype.boolean({ probability: 0.8 }) ? 'competitive' : 'practice',
       date,
@@ -82,10 +129,63 @@ export async function seedSchedulingRequests(
     });
   }
 
-  if (requests.length === 0) return [];
-  return batchInsert(requests, 10, (r) =>
-    prisma.schedulingRequest.create({
-      data: r as Prisma.SchedulingRequestUncheckedCreateInput,
-    })
-  );
+  const created = requests.length > 0
+    ? await batchInsert(requests, 10, (r) =>
+        prisma.schedulingRequest.create({
+          data: r as Prisma.SchedulingRequestUncheckedCreateInput,
+        })
+      )
+    : [];
+
+  // Guarantee dev user has scheduling requests (fallback if not in usersWithPhone)
+  const existingCount = await prisma.schedulingRequest.count({
+    where: { hostUserId: DEV_USER_ID },
+  });
+  if (existingCount === 0) {
+    const devUser = await prisma.user.findUnique({ where: { id: DEV_USER_ID } });
+    if (devUser && devUser.phone) {
+      for (let i = 0; i < 2; i++) {
+        let token: string;
+        do {
+          token = generateInviteToken();
+        } while (usedTokens.has(token));
+        usedTokens.add(token);
+        const date = faker.date.soon({ days: 14 });
+        const startTime = new Date(date);
+        startTime.setHours(faker.number.int({ min: 9, max: 18 }), 0, 0, 0);
+        const endTime = new Date(startTime.getTime() + 90 * 60 * 1000);
+        const { sportType, format } = pickSportAndFormat();
+        let hostPartnerUserId: string | null = null;
+        if (format === 'doubles') {
+          const partner = await prisma.user.findFirst({
+            where: { id: { not: DEV_USER_ID }, phone: { not: null } },
+          });
+          if (partner) hostPartnerUserId = partner.id;
+        }
+        await prisma.schedulingRequest.create({
+          data: {
+            hostUserId: DEV_USER_ID,
+            hostPartnerUserId,
+            sportType,
+            format,
+            matchType: 'competitive',
+            date,
+            startTime,
+            endTime,
+            locationText: faker.location.streetAddress(),
+            radiusKm: 20,
+            responseWindowMinutes: 240,
+            inviteToken: token,
+            status: 'active',
+          } as Prisma.SchedulingRequestUncheckedCreateInput,
+        });
+      }
+      const fallbackCreated = await prisma.schedulingRequest.findMany({
+        where: { hostUserId: DEV_USER_ID },
+      });
+      return [...(Array.isArray(created) ? created : []), ...fallbackCreated];
+    }
+  }
+
+  return created;
 }

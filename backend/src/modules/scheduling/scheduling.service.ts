@@ -476,7 +476,7 @@ export const schedulingService = {
   async listSchedulingRequestsByHost(hostUserId: string): Promise<SchedulingRequestDTO[]> {
     const requests = await prisma.schedulingRequest.findMany({
       where: { hostUserId },
-      include: { hostUser: true, hostPartner: true, candidates: { include: { contactUser: true } } },
+      include: { hostUser: true, hostPartner: true, candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return requests.map(toRequestDTOWithCandidates);
@@ -489,7 +489,7 @@ export const schedulingService = {
 
     const requests = await prisma.schedulingRequest.findMany({
       where: { id: { in: requestIds } },
-      include: { hostUser: true, hostPartner: true, candidates: { include: { contactUser: true } } },
+      include: { hostUser: true, hostPartner: true, candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return requests.map(toRequestDTOWithCandidates);

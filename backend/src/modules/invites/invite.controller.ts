@@ -37,6 +37,19 @@ export class InviteController {
   }
 
   /**
+   * GET /invites/open
+   * List pending community (open) invites that any user can browse
+   */
+  static async listOpenInvites(req: Request, res: Response, next: NextFunction) {
+    try {
+      const invites = await InviteService.listOpenInvites();
+      res.status(200).json(invites);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /invites/by-user/:userId
    * List all invites sent or received by a user
    */

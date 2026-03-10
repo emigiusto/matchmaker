@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
 import {
   Calendar,
@@ -30,15 +30,16 @@ import { PageHeader } from "@/components/page-header"
 import { MatchTypeBadge } from "@/components/match-type-badge"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
 import { toast } from "sonner"
-// TODO: wire to API — replace with schedulingService, invitesService
-import {
-  mockInvites,
-  CURRENT_USER_ID,
-} from "@/lib/mock-data"
+import { getCurrentUserId } from "@/lib/current-user"
+import { schedulingService } from "@/lib/services/scheduling.service"
+import { invitesService } from "@/lib/services/invites.service"
+import { adaptInvite } from "@/lib/api/adapters"
+import type { Invite } from "@/lib/types"
 
-// Mock invite requests with sequential invite progress
+// UI shape for scheduling request (mapped from API)
 interface InviteRequest {
   id: string
+  inviteToken: string
   date: string
   time: string
   location: string
@@ -55,159 +56,199 @@ interface InviteRequest {
 
 const MAX_ACTIVE_REQUESTS = 3
 
-const mockInviteRequests: InviteRequest[] = [
-  {
-    id: "req-1",
-    date: "2026-03-12",
-    time: "18:00 - 19:30",
-    location: "Barcelona (10 km)",
-    matchType: "competitive",
-    sport: "tennis",
-    matchFormat: "singles",
-    status: "scheduling",
-    contacts: [
-      { name: "Carlos", status: "declined" },
-      { name: "Pablo", status: "no_response" },
-      { name: "Marc", status: "contacted" },
-      { name: "Luis", status: "pending" },
-      { name: "Ana", status: "pending" },
-    ],
-    currentIndex: 2,
-  },
-  {
-    id: "req-4",
-    date: "2026-03-13",
-    time: "20:00 - 21:30",
-    location: "Padel Club Diagonal",
-    matchType: "competitive",
-    sport: "padel",
-    matchFormat: "doubles",
-    status: "scheduling",
-    contacts: [
-      { name: "Jordi", status: "declined" },
-      { name: "Laia", status: "accepted" },
-      { name: "Sergi", status: "contacted" },
-      { name: "Neus", status: "contacted" },
-      { name: "Toni", status: "pending" },
-    ],
-    currentIndex: 2,
-  },
-  {
-    id: "req-2",
-    date: "2026-03-14",
-    time: "10:00 - 11:30",
-    location: "Club Tennis Barcino",
-    matchType: "practice",
-    sport: "tennis",
-    matchFormat: "singles",
-    status: "matched",
-    contacts: [
-      { name: "Sofia", status: "accepted" },
-      { name: "Jorge", status: "pending" },
-    ],
-    currentIndex: 0,
-  },
-]
+function formatTimeRange(startIso: string, endIso: string): string {
+  try {
+    const start = new Date(startIso)
+    const end = new Date(endIso)
+    return `${format(start, "HH:mm")} - ${format(end, "HH:mm")}`
+  } catch {
+    return ""
+  }
+}
+
+function mapSchedulingToInviteRequest(
+  r: import("@/lib/services/scheduling.service").SchedulingRequestDTO
+): InviteRequest | null {
+  if (r.status === "cancelled") return null
+  const statusMap = {
+    active: "scheduling" as const,
+    paused: "paused" as const,
+    completed: "matched" as const,
+    expired: "expired" as const,
+    cancelled: "expired" as const,
+  }
+  const contactStatusMap = {
+    pending: "pending" as const,
+    contacted: "contacted" as const,
+    waiting_reply: "contacted" as const,
+    accepted: "accepted" as const,
+    declined: "declined" as const,
+    expired: "no_response" as const,
+  }
+  const dateStr = r.date.slice(0, 10)
+  const timeStr = formatTimeRange(r.startTime, r.endTime)
+  const candidates = r.candidates ?? []
+  const contacts = candidates.map((c) => ({
+    name: c.contactUserName ?? "Unknown",
+    status: contactStatusMap[c.status] ?? "pending",
+  }))
+  return {
+    id: r.id,
+    inviteToken: r.inviteToken,
+    date: dateStr,
+    time: timeStr,
+    location: r.locationText,
+    matchType: r.matchType,
+    sport: r.sportType,
+    matchFormat: r.format,
+    status: statusMap[r.status] ?? "scheduling",
+    contacts,
+    currentIndex: r.currentCandidateIndex,
+  }
+}
 
 export default function PlayPage() {
+  const currentUserId = getCurrentUserId()
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [invites, setInvites] = useState(mockInvites)
-  const [inviteRequests, setInviteRequests] = useState(mockInviteRequests)
+  const [incomingInvitesList, setIncomingInvitesList] = useState<Invite[]>([])
+  const [inviteRequests, setInviteRequests] = useState<InviteRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [copiedRequestId, setCopiedRequestId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function fetchData() {
+      setLoading(true)
+      try {
+        const [requestsRes, openInvitesRes] = await Promise.all([
+          schedulingService.listByHost(currentUserId),
+          invitesService.getOpenInvites().then((list: unknown[]) =>
+            (list as import("@/lib/api/adapters").BackendInviteDTO[]).map((d) => adaptInvite(d))
+          ).catch(() => []),
+        ])
+        if (!cancelled) {
+          const mapped = requestsRes
+            .map(mapSchedulingToInviteRequest)
+            .filter((r): r is InviteRequest => r !== null)
+          setInviteRequests(mapped)
+          setIncomingInvitesList(openInvitesRes)
+        }
+      } catch {
+        if (!cancelled) setIncomingInvitesList([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetchData()
+    return () => { cancelled = true }
+  }, [currentUserId])
 
   const activeRequestCount = inviteRequests.filter(
     (r) => r.status === "scheduling" || r.status === "paused"
   ).length
   const atCapacity = activeRequestCount >= MAX_ACTIVE_REQUESTS
 
-  const incomingInvites = invites.filter(
-    (i) =>
-      i.status === "pending" &&
-      (i.toUserId === CURRENT_USER_ID || i.isOpen) &&
-      i.fromUserId !== CURRENT_USER_ID
+  const incomingInvites = incomingInvitesList.filter(
+    (i) => i.status === "pending" && i.fromUserId !== currentUserId
   )
 
-  function handleAcceptInvite(token: string) {
-    setInvites((prev) =>
-      prev.map((i) => (i.token === token ? { ...i, status: "accepted" as const } : i))
-    )
-    toast.success("Invite accepted!")
-  }
-
-  function handleDeclineInvite(token: string) {
-    setInvites((prev) =>
-      prev.map((i) => (i.token === token ? { ...i, status: "declined" as const } : i))
-    )
-    toast.success("Invite declined")
-  }
-
-  function handlePauseRequest(id: string) {
-    setInviteRequests((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, status: r.status === "paused" ? "scheduling" : "paused" }
-          : r
+  async function handleAcceptInvite(token: string) {
+    try {
+      await invitesService.accept(token, currentUserId)
+      setIncomingInvitesList((prev) =>
+        prev.map((i) => (i.token === token ? { ...i, status: "accepted" as const } : i))
       )
-    )
-    toast.success("Invite request updated")
+      toast.success("Invite accepted!")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to accept invite")
+    }
   }
 
-  function handleCancelRequest(id: string) {
-    setInviteRequests((prev) => prev.filter((r) => r.id !== id))
-    toast.success("Invite request cancelled")
-  }
-
-  function handleSkipContact(requestId: string, contactName: string) {
-    setInviteRequests((prev) =>
-      prev.map((r) => {
-        if (r.id !== requestId) return r
-        const skippedIdx = r.contacts.findIndex((c) => c.name === contactName)
-        const nextIdx = skippedIdx + 1
-        return {
-          ...r,
-          currentIndex: nextIdx < r.contacts.length ? nextIdx : r.currentIndex,
-          contacts: r.contacts.map((c, i) => {
-            if (c.name === contactName) return { ...c, status: "no_response" as const }
-            if (i === nextIdx) return { ...c, status: "contacted" as const }
-            return c
-          }),
-        }
-      })
-    )
-    toast.success(`Skipped ${contactName}, contacting next person`)
-  }
-
-  function handleRetryContact(requestId: string, contactName: string) {
-    setInviteRequests((prev) =>
-      prev.map((r) =>
-        r.id === requestId
-          ? {
-              ...r,
-              contacts: r.contacts.map((c) =>
-                c.name === contactName ? { ...c, status: "contacted" as const } : c
-              ),
-            }
-          : r
+  async function handleDeclineInvite(token: string) {
+    try {
+      await invitesService.decline(token)
+      setIncomingInvitesList((prev) =>
+        prev.map((i) => (i.token === token ? { ...i, status: "declined" as const } : i))
       )
-    )
-    toast.success(`Re-sending invite to ${contactName}`)
+      toast.success("Invite declined")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to decline invite")
+    }
   }
 
-  function handleShareWhatsApp(requestId: string) {
-    const request = inviteRequests.find((r) => r.id === requestId)
-    if (!request) return
+  async function handlePauseRequest(id: string) {
+    try {
+      const updated = await schedulingService.pause(id, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === id ? mapped : r))
+        )
+        toast.success("Invite request updated")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update request")
+    }
+  }
+
+  async function handleResumeRequest(id: string) {
+    try {
+      const updated = await schedulingService.resume(id, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === id ? mapped : r))
+        )
+        toast.success("Invite request resumed")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to resume request")
+    }
+  }
+
+  async function handleCancelRequest(id: string) {
+    try {
+      await schedulingService.cancel(id, currentUserId)
+      setInviteRequests((prev) => prev.filter((r) => r.id !== id))
+      toast.success("Invite request cancelled")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to cancel request")
+    }
+  }
+
+  function handleSkipContact(_requestId: string, contactName: string) {
+    toast.info(`Skipping is done via the scheduling flow for ${contactName}`)
+  }
+
+  function handleRetryContact(_requestId: string, contactName: string) {
+    toast.info(`Retry is done via the scheduling flow for ${contactName}`)
+  }
+
+  function handleShareWhatsApp(request: InviteRequest) {
     const message = encodeURIComponent(
-      `Want to play tennis on ${format(new Date(request.date), "EEE, MMM d")} (${request.time}) at ${request.location}? Accept my invite here:\n\n${window.location.origin}/invite/tok-${requestId}`
+      `Want to play ${request.sport} on ${format(new Date(request.date), "EEE, MMM d")} (${request.time}) at ${request.location}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
     )
     window.open(`https://wa.me/?text=${message}`, "_blank")
   }
 
-  const [copiedRequestId, setCopiedRequestId] = useState<string | null>(null)
-
-  function handleCopyRequestLink(id: string) {
-    navigator.clipboard.writeText(`${window.location.origin}/invite/tok-${id}`)
-    setCopiedRequestId(id)
-    toast.success("Invite link copied")
-    setTimeout(() => setCopiedRequestId(null), 2000)
+  async function handleCopyRequestLink(request: InviteRequest) {
+    try {
+      const link = await schedulingService.getInviteLink(
+        request.id,
+        window.location.origin
+      )
+      const fullUrl = link.startsWith("http") ? link : `${window.location.origin}${link}`
+      await navigator.clipboard.writeText(fullUrl)
+      setCopiedRequestId(request.id)
+      toast.success("Invite link copied")
+      setTimeout(() => setCopiedRequestId(null), 2000)
+    } catch (e) {
+      const fallback = `${window.location.origin}/play?invite=${request.inviteToken}`
+      await navigator.clipboard.writeText(fallback)
+      setCopiedRequestId(request.id)
+      toast.success("Invite link copied")
+      setTimeout(() => setCopiedRequestId(null), 2000)
+    }
   }
 
   return (
@@ -246,6 +287,14 @@ export default function PlayPage() {
 
           {/* My Requests Tab - Shows active invite scheduling */}
           <TabsContent value="requests" className="mt-6">
+            {loading ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ) : (
+              <>
             {atCapacity && (
               <div className="mb-4 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
                 <XCircle className="h-4 w-4 shrink-0" />
@@ -396,7 +445,11 @@ export default function PlayPage() {
                               variant="outline"
                               size="sm"
                               className="gap-1.5"
-                              onClick={() => handlePauseRequest(request.id)}
+                              onClick={() =>
+                                request.status === "paused"
+                                  ? handleResumeRequest(request.id)
+                                  : handlePauseRequest(request.id)
+                              }
                             >
                               {request.status === "paused" ? (
                                 <>
@@ -414,7 +467,7 @@ export default function PlayPage() {
                               variant="outline"
                               size="sm"
                               className="gap-1.5"
-                              onClick={() => handleCopyRequestLink(request.id)}
+                              onClick={() => handleCopyRequestLink(request)}
                             >
                               {copiedRequestId === request.id ? (
                                 <><Check className="h-3.5 w-3.5" />Copied</>
@@ -426,7 +479,7 @@ export default function PlayPage() {
                               variant="outline"
                               size="sm"
                               className="gap-1.5 text-[#25D366] hover:border-[#25D366]/40 hover:bg-[#25D366]/10 hover:text-[#25D366]"
-                              onClick={() => handleShareWhatsApp(request.id)}
+                              onClick={() => handleShareWhatsApp(request)}
                             >
                               <Link2 className="h-3.5 w-3.5" />
                               WhatsApp
@@ -457,11 +510,19 @@ export default function PlayPage() {
                 ))}
               </div>
             )}
+              </>
+            )}
           </TabsContent>
 
           {/* Incoming Invites Tab */}
           <TabsContent value="incoming" className="mt-6">
-            {incomingInvites.length === 0 ? (
+            {loading ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ) : incomingInvites.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-20">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">

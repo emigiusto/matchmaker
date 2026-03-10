@@ -42,6 +42,7 @@ export interface BackendInviteDTO {
   fromPlayerName?: string
   fromPlayerLevel?: number
   fromPlayerCity?: string
+  visibility?: "private" | "community"
 }
 
 // Backend NotificationDTO shape
@@ -88,7 +89,7 @@ export function adaptInvite(dto: BackendInviteDTO & { message?: string; fromPlay
     time: dto.time ?? "",
     location: dto.location ?? "",
     status: mapInviteStatus(dto.status),
-    isOpen: false,
+    isOpen: dto.visibility === "community",
     createdAt: dto.createdAt,
     fromPlayerLevel: dto.fromPlayerLevel,
     fromPlayerCity: dto.fromPlayerCity,

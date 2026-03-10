@@ -11,15 +11,18 @@ type UserSeed = {
   isGuest: boolean;
 };
 
-/** Fixed dev user ID for frontend API wiring (no auth yet) */
-export const DEV_USER_ID = 'user-001';
+/** Fixed dev user ID for frontend API wiring (must match VITE_CURRENT_USER_ID in frontend .env) */
+export const DEV_USER_ID = '023eddcc-c568-4091-8d7b-354a1744c7d4';
+
+/** Secondary dev user for scheduling flow testing (use as candidate, invitee, or switch VITE_CURRENT_USER_ID) */
+export const DEV_USER_2_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
 export async function seedUsers() {
-  const usedPhones = new Set<string>();
-  const usedEmails = new Set<string>();
+  const usedPhones = new Set<string>(['+34 600 000 001', '+34 600 000 002']);
+  const usedEmails = new Set<string>(['alex@example.com', 'jordan@example.com']);
   const users: UserSeed[] = [];
 
-  // Create dev user first (fixed ID for frontend VITE_CURRENT_USER_ID)
+  // Create primary dev user (fixed ID for frontend VITE_CURRENT_USER_ID)
   const devUser = await prisma.user.create({
     data: {
       id: DEV_USER_ID,
@@ -30,7 +33,18 @@ export async function seedUsers() {
     },
   });
 
-  for (let i = 0; i < 299; i++) {
+  // Create secondary dev user (for scheduling flow: use as candidate, invitee, or switch current user)
+  const devUser2 = await prisma.user.create({
+    data: {
+      id: DEV_USER_2_ID,
+      name: 'Jordan Kim',
+      phone: '+34 600 000 002',
+      email: 'jordan@example.com',
+      isGuest: false,
+    },
+  });
+
+  for (let i = 0; i < 298; i++) {
     let phone: string;
     do {
       phone = faker.phone.number({ style: 'international' }) + i;
@@ -56,5 +70,5 @@ export async function seedUsers() {
   const created = await batchInsert(users, 20, (user) =>
     prisma.user.create({ data: user })
   );
-  return [devUser, ...created];
+  return [devUser, devUser2, ...created];
 }

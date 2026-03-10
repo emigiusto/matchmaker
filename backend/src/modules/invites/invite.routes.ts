@@ -50,7 +50,25 @@ const router = Router();
  */
 router.post('/', InviteController.createInvite);
 
-
+/**
+ * @openapi
+ * /invites/open:
+ *   get:
+ *     summary: List open (community) invites
+ *     description: Returns pending community invites that any user can browse and accept.
+ *     tags:
+ *       - Invites
+ *     responses:
+ *       200:
+ *         description: List of open invites
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Invite'
+ */
+router.get('/open', InviteController.listOpenInvites);
 
 /**
  * @openapi

@@ -138,6 +138,20 @@ export class SchedulingController {
     }
   }
 
+  static async debugDevUserCount(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (process.env.ENVIRONMENT !== 'DEVELOPMENT') {
+        return res.status(404).end();
+      }
+      const { prisma } = await import('../../prisma');
+      const DEV_USER_ID = '023eddcc-c568-4091-8d7b-354a1744c7d4';
+      const count = await prisma.schedulingRequest.count({ where: { hostUserId: DEV_USER_ID } });
+      res.json({ hostUserId: DEV_USER_ID, schedulingRequestCount: count });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async listIncomingInvites(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;

@@ -91,6 +91,23 @@ export class InviteService {
   }
 
   /**
+   * List pending community (open) invites that any user can browse and accept
+   */
+  static async listOpenInvites(): Promise<InviteDTO[]> {
+    const now = new Date();
+    const invites = await prisma.invite.findMany({
+      where: {
+        status: 'pending',
+        visibility: 'community',
+        expiresAt: { gt: now },
+      },
+      include: { availability: true, match: true, inviter: { include: { player: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return invites.map((inv) => InviteService.toDTOWithDetails(inv));
+  }
+
+  /**
    * List all invites for an availability
    */
   static async listInvitesByAvailability(availabilityId: string): Promise<InviteDTO[]> {
