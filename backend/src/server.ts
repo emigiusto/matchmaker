@@ -2,7 +2,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+import { ensureDatabaseUrl } from './config/database-url';
 import { ensureRedisUrl } from './config/redis';
+
+ensureDatabaseUrl();
 import app from './app';
 import { initRedisCache } from './shared/cache';
 
