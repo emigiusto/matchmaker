@@ -35,7 +35,8 @@ export async function seedAvailabilities(users: { id: string }[]) {
     startTime.setHours(startHour, 0, 0, 0);
     const endTime = new Date(startTime.getTime() + 90 * 60 * 1000); // 1.5h slot
     // Pick 8-15 users to have overlapping slots on this date
-    const overlapUsers = faker.helpers.arrayElements(users, faker.number.int({ min: 8, max: 15 }));
+    const overlapCount = Math.min(users.length, faker.number.int({ min: 8, max: 15 }));
+    const overlapUsers = faker.helpers.arrayElements(users, overlapCount);
     for (const user of overlapUsers) {
       availabilities.push({
         userId: user.id,
@@ -43,8 +44,8 @@ export async function seedAvailabilities(users: { id: string }[]) {
         startTime: new Date(startTime),
         endTime: new Date(endTime),
         locationText: faker.location.streetAddress(),
-        minLevel: faker.number.float({ min: 1, max: 5, fractionDigits: 1 }),
-        maxLevel: faker.number.float({ min: 5, max: 7, fractionDigits: 1 }),
+        minLevel: faker.number.float({ min: 1, max: 5, multipleOf: 0.1 }),
+        maxLevel: faker.number.float({ min: 5, max: 7, multipleOf: 0.1 }),
         preferredSurface: faker.helpers.arrayElement(['clay', 'grass', 'hard', null]),
         status: 'open',
       });
@@ -71,8 +72,8 @@ export async function seedAvailabilities(users: { id: string }[]) {
         startTime: slotStart,
         endTime: slotEnd,
         locationText: faker.location.streetAddress(),
-        minLevel: faker.number.float({ min: 1, max: 5, fractionDigits: 1 }),
-        maxLevel: faker.number.float({ min: 5, max: 7, fractionDigits: 1 }),
+        minLevel: faker.number.float({ min: 1, max: 5, multipleOf: 0.1 }),
+        maxLevel: faker.number.float({ min: 5, max: 7, multipleOf: 0.1 }),
         preferredSurface: faker.helpers.arrayElement(['clay', 'grass', 'hard', null]),
         status: 'open',
       });

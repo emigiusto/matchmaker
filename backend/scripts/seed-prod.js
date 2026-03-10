@@ -1,10 +1,10 @@
 /**
  * Run seed against production database.
- * Uses .env.production for credentials.
- * Requires SEED_ALLOW_PRODUCTION to bypass env check.
+ * Uses .env.production. Production seeding only runs if
+ * SEED_ALLOW_PRODUCTION=true is set in .env.production.
  */
 process.env.ENV_FILE = '.env.production';
-process.env.SEED_ALLOW_PRODUCTION = 'true';
+
 const path = require('path');
 const { spawnSync } = require('child_process');
 

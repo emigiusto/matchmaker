@@ -27,27 +27,30 @@ import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
 import { seedResults } from './results.seeder';
 
 async function main() {
-  // Only allow seeding in DEVELOPMENT, or when SEED_ALLOW_PRODUCTION=true
+  // Local: ENVIRONMENT=DEVELOPMENT. Production: SEED_ALLOW_PRODUCTION=true must be in .env.production
   const allowProduction = process.env.SEED_ALLOW_PRODUCTION === 'true' || process.env.SEED_ALLOW_PRODUCTION === '1';
   if (process.env.ENVIRONMENT !== 'DEVELOPMENT' && !allowProduction) {
-    console.error('Seeding is only allowed in DEVELOPMENT. Set SEED_ALLOW_PRODUCTION=true to seed production.');
+    console.error(
+      'Seeding is only allowed in DEVELOPMENT (npm run seed) or production when SEED_ALLOW_PRODUCTION=true is set in your .env.production file (npm run seed:prod).'
+    );
     process.exit(1);
   }
   if (allowProduction) {
-    console.log('[SEED] Running against production database (SEED_ALLOW_PRODUCTION=true)');
+    console.log('[SEED] Production mode (SEED_ALLOW_PRODUCTION in .env.production)');
   }
-  // Clean up all data (disable FK checks for MySQL to avoid order issues)
+  // Clean up all data — disable FK checks to avoid ordering issues (MySQL)
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0');
+  try {
   await prisma.setResult.deleteMany();
-  await prisma.notification.deleteMany();
+  await prisma.result.deleteMany();
   await prisma.message.deleteMany();
+  await prisma.notification.deleteMany();
   await prisma.groupMember.deleteMany();
-  await prisma.guestContact.deleteMany();
   await prisma.friendship.deleteMany();
-  await prisma.ratingHistory.deleteMany();
+  await prisma.guestContact.deleteMany();
   await prisma.schedulingCandidate.deleteMany();
   await prisma.schedulingRequest.deleteMany();
-  await prisma.result.deleteMany();
+  await prisma.ratingHistory.deleteMany(); // refs Player, Match — before match
   await prisma.conversation.deleteMany();
   await prisma.match.deleteMany();
   await prisma.invite.deleteMany();
@@ -57,7 +60,9 @@ async function main() {
   await prisma.venue.deleteMany();
   await prisma.group.deleteMany();
   await prisma.user.deleteMany();
-  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1');
+  } finally {
+    await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1');
+  }
 
   // 1. Users
   const users = await seedUsers();

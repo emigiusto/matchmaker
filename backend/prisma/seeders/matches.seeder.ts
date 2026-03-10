@@ -4,13 +4,26 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+type MatchSeed = {
+  inviteId: string;
+  availabilityId: string;
+  venueId: string;
+  playerAId: string;
+  playerBId: string;
+  scheduledAt: Date;
+  hostUserId: string;
+  opponentUserId: string;
+  status: 'scheduled';
+  type: 'competitive' | 'practice';
+};
+
 export async function seedMatches(
   invites: { id: string; availabilityId: string; inviterUserId: string; status: string; matchType?: 'competitive' | 'practice' }[],
   availabilities: { id: string; userId: string }[],
   players: { id: string; userId: string }[],
   venues: { id: string }[]
 ) {
-  const matches = [];
+  const matches: MatchSeed[] = [];
   for (const invite of invites) {
     // 1. Only accepted invites
     if (invite.status !== 'accepted') continue;
@@ -60,7 +73,7 @@ export async function seedMatches(
         hostUserId: match.hostUserId,
         opponentUserId: match.opponentUserId,
         status: 'scheduled',
-        type: match.type as 'competitive' | 'practice',
+        type: match.type,
       }
     })
   );

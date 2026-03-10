@@ -18,17 +18,21 @@ type InviteSeed = {
 };
 
 export async function seedInvites(users: { id: string }[], availabilities: { id: string; userId: string }[]) {
+  if (!users.length || !availabilities.length) return [];
   const usedPairs = new Set<string>();
   const invites: InviteSeed[] = [];
   for (let i = 0; i < 400; i++) {
     let inviter, availability;
+    let attempts = 0;
     do {
       inviter = faker.helpers.arrayElement(users);
       availability = faker.helpers.arrayElement(availabilities);
+      if (++attempts > 1000) break;
     } while (
       inviter.id === availability.userId ||
       usedPairs.has(inviter.id + '-' + availability.id)
     );
+    if (attempts > 1000) break;
     usedPairs.add(inviter.id + '-' + availability.id);
     // Generate minLevel and maxLevel (min <= max)
     const minLevel = faker.number.float({ min: 1, max: 4, multipleOf: 0.1 });

@@ -26,6 +26,7 @@ export async function seedSchedulingCandidates(
     if (request.hostPartnerUserId) excludeIds.add(request.hostPartnerUserId);
 
     const pool = contactUsers.filter((u) => !excludeIds.has(u.id));
+    if (pool.length === 0) continue;
     const count = faker.number.int({ min: 2, max: 8 });
     const chosen = faker.helpers.arrayElements(pool, Math.min(count, pool.length));
 

@@ -1,15 +1,17 @@
-import crypto from 'crypto';
+/// <reference types="node" />
+import { randomBytes } from 'crypto';
 import { faker } from '@faker-js/faker';
 import { batchInsert } from './batchInsert.util';
 import { PrismaClient } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 function generateInviteToken(): string {
-  return crypto.randomBytes(32).toString('base64url');
+  return randomBytes(32).toString('base64url');
 }
 
-type SchedulingRequestSeed = {
+type RequestData = {
   hostUserId: string;
   hostPartnerUserId: string | null;
   sportType: 'tennis' | 'padel';
@@ -22,7 +24,7 @@ type SchedulingRequestSeed = {
   radiusKm: number | null;
   responseWindowMinutes: number;
   inviteToken: string;
-  status: 'active' | 'paused' | 'completed' | 'expired' | 'cancelled';
+  status: 'active' | 'paused' | 'completed' | 'expired';
 };
 
 export async function seedSchedulingRequests(
@@ -30,7 +32,7 @@ export async function seedSchedulingRequests(
   usersWithPhone: { id: string; phone: string | null }[]
 ) {
   const usedTokens = new Set<string>();
-  const requests: SchedulingRequestSeed[] = [];
+  const requests: RequestData[] = [];
 
   const hostsWithPhone = usersWithPhone.filter((u) => u.phone);
   const hostCount = Math.min(25, Math.floor(hostsWithPhone.length / 2));
@@ -57,10 +59,10 @@ export async function seedSchedulingRequests(
     const endTime = new Date(startTime.getTime() + 90 * 60 * 1000);
 
     const status = faker.helpers.weightedArrayElement([
-      { weight: 5, value: 'active' as const },
-      { weight: 2, value: 'paused' as const },
-      { weight: 2, value: 'completed' as const },
-      { weight: 1, value: 'expired' as const },
+      { weight: 5, value: 'active' },
+      { weight: 2, value: 'paused' },
+      { weight: 2, value: 'completed' },
+      { weight: 1, value: 'expired' },
     ]);
 
     requests.push({
@@ -82,6 +84,8 @@ export async function seedSchedulingRequests(
 
   if (requests.length === 0) return [];
   return batchInsert(requests, 10, (r) =>
-    prisma.schedulingRequest.create({ data: r })
+    prisma.schedulingRequest.create({
+      data: r as Prisma.SchedulingRequestUncheckedCreateInput,
+    })
   );
 }

@@ -77,10 +77,18 @@ export async function seedResults(
   }
 }
 
-function generateTennisSets(hostUserId: string, opponentUserId: string) {
+type TennisSet = {
+  setNumber: number;
+  playerAScore: number;
+  playerBScore: number;
+  tiebreakScoreA: number | null;
+  tiebreakScoreB: number | null;
+};
+
+function generateTennisSets(hostUserId: string, opponentUserId: string): TennisSet[] {
   // 2 or 3 sets, realistic scores
   const numSets = faker.helpers.arrayElement([2, 3]);
-  const sets = [];
+  const sets: TennisSet[] = [];
   let hostSetsWon = 0;
   let opponentSetsWon = 0;
   for (let i = 1; i <= numSets; i++) {
@@ -120,7 +128,7 @@ function generateTennisSets(hostUserId: string, opponentUserId: string) {
   return sets;
 }
 
-function computeWinnerFromSets(sets: any[], hostUserId: string, opponentUserId: string) {
+function computeWinnerFromSets(sets: TennisSet[], hostUserId: string, opponentUserId: string) {
   let hostSetsWon = 0;
   let opponentSetsWon = 0;
   for (const set of sets) {

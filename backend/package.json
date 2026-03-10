@@ -20,7 +20,7 @@
     "migrate:deploy:prod": "cross-env ENV_FILE=.env.production node scripts/ensure-database-url.js npx prisma@6.19.2 migrate deploy",
     "migrate:resolve": "node scripts/ensure-database-url.js npx prisma@6.19.2 migrate resolve",
     "migrate:dev": "node scripts/ensure-database-url.js npx prisma@6.19.2 migrate dev",
-    "seed": "npx tsx prisma/seeders/seed.ts",
+    "seed": "cross-env ENV_FILE=.env.local ENVIRONMENT=DEVELOPMENT npx tsx prisma/seeders/seed.ts",
     "seed:prod": "node scripts/seed-prod.js",
     "test": "vitest run",
     "test:watch": "vitest",

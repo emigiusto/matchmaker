@@ -10,22 +10,20 @@ type GroupSeed = {
 };
 
 export async function seedGroups(users: { id: string }[]) {
+  if (!users.length) return [];
   const usedNames = new Set<string>();
-  const usedOwners = new Set<string>();
   const groups: GroupSeed[] = [];
-  for (let i = 0; i < 40; i++) {
+  const groupCount = Math.min(40, users.length);
+  for (let i = 0; i < groupCount; i++) {
     let name: string;
     do {
       name = faker.company.name();
     } while (usedNames.has(name));
     usedNames.add(name);
-    let owner;
-    do {
-      owner = faker.helpers.arrayElement(users);
-    } while (usedOwners.has(owner.id));
-    usedOwners.add(owner.id);
+    const owner = users[i];
     groups.push({ name, ownerUserId: owner.id });
   }
+  if (groups.length === 0) return [];
   return batchInsert(groups, 20, (group) =>
     prisma.group.create({ data: group })
   );
