@@ -11,12 +11,11 @@ import { seedResults } from './results.seeder';
 
 
 import * as dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
 import process from 'process';
 
 dotenv.config({ path: '../../.env' });
 
-const prisma = new PrismaClient();
+import prisma from '../../src/config/database';
 
 async function main() {
     // Only allow seeding in DEVELOPMENT environment

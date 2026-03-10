@@ -1,13 +1,14 @@
 import dotenv from 'dotenv';
 
+dotenv.config();
+
+import { ensureRedisUrl } from './config/redis';
 import app from './app';
 import { initRedisCache } from './shared/cache';
 
-// Load environment variables from .env file
-dotenv.config();
+ensureRedisUrl();
 
 const PORT = process.env.PORT || 3000;
-
 
 // Initialize Redis cache (non-blocking, optional)
 const redisUrl = process.env.REDIS_URL;

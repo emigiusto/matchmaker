@@ -164,10 +164,20 @@ exit
 
 ### 3. Configure Environment
 
-Copy `.env.example` to `.env` and set your variables:
+Copy `.env.example` to `.env` and set your variables. Use either `DATABASE_URL` or the `DB_*` pattern:
 
 ```env
+# Option 1: Single URL
 DATABASE_URL="mysql://USER:PASSWORD@localhost:3306/matchmaker"
+
+# Option 2: Separate vars (e.g. Render, Docker)
+# DB_DIALECT=mysql
+# DB_HOST=localhost
+# DB_PORT=3306
+# DB_NAME=matchmaker
+# DB_USER=matchmaker
+# DB_PASSWORD=your_password
+
 ENVIRONMENT=DEVELOPMENT
 ```
 
@@ -232,10 +242,20 @@ See the main repository README for:
 
 ---
 
+## Deploying (e.g. Render)
+
+- **Root Directory:** `backend`
+- **Build Command:** `node scripts/ensure-database-url.js npx prisma generate && npm run build`
+- **Start Command:** `npm start`
+
+When using `DB_*` vars instead of `DATABASE_URL`, the ensure script builds the connection string for Prisma during the build step.
+
+---
+
 ## Troubleshooting
 
 - Ensure MySQL is running and accessible
-- Verify `DATABASE_URL`
+- Verify `DATABASE_URL` (or `DB_*` vars)
 - Run `npx prisma validate` for schema issues
 - Check migration history if errors appear
 
