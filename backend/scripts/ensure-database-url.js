@@ -4,7 +4,11 @@
  * If no command, just sets process.env.DATABASE_URL (for require() usage).
  * If command given, runs it with the env (e.g. for prisma generate).
  */
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch (_) {
+  // dotenv not available (e.g. Render CI) - rely on process.env from platform
+}
 
 const d = process.env;
 if (!d.DATABASE_URL && d.DB_HOST) {
