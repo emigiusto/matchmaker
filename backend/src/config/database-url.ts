@@ -25,6 +25,8 @@ export function ensureDatabaseUrl(): void {
           ? 'sslaccept=strict'
           : SSL_ACCEPT_PARAM
       );
+    } else {
+      params.push(SSL_ACCEPT_PARAM); // default for cloud MySQL
     }
     if (params.length) url += '?' + params.join('&');
     d.DATABASE_URL = url;
@@ -32,12 +34,15 @@ export function ensureDatabaseUrl(): void {
   }
 
   // DATABASE_URL is set - append sslaccept if needed (for self-signed certs)
+  if (d.DB_SSL_STRICT === 'true' || d.DB_SSL_STRICT === '1') return; // skip - use strict verification
   let sslAccept = d.DB_SSL_ACCEPT;
   if (!sslAccept && (d.SSL_REQUIRE === 'true' || d.SSL_REQUIRE === '1')) {
     sslAccept =
       d.SSL_REJECT_UNAUTHORIZED === 'true' || d.SSL_REJECT_UNAUTHORIZED === '1' ? 'strict' : 'accept_invalid_certs';
   }
-  if (!sslAccept || sslAccept === 'strict') return;
+  // Default to accept_invalid_certs for cloud MySQL (Aiven, Render, DO, etc.)
+  if (!sslAccept) sslAccept = 'accept_invalid_certs';
+  if (sslAccept === 'strict') return; // skip patching - use server's default
 
   let url = d.DATABASE_URL;
   if (!url || url.includes('sslaccept=')) return;
