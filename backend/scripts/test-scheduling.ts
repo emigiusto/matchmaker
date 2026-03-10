@@ -60,7 +60,7 @@ async function main() {
     endTime: '2026-03-12T19:30:00.000Z',
     locationText: 'Barcelona Club',
     radiusKm: 10,
-    responseWindowMinutes: 60,
+    responseWindowMinutes: 1 / 3, // 20 seconds for fast local testing
     candidateUserIds: [c1.id, c2.id],
   };
   if (IS_DOUBLES && hostPartner) {

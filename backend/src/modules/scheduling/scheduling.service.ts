@@ -120,13 +120,16 @@ export const schedulingService = {
     let format = input.format ?? 'singles';
     if (input.sportType === 'padel') format = 'doubles';
 
-    if (format === 'doubles' && !input.hostPartnerUserId) {
-      throw new AppError('Host partner is required for doubles matches', 400);
-    }
 
-    const responseWindow = input.responseWindowMinutes ?? 240;
-    if (responseWindow < 30 || responseWindow > 1440) {
-      throw new AppError('Invalid responseWindowMinutes. Use 30, 60, 120, 240, 600, or 1440', 400);
+    // Round to 3 decimal places to avoid float precision issues
+    const rawWindow = input.responseWindowMinutes ?? 240;
+    const responseWindow = Math.round(rawWindow * 1000) / 1000;
+    // Min 10 seconds (0.167 min) for testing, max 24 hours (1440 min)
+    if (responseWindow < 10 / 60 || responseWindow > 1440) {
+      throw new AppError(
+        'Invalid responseWindowMinutes. Use 0.167 (10 sec), 0.333 (20 sec), 1, 5, 15, 30, 60, 120, 240, 600, or 1440 (minutes)',
+        400
+      );
     }
 
     const matchType = input.matchType ?? 'competitive';
@@ -440,13 +443,16 @@ export const schedulingService = {
   },
 
   async cancelSchedulingRequest(requestId: string, userId: string): Promise<SchedulingRequestDTO> {
-    const request = await schedulingRepository.findActiveOrPausedById(requestId);
-    if (!request) throw new AppError('Scheduling request not found or not active', 404);
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
     if (request.hostUserId !== userId) throw new AppError('Only the host can cancel', 403);
+    if (request.status === 'cancelled') return toRequestDTOWithCandidates(request);
+    if (request.status === 'completed') throw new AppError('Cannot cancel a completed match', 400);
 
-    const updated = await schedulingRepository.updateRequestStatus(requestId, 'cancelled');
+    await schedulingRepository.updateRequestStatus(requestId, 'cancelled');
     logger.info('SchedulingCancelled', { requestId, userId });
-    return toRequestDTO(updated);
+    const updated = await schedulingRepository.findRequestById(requestId);
+    return updated ? toRequestDTOWithCandidates(updated) : toRequestDTO(request);
   },
 
   async getInviteLink(requestId: string, baseUrl?: string): Promise<string> {

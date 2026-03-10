@@ -18,7 +18,9 @@ export class SchedulingController {
         endTime: body.endTime,
         locationText: body.locationText,
         radiusKm: body.radiusKm ?? null,
-        responseWindowMinutes: body.responseWindowMinutes,
+        responseWindowMinutes: body.responseWindowMinutes != null
+          ? Number(body.responseWindowMinutes)
+          : undefined,
         hostPartnerUserId: body.hostPartnerUserId ?? null,
         candidateUserIds: body.candidateUserIds || [],
       };

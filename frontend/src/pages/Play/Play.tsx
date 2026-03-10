@@ -55,6 +55,7 @@ interface InviteRequest {
 }
 
 const MAX_ACTIVE_REQUESTS = 3
+const SCHEDULING_POLL_INTERVAL_MS = 5000 // refetch every 5s when there are active requests
 
 function formatTimeRange(startIso: string, endIso: string): string {
   try {
@@ -115,33 +116,46 @@ export default function PlayPage() {
   const [loading, setLoading] = useState(true)
   const [copiedRequestId, setCopiedRequestId] = useState<string | null>(null)
 
+  async function fetchSchedulingData(isInitial = false) {
+    if (isInitial) setLoading(true)
+    try {
+      const [requestsRes, openInvitesRes] = await Promise.all([
+        schedulingService.listByHost(currentUserId),
+        invitesService.getOpenInvites().then((list: unknown[]) =>
+          (list as import("@/lib/api/adapters").BackendInviteDTO[]).map((d) => adaptInvite(d))
+        ).catch(() => []),
+      ])
+      const mapped = requestsRes
+        .map(mapSchedulingToInviteRequest)
+        .filter((r): r is InviteRequest => r !== null)
+      setInviteRequests(mapped)
+      setIncomingInvitesList(openInvitesRes)
+      return mapped
+    } catch {
+      setIncomingInvitesList([])
+      return []
+    } finally {
+      if (isInitial) setLoading(false)
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
-    async function fetchData() {
-      setLoading(true)
-      try {
-        const [requestsRes, openInvitesRes] = await Promise.all([
-          schedulingService.listByHost(currentUserId),
-          invitesService.getOpenInvites().then((list: unknown[]) =>
-            (list as import("@/lib/api/adapters").BackendInviteDTO[]).map((d) => adaptInvite(d))
-          ).catch(() => []),
-        ])
-        if (!cancelled) {
-          const mapped = requestsRes
-            .map(mapSchedulingToInviteRequest)
-            .filter((r): r is InviteRequest => r !== null)
-          setInviteRequests(mapped)
-          setIncomingInvitesList(openInvitesRes)
-        }
-      } catch {
-        if (!cancelled) setIncomingInvitesList([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    fetchData()
+    fetchSchedulingData(true).catch(() => {})
     return () => { cancelled = true }
   }, [currentUserId])
+
+  // Poll for updates when there are active scheduling requests (candidates expiring, etc.)
+  useEffect(() => {
+    const hasActive = inviteRequests.some(
+      (r) => r.status === "scheduling" || r.status === "paused"
+    )
+    if (!hasActive) return
+    const interval = setInterval(() => {
+      fetchSchedulingData(false)
+    }, SCHEDULING_POLL_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [inviteRequests, currentUserId])
 
   const activeRequestCount = inviteRequests.filter(
     (r) => r.status === "scheduling" || r.status === "paused"
@@ -354,6 +368,12 @@ export default function PlayPage() {
                               Matched
                             </span>
                           )}
+                          {request.status === "expired" && (
+                            <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                              <XCircle className="h-3 w-3" />
+                              No match
+                            </span>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
@@ -438,7 +458,21 @@ export default function PlayPage() {
                       </div>
 
                       {/* Actions */}
-                      {request.status !== "matched" && (
+                      {request.status === "expired" && (
+                        <div className="mt-4 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 px-4 py-3">
+                          <p className="text-sm text-muted-foreground">No one responded in time. Start a new request to try again.</p>
+                          <div className="mt-3 flex gap-2">
+                            <Button size="sm" onClick={() => setWizardOpen(true)}>
+                              <Zap className="mr-1.5 h-3.5 w-3.5" />
+                              New request
+                            </Button>
+                            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleCancelRequest(request.id)}>
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {request.status !== "matched" && request.status !== "expired" && (
                         <div className="mt-4 space-y-3 border-t border-border/30 pt-4">
                           <div className="flex items-center gap-2">
                             <Button
@@ -601,7 +635,19 @@ export default function PlayPage() {
         </Tabs>
       </div>
 
-      <IWantToPlayWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      <IWantToPlayWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        hostUserId={currentUserId}
+        onSuccess={() => {
+          schedulingService.listByHost(currentUserId).then((requestsRes) => {
+            const mapped = requestsRes
+              .map(mapSchedulingToInviteRequest)
+              .filter((r): r is InviteRequest => r !== null)
+            setInviteRequests(mapped)
+          }).catch(() => {})
+        }}
+      />
     </>
   )
 }

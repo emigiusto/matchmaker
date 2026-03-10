@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { format } from "date-fns"
 import {
   Calendar as CalendarIcon,
@@ -16,6 +16,7 @@ import {
   Target,
   Copy,
   Check,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,10 +43,15 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { schedulingService } from "@/lib/services/scheduling.service"
+import { usersService } from "@/lib/services/users.service"
+import { getCurrentUserId } from "@/lib/current-user"
 
 interface WizardProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  hostUserId?: string
+  onSuccess?: () => void
 }
 
 type Step = 1 | 2 | 3 | 4
@@ -72,27 +78,13 @@ function addOneHour(time: string): string {
 const RADIUS_STOPS = [2, 5, 8, 10, 15, 50] as const
 type LocationType = "area" | "specific"
 
-// Mock contact lists
-const CONTACT_LISTS = [
-  { id: "cl-1", name: "Tennis Regulars", contacts: ["Carlos", "Pablo", "Marc", "Luis", "Ana", "Sofia"] },
-  { id: "cl-2", name: "Club Members", contacts: ["Jorge", "Maria", "Pedro", "Elena", "Raul", "Carmen", "David", "Laura"] },
-  { id: "cl-3", name: "Padel Group", contacts: ["Miguel", "Rosa", "Alberto", "Lucia"] },
-]
-
-// Mock all contacts (for "Import contacts" simulation)
-const ALL_CONTACTS = [
-  "Carlos", "Pablo", "Marc", "Luis", "Ana", "Sofia",
-  "Jorge", "Maria", "Pedro", "Elena", "Raul", "Carmen",
-  "David", "Laura", "Miguel", "Rosa", "Alberto", "Lucia",
-  "Fernando", "Isabel", "Roberto", "Teresa"
-]
-
 interface Contact {
   id: string
   name: string
 }
 
-export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
+export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdProp, onSuccess }: WizardProps) {
+  const hostUserId = hostUserIdProp ?? getCurrentUserId()
   const [step, setStep] = useState<Step>(1)
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [startTime, setStartTime] = useState("")
@@ -110,7 +102,14 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
   // Step 3: Contact priority list
   const [priorityList, setPriorityList] = useState<Contact[]>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  const [responseWindow, setResponseWindow] = useState<number>(60) // minutes
+  // 20 sec (1/3 min) default for local testing; 60 min for production
+  const defaultResponseWindow = typeof import.meta !== "undefined" && import.meta.env?.DEV
+    ? 1 / 3 // 20 seconds
+    : 60
+  const [responseWindow, setResponseWindow] = useState<number>(defaultResponseWindow) // minutes (can be fractional)
+  const [availableContacts, setAvailableContacts] = useState<Contact[]>([])
+  const [contactsLoading, setContactsLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   function resetWizard() {
     setStep(1)
@@ -124,10 +123,31 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
     setMatchType("competitive")
     setMatchFormat("singles")
     setSport("tennis")
+    setResponseWindow(defaultResponseWindow)
     setPriorityList([])
     setDraggedIndex(null)
-    setResponseWindow(60)
   }
+
+  // Fetch users with phone for contact picker
+  useEffect(() => {
+    if (!open || !hostUserId) return
+    setContactsLoading(true)
+    usersService
+      .getAll()
+      .then((users) => {
+        const withPhone = users.filter(
+          (u) => u.phone && u.id !== hostUserId && (u.name || u.email || u.id)
+        )
+        setAvailableContacts(
+          withPhone.map((u) => ({ id: u.id, name: u.name || u.email || "Unknown" }))
+        )
+      })
+      .catch(() => {
+        setAvailableContacts([])
+        toast.error("Could not load contacts")
+      })
+      .finally(() => setContactsLoading(false))
+  }, [open, hostUserId])
 
   function handleClose(val: boolean) {
     if (!val) resetWizard()
@@ -141,8 +161,8 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
 
   const locationValid = locationType === "area" ? !!location : !!specificPlace
   const canProceedStep1 = date && startTime && endTime && locationValid && startTime < endTime
-  const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // contacts needed (user fills 1 spot)
-  const canProceedStep2 = priorityList.length >= spotsNeeded
+  const spotsNeeded = matchFormat === "doubles" ? 2 : 1 // candidates needed (host+partner fill 2 in doubles)
+  const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
   const displayLocation = locationType === "area" ? `${location} (${radius} km)` : specificPlace
 
@@ -150,38 +170,9 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
     ? TIME_SLOTS.filter((t) => t > startTime)
     : TIME_SLOTS
 
-  // Add all contacts from a list (merge, no duplicates)
-  function addContactsFromList(listId: string) {
-    const list = CONTACT_LISTS.find(l => l.id === listId)
-    if (!list) return
-    setPriorityList(prev => {
-      const existingNames = new Set(prev.map(c => c.name))
-      const newContacts: Contact[] = list.contacts
-        .filter(name => !existingNames.has(name))
-        .map((name, idx) => ({ id: `${listId}-${idx}-${Date.now()}`, name }))
-      return [...prev, ...newContacts]
-    })
-  }
-
-  // Remove all contacts sourced from a list
-  function removeContactsFromList(listId: string) {
-    const list = CONTACT_LISTS.find(l => l.id === listId)
-    if (!list) return
-    const listNames = new Set(list.contacts)
-    setPriorityList(prev => prev.filter(c => !listNames.has(c.name)))
-  }
-
-  // Check if all contacts from a list are already in the priority list
-  function isListFullyAdded(listId: string) {
-    const list = CONTACT_LISTS.find(l => l.id === listId)
-    if (!list) return false
-    return list.contacts.every(name => priorityList.some(c => c.name === name))
-  }
-
-  // Add a single contact to priority list
-  function addContact(name: string) {
-    if (priorityList.some(c => c.name === name)) return
-    setPriorityList(prev => [...prev, { id: `contact-${Date.now()}`, name }])
+  function addContact(contact: Contact) {
+    if (priorityList.some(c => c.id === contact.id)) return
+    setPriorityList(prev => [...prev, contact])
   }
 
   // Remove contact from priority list
@@ -221,11 +212,40 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
     setTimeout(() => setLinkCopied(false), 2000)
   }
 
-  function handleStartScheduling() {
-    toast.success("Scheduling started! Invites will be sent via WhatsApp.", {
-      description: `First contacting ${priorityList[0]?.name}...`
-    })
-    handleClose(false)
+  async function handleStartScheduling() {
+    if (!date || !startTime || !endTime || !hostUserId || priorityList.length === 0) return
+    setSubmitting(true)
+    try {
+      const dateStr = format(date, "yyyy-MM-dd")
+      const [startH, startM] = startTime.split(":").map(Number)
+      const [endH, endM] = endTime.split(":").map(Number)
+      const startDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), startH, startM)
+      const endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endH, endM)
+      const req = await schedulingService.create({
+        hostUserId,
+        sportType: sport,
+        format: matchFormat,
+        matchType,
+        date: dateStr,
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        locationText: locationType === "area" ? location : specificPlace,
+        radiusKm: locationType === "area" ? radius : null,
+        responseWindowMinutes: responseWindow,
+        hostPartnerUserId: null,
+        candidateUserIds: priorityList.map((c) => c.id),
+      })
+      await schedulingService.start(req.id)
+      toast.success("Scheduling started! Invites will be sent via WhatsApp.", {
+        description: `First contacting ${priorityList[0]?.name}...`
+      })
+      onSuccess?.()
+      handleClose(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to start scheduling")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -552,74 +572,48 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
         {step === 3 && (
           <div className="space-y-4 pt-2">
 
-            {/* Contact lists — multi-select */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Add from lists</Label>
-              <div className="space-y-2">
-                {CONTACT_LISTS.map((list) => {
-                  const fullyAdded = isListFullyAdded(list.id)
-                  return (
-                    <div
-                      key={list.id}
-                      className={cn(
-                        "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all",
-                        fullyAdded ? "border-primary/40 bg-primary/5" : "border-border/40 bg-card"
-                      )}
-                    >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{list.name}</p>
-                        <p className="text-xs text-muted-foreground">{list.contacts.length} contacts</p>
-                      </div>
-                      <Button
-                        variant={fullyAdded ? "outline" : "secondary"}
-                        size="sm"
-                        className="shrink-0 text-xs"
-                        onClick={() => fullyAdded ? removeContactsFromList(list.id) : addContactsFromList(list.id)}
-                      >
-                        {fullyAdded ? "Remove" : "Add all"}
-                      </Button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Add individual contacts */}
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-border/40" />
-              <span className="text-xs text-muted-foreground">or add individually</span>
-              <div className="h-px flex-1 bg-border/40" />
-            </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Contact
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-2" align="start">
-                <div className="max-h-48 overflow-y-auto space-y-1">
-                  {ALL_CONTACTS.filter(c => !priorityList.some(p => p.name === c)).map((name) => (
-                    <button
-                      key={name}
-                      onClick={() => addContact(name)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                    >
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                        {name[0]}
-                      </div>
-                      {name}
-                    </button>
-                  ))}
-                  {ALL_CONTACTS.filter(c => !priorityList.some(p => p.name === c)).length === 0 && (
-                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">All contacts added</p>
-                  )}
+              <Label className="text-base font-medium">Add contacts</Label>
+              {contactsLoading ? (
+                <div className="flex items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
-              </PopoverContent>
-            </Popover>
+              ) : (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full" disabled={availableContacts.length === 0}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Contact
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="start">
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {availableContacts
+                        .filter((c) => !priorityList.some((p) => p.id === c.id))
+                        .map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => addContact(c)}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                          >
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                              {c.name[0] ?? "?"}
+                            </div>
+                            {c.name}
+                          </button>
+                        ))}
+                      {availableContacts.filter((c) => !priorityList.some((p) => p.id === c.id)).length === 0 && (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                          {availableContacts.length === 0
+                            ? "No contacts with phone found"
+                            : "All contacts added"}
+                        </p>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
 
             {/* Priority list */}
             <div className="space-y-2">
@@ -688,7 +682,9 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
               <div className="flex items-center justify-between">
                 <Label className="text-base font-medium">Response window</Label>
                 <span className="text-sm font-semibold text-primary">
-                  {responseWindow < 60
+                  {responseWindow < 1
+                    ? `${Math.round(responseWindow * 60)} sec`
+                    : responseWindow < 60
                     ? `${responseWindow} min`
                     : responseWindow === 60
                     ? "1 hour"
@@ -698,25 +694,34 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
               <p className="text-xs text-muted-foreground">
                 How long to wait before contacting the next person in line
               </p>
-              <div className="flex gap-1.5">
-                {[30, 60, 120, 240, 720, 1440].map((mins) => {
-                  const label = mins < 60 ? `${mins}m` : mins === 60 ? "1h" : `${mins / 60}h`
-                  return (
-                    <button
-                      key={mins}
-                      type="button"
-                      onClick={() => setResponseWindow(mins)}
-                      className={cn(
-                        "flex-1 rounded-md py-1.5 text-xs font-medium transition-all",
-                        responseWindow === mins
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { value: 10 / 60, label: "10s" },
+                  { value: 1 / 3, label: "20s" },
+                  { value: 1, label: "1m" },
+                  { value: 5, label: "5m" },
+                  { value: 15, label: "15m" },
+                  { value: 30, label: "30m" },
+                  { value: 60, label: "1h" },
+                  { value: 120, label: "2h" },
+                  { value: 240, label: "4h" },
+                  { value: 720, label: "12h" },
+                  { value: 1440, label: "24h" },
+                ].map(({ value, label }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setResponseWindow(value)}
+                    className={cn(
+                      "rounded-md px-2 py-1.5 text-xs font-medium transition-all",
+                      Math.abs(responseWindow - value) < 0.01
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -728,9 +733,9 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
               <Button
                 size="lg"
                 className="flex-1"
-                disabled={!canProceedStep2}
+                disabled={!canProceedStep3}
                 onClick={() => setStep(4)}
-                title={!canProceedStep2 ? `Add at least ${spotsNeeded} contact${spotsNeeded > 1 ? "s" : ""}` : undefined}
+                title={!canProceedStep3 ? `Add at least ${spotsNeeded} contact${spotsNeeded > 1 ? "s" : ""}` : undefined}
               >
                 Continue
                 <ChevronRight className="ml-1 h-5 w-5" />
@@ -820,7 +825,9 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
                   If someone declines or doesn&apos;t respond within{" "}
                   <strong>
-                    {responseWindow < 60
+                    {responseWindow < 1
+                      ? `${Math.round(responseWindow * 60)} seconds`
+                      : responseWindow < 60
                       ? `${responseWindow} min`
                       : responseWindow === 60
                       ? "1 hour"
@@ -873,8 +880,13 @@ export function IWantToPlayWizard({ open, onOpenChange }: WizardProps) {
                 size="lg"
                 className="flex-1 bg-[#25D366] text-white hover:bg-[#25D366]/90"
                 onClick={handleStartScheduling}
+                disabled={submitting}
               >
-                <Zap className="mr-2 h-5 w-5" />
+                {submitting ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <Zap className="mr-2 h-5 w-5" />
+                )}
                 Start Scheduling
               </Button>
             </div>

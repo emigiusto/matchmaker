@@ -1,25 +1,36 @@
 // mock.provider.ts
-// Mock WhatsApp provider for development and testing
+// Mock WhatsApp provider for development and testing - logs all actions instead of calling real API
 
 import type { IWhatsAppProvider, CreateMatchGroupInput } from '../whatsapp.provider.interface';
 import type { SendMessageResult, CreateGroupResult } from '../whatsapp.types';
+import { logger } from '../../../config/logger';
 
 export class MockWhatsAppProvider implements IWhatsAppProvider {
   async sendInviteMessage(phoneNumber: string, message: string): Promise<SendMessageResult> {
-    // eslint-disable-next-line no-console
-    console.log('[MOCK WhatsApp] sendInviteMessage', { phoneNumber, messagePreview: message.slice(0, 50) + '...' });
+    logger.info('[MOCK WhatsApp] sendInviteMessage', {
+      to: phoneNumber,
+      messageLength: message.length,
+      preview: message.slice(0, 80) + (message.length > 80 ? '...' : ''),
+    });
     return { success: true, messageId: `mock-${Date.now()}` };
   }
 
   async createMatchGroup(input: CreateMatchGroupInput): Promise<CreateGroupResult> {
-    // eslint-disable-next-line no-console
-    console.log('[MOCK WhatsApp] createMatchGroup', { groupName: input.groupName, participantPhones: input.participantPhones, botPhone: input.botPhone });
+    logger.info('[MOCK WhatsApp] createMatchGroup', {
+      groupName: input.groupName,
+      participants: input.participantPhones.length,
+      phones: input.participantPhones,
+      botPhone: input.botPhone,
+    });
     return { success: true, groupId: `mock-group-${Date.now()}` };
   }
 
   async sendGroupMessage(groupId: string, message: string): Promise<SendMessageResult> {
-    // eslint-disable-next-line no-console
-    console.log('[MOCK WhatsApp] sendGroupMessage', { groupId, messagePreview: message.slice(0, 50) + '...' });
+    logger.info('[MOCK WhatsApp] sendGroupMessage', {
+      groupId,
+      messageLength: message.length,
+      preview: message.slice(0, 80) + (message.length > 80 ? '...' : ''),
+    });
     return { success: true, messageId: `mock-${Date.now()}` };
   }
 }

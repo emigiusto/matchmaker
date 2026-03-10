@@ -44,7 +44,30 @@ export interface SchedulingRequestDTO {
   candidates?: SchedulingCandidateDTO[]
 }
 
+export interface CreateSchedulingRequestInput {
+  hostUserId: string
+  sportType: "tennis" | "padel"
+  format: "singles" | "doubles"
+  matchType: "competitive" | "practice"
+  date: string
+  startTime: string
+  endTime: string
+  locationText: string
+  radiusKm?: number | null
+  responseWindowMinutes: number
+  hostPartnerUserId?: string | null
+  candidateUserIds: string[]
+}
+
 export const schedulingService = {
+  async create(input: CreateSchedulingRequestInput): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>("/scheduling", input)
+  },
+
+  async start(requestId: string): Promise<SchedulingRequestDTO | null> {
+    return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/start`)
+  },
+
   async listByHost(hostUserId: string): Promise<SchedulingRequestDTO[]> {
     return apiClient.get<SchedulingRequestDTO[]>("/scheduling", { hostUserId })
   },

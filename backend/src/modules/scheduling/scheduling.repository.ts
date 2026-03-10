@@ -101,7 +101,10 @@ export const schedulingRepository = {
     const now = Date.now();
     return candidates.filter((c) => {
       if (!c.contactedAt) return false;
-      const windowMs = (c.schedulingRequest.responseWindowMinutes || 240) * 60 * 1000;
+      const mins = c.schedulingRequest.responseWindowMinutes;
+      // Treat 0 or invalid as 20 sec (0.333 min) for testing - was truncated by old Int column
+      const windowMinutes = mins && mins > 0 ? mins : 1 / 3;
+      const windowMs = windowMinutes * 60 * 1000;
       return now - c.contactedAt.getTime() > windowMs;
     });
   },

@@ -29,7 +29,15 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 if (process.env.JOBS_ENABLED === 'true') {
 	// eslint-disable-next-line no-console
 	console.log('[JOBS] Scheduling background jobs...');
-	import('./modules/jobs').then(({ scheduleAllJobs }) => scheduleAllJobs());
+	import('./modules/jobs')
+		.then(({ scheduleAllJobs }) => scheduleAllJobs())
+		.catch((err) => {
+			// eslint-disable-next-line no-console
+			console.error('[JOBS] Failed to load jobs:', err);
+		});
+} else {
+	// eslint-disable-next-line no-console
+	if (process.env.NODE_ENV !== 'test') console.log('[JOBS] Disabled (JOBS_ENABLED != true)');
 }
 
 // Mount main routes

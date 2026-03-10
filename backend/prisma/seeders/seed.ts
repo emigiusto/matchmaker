@@ -22,8 +22,8 @@ import { seedGuestContacts } from './guestContacts.seeder';
 import { seedFriendships } from './friendships.seeder';
 import { seedInvites } from './invites.seeder';
 import { seedMatches } from './matches.seeder';
-import { seedSchedulingRequests } from './schedulingRequests.seeder';
-import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
+// import { seedSchedulingRequests } from './schedulingRequests.seeder';
+// import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
 import { seedResults } from './results.seeder';
 
 async function main() {
@@ -85,9 +85,9 @@ async function main() {
   const invites = await seedInvites(users, availabilities);
   // 10. Matches (for invites, availabilities, players, venues)
   const matchesRaw = await seedMatches(invites, availabilities, players, venues);
-  // 11. Scheduling requests and candidates (WhatsApp scheduling flow)
-  const schedulingRequests = await seedSchedulingRequests(users, users);
-  const schedulingCandidates = await seedSchedulingCandidates(schedulingRequests, users);
+  // 11. Scheduling requests and candidates (WhatsApp scheduling flow) — temporarily disabled to test flow from scratch
+  // const schedulingRequests = await seedSchedulingRequests(users, users);
+  // const schedulingCandidates = await seedSchedulingCandidates(schedulingRequests, users);
   // Only pass matches with non-null hostUserId/opponentUserId to results seeder
   const matches = matchesRaw
     .filter((m: any) => m && m.hostUserId && m.opponentUserId && m.scheduledAt && m.type)
@@ -112,8 +112,8 @@ async function main() {
     friendships: friendships.length,
     invites: invites.length,
     matches: matches.length,
-    schedulingRequests: schedulingRequests.length,
-    schedulingCandidates: schedulingCandidates.length,
+    // schedulingRequests: schedulingRequests.length,
+    // schedulingCandidates: schedulingCandidates.length,
     results: matches.length,
   });
 }

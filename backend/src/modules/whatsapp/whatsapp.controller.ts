@@ -3,6 +3,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { schedulingService } from '../scheduling/scheduling.service';
+import { logger } from '../../config/logger';
 
 export class WhatsappController {
   static async webhook(req: Request, res: Response, next: NextFunction) {
@@ -34,6 +35,11 @@ export class WhatsappController {
       if (!senderPhone || messageText === undefined) {
         return res.status(400).json({ error: 'Missing sender phone or message text' });
       }
+
+      logger.info('[WhatsApp] webhook received', {
+        from: senderPhone,
+        text: messageText,
+      });
 
       const { processed } = await schedulingService.handleCandidateResponse(senderPhone, messageText);
 
