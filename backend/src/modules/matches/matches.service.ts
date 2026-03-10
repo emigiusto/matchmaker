@@ -44,8 +44,8 @@ export async function listMatchesForUser(userId: string): Promise<MatchDTO[]> {
   const player = await prisma.player.findUnique({ where: { userId } });
 
   // Build query conditions
-  const orConditions: any[] = [
-    { invite: { inviterId: userId } },
+  const orConditions: Prisma.MatchWhereInput[] = [
+    { invite: { inviterUserId: userId } },
     { availability: { userId } },
   ];
   if (player) {
@@ -105,8 +105,8 @@ export async function listMatchesForPlayer(playerId: string): Promise<MatchDTO[]
 export async function listUpcomingMatchesForUser(userId: string): Promise<MatchDTO[]> {
   const now = new Date();
   const player = await prisma.player.findUnique({ where: { userId } });
-  const orConditions: any[] = [
-    { invite: { inviterId: userId } },
+  const orConditions: Prisma.MatchWhereInput[] = [
+    { invite: { inviterUserId: userId } },
     { availability: { userId } },
   ];
   if (player) {
@@ -132,8 +132,8 @@ export async function listUpcomingMatchesForUser(userId: string): Promise<MatchD
 export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]> {
   const now = new Date();
   const player = await prisma.player.findUnique({ where: { userId } });
-  const orConditions: any[] = [
-    { invite: { inviterId: userId } },
+  const orConditions: Prisma.MatchWhereInput[] = [
+    { invite: { inviterUserId: userId } },
     { availability: { userId } },
   ];
   if (player) {
@@ -170,11 +170,11 @@ export async function listMatchesForVenue(venueId: string): Promise<MatchDTO[]> 
  * List the most recent matches, optionally filtered by userId
  */
 export async function listRecentMatches(limit: number, userId?: string): Promise<MatchDTO[]> {
-  let where: any = {};
+  let where: Prisma.MatchWhereInput = {};
   if (userId) {
     const player = await prisma.player.findUnique({ where: { userId } });
-    const orConditions: any[] = [
-      { invite: { inviterId: userId } },
+    const orConditions: Prisma.MatchWhereInput[] = [
+      { invite: { inviterUserId: userId } },
       { availability: { userId } },
     ];
     if (player) {
@@ -356,6 +356,8 @@ export async function createMatch(input: CreateMatchInput): Promise<MatchDTO> {
   if (input.playerAId) data.playerA = { connect: { id: input.playerAId } };
   if (input.playerBId) data.playerB = { connect: { id: input.playerBId } };
   if (input.inviteId) data.invite = { connect: { id: input.inviteId } };
+  if (input.hostPartnerUserId) data.hostPartnerUser = { connect: { id: input.hostPartnerUserId } };
+  if (input.opponentPartnerUserId) data.opponentPartnerUser = { connect: { id: input.opponentPartnerUserId } };
   const match = await prisma.match.create({ data });
   return toMatchDTO(match);
 }
@@ -374,6 +376,8 @@ function toMatchDTO(match: Match): MatchDTO {
     playerBId: match.playerBId,
     hostUserId: match.hostUserId,
     opponentUserId: match.opponentUserId,
+    hostPartnerUserId: match.hostPartnerUserId ?? null,
+    opponentPartnerUserId: match.opponentPartnerUserId ?? null,
     scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
     status: match.status,

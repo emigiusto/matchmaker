@@ -5,6 +5,9 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only --watch src src/server.ts",
+    "test:scheduling": "bash scripts/test-scheduling-flow.sh",
+    "test:scheduling:singles": "npx tsx scripts/test-scheduling.ts",
+    "test:scheduling:doubles": "npx tsx scripts/test-scheduling.ts doubles",
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "npx tsx prisma/seeders/seed.ts",

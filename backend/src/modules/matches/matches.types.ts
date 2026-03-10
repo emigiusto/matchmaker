@@ -27,6 +27,8 @@ export interface MatchDTO {
   playerBId: string | null;
   hostUserId: string;
   opponentUserId: string;
+  hostPartnerUserId: string | null;
+  opponentPartnerUserId: string | null;
   scheduledAt: string; // ISO string
   createdAt: string;   // ISO string
   status: MatchStatus;
@@ -43,4 +45,6 @@ export interface CreateMatchInput {
   inviteId?: string | null;
   availabilityId?: string | null;
   type: MatchType;
+  hostPartnerUserId?: string | null;
+  opponentPartnerUserId?: string | null;
 }
