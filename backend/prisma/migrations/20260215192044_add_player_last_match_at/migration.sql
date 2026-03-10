@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE `player` ADD COLUMN `lastMatchAt` DATETIME(3) NULL;
+ALTER TABLE `Player` ADD COLUMN `lastMatchAt` DATETIME(3) NULL;

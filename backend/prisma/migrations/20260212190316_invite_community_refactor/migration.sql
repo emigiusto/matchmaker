@@ -5,7 +5,7 @@
 
 */
 -- AlterTable
-ALTER TABLE `invite` ADD COLUMN `maxLevel` DOUBLE NULL,
+ALTER TABLE `Invite` ADD COLUMN `maxLevel` DOUBLE NULL,
     ADD COLUMN `minLevel` DOUBLE NULL,
     ADD COLUMN `radiusKm` DOUBLE NULL,
     ADD COLUMN `visibility` ENUM('private', 'community') NOT NULL DEFAULT 'private',

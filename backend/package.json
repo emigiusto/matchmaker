@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "prisma:generate": "node scripts/ensure-database-url.js npx prisma generate",
     "migrate:deploy": "node scripts/ensure-database-url.js npx prisma migrate deploy",
+    "migrate:resolve": "node scripts/ensure-database-url.js npx prisma migrate resolve",
     "migrate:dev": "node scripts/ensure-database-url.js npx prisma migrate dev",
     "seed": "npx tsx prisma/seeders/seed.ts",
     "test": "vitest run",

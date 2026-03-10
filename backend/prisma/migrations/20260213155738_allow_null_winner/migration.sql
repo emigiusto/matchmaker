@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE `result` MODIFY `winnerUserId` VARCHAR(191) NULL;
+ALTER TABLE `Result` MODIFY `winnerUserId` VARCHAR(191) NULL;

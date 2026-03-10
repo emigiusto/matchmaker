@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE `availability` ADD COLUMN `preferredSurface` VARCHAR(191) NULL;
+ALTER TABLE `Availability` ADD COLUMN `preferredSurface` VARCHAR(191) NULL;

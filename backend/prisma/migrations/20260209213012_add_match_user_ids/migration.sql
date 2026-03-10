@@ -6,7 +6,7 @@
 
 */
 -- AlterTable
-ALTER TABLE `match` ADD COLUMN `hostUserId` VARCHAR(191) NOT NULL,
+ALTER TABLE `Match` ADD COLUMN `hostUserId` VARCHAR(191) NOT NULL,
     ADD COLUMN `opponentUserId` VARCHAR(191) NOT NULL;
 
 -- CreateIndex

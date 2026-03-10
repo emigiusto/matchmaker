@@ -6,13 +6,13 @@
 
 */
 -- DropForeignKey
-ALTER TABLE `result` DROP FOREIGN KEY `Result_winnerPlayerId_fkey`;
+ALTER TABLE `Result` DROP FOREIGN KEY `Result_winnerPlayerId_fkey`;
 
 -- DropIndex
-DROP INDEX `Result_winnerPlayerId_idx` ON `result`;
+DROP INDEX `Result_winnerPlayerId_idx` ON `Result`;
 
 -- AlterTable
-ALTER TABLE `result` DROP COLUMN `winnerPlayerId`,
+ALTER TABLE `Result` DROP COLUMN `winnerPlayerId`,
     ADD COLUMN `winnerUserId` VARCHAR(191) NOT NULL;
 
 -- CreateIndex

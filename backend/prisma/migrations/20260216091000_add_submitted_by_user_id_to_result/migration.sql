@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE `result` ADD COLUMN `submittedByUserId` VARCHAR(191) NULL;
+ALTER TABLE `Result` ADD COLUMN `submittedByUserId` VARCHAR(191) NULL;
