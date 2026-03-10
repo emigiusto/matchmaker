@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import routes from './routes';
 
 import swaggerUi from 'swagger-ui-express';
@@ -10,6 +11,10 @@ const app = express();
 
 // Configure rating system before handling requests
 configureRatingSystem();
+
+// CORS
+const corsOrigin = process.env.CORS_ORIGIN;
+app.use(cors(corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : {}));
 
 // Parse JSON bodies
 app.use(express.json());
