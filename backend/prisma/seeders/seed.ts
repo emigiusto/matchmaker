@@ -1,46 +1,63 @@
+import * as dotenv from 'dotenv';
+import path from 'path';
+import process from 'process';
 
-// Seeder function imports
+// Load .env from backend folder (ENV_FILE selects .env.local or .env.production)
+const backendDir = path.resolve(__dirname, '../..');
+const envFile = process.env.ENV_FILE || '.env';
+dotenv.config({ path: path.join(backendDir, envFile) });
+
+// Build DATABASE_URL from DB_* vars if needed (must run before any Prisma usage)
+import { ensureDatabaseUrl } from '../../src/config/database-url';
+ensureDatabaseUrl();
+
+import prisma from '../../src/config/database';
 import { seedUsers } from './users.seeder';
 import { seedPlayers } from './players.seeder';
 import { seedAvailabilities } from './availabilities.seeder';
 import { seedVenues } from './venues.seeder';
 import { seedGroups } from './groups.seeder';
+import { seedGroupMembers } from './groupMembers.seeder';
+import { seedGuestContacts } from './guestContacts.seeder';
+import { seedFriendships } from './friendships.seeder';
 import { seedInvites } from './invites.seeder';
 import { seedMatches } from './matches.seeder';
+import { seedSchedulingRequests } from './schedulingRequests.seeder';
+import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
 import { seedResults } from './results.seeder';
 
-
-import * as dotenv from 'dotenv';
-import process from 'process';
-
-dotenv.config({ path: '../../.env' });
-
-import prisma from '../../src/config/database';
-
 async function main() {
-    // Only allow seeding in DEVELOPMENT environment
-    if (process.env.ENVIRONMENT !== 'DEVELOPMENT') {
-      console.error('Seeding is only allowed in DEVELOPMENT environment. Aborting.');
-      process.exit(1);
-    }
-  // Clean up all data (order matters for FKs)
-  // 1. Delete leaf tables first (SetResult, Notification, Message, GroupMember, GuestContact, Friendship, etc.)
+  // Only allow seeding in DEVELOPMENT, or when SEED_ALLOW_PRODUCTION=true
+  const allowProduction = process.env.SEED_ALLOW_PRODUCTION === 'true' || process.env.SEED_ALLOW_PRODUCTION === '1';
+  if (process.env.ENVIRONMENT !== 'DEVELOPMENT' && !allowProduction) {
+    console.error('Seeding is only allowed in DEVELOPMENT. Set SEED_ALLOW_PRODUCTION=true to seed production.');
+    process.exit(1);
+  }
+  if (allowProduction) {
+    console.log('[SEED] Running against production database (SEED_ALLOW_PRODUCTION=true)');
+  }
+  // Clean up all data (disable FK checks for MySQL to avoid order issues)
+  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0');
   await prisma.setResult.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.message.deleteMany();
   await prisma.groupMember.deleteMany();
   await prisma.guestContact.deleteMany();
   await prisma.friendship.deleteMany();
-  // 2. Delete mid-level tables (Result, Match, Invite, Availability, Player, Venue, Group)
+  await prisma.ratingHistory.deleteMany();
+  await prisma.schedulingCandidate.deleteMany();
+  await prisma.schedulingRequest.deleteMany();
   await prisma.result.deleteMany();
+  await prisma.conversation.deleteMany();
   await prisma.match.deleteMany();
   await prisma.invite.deleteMany();
   await prisma.availability.deleteMany();
+  await prisma.playerSurface.deleteMany();
   await prisma.player.deleteMany();
   await prisma.venue.deleteMany();
   await prisma.group.deleteMany();
-  // 3. Delete users last
   await prisma.user.deleteMany();
+  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1');
 
   // 1. Users
   const users = await seedUsers();
@@ -53,10 +70,19 @@ async function main() {
   const venues = await seedVenues();
   // 5. Groups
   const groups = await seedGroups(users);
-  // 6. Invites (for availabilities)
+  // 6. Group members
+  const groupMembers = await seedGroupMembers(groups, users);
+  // 7. Guest contacts (users' address book entries)
+  const guestContacts = await seedGuestContacts(users);
+  // 8. Friendships (user-user and user-guestContact)
+  const friendships = await seedFriendships(users, guestContacts);
+  // 9. Invites (for availabilities)
   const invites = await seedInvites(users, availabilities);
-  // 7. Matches (for invites, availabilities, players, venues)
+  // 10. Matches (for invites, availabilities, players, venues)
   const matchesRaw = await seedMatches(invites, availabilities, players, venues);
+  // 11. Scheduling requests and candidates (WhatsApp scheduling flow)
+  const schedulingRequests = await seedSchedulingRequests(users, users);
+  const schedulingCandidates = await seedSchedulingCandidates(schedulingRequests, users);
   // Only pass matches with non-null hostUserId/opponentUserId to results seeder
   const matches = matchesRaw
     .filter((m: any) => m && m.hostUserId && m.opponentUserId && m.scheduledAt && m.type)
@@ -67,7 +93,7 @@ async function main() {
       scheduledAt: m.scheduledAt,
       type: m.type,
     })) as { id: string; hostUserId: string; opponentUserId: string; scheduledAt: Date; type: 'competitive' | 'practice' }[];
-  // 8. Results (for matches)
+  // 12. Results (for matches)
   await seedResults(matches);
 
   console.log('Seeded:', {
@@ -76,9 +102,14 @@ async function main() {
     availabilities: availabilities.length,
     venues: venues.length,
     groups: groups.length,
+    groupMembers: groupMembers.length,
+    guestContacts: guestContacts.length,
+    friendships: friendships.length,
     invites: invites.length,
     matches: matches.length,
-    results: matches.length, 
+    schedulingRequests: schedulingRequests.length,
+    schedulingCandidates: schedulingCandidates.length,
+    results: matches.length,
   });
 }
 

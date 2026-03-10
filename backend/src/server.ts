@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+const envFile = process.env.ENV_FILE || '.env';
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 import { ensureDatabaseUrl } from './config/database-url';
 import { ensureRedisUrl } from './config/redis';

@@ -5,7 +5,9 @@
  * If command given, runs it with the env (e.g. for prisma generate).
  */
 try {
-  require('dotenv').config();
+  const path = require('path');
+  const envFile = process.env.ENV_FILE || '.env';
+  require('dotenv').config({ path: path.resolve(process.cwd(), envFile) });
 } catch (_) {
   // dotenv not available (e.g. Render CI) - rely on process.env from platform
 }
