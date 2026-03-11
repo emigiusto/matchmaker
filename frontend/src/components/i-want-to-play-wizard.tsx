@@ -6,7 +6,6 @@ import {
   ChevronRight,
   ChevronLeft,
   GripVertical,
-  Plus,
   X,
   Zap,
   Clock,

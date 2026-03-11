@@ -47,7 +47,7 @@ export default function MatchDetailPage() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [remindersLoading, setRemindersLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [resultSubmitted, setResultSubmitted] = useState(false)
+  const [resultSubmitted, _setResultSubmitted] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
 
   function fetchReminders() {

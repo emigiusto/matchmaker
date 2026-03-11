@@ -56,7 +56,6 @@ export function AddContactsToInvite({
         const withPhone = users.filter(
           (u) => u.phone && u.id !== hostUserId && (u.name || u.email || u.id)
         )
-        const userPhones = new Set(withPhone.map((u) => u.phone).filter(Boolean))
         setGroups(g)
         setFriends(f.filter((x) => x.type === "user"))
         const userContacts: AvailableContact[] = withPhone.map((u) => ({

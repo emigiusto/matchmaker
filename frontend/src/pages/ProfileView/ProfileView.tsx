@@ -49,7 +49,7 @@ export default function PlayerProfilePage() {
     }
     playersService
       .getByUser(userId)
-      .then((dto) => setPlayer(adaptPlayer(dto as Record<string, unknown>)))
+      .then((dto) => setPlayer(adaptPlayer(dto as unknown as Record<string, unknown>)))
       .catch(() => setPlayer(null))
       .finally(() => setLoading(false))
   }, [userId])
