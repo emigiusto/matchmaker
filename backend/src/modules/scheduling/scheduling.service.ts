@@ -109,6 +109,14 @@ const INVITE_BUTTONS = [
   { id: 'invite_no', title: 'NO' },
 ] as const;
 
+function formatResponseWindow(minutes: number): string {
+  if (minutes < 60) return `${Math.round(minutes)} minute${Math.round(minutes) === 1 ? '' : 's'}`;
+  const hours = minutes / 60;
+  if (hours < 24) return `${Math.round(hours)} hour${Math.round(hours) === 1 ? '' : 's'}`;
+  const days = hours / 24;
+  return `${Math.round(days)} day${Math.round(days) === 1 ? '' : 's'}`;
+}
+
 function formatInviteMessage(
   hostName: string,
   sportType: string,
@@ -116,16 +124,29 @@ function formatInviteMessage(
   dateStr: string,
   timeStr: string,
   location: string,
-  withButtons = false
+  withButtons: boolean,
+  responseWindowMinutes: number
 ): string {
   const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
-  const base = `${hostName} wants to play ${sportType} ${formatLabel} with you.\n\n${dateStr} ${timeStr}\nLocation: ${location}`;
+  const timeLeft = formatResponseWindow(responseWindowMinutes);
+  const base = `${hostName} wants to play ${sportType} ${formatLabel} with you.\n\n${dateStr} ${timeStr}\nLocation: ${location}\n\nReply within ${timeLeft}`;
   return withButtons ? base : `${base}\n\nReply YES to accept\nReply NO to decline`;
 }
 
-function formatMatchDetailsMessage(sportType: string, format: string, dateStr: string, timeStr: string, location: string): string {
+const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
+
+function formatMatchDetailsMessage(
+  sportType: string,
+  format: string,
+  whenStr: string,
+  location: string,
+  matchId: string
+): string {
+  const sport = sportType.charAt(0).toUpperCase() + sportType.slice(1).toLowerCase();
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
-  return `Match confirmed!\n\n${sportType} · ${formatLabel}\n${dateStr} ${timeStr}\nLocation: ${location}`;
+  const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
+  const signupUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/signup`;
+  return `✅ Match confirmed!\n\n${sport} · ${formatLabel}\nWhen: ${whenStr}\nWhere: ${location}\n\n🔗 View match: ${matchUrl}\n\nCreate an account to manage matches: ${signupUrl}`;
 }
 
 function formatInviteNoLongerAvailableMessage(
@@ -279,7 +300,16 @@ export const schedulingService = {
     const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'long' });
     const timeStr = `${request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${request.endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     const format = (request as RequestRow).format || 'singles';
-    const message = formatInviteMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, true);
+    const message = formatInviteMessage(
+        hostName,
+        request.sportType,
+        format,
+        dateStr,
+        timeStr,
+        request.locationText,
+        true,
+        request.responseWindowMinutes ?? 240
+      );
 
     for (const candidate of toContact) {
       const phone = candidate.contactUser?.phone;
@@ -531,9 +561,9 @@ export const schedulingService = {
       process.env.WHAPI_ACCOUNT_NUMBER;
 
     if (participantPhones.length >= 2) {
-      const dayStr = request.date.toLocaleDateString('en-US', { weekday: 'long' });
+      const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
       const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      const groupName = `${dayStr} ${timeStr} - ${request.locationText}`;
+      const groupName = `${dateStr} ${timeStr}`;
 
       const groupResult = await whatsappService.createMatchGroup({
         participantPhones,
@@ -547,7 +577,13 @@ export const schedulingService = {
           where: { id: match.id },
           data: { whatsappGroupId: groupResult.groupId },
         });
-        const detailsMessage = formatMatchDetailsMessage(request.sportType, format, dayStr, timeStr, request.locationText);
+        const detailsMessage = formatMatchDetailsMessage(
+          request.sportType,
+          format,
+          `${dateStr} at ${timeStr}`,
+          request.locationText,
+          match.id
+        );
         await whatsappService.sendGroupMessage(groupResult.groupId, detailsMessage);
       }
     }

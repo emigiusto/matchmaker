@@ -584,8 +584,7 @@ export function InviteRequestsSection({
                                     <XCircle className="h-3 w-3" />
                                   </button>
                                 )}
-                              {(request.status === "matched" ||
-                                request.status === "scheduling" ||
+                              {(request.status === "scheduling" ||
                                 request.status === "paused" ||
                                 request.status === "expired") &&
                                 contact.status === "accepted" && (
