@@ -1,6 +1,7 @@
 
 import { Router } from 'express';
 
+import healthRoutes from './modules/health/health.routes';
 import userRoutes from './modules/users/users.routes';
 import availabilityRoutes from './modules/availabilities/availability.routes';
 import inviteRoutes from './modules/invites/invite.routes';
@@ -20,6 +21,7 @@ import whatsappRoutes from './modules/whatsapp/whatsapp.routes';
 
 const router = Router();
 
+router.use('/', healthRoutes);
 router.use('/users', userRoutes);
 router.use('/availability', availabilityRoutes);
 router.use('/invites', inviteRoutes);
