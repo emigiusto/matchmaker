@@ -6,6 +6,7 @@ import type {
   IWhatsAppProvider,
   CreateMatchGroupInput,
   GroupWithParticipants,
+  InviteMessageOptions,
 } from '../whatsapp.provider.interface';
 import type {
   SendMessageResult,
@@ -23,12 +24,39 @@ function normalizePhone(phone: string): string {
 }
 
 export class WhapiProvider implements IWhatsAppProvider {
-  async sendInviteMessage(phoneNumber: string, message: string): Promise<SendMessageResult> {
+  async sendInviteMessage(phoneNumber: string, message: string, options?: InviteMessageOptions): Promise<SendMessageResult> {
     if (!WHAPI_TOKEN) {
       return { success: false, error: 'WHAPI_API_TOKEN not configured' };
     }
     try {
       const to = normalizePhone(phoneNumber);
+      const buttons = options?.buttons?.slice(0, 3);
+      if (buttons && buttons.length >= 1) {
+        const res = await fetch(`${WHAPI_BASE}/messages/interactive`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${WHAPI_TOKEN}`,
+          },
+          body: JSON.stringify({
+            to,
+            type: 'button',
+            body: { text: message },
+            action: {
+              buttons: buttons.map((b) => ({
+                type: 'quick_reply',
+                id: b.id,
+                title: b.title.slice(0, 25),
+              })),
+            },
+          }),
+        });
+        const data = (await res.json()) as { id?: string; error?: string };
+        if (!res.ok) {
+          return { success: false, error: data.error || res.statusText };
+        }
+        return { success: true, messageId: data.id };
+      }
       const res = await fetch(`${WHAPI_BASE}/messages/text`, {
         method: 'POST',
         headers: {
@@ -168,10 +196,20 @@ export class WhapiProvider implements IWhatsAppProvider {
     const msg = Array.isArray(b?.messages) ? (b.messages as unknown[])[0] : null;
     const msgObj = msg && typeof msg === 'object' ? (msg as Record<string, unknown>) : null;
     if (!msgObj || msgObj.from_me) return null;
-    if (msgObj.type !== 'text') return null;
     const from = msgObj.from ? String(msgObj.from).replace(/\D/g, '') : '';
-    const text = (msgObj.text as { body?: string })?.body;
-    if (!from || text === undefined) return null;
-    return { senderPhone: from, messageText: text };
+
+    if (msgObj.type === 'text') {
+      const text = (msgObj.text as { body?: string })?.body;
+      if (!from || text === undefined) return null;
+      return { senderPhone: from, messageText: text };
+    }
+    if (msgObj.type === 'reply') {
+      const reply = msgObj.reply as { type?: string; buttons_reply?: { id?: string; title?: string } } | undefined;
+      if (reply?.type === 'buttons_reply' && reply.buttons_reply?.title) {
+        if (!from) return null;
+        return { senderPhone: from, messageText: reply.buttons_reply.title };
+      }
+    }
+    return null;
   }
 }

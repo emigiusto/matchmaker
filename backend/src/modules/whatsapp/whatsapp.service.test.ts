@@ -183,7 +183,7 @@ describe('whatsappService', () => {
     await whatsappService.sendInviteMessage('34612345678', 'Hi');
     await whatsappService.sendGroupMessage('group-1', 'Hello group');
 
-    expect(mockProvider.sendInviteMessage).toHaveBeenCalledWith('34612345678', 'Hi');
+    expect(mockProvider.sendInviteMessage).toHaveBeenCalledWith('34612345678', 'Hi', undefined);
     expect(mockProvider.sendGroupMessage).toHaveBeenCalledWith('group-1', 'Hello group');
   });
 });

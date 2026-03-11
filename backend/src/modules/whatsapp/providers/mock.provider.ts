@@ -5,6 +5,7 @@ import type {
   IWhatsAppProvider,
   CreateMatchGroupInput,
   GroupWithParticipants,
+  InviteMessageOptions,
 } from '../whatsapp.provider.interface';
 import type {
   SendMessageResult,
@@ -14,7 +15,7 @@ import type {
 import { logger } from '../../../config/logger';
 
 export class MockWhatsAppProvider implements IWhatsAppProvider {
-  async sendInviteMessage(phoneNumber: string, message: string): Promise<SendMessageResult> {
+  async sendInviteMessage(phoneNumber: string, message: string, _options?: InviteMessageOptions): Promise<SendMessageResult> {
     logger.info('[MOCK WhatsApp] sendInviteMessage', {
       to: phoneNumber,
       messageLength: message.length,

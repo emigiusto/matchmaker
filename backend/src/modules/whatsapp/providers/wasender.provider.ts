@@ -6,6 +6,7 @@ import type {
   IWhatsAppProvider,
   CreateMatchGroupInput,
   GroupWithParticipants,
+  InviteMessageOptions,
 } from '../whatsapp.provider.interface';
 import type {
   SendMessageResult,
@@ -29,23 +30,38 @@ function phoneToJid(phone: string): string {
 }
 
 export class WasenderProvider implements IWhatsAppProvider {
-  async sendInviteMessage(phoneNumber: string, message: string): Promise<SendMessageResult> {
+  async sendInviteMessage(phoneNumber: string, message: string, options?: InviteMessageOptions): Promise<SendMessageResult> {
     if (!WASENDER_TOKEN) {
       return { success: false, error: 'WASENDER_API_KEY not configured' };
     }
     try {
-      const to = normalizePhone(phoneNumber);
+      const to = `+${normalizePhone(phoneNumber)}`;
+      const buttons = options?.buttons?.slice(0, 12);
+      const body: Record<string, unknown> = { to };
+
+      if (buttons && buttons.length >= 2) {
+        body.poll = {
+          question: message,
+          options: buttons.map((b) => b.title.slice(0, 25)),
+          multiSelect: false,
+        };
+      } else {
+        body.text = message;
+      }
+
       const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${WASENDER_TOKEN}`,
         },
-        body: JSON.stringify({ to: `+${to}`, text: message }),
+        body: JSON.stringify(body),
       });
-      const data = (await res.json()) as { success?: boolean; data?: { msgId?: string }; error?: string };
+      const data = (await res.json()) as { success?: boolean; data?: { msgId?: string }; error?: string; message?: string };
       if (!res.ok) {
-        return { success: false, error: data.error || res.statusText };
+        const errMsg = data.error || data.message || res.statusText;
+        const extra = typeof data === 'object' && data !== null ? JSON.stringify(data) : '';
+        return { success: false, error: extra ? `${errMsg} (${extra})` : errMsg };
       }
       return {
         success: true,
@@ -213,8 +229,12 @@ export class WasenderProvider implements IWhatsAppProvider {
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
     const b = body as Record<string, unknown>;
     const data = b?.data as Record<string, unknown> | undefined;
-    const messages = data?.messages;
 
+    if (b?.event === 'poll.results' && data?.pollResult && Array.isArray(data.pollResult)) {
+      return this.parsePollResults(data as { key?: Record<string, unknown>; pollResult: Array<{ name?: string; voters?: string[] }> });
+    }
+
+    const messages = data?.messages;
     if (!messages || typeof messages !== 'object') return null;
 
     const msgObj = messages as Record<string, unknown>;
@@ -234,6 +254,29 @@ export class WasenderProvider implements IWhatsAppProvider {
     return {
       senderPhone: senderPhone.replace(/\D/g, ''),
       messageText: String(messageText),
+    };
+  }
+
+  private parsePollResults(data: {
+    key?: Record<string, unknown>;
+    pollResult: Array<{ name?: string; voters?: string[] }>;
+  }): WebhookIncomingMessage | null {
+    const voted = data.pollResult.find((r) => Array.isArray(r.voters) && r.voters.length > 0);
+    if (!voted?.name) return null;
+
+    let senderPhone = '';
+    const key = data.key;
+    if (key?.remoteJid && typeof key.remoteJid === 'string') {
+      senderPhone = String(key.remoteJid).replace(/@.*$/, '').replace(/\D/g, '');
+    }
+    if (!senderPhone && voted.voters?.[0]) {
+      senderPhone = String(voted.voters[0]).replace(/@.*$/, '').replace(/\D/g, '');
+    }
+    if (!senderPhone) return null;
+
+    return {
+      senderPhone,
+      messageText: String(voted.name).trim().toUpperCase(),
     };
   }
 }

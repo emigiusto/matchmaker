@@ -24,6 +24,7 @@
     "migrate:dev": "node scripts/ensure-database-url.js npx prisma@6.19.2 migrate dev",
     "seed": "cross-env ENV_FILE=.env.local ENVIRONMENT=DEVELOPMENT npx tsx prisma/seeders/seed.ts",
     "ensure-dev-user-data": "cross-env ENV_FILE=.env.local npx tsx scripts/ensure-dev-user-data.ts",
+    "test:whatsapp-message": "dotenv -e .env.local -- npx tsx scripts/test-whatsapp-message.ts",
     "seed:prod": "node scripts/seed-prod.js",
     "test": "vitest run",
     "test:watch": "vitest",

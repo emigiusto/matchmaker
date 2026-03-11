@@ -19,8 +19,13 @@ export interface GroupWithParticipants {
   participantPhones: string[];
 }
 
+export interface InviteMessageOptions {
+  /** Quick-reply buttons (e.g. YES, NO). Max 3, 25 chars each. Provider may fall back to plain text. */
+  buttons?: Array<{ id: string; title: string }>;
+}
+
 export interface IWhatsAppProvider {
-  sendInviteMessage(phoneNumber: string, message: string): Promise<SendMessageResult>;
+  sendInviteMessage(phoneNumber: string, message: string, options?: InviteMessageOptions): Promise<SendMessageResult>;
   createMatchGroup(input: CreateMatchGroupInput): Promise<CreateGroupResult>;
   sendGroupMessage(groupId: string, message: string): Promise<SendMessageResult>;
 

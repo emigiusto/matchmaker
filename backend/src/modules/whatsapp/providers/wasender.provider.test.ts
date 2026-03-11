@@ -199,5 +199,35 @@ describe('WasenderProvider', () => {
       const result = provider.parseWebhookPayload(body);
       expect(result).toEqual({ senderPhone: '34612345678', messageText: 'Hi' });
     });
+
+    it('parses poll.results event (user voted NO)', () => {
+      const body = {
+        event: 'poll.results',
+        data: {
+          key: { remoteJid: '34600972125@s.whatsapp.net' },
+          pollResult: [
+            { name: 'YES', voters: [] },
+            { name: 'NO', voters: ['34600972125@s.whatsapp.net'] },
+          ],
+        },
+      };
+      const result = provider.parseWebhookPayload(body);
+      expect(result).toEqual({ senderPhone: '34600972125', messageText: 'NO' });
+    });
+
+    it('parses poll.results event (user voted YES)', () => {
+      const body = {
+        event: 'poll.results',
+        data: {
+          key: { remoteJid: '34611111111@s.whatsapp.net' },
+          pollResult: [
+            { name: 'YES', voters: ['34611111111@s.whatsapp.net'] },
+            { name: 'NO', voters: [] },
+          ],
+        },
+      };
+      const result = provider.parseWebhookPayload(body);
+      expect(result).toEqual({ senderPhone: '34611111111', messageText: 'YES' });
+    });
   });
 });

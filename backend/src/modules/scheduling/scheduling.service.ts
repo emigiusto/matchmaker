@@ -103,9 +103,24 @@ function toCandidateDTO(c: { id: string; schedulingRequestId: string; contactUse
   };
 }
 
-function formatInviteMessage(hostName: string, sportType: string, format: string, dateStr: string, timeStr: string, location: string): string {
+/** Quick-reply buttons for invite (Whapi supports; Wasender/Mock fall back to plain text) */
+const INVITE_BUTTONS = [
+  { id: 'invite_yes', title: 'YES' },
+  { id: 'invite_no', title: 'NO' },
+] as const;
+
+function formatInviteMessage(
+  hostName: string,
+  sportType: string,
+  format: string,
+  dateStr: string,
+  timeStr: string,
+  location: string,
+  withButtons = false
+): string {
   const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
-  return `${hostName} wants to play ${sportType} ${formatLabel} with you.\n\n${dateStr} ${timeStr}\nLocation: ${location}\n\nReply YES to accept\nReply NO to decline`;
+  const base = `${hostName} wants to play ${sportType} ${formatLabel} with you.\n\n${dateStr} ${timeStr}\nLocation: ${location}`;
+  return withButtons ? base : `${base}\n\nReply YES to accept\nReply NO to decline`;
 }
 
 function formatMatchDetailsMessage(sportType: string, format: string, dateStr: string, timeStr: string, location: string): string {
@@ -264,7 +279,7 @@ export const schedulingService = {
     const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'long' });
     const timeStr = `${request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${request.endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     const format = (request as RequestRow).format || 'singles';
-    const message = formatInviteMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText);
+    const message = formatInviteMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, true);
 
     for (const candidate of toContact) {
       const phone = candidate.contactUser?.phone;
@@ -286,7 +301,9 @@ export const schedulingService = {
         });
       });
 
-      const result = await whatsappService.sendInviteMessage(phone, message);
+      const result = await whatsappService.sendInviteMessage(phone, message, {
+        buttons: [...INVITE_BUTTONS],
+      });
       await schedulingRepository.updateCandidateStatus(candidate.id, 'waiting_reply');
 
       if (!result.success) {
@@ -301,16 +318,25 @@ export const schedulingService = {
 
   async handleCandidateResponse(senderPhoneNumber: string, messageText: string): Promise<{ processed: boolean }> {
     const user = await schedulingRepository.findUserByPhone(senderPhoneNumber);
-    if (!user) return { processed: false };
+    if (!user) {
+      logger.info('InviteResponseIgnored', { reason: 'user_not_found', phone: senderPhoneNumber });
+      return { processed: false };
+    }
 
     const candidate = await schedulingRepository.findWaitingReplyCandidateByContactUserId(user.id);
-    if (!candidate) return { processed: false };
+    if (!candidate) {
+      logger.info('InviteResponseIgnored', { reason: 'no_waiting_candidate', userId: user.id, phone: senderPhoneNumber });
+      return { processed: false };
+    }
 
     const text = (messageText || '').trim();
     const isAccept = ACCEPT_PATTERNS.test(text);
     const isDecline = DECLINE_PATTERNS.test(text);
 
-    if (!isAccept && !isDecline) return { processed: false };
+    if (!isAccept && !isDecline) {
+      logger.info('InviteResponseIgnored', { reason: 'unrecognized_text', text: text.slice(0, 50), phone: senderPhoneNumber });
+      return { processed: false };
+    }
 
     const request = candidate.schedulingRequest;
     if (request.status !== 'active') {

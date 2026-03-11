@@ -2,7 +2,7 @@
 // WhatsApp integration service - abstracts providers (Whapi, WasenderApi, etc.)
 
 import { logger } from '../../config/logger';
-import type { IWhatsAppProvider } from './whatsapp.provider.interface';
+import type { IWhatsAppProvider, InviteMessageOptions } from './whatsapp.provider.interface';
 import type { CreateGroupResult, WhatsAppProvider, WebhookIncomingMessage } from './whatsapp.types';
 import { WhapiProvider } from './providers/whapi.provider';
 import { WasenderProvider } from './providers/wasender.provider';
@@ -43,8 +43,8 @@ function getProvider(): IWhatsAppProvider {
 const provider = getProvider();
 
 export const whatsappService = {
-  async sendInviteMessage(phoneNumber: string, message: string) {
-    return provider.sendInviteMessage(phoneNumber, message);
+  async sendInviteMessage(phoneNumber: string, message: string, options?: InviteMessageOptions) {
+    return provider.sendInviteMessage(phoneNumber, message, options);
   },
 
   async createMatchGroup(input: {

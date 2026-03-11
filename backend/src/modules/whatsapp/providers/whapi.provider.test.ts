@@ -60,6 +60,34 @@ describe('WhapiProvider', () => {
       const result = await provider.sendInviteMessage('34612345678', 'Hi');
       expect(result).toEqual({ success: false, error: 'Invalid phone' });
     });
+
+    it('sends interactive message with buttons when options.buttons provided', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'msg-interactive-1' }),
+      });
+
+      const result = await provider.sendInviteMessage('34612345678', 'Play with me?', {
+        buttons: [
+          { id: 'invite_yes', title: 'YES' },
+          { id: 'invite_no', title: 'NO' },
+        ],
+      });
+
+      expect(result).toEqual({ success: true, messageId: 'msg-interactive-1' });
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/messages/interactive'),
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('quick_reply'),
+        })
+      );
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.type).toBe('button');
+      expect(body.body.text).toBe('Play with me?');
+      expect(body.action.buttons).toHaveLength(2);
+      expect(body.action.buttons[0]).toEqual({ type: 'quick_reply', id: 'invite_yes', title: 'YES' });
+    });
   });
 
   describe('createMatchGroup', () => {
@@ -213,6 +241,24 @@ describe('WhapiProvider', () => {
       };
       const result = provider.parseWebhookPayload(body);
       expect(result).toEqual({ senderPhone: '34612345678', messageText: 'Hi' });
+    });
+
+    it('parses quick-reply button response (type reply, buttons_reply)', () => {
+      const body = {
+        messages: [
+          {
+            from: '34612345678',
+            type: 'reply',
+            from_me: false,
+            reply: {
+              type: 'buttons_reply',
+              buttons_reply: { id: 'invite_yes', title: 'YES' },
+            },
+          },
+        ],
+      };
+      const result = provider.parseWebhookPayload(body);
+      expect(result).toEqual({ senderPhone: '34612345678', messageText: 'YES' });
     });
   });
 });
