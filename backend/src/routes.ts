@@ -2,6 +2,7 @@
 import { Router } from 'express';
 
 import healthRoutes from './modules/health/health.routes';
+import authRoutes from './modules/auth/auth.routes';
 import userRoutes from './modules/users/users.routes';
 import availabilityRoutes from './modules/availabilities/availability.routes';
 import inviteRoutes from './modules/invites/invite.routes';
@@ -23,6 +24,7 @@ import remindersRoutes from './modules/reminders/reminders.routes';
 const router = Router();
 
 router.use('/', healthRoutes);
+router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/availability', availabilityRoutes);
 router.use('/invites', inviteRoutes);

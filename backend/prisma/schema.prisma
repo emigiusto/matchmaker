@@ -12,13 +12,14 @@ datasource db {
 ////////////////////////////////////////////////////////////
 
 model User {
-  id        String   @id @default(uuid())
-  name      String?
-  email     String?  @unique
-  phone     String?  @unique
-  isGuest   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String?
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String?
+  isGuest      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   player         Player?
   availabilities Availability[]

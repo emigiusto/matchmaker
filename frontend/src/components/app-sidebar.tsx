@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import {
   LayoutDashboard,
   Swords,
@@ -7,6 +7,7 @@ import {
   Bell,
   CirclePlay,
   Zap,
+  LogOut,
 } from "lucide-react"
 import {
   Sidebar,
@@ -25,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { useAuth } from "@/lib/auth/AuthContext"
 import { getCurrentUserId } from "@/lib/current-user"
 import { usersService } from "@/lib/services/users.service"
 
@@ -41,16 +43,22 @@ function getInitials(name: string | undefined): string {
 
 export function AppSidebar() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [userName, setUserName] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string | null>(user?.name ?? null)
   const { t } = useTranslation()
   const currentUserId = getCurrentUserId()
+
+  useEffect(() => {
+    setUserName(user?.name ?? null)
+  }, [user?.name])
 
   useEffect(() => {
     usersService
       .getById(currentUserId)
       .then((u) => setUserName(u.name ?? null))
-      .catch(() => setUserName(null))
+      .catch(() => {})
   }, [currentUserId])
 
   // v1: Dashboard, My Invites, Matches
@@ -150,21 +158,35 @@ export function AppSidebar() {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border p-4">
-          <div className="flex items-center justify-between gap-2">
-            <Link
-              to="/profile"
-              className="flex flex-1 items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-sidebar-accent"
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <Link
+                to="/profile"
+                className="flex flex-1 items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-sidebar-accent min-w-0"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
+                  {getInitials(userName ?? user?.name ?? undefined)}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="truncate text-base font-medium text-sidebar-foreground">
+                    {userName ?? user?.name ?? t("navigation.profile")}
+                  </span>
+                </div>
+              </Link>
+              <LanguageSwitcher />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                logout()
+                navigate("/login")
+              }}
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
-                {getInitials(userName ?? undefined)}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="truncate text-base font-medium text-sidebar-foreground">
-                  {userName ?? t("navigation.profile")}
-                </span>
-              </div>
-            </Link>
-            <LanguageSwitcher />
+              <LogOut className="h-4 w-4" />
+              Log out
+            </Button>
           </div>
         </SidebarFooter>
       </Sidebar>
