@@ -106,18 +106,21 @@ export async function createGuestUser(name?: string, email?: string, phone?: str
 
 /**
  * Update an existing user by ID.
+ * Email is not updatable (managed by auth provider).
  * @param id User ID
  * @param name Optional new name
- * @param email Optional new email
  * @param phone Optional new phone number
  * @returns Updated UserDTO object
  * @throws AppError if user not found, phone/email exists, or update fails
  */
-export async function updateUser(id: string, name?: string, email?: string, phone?: string): Promise<UserDTO> {
+export async function updateUser(id: string, name?: string, phone?: string): Promise<UserDTO> {
   try {
+    const data: { name?: string; phone?: string } = {};
+    if (name !== undefined) data.name = name;
+    if (phone !== undefined) data.phone = phone;
     const user = await prisma.user.update({
       where: { id },
-      data: { name, email, phone },
+      data,
     });
     return toDTO(user);
   } catch (err: unknown) {

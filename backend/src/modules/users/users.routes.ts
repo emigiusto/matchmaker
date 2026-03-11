@@ -129,7 +129,7 @@ router.get('/:id', findUserByIdController);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UserInput'
+ *             $ref: '#/components/schemas/UpdateUserInput'
  *     responses:
  *       200:
  *         description: User updated

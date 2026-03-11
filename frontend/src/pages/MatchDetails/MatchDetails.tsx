@@ -30,11 +30,13 @@ import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { ResultUploadDialog } from "@/components/result-upload-dialog"
 import { toast } from "sonner"
+import { getCurrentUserId } from "@/lib/current-user"
 // TODO: wire to API — replace with matchesService.getById(id)
 import { mockMatches, CURRENT_USER_ID } from "@/lib/mock-data"
 
 export default function MatchDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const currentUserId = getCurrentUserId()
   const match = mockMatches.find((m) => m.id === id)
   const [resultSubmitted, setResultSubmitted] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
@@ -148,6 +150,7 @@ export default function MatchDetailPage() {
                     matchTime={match.time}
                     opponent={opponent.name}
                     location={match.location}
+                    userId={currentUserId}
                     trigger={
                       <Button variant="outline" size="lg" className="gap-2">
                         <Bell className="h-5 w-5" />

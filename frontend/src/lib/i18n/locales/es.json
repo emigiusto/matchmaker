@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Tennis MatchMaker",
+    "appName": "MatchMaker",
     "iWantToPlay": "Quiero Jugar",
     "logout": "Cerrar sesión",
     "language": "Idioma",
@@ -24,6 +24,8 @@
     "personal": "Personal"
   },
   "dashboard": {
+    "pageTitle": "Panel Principal",
+    "pageDescription": "Tus invitaciones y próximos partidos",
     "matchesToday": "Partidos Hoy",
     "upcomingMatches": "Próximos Partidos",
     "pastMatches": "Partidos Pasados",
@@ -157,6 +159,9 @@
     "unauthorized": "No autorizado",
     "fieldRequired": "Este campo es requerido",
     "invalidEmail": "Dirección de correo inválida"
+  },
+  "footer": {
+    "tagline": "La forma más simple de organizar tus partidos de tenis."
   },
   "success": {
     "saved": "Guardado correctamente",

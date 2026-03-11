@@ -8,6 +8,11 @@ export interface User {
   phone?: string
 }
 
+export interface UpdateUserInput {
+  name?: string
+  phone?: string
+}
+
 export const usersService = {
   async getAll(): Promise<User[]> {
     return apiClient.get<User[]>("/users")
@@ -17,7 +22,7 @@ export const usersService = {
     return apiClient.get<User>(`/users/${userId}`)
   },
 
-  async getCurrent(): Promise<User> {
-    return apiClient.get<User>("/users/me")
+  async update(userId: string, data: UpdateUserInput): Promise<User> {
+    return apiClient.put<User>(`/users/${userId}`, data)
   },
 }

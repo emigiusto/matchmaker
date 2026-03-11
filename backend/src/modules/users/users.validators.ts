@@ -8,7 +8,6 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().optional(),
-  email: z.string().email('Invalid email').optional(),
   phone: z.string().optional(),
 });
 // users.validators.ts

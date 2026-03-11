@@ -1,17 +1,12 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
 import {
   LayoutDashboard,
   Swords,
-  Trophy,
   User,
-  Users,
   Bell,
-  Clock,
   CirclePlay,
   Zap,
-  BrainCircuit,
-  BarChart3,
 } from "lucide-react"
 import {
   Sidebar,
@@ -30,28 +25,51 @@ import { Button } from "@/components/ui/button"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { getCurrentUserId } from "@/lib/current-user"
+import { usersService } from "@/lib/services/users.service"
+
+function getInitials(name: string | undefined): string {
+  if (!name?.trim()) return "?"
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase()
+}
 
 export function AppSidebar() {
   const { pathname } = useLocation()
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [userName, setUserName] = useState<string | null>(null)
   const { t } = useTranslation()
+  const currentUserId = getCurrentUserId()
 
+  useEffect(() => {
+    usersService
+      .getById(currentUserId)
+      .then((u) => setUserName(u.name ?? null))
+      .catch(() => setUserName(null))
+  }, [currentUserId])
+
+  // v1: Dashboard, My Invites, Matches
   const mainNav = [
     { title: t("navigation.dashboard"), href: "/dashboard", icon: LayoutDashboard },
     { title: t("navigation.myInvites"), href: "/play", icon: CirclePlay },
-    { title: t("navigation.suggested"), href: "/suggested", icon: Users },
+    { title: t("navigation.matches"), href: "/matches", icon: Swords },
   ]
 
-  const matchNav = [
-    { title: t("navigation.upcoming"), href: "/matches/upcoming", icon: Swords },
-    { title: t("navigation.past"), href: "/matches/past", icon: Clock },
-    { title: t("navigation.rankings"), href: "/rankings", icon: Trophy },
-  ]
-
-  const aiCoachNav = [
-    { title: t("navigation.matchCompanion"), href: "/ai-coach/companion", icon: BrainCircuit },
-    { title: t("navigation.playerInsights"), href: "/ai-coach/insights", icon: BarChart3 },
-  ]
+  // Disabled for v1 - kept for future use
+  // const matchNav = [
+  //   { title: t("navigation.upcoming"), href: "/matches/upcoming", icon: Swords },
+  //   { title: t("navigation.past"), href: "/matches/past", icon: Clock },
+  //   { title: t("navigation.rankings"), href: "/rankings", icon: Trophy },
+  // ]
+  // const aiCoachNav = [
+  //   { title: t("navigation.matchCompanion"), href: "/ai-coach/companion", icon: BrainCircuit },
+  //   { title: t("navigation.playerInsights"), href: "/ai-coach/insights", icon: BarChart3 },
+  // ]
 
   const personalNav = [
     { title: t("navigation.profile"), href: "/profile", icon: User },
@@ -110,50 +128,6 @@ export function AppSidebar() {
           </SidebarGroup>
           <SidebarGroup>
             <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-              {t("navigation.matches")}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {matchNav.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-                    >
-                      <Link to={item.href}>
-                        <item.icon className="h-5 w-5" />
-                        <span className="text-base">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-              {t("navigation.aiCoach")}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {aiCoachNav.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-                    >
-                      <Link to={item.href}>
-                        <item.icon className="h-5 w-5" />
-                        <span className="text-base">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
               {t("navigation.personal")}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -182,11 +156,12 @@ export function AppSidebar() {
               className="flex flex-1 items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-sidebar-accent"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
-                AR
+                {getInitials(userName ?? undefined)}
               </div>
-              <div className="flex flex-col">
-                <span className="text-base font-medium text-sidebar-foreground">Alex Rivera</span>
-                <span className="font-mono text-sm text-muted-foreground">Level 5.2</span>
+              <div className="flex flex-col min-w-0">
+                <span className="truncate text-base font-medium text-sidebar-foreground">
+                  {userName ?? t("navigation.profile")}
+                </span>
               </div>
             </Link>
             <LanguageSwitcher />

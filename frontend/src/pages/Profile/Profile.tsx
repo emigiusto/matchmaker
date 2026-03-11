@@ -1,412 +1,268 @@
-import { useState } from "react"
-import { Link } from "react-router-dom"
-import { format } from "date-fns"
+import { useState, useEffect } from "react"
 import {
-  MapPin,
-  Activity,
-  Target,
-  Swords,
-  Flame,
-  TrendingUp,
-  ArrowRight,
-  BarChart3,
-  Repeat,
-  Lightbulb,
-  Clock,
-  Layers,
-  Zap,
+  Phone,
+  Mail,
+  Globe,
+  User as UserIcon,
+  Settings,
+  Loader2,
+  Save,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { PageHeader } from "@/components/page-header"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
-  // TODO: wire to API — replace with playersService.getByUserId(currentUser)
-  mockPlayers,
-  mockExtendedMatches,
-  mockPlayerStats,
-  mockRivals,
-  mockPerformanceInsights,
-  mockPersonalProgress,
-  CURRENT_USER_ID,
-} from "@/lib/mock-data"
-
-const insightIcons: Record<string, typeof Layers> = {
-  surface: Layers,
-  level: TrendingUp,
-  close: Target,
-  time: Clock,
-  streak: Flame,
-}
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { PageHeader } from "@/components/page-header"
+import { useLanguage } from "@/lib/i18n/language-context"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { getCurrentUserId } from "@/lib/current-user"
+import { usersService, type User } from "@/lib/services/users.service"
+import { toast } from "sonner"
 
 export default function ProfilePage() {
-  const player = mockPlayers.find((p) => p.userId === CURRENT_USER_ID)!
-  const stats = mockPlayerStats
-  const progress = mockPersonalProgress
-  const allMatches = mockExtendedMatches
-  const competitiveMatches = allMatches.filter(
-    (m) => m.matchType === "competitive" && m.status === "completed"
-  )
-  const practiceMatches = allMatches.filter(
-    (m) => m.matchType === "practice" && m.status === "completed"
-  )
-  const [expandedInsight, setExpandedInsight] = useState<string | null>(null)
+  const currentUserId = getCurrentUserId()
+  const { language, setLanguage } = useLanguage()
+  const { t } = useTranslation()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ name: "", phone: "" })
+
+  useEffect(() => {
+    let cancelled = false
+    usersService
+      .getById(currentUserId)
+      .then((u) => {
+        if (!cancelled) {
+          setUser(u)
+          setForm({
+            name: u.name ?? "",
+            phone: u.phone ?? "",
+          })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [currentUserId])
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const updated = await usersService.update(currentUserId, {
+        name: form.name || undefined,
+        phone: form.phone || undefined,
+      })
+      setUser(updated)
+      toast.success(t("success.saved"))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save"
+      toast.error(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title={t("profile.myProfile")} description="" />
+        <div className="flex flex-1 items-center justify-center p-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </>
+    )
+  }
+
+  if (!user) {
+    return (
+      <>
+        <PageHeader title={t("profile.myProfile")} description="" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12">
+          <p className="text-muted-foreground">Could not load your profile.</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </>
+    )
+  }
+
+  const displayName = user?.name || form.name || "You"
 
   return (
     <>
-      <PageHeader title="My Profile" description="Your tennis profile, stats, and insights" />
+      <PageHeader
+        title={t("profile.myProfile")}
+        description="Your personal settings and preferences for scheduling"
+      />
       <div className="flex flex-1 flex-col gap-6 p-5 lg:p-8">
-        {/* Profile Header */}
+        {/* Profile header - minimal */}
         <Card className="overflow-hidden">
-          <div className="border-b border-border/30 bg-primary/5 px-6 py-8">
+          <div className="border-b border-border/30 bg-primary/5 px-6 py-6">
             <div className="flex items-center gap-6">
-              <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-primary/10 text-3xl font-bold text-primary">
-                {player.name.split(" ").map((n) => n[0]).join("")}
+              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary">
+                {displayName.split(" ").map((n) => n[0]).join("") || "?"}
               </div>
               <div>
-                <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  {player.name}
+                <h2 className="text-xl font-bold tracking-tight text-foreground">
+                  {displayName}
                 </h2>
-                <div className="mt-1.5 flex items-center gap-4 text-base text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4" />
-                    {player.city}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <span className="font-mono text-3xl font-bold text-primary">
-                    {player.levelValue.toFixed(1)}
-                  </span>
-                  <span className="text-base text-muted-foreground">Level</span>
-                </div>
+                {user?.email && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">{user.email}</p>
+                )}
               </div>
             </div>
           </div>
         </Card>
 
-        {/* ==== PERSONAL PROGRESS DASHBOARD ==== */}
+        {/* Personal settings - for scheduling service */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Personal Progress
+              <Settings className="h-5 w-5 text-primary" />
+              Personal Settings
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              These details are used for scheduling, WhatsApp invites, and reminders.
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {/* Matches this month */}
-              <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Matches this month</p>
-                <p className="mt-1 font-mono text-2xl font-bold text-foreground">{progress.matchesThisMonth}</p>
+            <form onSubmit={handleSave} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="flex items-center gap-2">
+                  <UserIcon className="h-4 w-4" />
+                  Display name
+                </Label>
+                <Input
+                  id="name"
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="Your name"
+                  className="max-w-md"
+                />
               </div>
-              {/* Win rate overall */}
-              <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Win rate (overall)</p>
-                <p className="mt-1 font-mono text-2xl font-bold text-foreground">{progress.winRateOverall}%</p>
-              </div>
-              {/* Win rate monthly */}
-              <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Win rate (this month)</p>
-                <p className="mt-1 font-mono text-2xl font-bold text-primary">{progress.winRateMonthly}%</p>
-              </div>
-              {/* Current level */}
-              <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current level</p>
-                <p className="mt-1 font-mono text-2xl font-bold text-primary">{progress.currentLevel.toFixed(1)}</p>
-              </div>
-              {/* Most played surface */}
-              <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most played surface</p>
-                <p className="mt-1 text-xl font-bold text-foreground">{progress.mostPlayedSurface}</p>
-              </div>
-              {/* Most frequent rival */}
-              <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most frequent rival</p>
-                <p className="mt-1 text-xl font-bold text-foreground">{progress.mostFrequentRival}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                <Swords className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Total</p>
-                <p className="font-mono text-2xl font-bold text-foreground">{stats.totalMatches}</p>
-                <p className="text-sm text-muted-foreground">{stats.competitiveMatches} comp / {stats.practiceMatches} practice</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                <Target className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Win Rate</p>
-                <p className="font-mono text-2xl font-bold text-foreground">{stats.winRate}%</p>
-                <p className="text-sm text-muted-foreground">{stats.wins}W - {stats.losses}L</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                <Flame className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Streak</p>
-                <p className="font-mono text-2xl font-bold text-primary">
-                  {stats.currentStreak}{stats.streakType === "win" ? "W" : stats.streakType === "loss" ? "L" : ""}
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Phone number
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                  placeholder="+34 612 345 678"
+                  className="max-w-md"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Required for WhatsApp invites and match reminders.
                 </p>
-                <p className="text-sm text-muted-foreground">Current run</p>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                <Activity className="h-5 w-5 text-primary" />
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Email
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {user?.email || "—"}
+                </p>
               </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Avg Opponent</p>
-                <p className="font-mono text-2xl font-bold text-foreground">{stats.averageOpponentLevel}</p>
-                <p className="text-sm text-muted-foreground">Level</p>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Preferred language
+                </Label>
+                <Select value={language} onValueChange={(v) => setLanguage(v as "en" | "es")}>
+                  <SelectTrigger className="max-w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">{t("common.english")}</SelectItem>
+                    <SelectItem value="es">{t("common.spanish")}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </CardContent>
-          </Card>
+
+              <Button type="submit" disabled={saving} className="gap-2">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save changes
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Future preferences - useful for scheduling service */}
+        <Card className="border-dashed opacity-75">
+          <CardHeader>
+            <CardTitle className="text-base font-medium text-muted-foreground">
+              More preferences (coming soon)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>Proposed settings for scheduling:</p>
+            <ul className="ml-4 list-disc space-y-0.5">
+              <li>Default city — for "find players near me" and default location in requests</li>
+              <li>Timezone — to show match times correctly</li>
+              <li>Default sport — tennis or padel for new scheduling requests</li>
+              <li>Default search radius — km for matching nearby players</li>
+              <li>WhatsApp reminders — toggle on/off for match reminders</li>
+              <li>Response window — default minutes to wait for invite replies</li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        {/* ==== COMMENTED OUT FOR V1 - Personal progress, stats, rivals, insights, level history, match history ==== */}
+        {/*
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal Progress</CardTitle>
+          </CardHeader>
+          <CardContent>...</CardContent>
+        </Card>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>Stats...</Card>
         </div>
-
-        {/* ==== TOP RIVALS ==== */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <Repeat className="h-5 w-5 text-primary" />
-              Top Rivals
-            </CardTitle>
+            <CardTitle>Top Rivals</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {mockRivals.map((rival, i) => {
-                const headToHead = `${rival.wins}-${rival.losses}`
-                const isAhead = rival.wins > rival.losses
-                const isTied = rival.wins === rival.losses
-                return (
-                  <div
-                    key={rival.player.id}
-                    className="flex items-center justify-between rounded-2xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
-                        #{i + 1}
-                      </div>
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
-                        {rival.player.name.split(" ").map((n) => n[0]).join("")}
-                      </div>
-                      <div>
-                        <p className="text-base font-semibold text-foreground">{rival.player.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Level {rival.player.levelValue.toFixed(1)} -- {rival.matchesPlayed} matches played
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className={`font-mono text-lg font-bold ${isAhead ? "text-primary" : isTied ? "text-muted-foreground" : "text-destructive"}`}>
-                          {headToHead}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {isAhead ? "You lead" : isTied ? "Tied" : "They lead"}
-                        </p>
-                      </div>
-                      <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                        <Link to="/suggested">
-                          <Swords className="h-4 w-4" />
-                          Rematch
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
+          <CardContent>...</CardContent>
         </Card>
-
-        {/* ==== PERFORMANCE INSIGHTS ==== */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <Lightbulb className="h-5 w-5 text-primary" />
-              Performance Insights
-            </CardTitle>
+            <CardTitle>Performance Insights</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {mockPerformanceInsights.map((insight) => {
-                const Icon = insightIcons[insight.icon] || Zap
-                const isExpanded = expandedInsight === insight.id
-                return (
-                  <button
-                    key={insight.id}
-                    type="button"
-                    onClick={() => setExpandedInsight(isExpanded ? null : insight.id)}
-                    className="w-full rounded-2xl border border-border/40 bg-muted/20 p-4 text-left transition-all hover:bg-muted/40"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                        <Icon className="h-4 w-4 text-primary" />
-                      </div>
-                      <p className="flex-1 text-base font-semibold text-foreground">{insight.text}</p>
-                      <ArrowRight className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                    </div>
-                    {isExpanded && (
-                      <p className="mt-3 pl-12 text-sm leading-relaxed text-muted-foreground">
-                        {insight.detail}
-                      </p>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-4 rounded-2xl bg-accent/60 px-4 py-3">
-              <p className="text-sm text-accent-foreground">
-                Want deeper analysis?{" "}
-                <Link to="/ai-coach/insights" className="font-semibold text-primary underline-offset-2 hover:underline">
-                  Open AI Player Insights
-                </Link>
-              </p>
-            </div>
-          </CardContent>
+          <CardContent>...</CardContent>
         </Card>
-
-        {/* Level History Chart */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-bold tracking-tight">Level History</CardTitle>
+            <CardTitle>Level History</CardTitle>
           </CardHeader>
-          <CardContent>
-            {(() => {
-              const BAR_AREA_HEIGHT = 120
-              const ratings = stats.ratingHistory.map((p) => p.rating)
-              const min = Math.min(...ratings)
-              const max = Math.max(...ratings)
-              const range = max - min || 0.5
-              return (
-                <div className="flex items-end gap-2">
-                  {stats.ratingHistory.map((point, i) => {
-                    const normalized = (point.rating - min) / range
-                    const barHeight = Math.max(normalized * BAR_AREA_HEIGHT, 8)
-                    return (
-                      <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {point.rating.toFixed(1)}
-                        </span>
-                        <div
-                          className="w-full rounded-t-lg bg-primary/20 transition-all hover:bg-primary/40"
-                          style={{ height: `${barHeight}px` }}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(point.date), "M/d")}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })()}
-          </CardContent>
+          <CardContent>...</CardContent>
         </Card>
-
-        {/* Match History */}
         <Card>
-          <CardHeader className="pb-0">
-            <Tabs defaultValue="competitive">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-bold tracking-tight">Match History</CardTitle>
-                <TabsList>
-                  <TabsTrigger value="competitive" className="text-sm">Competitive</TabsTrigger>
-                  <TabsTrigger value="practice" className="text-sm">Practice</TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value="competitive" className="mt-5">
-                {competitiveMatches.length === 0 ? (
-                  <p className="py-12 text-center text-base text-muted-foreground">No competitive matches yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {competitiveMatches.map((match) => {
-                      const opp = match.player1.userId === CURRENT_USER_ID ? match.player2 : match.player1
-                      const isWinner = match.result?.winnerId === "player-001"
-                      return (
-                        <Link
-                          key={match.id}
-                          to={`/matches/${match.id}`}
-                          className="flex items-center justify-between rounded-2xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${isWinner ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                              {isWinner ? "W" : "L"}
-                            </div>
-                            <div>
-                              <p className="text-base font-semibold text-foreground">vs {opp.name}</p>
-                              <p className="text-sm text-muted-foreground">{format(new Date(match.date), "MMM d, yyyy")}</p>
-                            </div>
-                          </div>
-                          {match.result && (
-                            <p className="font-mono text-base font-medium text-foreground">
-                              {match.result.sets.map((s) => `${s.player1Score}-${s.player2Score}`).join(" ")}
-                            </p>
-                          )}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="practice" className="mt-5">
-                {practiceMatches.length === 0 ? (
-                  <p className="py-12 text-center text-base text-muted-foreground">No practice matches yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {practiceMatches.map((match) => {
-                      const opp = match.player1.userId === CURRENT_USER_ID ? match.player2 : match.player1
-                      const isWinner = match.result?.winnerId === "player-001"
-                      return (
-                        <Link
-                          key={match.id}
-                          to={`/matches/${match.id}`}
-                          className="flex items-center justify-between rounded-2xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${isWinner ? "bg-practice/10 text-practice" : "bg-muted text-muted-foreground"}`}>
-                              {isWinner ? "W" : "L"}
-                            </div>
-                            <div>
-                              <p className="text-base font-semibold text-foreground">vs {opp.name}</p>
-                              <p className="text-sm text-muted-foreground">{format(new Date(match.date), "MMM d, yyyy")}</p>
-                            </div>
-                          </div>
-                          {match.result && (
-                            <p className="font-mono text-base font-medium text-foreground">
-                              {match.result.sets.map((s) => `${s.player1Score}-${s.player2Score}`).join(" ")}
-                            </p>
-                          )}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+          <CardHeader>
+            <CardTitle>Match History</CardTitle>
           </CardHeader>
+          <CardContent>...</CardContent>
         </Card>
+        */}
       </div>
     </>
   )

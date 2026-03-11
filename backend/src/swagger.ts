@@ -29,9 +29,16 @@ export const swaggerOptions = {
           properties: {
             name: { type: 'string', description: 'User name' },
             email: { type: 'string', description: 'User email' },
-            password: { type: 'string', description: 'User password' }
+            phone: { type: 'string', description: 'User phone' }
+          }
+        },
+        UpdateUserInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'User name' },
+            phone: { type: 'string', description: 'User phone' }
           },
-          required: ['name', 'email', 'password']
+          description: 'Email is read-only (managed by auth provider)'
         },
         Player: {
           type: 'object',

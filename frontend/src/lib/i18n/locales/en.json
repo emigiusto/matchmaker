@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Tennis MatchMaker",
+    "appName": "MatchMaker",
     "iWantToPlay": "I Want to Play",
     "logout": "Logout",
     "language": "Language",
@@ -24,6 +24,8 @@
     "personal": "Personal"
   },
   "dashboard": {
+    "pageTitle": "Dashboard",
+    "pageDescription": "Your invites and upcoming matches",
     "matchesToday": "Matches Today",
     "upcomingMatches": "Upcoming Matches",
     "pastMatches": "Past Matches",
@@ -157,6 +159,9 @@
     "unauthorized": "Unauthorized",
     "fieldRequired": "This field is required",
     "invalidEmail": "Invalid email address"
+  },
+  "footer": {
+    "tagline": "The simplest way to organize your tennis matches."
   },
   "success": {
     "saved": "Saved successfully",

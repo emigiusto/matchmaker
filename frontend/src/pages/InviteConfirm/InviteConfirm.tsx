@@ -159,13 +159,13 @@ export default function InviteLandingPage() {
       try {
         await invitesService.accept(token, currentUserId)
         setFlowState("accepted")
-        toast.success("Account created and invite accepted! Welcome to Tennis MatchMaker.")
+        toast.success("Account created and invite accepted! Welcome to MatchMaker.")
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to accept")
       }
     } else {
       setFlowState("accepted")
-      toast.success("Account created and invite accepted! Welcome to Tennis MatchMaker.")
+      toast.success("Account created and invite accepted! Welcome to MatchMaker.")
     }
   }
 
@@ -187,7 +187,7 @@ export default function InviteLandingPage() {
               <TennisBallIcon className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold tracking-tight text-foreground">
-              Tennis MatchMaker
+              MatchMaker
             </span>
           </div>
           <Button variant="outline" size="sm" className="hidden gap-1.5 sm:flex" asChild>
@@ -592,7 +592,7 @@ export default function InviteLandingPage() {
                       }
                     >
                       <Sparkles className="h-4 w-4" />
-                      Explore Tennis MatchMaker
+                      Explore MatchMaker
                     </Button>
                   </div>
                 )}
@@ -690,7 +690,7 @@ export default function InviteLandingPage() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
               <TennisBallIcon className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-sm font-semibold text-foreground">Tennis MatchMaker</span>
+            <span className="text-sm font-semibold text-foreground">MatchMaker</span>
           </div>
           <p className="text-sm text-muted-foreground">
             The simplest way to organize your tennis matches.

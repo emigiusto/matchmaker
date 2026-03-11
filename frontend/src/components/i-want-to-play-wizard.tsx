@@ -1053,7 +1053,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 </li>
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  You can run up to <strong>3 scheduling requests</strong> simultaneously
+                  You can run up to <strong>5 scheduling requests</strong> simultaneously
                 </li>
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />

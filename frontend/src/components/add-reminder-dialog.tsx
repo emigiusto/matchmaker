@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { format } from "date-fns"
-import { Bell, Calendar as CalendarIcon, Clock } from "lucide-react"
+import { Bell, Calendar as CalendarIcon, Clock, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { remindersService } from "@/lib/services/reminders.service"
 
 interface AddReminderDialogProps {
   matchId: string
@@ -26,6 +27,8 @@ interface AddReminderDialogProps {
   matchTime: string
   opponent: string
   location: string
+  /** User ID setting the reminder (must be match participant) */
+  userId: string
   /** Render prop for the trigger button so we can customise appearance per context */
   trigger?: React.ReactNode
 }
@@ -43,14 +46,28 @@ const presets = [
   { label: "1 week before", value: "1w" },
 ] as const
 
+const presetToMs: Record<string, number> = {
+  "30m": 30 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "2h": 2 * 60 * 60 * 1000,
+  "6h": 6 * 60 * 60 * 1000,
+  "12h": 12 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "2d": 2 * 24 * 60 * 60 * 1000,
+  "1w": 7 * 24 * 60 * 60 * 1000,
+}
+
 export function AddReminderDialog({
+  matchId,
   matchDate,
   matchTime,
   opponent,
   location,
+  userId,
   trigger,
 }: AddReminderDialogProps) {
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<ReminderMode>("preset")
   const [selectedPreset, setSelectedPreset] = useState<string>("24h")
 
@@ -85,12 +102,56 @@ export function AddReminderDialog({
     return "Custom"
   }
 
-  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+  function getMatchDateTime(): Date {
+    const firstTime = matchTime.split(/\s/)[0] || matchTime || "12:00"
+    const [h, m] = firstTime.split(":").map((n) => parseInt(n, 10) || 0)
+    return new Date(matchDate + `T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`)
+  }
+
+  function computeScheduledAt(): string {
+    const matchDt = getMatchDateTime()
+    if (mode === "preset") {
+      const ms = presetToMs[selectedPreset] ?? 24 * 60 * 60 * 1000
+      return new Date(matchDt.getTime() - ms).toISOString()
+    }
+    if (mode === "relative") {
+      const amount = parseInt(relativeAmount, 10) || 1
+      const factor = relativeUnit === "hours" ? amount * 60 * 60 * 1000 : amount * 24 * 60 * 60 * 1000
+      return new Date(matchDt.getTime() - factor).toISOString()
+    }
+    if (mode === "exact" && exactDate && exactTime) {
+      const [h, m] = exactTime.split(":").map((n) => parseInt(n, 10) || 0)
+      const d = new Date(exactDate)
+      d.setHours(h, m, 0, 0)
+      return d.toISOString()
+    }
+    throw new Error("Invalid reminder configuration")
+  }
+
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const label = getReminderLabel()
-    toast.success(`Reminder set: ${label} your match vs ${opponent}`)
-    setOpen(false)
-    resetForm()
+    setLoading(true)
+    try {
+      const scheduledAt = computeScheduledAt()
+      await remindersService.create({ userId, matchId, scheduledAt })
+      toast.success(`Reminder set: ${label} your match vs ${opponent}. We'll WhatsApp you.`)
+      setOpen(false)
+      resetForm()
+    } catch (err) {
+      let msg = "Failed to set reminder"
+      if (err instanceof Error) {
+        try {
+          const parsed = JSON.parse(err.message) as { error?: string }
+          msg = parsed.error ?? err.message
+        } catch {
+          msg = err.message
+        }
+      }
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const canSubmit =
@@ -265,8 +326,12 @@ export function AddReminderDialog({
             </div>
           )}
 
-          <Button type="submit" size="lg" className="w-full gap-2" disabled={!canSubmit}>
-            <Bell className="h-5 w-5" />
+          <Button type="submit" size="lg" className="w-full gap-2" disabled={!canSubmit || loading}>
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Bell className="h-5 w-5" />
+            )}
             Set Reminder
           </Button>
         </form>
