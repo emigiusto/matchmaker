@@ -7,6 +7,7 @@
 
 import * as dotenv from 'dotenv';
 import path from 'path';
+import bcrypt from 'bcryptjs';
 
 const backendDir = path.resolve(__dirname, '..');
 dotenv.config({ path: path.join(backendDir, '.env.local') });
@@ -18,12 +19,15 @@ import { randomBytes } from 'crypto';
 import { DEV_USER_ID, DEV_USER_2_ID } from '../prisma/seeders/users.seeder';
 
 const prisma = new PrismaClient();
+const SALT_ROUNDS = 10;
+const DEV_PASSWORD = process.env.DEV_USER_PASSWORD || 'dev123';
 
 function generateInviteToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
 async function ensureDevUsers() {
+  const passwordHash = bcrypt.hashSync(DEV_PASSWORD, SALT_ROUNDS);
   for (const [id, data] of [
     [DEV_USER_ID, { name: 'Alex Rivera', phone: '+34 600 000 001', email: 'alex@example.com' }],
     [DEV_USER_2_ID, { name: 'Jordan Kim', phone: '+34 600 000 002', email: 'jordan@example.com' }],
@@ -31,9 +35,15 @@ async function ensureDevUsers() {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       await prisma.user.create({
-        data: { id, ...data, isGuest: false },
+        data: { id, ...data, passwordHash, isGuest: false },
       });
       console.log(`Created dev user: ${data.name} (${id})`);
+    } else {
+      await prisma.user.update({
+        where: { id },
+        data: { passwordHash },
+      });
+      console.log(`Updated dev user ${data.name} with password for login`);
     }
   }
 }

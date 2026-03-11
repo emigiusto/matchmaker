@@ -16,14 +16,15 @@ const SALT_ROUNDS = 10;
 export async function signup(input: SignupInput): Promise<AuthResponse> {
   const { name, email, password } = input;
   const trimmedEmail = email.trim().toLowerCase();
-  if (!trimmedEmail || !password || password.length < 6) {
+  const trimmedPassword = password.trim();
+  if (!trimmedEmail || !trimmedPassword || trimmedPassword.length < 6) {
     throw new AppError('Email and password (min 6 characters) are required', 400);
   }
   const existing = await prisma.user.findUnique({ where: { email: trimmedEmail } });
   if (existing) {
     throw new AppError('An account with this email already exists', 409);
   }
-  const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
+  const passwordHash = bcrypt.hashSync(trimmedPassword, SALT_ROUNDS);
   const user = await prisma.user.create({
     data: {
       name: name?.trim() || null,
@@ -45,6 +46,7 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
 export async function login(input: LoginInput): Promise<AuthResponse> {
   const { email, password } = input;
   const trimmedEmail = email.trim().toLowerCase();
+  const trimmedPassword = password.trim();
   const user = await prisma.user.findUnique({ where: { email: trimmedEmail } });
   if (!user) {
     throw new AppError('Invalid email or password', 401);
@@ -52,7 +54,7 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   if (!user.passwordHash) {
     throw new AppError('This account has no password. Try signing in as guest or use another method.', 401);
   }
-  const valid = bcrypt.compareSync(password, user.passwordHash);
+  const valid = bcrypt.compareSync(trimmedPassword, user.passwordHash);
   if (!valid) {
     throw new AppError('Invalid email or password', 401);
   }

@@ -1,8 +1,11 @@
+import bcrypt from 'bcryptjs';
 import { faker } from '@faker-js/faker';
 import { batchInsert } from './batchInsert.util';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+const SALT_ROUNDS = 10;
+const DEV_PASSWORD = process.env.DEV_USER_PASSWORD || 'dev123';
 
 type UserSeed = {
   name: string;
@@ -22,6 +25,8 @@ export async function seedUsers() {
   const usedEmails = new Set<string>(['alex@example.com', 'jordan@example.com']);
   const users: UserSeed[] = [];
 
+  const devPasswordHash = bcrypt.hashSync(DEV_PASSWORD, SALT_ROUNDS);
+
   // Create primary dev user (fixed ID for frontend VITE_CURRENT_USER_ID)
   const devUser = await prisma.user.create({
     data: {
@@ -29,6 +34,7 @@ export async function seedUsers() {
       name: 'Alex Rivera',
       phone: '+34 600 000 001',
       email: 'alex@example.com',
+      passwordHash: devPasswordHash,
       isGuest: false,
     },
   });
@@ -40,6 +46,7 @@ export async function seedUsers() {
       name: 'Jordan Kim',
       phone: '+34 600 000 002',
       email: 'jordan@example.com',
+      passwordHash: devPasswordHash,
       isGuest: false,
     },
   });
