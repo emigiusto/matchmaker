@@ -101,20 +101,96 @@ export function adaptInvite(dto: BackendInviteDTO & { message?: string; fromPlay
   }
 }
 
+const BACKEND_TO_FRONTEND_TYPE: Record<string, Notification["type"]> = {
+  "invite.accepted": "invite_accepted",
+  "invite_received": "invite_received",
+  "match.created": "invite_accepted",
+  "match.completed": "match_completed",
+  "match.cancelled": "match_cancelled",
+  "result_pending": "result_pending",
+  "rating_change": "rating_change",
+}
+
+function deriveNotificationTitle(type: string, payload: Record<string, unknown>): string {
+  if (payload.title && typeof payload.title === "string") return payload.title
+  switch (type) {
+    case "invite.accepted":
+      return "Invite accepted"
+    case "match.created":
+      return "Match scheduled"
+    case "match.completed":
+      return "Match completed"
+    case "invite_received":
+      return "New invite"
+    case "result_pending":
+      return "Result pending"
+    case "rating_change":
+      return "Rating updated"
+    default:
+      return type.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  }
+}
+
+function deriveNotificationMessage(type: string, payload: Record<string, unknown>): string {
+  if (payload.message && typeof payload.message === "string") return payload.message
+  const scheduledAt = payload.scheduledAt
+  const dateStr =
+    scheduledAt && typeof scheduledAt === "string"
+      ? new Date(scheduledAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+      : (payload.date && typeof payload.date === "string"
+          ? new Date(payload.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+          : null)
+  const timeStr = payload.time && typeof payload.time === "string" ? payload.time : null
+  const location = payload.location && typeof payload.location === "string" ? payload.location : null
+  const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
+  switch (type) {
+    case "invite.accepted":
+      return dateStr ? `A match was scheduled for ${dateStr}` : "A match was scheduled."
+    case "match.created": {
+      const parts: string[] = []
+      if (opponents) parts.push(`vs ${opponents}`)
+      if (dateStr) parts.push(dateStr)
+      if (timeStr) parts.push(`at ${timeStr}`)
+      if (location) parts.push(`· ${location}`)
+      return parts.length > 0 ? parts.join(" ") : "Your match was scheduled."
+    }
+    case "match.completed":
+      return "Your match result was confirmed."
+    case "match.cancelled": {
+      const parts: string[] = []
+      if (dateStr) parts.push(dateStr)
+      if (timeStr) parts.push(`at ${timeStr}`)
+      if (location) parts.push(location)
+      return parts.length > 0 ? `Match cancelled: ${parts.join(" · ")}` : "Your match was cancelled."
+    }
+    case "invite_received":
+      return "You received a new match invite."
+    case "result_pending":
+      return "A result is awaiting your confirmation."
+    case "rating_change":
+      return "Your rating was updated."
+    default:
+      return ""
+  }
+}
+
 /**
  * Map backend NotificationDTO to frontend Notification
  */
 export function adaptNotification(dto: BackendNotificationDTO): Notification {
   const payload = (dto.payload ?? {}) as Record<string, unknown>
+  const frontendType = BACKEND_TO_FRONTEND_TYPE[dto.type] ?? ("invite_accepted" as Notification["type"])
   return {
     id: dto.id,
     userId: dto.userId,
-    type: dto.type as Notification["type"],
-    title: (payload.title as string) ?? dto.type,
-    message: (payload.message as string) ?? "",
+    type: frontendType,
+    title: deriveNotificationTitle(dto.type, payload),
+    message: deriveNotificationMessage(dto.type, payload),
     read: !!dto.readAt,
     createdAt: dto.createdAt,
-    metadata: payload as Record<string, string>,
+    metadata: Object.fromEntries(
+      Object.entries(payload).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
+    ),
   }
 }
 
@@ -157,6 +233,10 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
   const participants = dto.participants ?? []
   const teamA = participants.filter((p) => p.team === "A")
   const teamB = participants.filter((p) => p.team === "B")
+  const isDoubles = participants.length >= 4
+  const hasKnownTeams = teamA.length > 0 && teamB.length > 0
+  const showVsLayout = !isDoubles || hasKnownTeams
+
   // Use team reps when assigned, otherwise first two participants
   const p1 = teamA.length > 0 ? teamA[0] : participants[0]
   const p2 = teamB.length > 0 ? teamB[0] : participants[1]
@@ -187,5 +267,7 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
     location: dto.location ?? "",
     matchType: dto.type,
     status: dto.status as Match["status"],
+    participants: participants.map((p) => ({ userId: p.userId, userName: p.userName, team: p.team })),
+    showVsLayout,
   }
 }

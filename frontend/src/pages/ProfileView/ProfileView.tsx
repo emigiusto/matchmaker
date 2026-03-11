@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import { Link, useParams } from "react-router-dom"
 import {
   ArrowLeft,
@@ -6,17 +7,63 @@ import {
   UserPlus,
   Swords,
   Target,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
 import { toast } from "sonner"
-// TODO: wire to API — replace with playersService.getByUserId(userId)
-import { mockPlayers, CURRENT_USER_ID } from "@/lib/mock-data"
+import { playersService } from "@/lib/services/players.service"
+import { getCurrentUserId } from "@/lib/current-user"
+import type { Player } from "@/lib/types"
+
+// Backend returns displayName/defaultCity; map to frontend Player shape
+function adaptPlayer(dto: Record<string, unknown>): Player {
+  return {
+    id: dto.id as string,
+    userId: dto.userId as string,
+    name: (dto.displayName ?? dto.name ?? "Player") as string,
+    city: (dto.defaultCity ?? dto.city ?? "") as string,
+    latitude: (dto.latitude as number) ?? 0,
+    longitude: (dto.longitude as number) ?? 0,
+    levelValue: (dto.levelValue as number) ?? 0,
+    levelConfidence: (dto.levelConfidence as number) ?? 0,
+    rating: 0,
+    matchesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    ...dto,
+  }
+}
 
 export default function PlayerProfilePage() {
   const { userId } = useParams<{ userId: string }>()
-  const player = mockPlayers.find((p) => p.userId === userId)
+  const currentUserId = getCurrentUserId()
+  const [player, setPlayer] = useState<Player | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+    playersService
+      .getByUser(userId)
+      .then((dto) => setPlayer(adaptPlayer(dto as Record<string, unknown>)))
+      .catch(() => setPlayer(null))
+      .finally(() => setLoading(false))
+  }, [userId])
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title="Player Profile" />
+        <div className="flex flex-1 items-center justify-center p-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </>
+    )
+  }
 
   if (!player) {
     return (
@@ -29,7 +76,7 @@ export default function PlayerProfilePage() {
     )
   }
 
-  const isOwnProfile = player.userId === CURRENT_USER_ID
+  const isOwnProfile = !!currentUserId && player.userId === currentUserId
   const winRate = player.matchesPlayed > 0
     ? ((player.wins / player.matchesPlayed) * 100).toFixed(1)
     : "0"
@@ -38,7 +85,7 @@ export default function PlayerProfilePage() {
     <>
       <PageHeader title="Player Profile">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/rankings">
+          <Link to="/dashboard">
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
           </Link>
         </Button>

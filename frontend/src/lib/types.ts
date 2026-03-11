@@ -54,8 +54,12 @@ export interface Match {
   time: string
   location: string
   matchType: "competitive" | "practice"
-  status: "scheduled" | "awaiting_confirmation" | "completed" | "disputed"
+  status: "scheduled" | "awaiting_confirmation" | "completed" | "cancelled" | "disputed"
   result?: MatchResult
+  /** All participants (for doubles: always list all 4) */
+  participants?: { userId: string; userName?: string; team?: "A" | "B" | null }[]
+  /** False for doubles before result: teams unknown, hide vs layout */
+  showVsLayout?: boolean
 }
 
 export interface PostMatchQuestionnaire {
@@ -105,7 +109,7 @@ export interface SuggestedOpponent {
 export interface Notification {
   id: string
   userId: string
-  type: "invite_received" | "result_pending" | "match_completed" | "rating_change" | "invite_accepted"
+  type: "invite_received" | "result_pending" | "match_completed" | "rating_change" | "invite_accepted" | "match_cancelled"
   title: string
   message: string
   read: boolean

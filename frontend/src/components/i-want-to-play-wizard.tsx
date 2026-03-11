@@ -12,8 +12,6 @@ import {
   Clock,
   Users,
   CircleDot,
-  Swords,
-  Target,
   Copy,
   Check,
   Loader2,
@@ -106,8 +104,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [radius, setRadius] = useState(10)
   const [specificPlace, setSpecificPlace] = useState("")
   
-  // Step 2: Match type + format + sport
-  const [matchType, setMatchType] = useState<"competitive" | "practice">("competitive")
+  // Step 2: Match type + format + sport (v1: always practice; competitive/practice hidden)
+  const [matchType, setMatchType] = useState<"competitive" | "practice">("practice")
   const [matchFormat, setMatchFormat] = useState<"singles" | "doubles">("singles")
   const [sport, setSport] = useState<"tennis" | "padel">("tennis")
   
@@ -140,7 +138,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setLocation("My current location")
     setRadius(10)
     setSpecificPlace("")
-    setMatchType("competitive")
+    setMatchType("practice")
     setMatchFormat("singles")
     setSport("tennis")
     setResponseWindow(defaultResponseWindow)
@@ -347,13 +345,13 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold tracking-tight">
             {step === 1 && "When & Where"}
-            {step === 2 && "Match Type"}
+            {step === 2 && "Format & Sport"}
             {step === 3 && "Who to Invite"}
             {step === 4 && "Start Scheduling"}
           </DialogTitle>
           <DialogDescription className="sr-only">
             {step === 1 && "Set the date, time, and location for your match"}
-            {step === 2 && "Choose competitive or practice match"}
+            {step === 2 && "Choose sport and format"}
             {step === 3 && "Select and prioritize contacts to invite"}
             {step === 4 && "Review and start the automated invite sequence"}
           </DialogDescription>
@@ -609,45 +607,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               )}
             </div>
 
-            {/* Competitive / Practice */}
-            <div className="space-y-2">
-              <Label className="text-base font-medium">Mode</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setMatchType("competitive")}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
-                    matchType === "competitive"
-                      ? "border-primary bg-primary/5"
-                      : "border-border/50 hover:border-primary/30"
-                  )}
-                >
-                  <Swords className={cn("h-6 w-6", matchType === "competitive" ? "text-primary" : "text-muted-foreground")} />
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Competitive</p>
-                    <p className="text-xs text-muted-foreground">Track score & stats</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMatchType("practice")}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
-                    matchType === "practice"
-                      ? "border-[#22c55e] bg-[#22c55e]/5"
-                      : "border-border/50 hover:border-[#22c55e]/30"
-                  )}
-                >
-                  <Target className={cn("h-6 w-6", matchType === "practice" ? "text-[#22c55e]" : "text-muted-foreground")} />
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Practice</p>
-                    <p className="text-xs text-muted-foreground">Casual, no tracking</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-
+            {/* Competitive / Practice — hidden in v1, default to practice */}
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(1)}>
                 <ChevronLeft className="mr-1 h-5 w-5" />
@@ -1003,8 +963,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <span className="capitalize">{sport}</span>
                   <span className="text-muted-foreground">·</span>
                   <span className="capitalize">{matchFormat}</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="capitalize">{matchType}</span>
                 </div>
               </div>
             </div>

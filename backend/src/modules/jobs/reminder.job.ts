@@ -61,12 +61,21 @@ async function processPendingReminders() {
         continue;
       }
 
-      if (reminder.match.status === 'cancelled') {
+      // Only send reminders for matches that are confirmed (scheduled or awaiting confirmation)
+      const sendableStatuses = ['scheduled', 'awaiting_confirmation'];
+      if (!sendableStatuses.includes(reminder.match.status)) {
+        const errorMsg =
+          reminder.match.status === 'cancelled'
+            ? 'Match was cancelled'
+            : 'Match is no longer scheduled';
         await prisma.reminder.update({
           where: { id: reminder.id },
-          data: { status: 'failed', error: 'Match was cancelled' },
+          data: { status: 'failed', error: errorMsg },
         });
-        logger.info('ReminderSkippedMatchCancelled', { reminderId: reminder.id });
+        logger.info('ReminderSkippedMatchNotConfirmed', {
+          reminderId: reminder.id,
+          matchStatus: reminder.match.status,
+        });
         continue;
       }
 

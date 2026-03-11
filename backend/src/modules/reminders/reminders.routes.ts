@@ -7,5 +7,6 @@ const router = Router();
 
 router.post('/', RemindersController.create);
 router.get('/', RemindersController.listByUser);
+router.delete('/:id', RemindersController.delete);
 
 export default router;

@@ -6,11 +6,13 @@
 
 import { AppError } from '../../shared/errors/AppError';
 import { prisma } from '../../prisma';
+import { logger } from '../../config/logger';
 import { MatchDTO, CreateMatchInput } from './matches.types';
 import { Match, MatchStatus, Prisma } from '@prisma/client';
 import { RatingService } from '../rating/rating.service';
 import { createNotification } from '../notifications/notifications.service';
 import { validateResultMatchConsistency } from '../results/results.service';
+import { whatsappService } from '../whatsapp/whatsapp.service';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -28,7 +30,6 @@ export async function getMatchById(matchId: string): Promise<MatchDTO> {
     include: matchInclude,
   });
   if (!match) throw new AppError('Match not found', 404);
-  if (!match.invite) throw new AppError('Invariant violation: Match missing Invite', 500);
   if (!match.availability) throw new AppError('Invariant violation: Match missing Availability', 500);
   return toMatchDTO(match);
 }
@@ -111,6 +112,7 @@ export async function listUpcomingMatchesForUser(userId: string): Promise<MatchD
     where: {
       OR: orConditions,
       scheduledAt: { gt: now },
+      status: { not: 'cancelled' },
     },
     include: matchInclude,
     orderBy: { scheduledAt: 'asc' },
@@ -287,7 +289,7 @@ export async function completeMatch(matchId: string, currentUserId: string, isAd
  * Cancel a match (scheduled -> cancelled)
  * Only allowed if:
  *   - Match exists
- *   - Only the slot owner (availability.userId) can cancel
+ *   - User is a participant in the match
  *   - status is scheduled
  *   - Now is before scheduledAt
  * Throws AppError on invalid transition.
@@ -296,16 +298,20 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
   return await prisma.$transaction(async (tx) => {
     const match = await tx.match.findUnique({
       where: { id: matchId },
-      include: { availability: { select: { userId: true } } },
+      include: {
+        availability: { select: { userId: true } },
+        participants: { select: { userId: true } },
+      },
     });
     if (!match) throw new AppError('Match not found', 404);
     if (!('status' in match)) throw new AppError('Match missing status field (migration not applied)', 500);
     if (match.status !== 'scheduled') {
       throw new AppError('Match cannot be cancelled: not in scheduled state', 409);
     }
-    const ownerId = match.availability?.userId;
-    if (ownerId !== userId) {
-      throw new AppError('Only the slot owner can cancel this match', 403);
+    const participantUserIds = (match as any).participants?.map((p: { userId: string }) => p.userId) ?? [];
+    const isParticipant = participantUserIds.includes(userId);
+    if (!isParticipant) {
+      throw new AppError('Only participants can cancel this match', 403);
     }
     const now = new Date();
     if (now >= match.scheduledAt) {
@@ -317,7 +323,12 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
       data: { status: 'cancelled' as MatchStatus },
       include: matchInclude,
     });
-    return toMatchDTO(updated);
+    const dto = toMatchDTO(updated);
+    // Notify participants and WhatsApp group (outside tx; failures logged, don't affect cancel)
+    notifyMatchParticipantsOnCancel(updated as EnrichedMatch & { whatsappGroupId?: string | null }).catch((err) => {
+      logger.error('Failed to notify on match cancel', { matchId: updated.id, error: err instanceof Error ? err.message : String(err) });
+    });
+    return dto;
   });
 }
 
@@ -365,6 +376,82 @@ export async function createMatch(
     include: { participants: { include: { user: { select: { id: true, name: true } } } }, availability: true },
   });
   return toMatchDTO(match);
+}
+
+/**
+ * Notify all match participants that a match was cancelled.
+ * Creates in-app notifications and sends WhatsApp message to the group if it exists.
+ * Failures are logged but do not affect the cancel operation.
+ */
+async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsappGroupId?: string | null }): Promise<void> {
+  const av = match.availability;
+  const dateStr = av?.date ? new Date(av.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }) : 'TBD';
+  const timeStr = av?.startTime ? new Date(av.startTime).toTimeString().slice(0, 5) : '';
+  const location = av?.locationText ?? 'TBD';
+  const participants = (match as any).participants ?? [];
+
+  for (const p of participants) {
+    const payload = {
+      matchId: match.id,
+      date: av?.date ? new Date(av.date).toISOString().slice(0, 10) : undefined,
+      time: timeStr || undefined,
+      location,
+    };
+    try {
+      await createNotification(p.userId, 'match.cancelled', payload);
+    } catch (err) {
+      logger.error('Failed to create match.cancelled notification', {
+        userId: p.userId,
+        matchId: match.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const groupId = match.whatsappGroupId;
+  if (groupId && groupId.trim()) {
+    try {
+      const message = `⚠️ Match cancelled\n\n${dateStr}${timeStr ? ` at ${timeStr}` : ''}\n📍 ${location}\n\nThe match has been cancelled.`;
+      await whatsappService.sendGroupMessage(groupId, message);
+      logger.info('MatchCancelledWhatsAppSent', { matchId: match.id, groupId });
+    } catch (err) {
+      logger.error('Failed to send WhatsApp group message for cancelled match', {
+        matchId: match.id,
+        groupId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
+
+/**
+ * Notify all match participants that a match was created.
+ * Called as a side effect after match creation; failures are logged but do not affect the match.
+ */
+export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<void> {
+  for (const p of match.participants) {
+    const opponentNames = match.participants
+      .filter((o) => o.userId !== p.userId)
+      .map((o) => o.userName ?? 'Opponent')
+      .filter(Boolean);
+    const payload = {
+      matchId: match.id,
+      scheduledAt: match.scheduledAt,
+      location: match.location,
+      date: match.date,
+      time: match.time,
+      opponentNames: opponentNames.join(', '),
+    };
+    try {
+      await createNotification(p.userId, 'match.created', payload);
+    } catch (err) {
+      logger.error('Failed to create match.created notification', {
+        userId: p.userId,
+        matchId: match.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 }
 
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
+import { Link } from "react-router-dom"
 import {
   Calendar,
   Clock,
@@ -19,10 +20,10 @@ import {
   Link2,
   Copy,
   Check,
+  ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { MatchTypeBadge } from "@/components/match-type-badge"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
 import { AddContactsToInvite } from "@/components/add-contacts-to-invite"
 import {
@@ -49,6 +50,7 @@ export interface InviteRequest {
   sport: "tennis" | "padel"
   matchFormat: "singles" | "doubles"
   status: "scheduling" | "paused" | "matched" | "expired" | "cancelled"
+  matchId: string | null
   whatsappGroupId: string | null
   contacts: {
     id: string
@@ -110,6 +112,7 @@ function mapSchedulingToInviteRequest(
     sport: r.sportType,
     matchFormat: r.format,
     status: statusMap[r.status] ?? "scheduling",
+    matchId: r.matchId ?? null,
     whatsappGroupId: r.whatsappGroupId ?? null,
     contacts,
     currentIndex: r.currentCandidateIndex,
@@ -124,6 +127,10 @@ export interface InviteRequestsSectionProps {
   headerAction?: React.ReactNode
   /** When "standalone", renders PageHeader + padded content. Use for full pages like /play */
   variant?: "standalone" | "embedded"
+  /** When false, wizard is rendered by parent (e.g. Dashboard). Use when wizard must stay mounted across tab switches. */
+  renderWizard?: boolean
+  /** Increment to trigger a refetch of invites (e.g. after wizard completes in parent) */
+  refreshTrigger?: number
   pageTitle?: string
   pageDescription?: string
 }
@@ -134,6 +141,8 @@ export function InviteRequestsSection({
   setWizardOpen,
   headerAction,
   variant = "embedded",
+  renderWizard = true,
+  refreshTrigger,
   pageTitle = "Invites",
   pageDescription,
 }: InviteRequestsSectionProps) {
@@ -168,6 +177,12 @@ export function InviteRequestsSection({
   useEffect(() => {
     fetchSchedulingData(true).catch(() => {})
   }, [currentUserId])
+
+  useEffect(() => {
+    if (refreshTrigger != null && refreshTrigger > 0) {
+      fetchSchedulingData(false).catch(() => {})
+    }
+  }, [refreshTrigger])
 
   useEffect(() => {
     const hasActive = inviteRequests.some(
@@ -412,7 +427,6 @@ export function InviteRequestsSection({
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex flex-wrap items-center gap-2">
-                          <MatchTypeBadge type={request.matchType} />
                           <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium capitalize text-foreground">
                             {request.sport}
                           </span>
@@ -686,7 +700,15 @@ export function InviteRequestsSection({
                         )}
 
                       {request.status === "matched" && (
-                        <div className="mt-4">
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {request.matchId && (
+                            <Button size="sm" className="gap-1.5" asChild>
+                              <Link to={`/matches/${request.matchId}`}>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                Go to match
+                              </Link>
+                            </Button>
+                          )}
                           {request.whatsappGroupId ? (
                             <Button
                               size="sm"
@@ -767,22 +789,24 @@ export function InviteRequestsSection({
         content
       )}
 
-      <IWantToPlayWizard
-        open={wizardOpen}
-        onOpenChange={setWizardOpen}
-        hostUserId={currentUserId}
-        onSuccess={() => {
-          schedulingService
-            .listByHost(currentUserId)
-            .then((requestsRes) => {
-              const mapped = requestsRes
-                .map(mapSchedulingToInviteRequest)
-                .filter((r): r is InviteRequest => r !== null)
-              setInviteRequests(mapped)
-            })
-            .catch(() => {})
-        }}
-      />
+      {renderWizard && (
+        <IWantToPlayWizard
+          open={wizardOpen}
+          onOpenChange={setWizardOpen}
+          hostUserId={currentUserId}
+          onSuccess={() => {
+            schedulingService
+              .listByHost(currentUserId)
+              .then((requestsRes) => {
+                const mapped = requestsRes
+                  .map(mapSchedulingToInviteRequest)
+                  .filter((r): r is InviteRequest => r !== null)
+                setInviteRequests(mapped)
+              })
+              .catch(() => {})
+          }}
+        />
+      )}
 
       <AlertDialog
         open={!!acceptConfirm}

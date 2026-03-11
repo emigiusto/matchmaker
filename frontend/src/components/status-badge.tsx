@@ -4,6 +4,7 @@ const statusConfig = {
   scheduled: { label: "Scheduled", className: "border-0 bg-primary/10 text-primary text-sm" },
   awaiting_confirmation: { label: "Awaiting", className: "border-0 bg-chart-4/15 text-chart-4 text-sm" },
   completed: { label: "Completed", className: "border-0 bg-primary/10 text-primary text-sm" },
+  cancelled: { label: "Cancelled", className: "border-0 bg-destructive/10 text-destructive text-sm font-semibold" },
   disputed: { label: "Disputed", className: "border-0 bg-destructive/10 text-destructive text-sm" },
   pending: { label: "Pending", className: "border-0 bg-chart-4/15 text-chart-4 text-sm" },
   confirmed: { label: "Confirmed", className: "border-0 bg-primary/10 text-primary text-sm" },

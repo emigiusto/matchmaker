@@ -11,46 +11,26 @@ interface AddToCalendarButtonProps {
   date: string // "2026-02-19"
   time: string // "18:00"
   location: string
-  opponent: string
+  /** Participant names (2 for singles, 4 for doubles). Used in description. */
+  participants: string[]
   matchType: "competitive" | "practice"
   /** Render as compact icon-only button */
   compact?: boolean
 }
 
-function formatGoogleCalendarUrl({
-  date,
-  time,
-  location,
-  opponent,
-  matchType,
-}: AddToCalendarButtonProps): string {
-  // Parse date and time to create ISO datetime
-  const [year, month, day] = date.split("-")
-  const [hours, minutes] = time.split(":")
-  const startDate = `${year}${month}${day}T${hours}${minutes}00`
-  // Assume 1.5 hours for a match
-  const endHour = (parseInt(hours) + 1).toString().padStart(2, "0")
-  const endMin = (parseInt(minutes) + 30).toString().padStart(2, "0")
-  const endDate = `${year}${month}${day}T${endHour}${endMin}00`
-
-  const title = encodeURIComponent(
-    `Tennis ${matchType === "competitive" ? "Match" : "Practice"} vs ${opponent}`
-  )
-  const details = encodeURIComponent(
-    `${matchType === "competitive" ? "Competitive match" : "Practice session"} against ${opponent} at ${location}`
-  )
-  const loc = encodeURIComponent(location)
-
-  return `https://calendar.google.com/calendar/event?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${loc}`
+function buildCalendarParts(props: AddToCalendarButtonProps) {
+  const { participants, location } = props
+  const participantNames = participants.filter(Boolean)
+  const title = "Match"
+  const description =
+    participantNames.length > 0
+      ? `Participants: ${participantNames.join(", ")}\n\nLocation: ${location}`
+      : `Location: ${location}`
+  return { title, description }
 }
 
-function formatIcsContent({
-  date,
-  time,
-  location,
-  opponent,
-  matchType,
-}: AddToCalendarButtonProps): string {
+function formatGoogleCalendarUrl(props: AddToCalendarButtonProps): string {
+  const { date, time, location } = props
   const [year, month, day] = date.split("-")
   const [hours, minutes] = time.split(":")
   const startDate = `${year}${month}${day}T${hours}${minutes}00`
@@ -58,8 +38,20 @@ function formatIcsContent({
   const endMin = (parseInt(minutes) + 30).toString().padStart(2, "0")
   const endDate = `${year}${month}${day}T${endHour}${endMin}00`
 
-  const title = `Tennis ${matchType === "competitive" ? "Match" : "Practice"} vs ${opponent}`
-  const description = `${matchType === "competitive" ? "Competitive match" : "Practice session"} against ${opponent} at ${location}`
+  const { title, description } = buildCalendarParts(props)
+  return `https://calendar.google.com/calendar/event?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDate}/${endDate}&details=${encodeURIComponent(description)}&location=${encodeURIComponent(location)}`
+}
+
+function formatIcsContent(props: AddToCalendarButtonProps): string {
+  const { date, time, location } = props
+  const [year, month, day] = date.split("-")
+  const [hours, minutes] = time.split(":")
+  const startDate = `${year}${month}${day}T${hours}${minutes}00`
+  const endHour = (parseInt(hours) + 1).toString().padStart(2, "0")
+  const endMin = (parseInt(minutes) + 30).toString().padStart(2, "0")
+  const endDate = `${year}${month}${day}T${endHour}${endMin}00`
+
+  const { title, description } = buildCalendarParts(props)
 
   return [
     "BEGIN:VCALENDAR",
@@ -81,7 +73,8 @@ function downloadIcs(props: AddToCalendarButtonProps) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url
-  link.download = `match-vs-${props.opponent.replace(/\s/g, "-").toLowerCase()}.ics`
+  const slug = props.participants.filter(Boolean).join("-").replace(/\s/g, "-").toLowerCase() || "match"
+  link.download = `${slug.slice(0, 50)}.ics`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

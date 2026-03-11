@@ -55,6 +55,7 @@ import { CreateInviteInput, InviteDTO } from './invite.types';
 import { generateInviteToken, getInviteExpiration, isInviteExpired } from './invite.token';
 import { isPending } from './invite.model';
 import { createNotification } from '../notifications/notifications.service';
+import { getMatchById, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
 import { logger } from '../../config/logger';
 import { AvailabilityService } from '../availabilities/availability.service';
 import { MatchType } from '../matches/matches.types';
@@ -304,6 +305,19 @@ export class InviteService {
         inviteId: updatedInviteDTO.id,
         error: err instanceof Error ? err.message : err
       });
+    }
+
+    // Notify all match participants that a match was created
+    if (updatedInviteDTO.matchId) {
+      try {
+        const match = await getMatchById(updatedInviteDTO.matchId);
+        await notifyMatchParticipantsOnCreate(match);
+      } catch (err) {
+        logger.error('Failed to notify match participants', {
+          matchId: updatedInviteDTO.matchId,
+          error: err instanceof Error ? err.message : err
+        });
+      }
     }
 
     return updatedInviteDTO;

@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
-import { MatchTypeBadge } from "@/components/match-type-badge"
 import { InviteRequestsSection } from "@/components/invite-requests-section"
+import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { ResultUploadDialog } from "@/components/result-upload-dialog"
@@ -30,6 +30,7 @@ function safeFormatDate(
 export default function Dashboard() {
   const currentUserId = getCurrentUserId()
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [invitesRefreshTrigger, setInvitesRefreshTrigger] = useState(0)
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([])
   const [matchesLoading, setMatchesLoading] = useState(true)
   const { t } = useTranslation()
@@ -57,7 +58,9 @@ export default function Dashboard() {
   const matchesToday = upcomingMatches.filter(
     (m) => m.date === today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
   )
-  const matchesLater = upcomingMatches.filter((m) => m.date !== today)
+  const matchesLater = upcomingMatches.filter(
+    (m) => m.date !== today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
+  )
 
   return (
     <>
@@ -133,6 +136,8 @@ export default function Dashboard() {
               wizardOpen={wizardOpen}
               setWizardOpen={setWizardOpen}
               variant="embedded"
+              renderWizard={false}
+              refreshTrigger={invitesRefreshTrigger}
             />
           </TabsContent>
 
@@ -152,6 +157,10 @@ export default function Dashboard() {
                 <p className="mt-1 text-center text-sm text-muted-foreground">
                   Create invites to schedule your next match
                 </p>
+                <Button size="lg" className="mt-6 gap-2" onClick={() => setWizardOpen(true)}>
+                  <Zap className="h-5 w-5" />
+                  I Want to Play
+                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -174,12 +183,11 @@ export default function Dashboard() {
                           key={match.id}
                           className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 p-4 backdrop-blur-sm"
                         >
-                          <div className="flex-1">
+                          <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-base font-semibold text-foreground">
                                 vs {opponent.name}
                               </p>
-                              <MatchTypeBadge type={match.matchType} />
                             </div>
                             <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1.5">
@@ -191,8 +199,8 @@ export default function Dashboard() {
                                 {match.location}
                               </span>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
+                          </Link>
+                          <div className="flex items-center gap-2 shrink-0">
                             <AddReminderDialog
                               matchId={match.id}
                               matchDate={match.date}
@@ -205,7 +213,11 @@ export default function Dashboard() {
                               date={match.date}
                               time={match.time}
                               location={match.location}
-                              opponent={opponent.name}
+                              participants={
+                                (match.participants ?? []).length >= 4
+                                  ? (match.participants ?? []).map((p) => p.userName ?? "").filter(Boolean)
+                                  : [match.player1.name, match.player2.name]
+                              }
                               matchType={match.matchType}
                               compact
                             />
@@ -236,12 +248,11 @@ export default function Dashboard() {
                           key={match.id}
                           className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
                         >
-                          <div className="flex-1">
+                          <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-base font-semibold text-foreground">
                                 vs {opponent.name}
                               </p>
-                              <MatchTypeBadge type={match.matchType} />
                             </div>
                             <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1.5">
@@ -257,8 +268,8 @@ export default function Dashboard() {
                                 {match.location}
                               </span>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
+                          </Link>
+                          <div className="flex items-center gap-2 shrink-0">
                             <AddReminderDialog
                               matchId={match.id}
                               matchDate={match.date}
@@ -271,7 +282,11 @@ export default function Dashboard() {
                               date={match.date}
                               time={match.time}
                               location={match.location}
-                              opponent={opponent.name}
+                              participants={
+                                (match.participants ?? []).length >= 4
+                                  ? (match.participants ?? []).map((p) => p.userName ?? "").filter(Boolean)
+                                  : [match.player1.name, match.player2.name]
+                              }
                               matchType={match.matchType}
                               compact
                             />
@@ -287,6 +302,13 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <IWantToPlayWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        hostUserId={currentUserId}
+        onSuccess={() => setInvitesRefreshTrigger((t) => t + 1)}
+      />
     </>
   )
 }

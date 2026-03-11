@@ -8,7 +8,6 @@ import {
   CheckCircle,
   XCircle,
   Users,
-  Trophy,
   TrendingUp,
   BarChart3,
   ArrowRight,
@@ -41,14 +40,14 @@ const mockInviteData: Invite & { message?: string; fromPlayerLevel?: number; fro
   fromPlayerMatches: 35,
   fromPlayerWins: 20,
   availabilityId: "avail-001",
-  matchType: "competitive",
+  matchType: "practice",
   date: "2026-02-25",
   time: "18:00",
   location: "Club Tennis Barcelona",
   status: "pending",
   isOpen: false,
   createdAt: new Date().toISOString(),
-  message: "Hey! Want to play a competitive match next Tuesday? I reserved a clay court at Club Tennis Barcelona.",
+  message: "Hey! Want to play next Tuesday? I reserved a clay court at Club Tennis Barcelona.",
 }
 
 function TennisBallIcon({ className }: { className?: string }) {
@@ -213,8 +212,7 @@ export default function InviteLandingPage() {
             {"You've been invited to play"}
           </h1>
           <p className="mx-auto mt-3 max-w-md text-pretty text-base text-muted-foreground lg:text-lg">
-            {displayInvite.fromPlayerName} wants to play a{" "}
-            {displayInvite.matchType === "competitive" ? "competitive" : "practice"} match with you
+            {displayInvite.fromPlayerName} wants to play a match with you
           </p>
         </div>
 
@@ -263,7 +261,7 @@ export default function InviteLandingPage() {
 
               <CardContent className="p-6">
                 {/* Match details grid */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <div className="rounded-xl bg-muted/40 p-4 text-center">
                     <Calendar className="mx-auto mb-2 h-5 w-5 text-primary" />
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -286,15 +284,6 @@ export default function InviteLandingPage() {
                       Location
                     </p>
                     <p className="mt-1 text-sm font-bold text-foreground">{displayInvite.location}</p>
-                  </div>
-                  <div className="rounded-xl bg-muted/40 p-4 text-center">
-                    <Trophy className="mx-auto mb-2 h-5 w-5 text-primary" />
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Type
-                    </p>
-                    <p className="mt-1 text-base font-bold capitalize text-foreground">
-                      {displayInvite.matchType}
-                    </p>
                   </div>
                 </div>
 

@@ -23,4 +23,9 @@ export const matchesService = {
     const dto = await apiClient.get<BackendMatchDTO>(`/matches/${matchId}`)
     return adaptMatch(dto)
   },
+
+  async cancel(matchId: string, userId: string): Promise<Match> {
+    const dto = await apiClient.post<BackendMatchDTO>(`/matches/${matchId}/cancel`, { userId })
+    return adaptMatch(dto)
+  },
 }

@@ -7,7 +7,7 @@ import { AppError } from '../../shared/errors/AppError';
 import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
-import { createMatch, cancelMatch } from '../matches/matches.service';
+import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
 import type {
   CreateSchedulingRequestInput,
   SchedulingRequestDTO,
@@ -484,6 +484,9 @@ export const schedulingService = {
     });
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
+
+    // Notify all match participants
+    await notifyMatchParticipantsOnCreate(match);
 
     const userIdsForWhatsApp = match.participants.map((p) => p.userId);
     const uniqueUserIds = [...new Set(userIdsForWhatsApp)];

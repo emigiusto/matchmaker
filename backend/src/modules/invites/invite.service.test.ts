@@ -44,6 +44,19 @@ vi.mock('../availabilities/availability.service', () => ({
   },
 }));
 
+// Mock matches.service (getMatchById, notifyMatchParticipantsOnCreate)
+vi.mock('../matches/matches.service', () => ({
+  getMatchById: vi.fn().mockResolvedValue({
+    id: 'match1',
+    participants: [{ userId: 'userA' }, { userId: 'userB' }],
+    scheduledAt: new Date().toISOString(),
+    location: '',
+    date: '',
+    time: '',
+  }),
+  notifyMatchParticipantsOnCreate: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ------------------------------------------------------
 // Base Fixtures
 // ------------------------------------------------------

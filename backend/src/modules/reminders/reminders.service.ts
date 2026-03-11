@@ -31,8 +31,14 @@ export async function createReminder(input: CreateReminderInput) {
   });
 
   if (!match) throw new AppError('Match not found', 404);
-  if (match.status === 'cancelled') {
-    throw new AppError('Cannot set reminder for cancelled match', 400);
+  const sendableStatuses = ['scheduled', 'awaiting_confirmation'];
+  if (!sendableStatuses.includes(match.status)) {
+    throw new AppError(
+      match.status === 'cancelled'
+        ? 'Cannot set reminder for cancelled match'
+        : 'Reminders are only available for scheduled matches',
+      400
+    );
   }
 
   const isParticipant = match.participants.some((p) => p.userId === userId);
@@ -60,5 +66,24 @@ export async function listRemindersByUser(userId: string) {
     where: { userId },
     include: { match: { include: { availability: true } } },
     orderBy: { scheduledAt: 'asc' },
+  });
+}
+
+/**
+ * Delete a reminder. Only pending reminders can be deleted.
+ */
+export async function deleteReminder(reminderId: string, userId: string): Promise<void> {
+  const reminder = await prisma.reminder.findUnique({
+    where: { id: reminderId },
+  });
+  if (!reminder) throw new AppError('Reminder not found', 404);
+  if (reminder.userId !== userId) {
+    throw new AppError('You can only delete your own reminders', 403);
+  }
+  if (reminder.status !== 'pending') {
+    throw new AppError('Only pending reminders can be deleted', 400);
+  }
+  await prisma.reminder.delete({
+    where: { id: reminderId },
   });
 }

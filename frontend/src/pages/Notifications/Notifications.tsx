@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { Link } from "react-router-dom"
 import {
   Bell,
   Mail,
@@ -6,13 +7,15 @@ import {
   TrendingUp,
   Swords,
   Check,
+  Loader2,
+  ArrowRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
-// TODO: wire to API — replace with notificationsService.list()
-import { mockNotifications } from "@/lib/mock-data"
+import { notificationsService } from "@/lib/services/notifications.service"
 import type { Notification } from "@/lib/types"
+import { getCurrentUserId } from "@/lib/current-user"
 import { formatDistanceToNow } from "date-fns"
 
 const iconMap: Record<string, typeof Bell> = {
@@ -24,17 +27,59 @@ const iconMap: Record<string, typeof Bell> = {
 }
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications)
+  const currentUserId = getCurrentUserId()
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
   const unreadCount = notifications.filter((n) => !n.read).length
 
-  function handleMarkRead(id: string) {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    )
+  useEffect(() => {
+    let cancelled = false
+    notificationsService
+      .getAll(currentUserId)
+      .then((data) => {
+        if (!cancelled) setNotifications(data)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [currentUserId])
+
+  async function handleMarkRead(id: string) {
+    try {
+      const updated = await notificationsService.markAsRead(id)
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? updated : n))
+      )
+    } catch {
+      // Optimistic revert handled by not updating on error
+    }
   }
 
-  function handleMarkAllRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  async function handleMarkAllRead() {
+    const unread = notifications.filter((n) => !n.read)
+    if (unread.length === 0) return
+    try {
+      await notificationsService.markAllAsRead(notifications)
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, read: true }))
+      )
+    } catch {
+      // Partial failure: refresh list
+      const data = await notificationsService.getAll(currentUserId)
+      setNotifications(data)
+    }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title="Notifications" description="" />
+        <div className="flex flex-1 items-center justify-center p-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </>
+    )
   }
 
   return (
@@ -114,6 +159,15 @@ export default function NotificationsPage() {
                         addSuffix: true,
                       })}
                     </p>
+                    {notification.metadata?.matchId && (
+                      <Link
+                        to={`/matches/${notification.metadata.matchId}`}
+                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                      >
+                        View match
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>

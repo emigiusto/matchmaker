@@ -3,7 +3,6 @@ import { format } from "date-fns"
 import { Calendar, MapPin, TrendingUp, Clock as ClockIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
-import { MatchTypeBadge } from "@/components/match-type-badge"
 // TODO: wire to API — replace with matchesService.getPast()
 import { mockMatches, CURRENT_USER_ID } from "@/lib/mock-data"
 
@@ -48,7 +47,6 @@ export default function PastMatchesPage() {
                             <p className="text-base font-semibold text-foreground">
                               vs {opponent.name}
                             </p>
-                            <MatchTypeBadge type={match.matchType} />
                           </div>
                           <div className="mt-2 flex items-center gap-5 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1.5">

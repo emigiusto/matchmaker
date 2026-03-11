@@ -145,7 +145,7 @@ export class MatchesController {
   /**
    * POST /matches/:id/cancel
    * Cancel a match (scheduled -> cancelled)
-   * Only hostUserId can cancel
+   * Any participant can cancel
    */
   static async cancelMatch(req: Request, res: Response, next: NextFunction) {
     try {
@@ -175,6 +175,7 @@ export class MatchesController {
         return res.status(400).json({ error: 'Invalid match type. Must be "competitive" or "practice".' });
       }
       const match = await MatchesService.createMatch(input);
+      await MatchesService.notifyMatchParticipantsOnCreate(match);
       return res.status(201).json(match);
     } catch (error) {
       next(error);

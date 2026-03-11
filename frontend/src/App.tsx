@@ -12,9 +12,9 @@ import MatchesUpcoming from '@/pages/MatchesUpcoming/MatchesUpcoming'
 // Disabled for v1 - components kept for future use
 // import Suggested from '@/pages/Suggested/Suggested'
 // import MatchesPast from '@/pages/MatchesPast/MatchesPast'
-// import MatchDetails from '@/pages/MatchDetails/MatchDetails'
+import MatchDetails from '@/pages/MatchDetails/MatchDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
-// import ProfileView from '@/pages/ProfileView/ProfileView'
+import ProfileView from '@/pages/ProfileView/ProfileView'
 // import Reminders from '@/pages/Reminders/Reminders'
 // import AiCoachCompanion from '@/pages/AiCoachCompanion/AiCoachCompanion'
 // import AiCoachInsights from '@/pages/AiCoachInsights/AiCoachInsights'
@@ -41,9 +41,9 @@ function App() {
               {/* Disabled for v1 - components kept for future use */}
               {/* <Route path="/suggested" element={<Suggested />} /> */}
               {/* <Route path="/matches/past" element={<MatchesPast />} /> */}
-              {/* <Route path="/matches/:id" element={<MatchDetails />} /> */}
+              <Route path="/matches/:id" element={<MatchDetails />} />
               {/* <Route path="/rankings" element={<Rankings />} /> */}
-              {/* <Route path="/profile/:userId" element={<ProfileView />} /> */}
+              <Route path="/profile/:userId" element={<ProfileView />} />
               {/* <Route path="/reminders" element={<Reminders />} /> */}
               {/* <Route path="/ai-coach/companion" element={<AiCoachCompanion />} /> */}
               {/* <Route path="/ai-coach/insights" element={<AiCoachInsights />} /> */}

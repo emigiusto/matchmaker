@@ -31,6 +31,8 @@ interface AddReminderDialogProps {
   userId: string
   /** Render prop for the trigger button so we can customise appearance per context */
   trigger?: React.ReactNode
+  /** Called after a reminder is successfully created */
+  onSuccess?: () => void
 }
 
 type ReminderMode = "preset" | "relative" | "exact"
@@ -65,6 +67,7 @@ export function AddReminderDialog({
   location,
   userId,
   trigger,
+  onSuccess,
 }: AddReminderDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -138,6 +141,7 @@ export function AddReminderDialog({
       toast.success(`Reminder set: ${label} your match vs ${opponent}. We'll WhatsApp you.`)
       setOpen(false)
       resetForm()
+      onSuccess?.()
     } catch (err) {
       let msg = "Failed to set reminder"
       if (err instanceof Error) {

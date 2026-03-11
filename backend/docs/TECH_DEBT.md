@@ -4,6 +4,24 @@ Items técnicos pendientes o mejoras identificadas.
 
 ---
 
+## Competitive / Practice – Reintroducir en la UI
+
+**Prioridad:** Media  
+**Módulo:** `frontend`
+
+En la v1, la distinción Competitive/Practice está oculta: todos los partidos e invites se crean como **practice** por defecto. No se muestra el selector ni los badges en la UI.
+
+**Propuesta para reintroducir:**
+
+1. **I Want to Play wizard** – Restaurar el paso 2 (o el bloque dentro de él) que permite elegir Competitive vs Practice.
+2. **MatchTypeBadge** – Volver a usar en: Dashboard, Matches, MatchDetails, MatchesPast, InviteRequestsSection.
+3. **InviteConfirm** – Mostrar tipo de partido (competitive/practice) en el mensaje y en la tarjeta de detalles.
+4. **AddToCalendarButton** – Restaurar títulos diferenciados (“Competitive match” vs “Practice session”).
+5. **Suggested** – Restaurar el filtro por tipo de partido.
+6. **i18n** – Las claves `matchType`, `competitive`, `practice` ya existen en los locales.
+
+---
+
 ## WhatsApp Webhook – Verificación de firma
 
 **Prioridad:** Media  

@@ -1,13 +1,6 @@
 import { useState } from "react"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
 import { SuggestionCard } from "@/components/suggestion-card"
@@ -18,15 +11,11 @@ import { SlidersHorizontal } from "lucide-react"
 export default function SuggestedOpponentsPage() {
   const [distanceRadius, setDistanceRadius] = useState([10])
   const [levelRange, setLevelRange] = useState([2.0, 6.0])
-  const [matchType, setMatchType] = useState("all")
-
   const filtered = mockSuggestions.filter((s) => {
     const matchDist = s.distance <= distanceRadius[0]
     const matchLevel =
       s.player.levelValue >= levelRange[0] && s.player.levelValue <= levelRange[1]
-    const matchTypeFilter =
-      matchType === "all" || true // backend would handle this
-    return matchDist && matchLevel && matchTypeFilter
+    return matchDist && matchLevel
   })
 
   return (
@@ -70,19 +59,7 @@ export default function SuggestedOpponentsPage() {
                   onValueChange={setLevelRange}
                 />
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Match Type</Label>
-                <Select value={matchType} onValueChange={setMatchType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="competitive">Competitive</SelectItem>
-                    <SelectItem value="practice">Practice</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Match type filter hidden in v1; default to practice */}
             </CardContent>
           </Card>
 

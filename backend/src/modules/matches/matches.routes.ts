@@ -228,7 +228,7 @@ router.post('/:id/complete', MatchesController.completeMatch);
  *             properties:
  *               userId:
  *                 type: string
- *                 description: Host user ID
+ *                 description: User ID of the participant requesting cancellation
  *     responses:
  *       200:
  *         description: Match cancelled
@@ -237,7 +237,7 @@ router.post('/:id/complete', MatchesController.completeMatch);
  *             schema:
  *               $ref: '#/components/schemas/Match'
  *       403:
- *         description: Only host can cancel
+ *         description: Only participants can cancel
  *       409:
  *         description: Invalid transition
  */

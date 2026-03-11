@@ -42,4 +42,22 @@ export class RemindersController {
       next(err);
     }
   }
+
+  /**
+   * DELETE /reminders/:id?userId=...
+   * Delete a pending reminder
+   */
+  static async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { userId } = req.query;
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'Missing or invalid userId' });
+      }
+      await RemindersService.deleteReminder(id, userId);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  }
 }
