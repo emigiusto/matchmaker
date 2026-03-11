@@ -8,12 +8,20 @@ import { getHealthStats } from './health.service';
  * @openapi
  * /:
  *   get:
- *     summary: Health stats
- *     description: Returns API health status, uptime, and basic stats (DB counts, Redis, etc.)
+ *     summary: Health stats (root)
+ *     description: Returns API health status, uptime, DB and Redis connectivity
+ *     tags: [Health]
+ *     responses:
+ *       200: { description: API is healthy }
+ *       503: { description: API is down (database unreachable) }
+ * /health:
+ *   get:
+ *     summary: Health check
+ *     description: Returns API health status, uptime, DB and Redis connectivity. Use for monitoring and load balancer probes.
  *     tags: [Health]
  *     responses:
  *       200:
- *         description: API is healthy
+ *         description: API is healthy (or degraded if Redis down but DB up)
  *         content:
  *           application/json:
  *             schema:

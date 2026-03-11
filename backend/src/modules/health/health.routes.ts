@@ -7,5 +7,6 @@ import { HealthController } from './health.controller';
 const router = Router();
 
 router.get('/', HealthController.index);
+router.get('/health', HealthController.index);
 
 export default router;
