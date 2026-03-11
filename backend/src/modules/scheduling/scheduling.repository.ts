@@ -61,6 +61,7 @@ export const schedulingRepository = {
         hostUser: true,
         hostPartner: true,
         candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } },
+        match: { select: { whatsappGroupId: true } },
       },
     });
   },
@@ -181,6 +182,7 @@ export const schedulingRepository = {
         hostUser: true,
         hostPartner: true,
         candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } },
+        match: { select: { whatsappGroupId: true } },
       },
     });
   },

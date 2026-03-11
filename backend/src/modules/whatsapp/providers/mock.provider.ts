@@ -1,7 +1,11 @@
 // mock.provider.ts
 // Mock WhatsApp provider for development and testing - logs all actions instead of calling real API
 
-import type { IWhatsAppProvider, CreateMatchGroupInput } from '../whatsapp.provider.interface';
+import type {
+  IWhatsAppProvider,
+  CreateMatchGroupInput,
+  GroupWithParticipants,
+} from '../whatsapp.provider.interface';
 import type {
   SendMessageResult,
   CreateGroupResult,
@@ -27,6 +31,15 @@ export class MockWhatsAppProvider implements IWhatsAppProvider {
       botPhone: input.botPhone,
     });
     return { success: true, groupId: `mock-group-${Date.now()}` };
+  }
+
+  async listGroupsWithParticipants(): Promise<GroupWithParticipants[]> {
+    return [];
+  }
+
+  async updateGroupSubject(groupId: string, subject: string): Promise<SendMessageResult> {
+    logger.info('[MOCK WhatsApp] updateGroupSubject', { groupId, subject });
+    return { success: true };
   }
 
   async sendGroupMessage(groupId: string, message: string): Promise<SendMessageResult> {

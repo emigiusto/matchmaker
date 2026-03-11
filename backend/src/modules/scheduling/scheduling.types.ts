@@ -57,6 +57,7 @@ export interface SchedulingRequestDTO {
   status: SchedulingRequestStatus;
   currentCandidateIndex: number;
   matchId: string | null;
+  whatsappGroupId: string | null;
   createdAt: string;
   updatedAt: string;
   candidates?: SchedulingCandidateDTO[];

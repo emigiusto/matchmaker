@@ -14,10 +14,25 @@ export interface CreateMatchGroupInput {
   botPhone?: string;
 }
 
+export interface GroupWithParticipants {
+  groupId: string;
+  participantPhones: string[];
+}
+
 export interface IWhatsAppProvider {
   sendInviteMessage(phoneNumber: string, message: string): Promise<SendMessageResult>;
   createMatchGroup(input: CreateMatchGroupInput): Promise<CreateGroupResult>;
   sendGroupMessage(groupId: string, message: string): Promise<SendMessageResult>;
+
+  /**
+   * List all groups the bot is in, with their participant phone numbers (digits only).
+   */
+  listGroupsWithParticipants(): Promise<GroupWithParticipants[]>;
+
+  /**
+   * Update the group subject/name. Requires admin.
+   */
+  updateGroupSubject(groupId: string, subject: string): Promise<SendMessageResult>;
 
   /**
    * Parse provider-specific webhook body into normalized incoming message.

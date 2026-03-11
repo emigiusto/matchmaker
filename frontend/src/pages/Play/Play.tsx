@@ -50,6 +50,7 @@ interface InviteRequest {
   sport: "tennis" | "padel"
   matchFormat: "singles" | "doubles"
   status: "scheduling" | "paused" | "matched" | "expired" | "cancelled"
+  whatsappGroupId: string | null
   contacts: {
     id: string
     contactUserId: string
@@ -110,6 +111,7 @@ function mapSchedulingToInviteRequest(
     sport: r.sportType,
     matchFormat: r.format,
     status: statusMap[r.status] ?? "scheduling",
+    whatsappGroupId: r.whatsappGroupId ?? null,
     contacts,
     currentIndex: r.currentCandidateIndex,
   }
@@ -171,7 +173,8 @@ export default function PlayPage() {
     return true
   })
 
-  function switchToFilterForStatus(status: InviteRequest["status"]) {
+  function switchToFilterForStatus(status: InviteRequest["status"], forceSwitch = false) {
+    if (inviteFilter === "all" && !forceSwitch) return
     if (status === "scheduling" || status === "paused") setInviteFilter("scheduling")
     else if (status === "expired") setInviteFilter("no_match")
     else if (status === "cancelled") setInviteFilter("cancelled")
@@ -221,7 +224,7 @@ export default function PlayPage() {
         setInviteRequests((prev) =>
           prev.map((r) => (r.id === id ? mapped : r))
         )
-        switchToFilterForStatus(mapped.status)
+        switchToFilterForStatus(mapped.status, true)
       }
       toast.success("Invite request cancelled")
     } catch (e) {
@@ -373,7 +376,7 @@ export default function PlayPage() {
               {f === "all" && "Active"}
               {f === "scheduling" && "Scheduling"}
               {f === "no_match" && "No Match"}
-              {f === "completed" && "Completed"}
+              {f === "completed" && "Confirmed"}
               {f === "cancelled" && "Cancelled"}
             </Button>
           ))}
@@ -410,7 +413,7 @@ export default function PlayPage() {
                       ? "No expired invites"
                       : inviteFilter === "cancelled"
                       ? "No cancelled invites"
-                      : "No completed matches"}
+                      : "No confirmed matches"}
                   </p>
                   <p className="mt-1 text-base text-muted-foreground">
                     {inviteRequests.length === 0 ? "Tap \"I Want to Play\" to create your first invite" : "Try another filter"}
@@ -665,10 +668,32 @@ export default function PlayPage() {
 
                       {request.status === "matched" && (
                         <div className="mt-4">
-                          <Button size="sm" className="gap-1.5 bg-[#25D366] text-white hover:bg-[#25D366]/90">
-                            <CheckCircle className="h-3.5 w-3.5" />
-                            Open WhatsApp Group
-                          </Button>
+                          {request.whatsappGroupId ? (
+                            <Button
+                              size="sm"
+                              className="gap-1.5 bg-[#25D366] text-white hover:bg-[#25D366]/90"
+                              asChild
+                            >
+                              <a
+                                href={`https://chat.whatsapp.com/${request.whatsappGroupId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                Open WhatsApp Group
+                              </a>
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="gap-1.5 bg-[#25D366] text-white hover:bg-[#25D366]/90"
+                              disabled
+                              title="WhatsApp group link not available"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5" />
+                              Open WhatsApp Group
+                            </Button>
+                          )}
                         </div>
                       )}
                     </CardContent>

@@ -2,7 +2,11 @@
 // WasenderApi WhatsApp API provider
 // Docs: https://wasenderapi.com/api-docs
 
-import type { IWhatsAppProvider, CreateMatchGroupInput } from '../whatsapp.provider.interface';
+import type {
+  IWhatsAppProvider,
+  CreateMatchGroupInput,
+  GroupWithParticipants,
+} from '../whatsapp.provider.interface';
 import type {
   SendMessageResult,
   CreateGroupResult,
@@ -92,6 +96,76 @@ export class WasenderProvider implements IWhatsAppProvider {
         return { success: false, error: 'No group id in response' };
       }
       return { success: true, groupId };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async listGroupsWithParticipants(): Promise<GroupWithParticipants[]> {
+    if (!WASENDER_TOKEN) return [];
+    try {
+      const listRes = await fetch(`${WASENDER_BASE}/api/groups`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${WASENDER_TOKEN}` },
+      });
+      if (!listRes.ok) return [];
+      const listData = (await listRes.json()) as { data?: Array<{ jid?: string }> };
+      const groups = listData.data ?? [];
+      const result: GroupWithParticipants[] = [];
+
+      for (const g of groups) {
+        const jid = g.jid;
+        if (!jid) continue;
+        try {
+          const partRes = await fetch(
+            `${WASENDER_BASE}/api/groups/${encodeURIComponent(jid)}/participants`,
+            { method: 'GET', headers: { Authorization: `Bearer ${WASENDER_TOKEN}` } },
+          );
+          if (!partRes.ok) continue;
+          const partData = (await partRes.json()) as { data?: Array<{ id?: string }> };
+          const participants = partData.data ?? [];
+          const phones = participants
+            .map((p) => {
+              if (!p.id) return '';
+              const beforeAt = String(p.id).split('@')[0] ?? '';
+              return beforeAt.replace(/\D/g, '');
+            })
+            .filter(Boolean);
+          result.push({ groupId: jid, participantPhones: phones });
+        } catch {
+          // Skip group on error
+        }
+      }
+      return result;
+    } catch {
+      return [];
+    }
+  }
+
+  async updateGroupSubject(groupId: string, subject: string): Promise<SendMessageResult> {
+    if (!WASENDER_TOKEN) {
+      return { success: false, error: 'WASENDER_API_KEY not configured' };
+    }
+    try {
+      const res = await fetch(
+        `${WASENDER_BASE}/api/groups/${encodeURIComponent(groupId)}/settings`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${WASENDER_TOKEN}`,
+          },
+          body: JSON.stringify({ subject }),
+        },
+      );
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      return { success: true };
     } catch (err) {
       return {
         success: false,

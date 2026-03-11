@@ -2,7 +2,11 @@
 // Whapi.Cloud WhatsApp API provider
 // Docs: https://whapi.cloud/docs
 
-import type { IWhatsAppProvider, CreateMatchGroupInput } from '../whatsapp.provider.interface';
+import type {
+  IWhatsAppProvider,
+  CreateMatchGroupInput,
+  GroupWithParticipants,
+} from '../whatsapp.provider.interface';
 import type {
   SendMessageResult,
   CreateGroupResult,
@@ -76,6 +80,55 @@ export class WhapiProvider implements IWhatsAppProvider {
       }
       const groupId = data.id || data.group_id;
       return { success: true, groupId };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async listGroupsWithParticipants(): Promise<GroupWithParticipants[]> {
+    if (!WHAPI_TOKEN) return [];
+    try {
+      const res = await fetch(`${WHAPI_BASE}/groups`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${WHAPI_TOKEN}` },
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { groups?: Array<{ id?: string; participants?: Array<{ id?: string }> }> };
+      const groups = data.groups ?? [];
+      return groups
+        .filter((g) => g.id)
+        .map((g) => ({
+          groupId: g.id!,
+          participantPhones: (g.participants ?? [])
+            .map((p) => (p.id ? normalizePhone(p.id) : ''))
+            .filter(Boolean),
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  async updateGroupSubject(groupId: string, subject: string): Promise<SendMessageResult> {
+    if (!WHAPI_TOKEN) {
+      return { success: false, error: 'WHAPI_API_TOKEN not configured' };
+    }
+    try {
+      const res = await fetch(`${WHAPI_BASE}/groups/${groupId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${WHAPI_TOKEN}`,
+        },
+        body: JSON.stringify({ subject }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      return { success: true };
     } catch (err) {
       return {
         success: false,
