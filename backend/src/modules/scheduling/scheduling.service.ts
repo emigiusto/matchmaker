@@ -35,6 +35,7 @@ type RequestRow = {
   locationText: string;
   radiusKm: number | null;
   responseWindowMinutes: number;
+  maxParallelCandidates: number;
   inviteToken: string;
   status: string;
   currentCandidateIndex: number;
@@ -57,6 +58,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     locationText: r.locationText,
     radiusKm: r.radiusKm,
     responseWindowMinutes: r.responseWindowMinutes ?? 240,
+    maxParallelCandidates: (r as RequestRow).maxParallelCandidates ?? 1,
     inviteToken: r.inviteToken,
     status: r.status as SchedulingRequestDTO['status'],
     currentCandidateIndex: r.currentCandidateIndex,
@@ -67,7 +69,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
 }
 
 function toRequestDTOWithCandidates(
-  r: RequestRow & { candidates?: Array<{ id: string; schedulingRequestId: string; contactUserId: string; contactUser?: { name: string | null } | null; priorityOrder: number; status: string; contactedAt: Date | null; responseAt: Date | null; createdAt: Date; updatedAt: Date }> }
+  r: RequestRow & { candidates?: Array<{ id: string; schedulingRequestId: string; contactUserId: string; contactUser?: { name: string | null } | null; priorityOrder: number; retryOrder?: number | null; status: string; contactedAt: Date | null; responseAt: Date | null; createdAt: Date; updatedAt: Date }> }
 ): SchedulingRequestDTO {
   const dto = toRequestDTO(r);
   if (r.candidates) {
@@ -79,12 +81,13 @@ function toRequestDTOWithCandidates(
   return dto;
 }
 
-function toCandidateDTO(c: { id: string; schedulingRequestId: string; contactUserId: string; priorityOrder: number; status: string; contactedAt: Date | null; responseAt: Date | null; createdAt: Date; updatedAt: Date }): SchedulingCandidateDTO {
+function toCandidateDTO(c: { id: string; schedulingRequestId: string; contactUserId: string; priorityOrder: number; retryOrder?: number | null; status: string; contactedAt: Date | null; responseAt: Date | null; createdAt: Date; updatedAt: Date }): SchedulingCandidateDTO {
   return {
     id: c.id,
     schedulingRequestId: c.schedulingRequestId,
     contactUserId: c.contactUserId,
     priorityOrder: c.priorityOrder,
+    retryOrder: c.retryOrder ?? null,
     status: c.status as SchedulingCandidateDTO['status'],
     contactedAt: c.contactedAt?.toISOString() ?? null,
     responseAt: c.responseAt?.toISOString() ?? null,
@@ -132,6 +135,8 @@ export const schedulingService = {
       );
     }
 
+    const maxParallel = Math.min(3, Math.max(1, input.maxParallelCandidates ?? 1));
+
     const matchType = input.matchType ?? 'competitive';
     const date = new Date(input.date);
     const startTime = new Date(input.startTime);
@@ -152,6 +157,7 @@ export const schedulingService = {
           locationText: input.locationText,
           radiusKm: input.radiusKm ?? null,
           responseWindowMinutes: responseWindow,
+          maxParallelCandidates: maxParallel,
           inviteToken,
           status: 'active',
         },
@@ -201,31 +207,28 @@ export const schedulingService = {
       return toRequestDTOWithCandidates({ ...request, status: 'expired' });
     }
 
-    await this.contactNextCandidate(requestId);
+    await this.contactNextCandidates(requestId);
     const updated = await schedulingRepository.findRequestById(requestId);
     return updated ? toRequestDTOWithCandidates(updated) : null;
   },
 
-  async contactNextCandidate(requestId: string): Promise<void> {
+  async contactNextCandidates(requestId: string): Promise<void> {
     const request = await schedulingRepository.findActiveRequestById(requestId);
     if (!request) return;
 
-    const candidate = await schedulingRepository.findFirstPendingCandidate(requestId);
-    if (!candidate) {
+    const maxParallel = (request as RequestRow & { maxParallelCandidates?: number }).maxParallelCandidates ?? 1;
+    const waitingCount = await schedulingRepository.countWaitingReplyCandidates(requestId);
+    const slotsToFill = Math.max(0, maxParallel - waitingCount);
+    if (slotsToFill === 0) return;
+
+    const toContact = await schedulingRepository.findPendingCandidatesOrdered(requestId, slotsToFill);
+    if (toContact.length === 0) {
       const pendingCount = await schedulingRepository.countPendingCandidates(requestId);
-      if (pendingCount === 0) {
+      const waitingReplyCount = await schedulingRepository.countWaitingReplyCandidates(requestId);
+      if (pendingCount === 0 && waitingReplyCount === 0) {
         await schedulingRepository.updateRequestStatus(requestId, 'expired');
         logger.info('SchedulingExpired', { requestId, reason: 'all_candidates_exhausted' });
       }
-      return;
-    }
-
-    const contactUser = candidate.contactUser;
-    const phone = contactUser?.phone;
-    if (!phone) {
-      logger.warn('InviteSkipped', { candidateId: candidate.id, reason: 'no_phone' });
-      await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
-      await this.contactNextCandidate(requestId);
       return;
     }
 
@@ -235,29 +238,37 @@ export const schedulingService = {
     const format = (request as RequestRow).format || 'singles';
     const message = formatInviteMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.schedulingCandidate.update({
-        where: { id: candidate.id },
-        data: { status: 'contacted', contactedAt: new Date() },
+    for (const candidate of toContact) {
+      const phone = candidate.contactUser?.phone;
+      const contactName = candidate.contactUser?.name ?? candidate.contactUser?.email ?? candidate.contactUserId;
+      if (!phone) {
+        logger.warn('InviteSkipped', { candidateId: candidate.id, contactName, reason: 'no_phone' });
+        await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
+        continue;
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.schedulingCandidate.update({
+          where: { id: candidate.id },
+          data: { status: 'contacted', contactedAt: new Date() },
+        });
+        await tx.schedulingRequest.update({
+          where: { id: requestId },
+          data: { currentCandidateIndex: candidate.priorityOrder },
+        });
       });
-      await tx.schedulingRequest.update({
-        where: { id: requestId },
-        data: { currentCandidateIndex: candidate.priorityOrder },
-      });
-    });
 
-    const result = await whatsappService.sendInviteMessage(phone, message);
+      const result = await whatsappService.sendInviteMessage(phone, message);
+      await schedulingRepository.updateCandidateStatus(candidate.id, 'waiting_reply');
 
-    await schedulingRepository.updateCandidateStatus(candidate.id, 'waiting_reply');
-
-    if (!result.success) {
-      logger.error('InviteSendFailed', { candidateId: candidate.id, error: result.error });
-      await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
-      await this.contactNextCandidate(requestId);
-      return;
+      if (!result.success) {
+        logger.error('InviteSendFailed', { candidateId: candidate.id, contactName, error: result.error });
+        await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
+      } else {
+        logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId, contactName });
+      }
     }
-
-    logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId });
+    await this.contactNextCandidates(requestId);
   },
 
   async handleCandidateResponse(senderPhoneNumber: string, messageText: string): Promise<{ processed: boolean }> {
@@ -303,7 +314,7 @@ export const schedulingService = {
         return { processed: true };
       }
       logger.info('InviteDeclined', { requestId: request.id, candidateId: candidate.id });
-      await this.contactNextCandidate(request.id);
+      await this.contactNextCandidates(request.id);
       return { processed: true };
     }
 
@@ -319,7 +330,7 @@ export const schedulingService = {
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'expired');
     logger.info('InviteExpired', { requestId: candidate.schedulingRequestId, candidateId });
-    await this.contactNextCandidate(candidate.schedulingRequestId);
+    await this.contactNextCandidates(candidate.schedulingRequestId);
   },
 
   async expireWaitingCandidates(): Promise<number> {
@@ -439,6 +450,33 @@ export const schedulingService = {
       include: { hostUser: true, hostPartner: true, candidates: { include: { contactUser: true } } },
     });
     logger.info('SchedulingResumed', { requestId, userId });
+    return toRequestDTOWithCandidates(updated);
+  },
+
+  async retryCandidate(requestId: string, candidateId: string, userId: string): Promise<SchedulingRequestDTO> {
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
+    if (request.hostUserId !== userId) throw new AppError('Only the host can retry', 403);
+    if (!['active', 'paused', 'expired'].includes(request.status)) {
+      throw new AppError('Request must be active, paused, or expired to retry', 400);
+    }
+
+    const candidate = request.candidates?.find((c) => c.id === candidateId);
+    if (!candidate) throw new AppError('Candidate not found', 404);
+    const retryable = ['declined', 'expired'].includes(candidate.status);
+    if (!retryable) throw new AppError('Only declined or expired candidates can be retried', 400);
+
+    const maxRetry = await schedulingRepository.getMaxRetryOrder(requestId);
+    const retryOrder = maxRetry + 1;
+    await schedulingRepository.retryCandidate(candidateId, retryOrder);
+
+    if (request.status === 'paused' || request.status === 'expired') {
+      await schedulingRepository.updateRequestStatus(requestId, 'active');
+    }
+    await this.contactNextCandidates(requestId);
+
+    const updated = await schedulingRepository.findRequestById(requestId);
+    if (!updated) throw new AppError('Failed to load updated request', 500);
     return toRequestDTOWithCandidates(updated);
   },
 

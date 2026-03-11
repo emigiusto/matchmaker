@@ -67,18 +67,23 @@ export class GroupsController {
   }
 
   /**
-   * GET /groups?userId=
-   * List groups for a user
+   * GET /groups?userId=&withMembers=
+   * List groups for a user. If withMembers=1, includes member details (id, name, phone).
    */
   static async listGroupsForUser(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.query.userId as string;
+      const withMembers = req.query.withMembers === '1' || req.query.withMembers === 'true';
       if (!userId) {
         return res.status(400).json({ error: 'Missing userId query param' });
       }
       // Validate userId as UUID
       if (!/^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/.test(userId)) {
         return res.status(400).json({ error: 'Invalid userId' });
+      }
+      if (withMembers) {
+        const groups = await GroupsService.listGroupsWithMembersForUser(userId);
+        return res.status(200).json(groups);
       }
       const groups = await GroupsService.listGroupsForUser(userId);
       return res.status(200).json(groups);

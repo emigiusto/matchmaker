@@ -4,7 +4,7 @@
 
 import { AppError } from '../../shared/errors/AppError';
 import { prisma } from '../../prisma';
-import { GroupDTO } from './groups.types';
+import { GroupDTO, GroupWithMembersDTO } from './groups.types';
 import type { Group, GroupMember } from '@prisma/client';
 
 /**
@@ -78,6 +78,31 @@ export async function listGroupsForUser(userId: string): Promise<GroupDTO[]> {
     include: { group: { include: { members: true } } },
   });
   return memberships.map((m) => toGroupDTO(m.group, m.group.members));
+}
+
+/**
+ * List groups for a user with member details (id, name, phone) for invite flow.
+ */
+export async function listGroupsWithMembersForUser(userId: string): Promise<GroupWithMembersDTO[]> {
+  const memberships = await prisma.groupMember.findMany({
+    where: { userId },
+    include: {
+      group: {
+        include: { members: { include: { user: true } } },
+      },
+    },
+  });
+  return memberships.map((m) => {
+    const group = m.group;
+    return {
+      ...toGroupDTO(group, group.members),
+      members: group.members.map((member) => ({
+        id: member.user.id,
+        name: member.user.name ?? member.user.email ?? member.user.id,
+        phone: member.user.phone,
+      })),
+    };
+  });
 }
 
 /**

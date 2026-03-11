@@ -488,6 +488,7 @@ model SchedulingRequest {
   locationText          String
   radiusKm              Float?
   responseWindowMinutes Float                 @default(240)
+  maxParallelCandidates Int                   @default(1)
   inviteToken           String                @unique
   status                SchedulingRequestStatus @default(active)
   currentCandidateIndex Int                   @default(0)
@@ -533,6 +534,7 @@ model SchedulingCandidate {
   schedulingRequestId   String
   contactUserId         String
   priorityOrder         Int
+  retryOrder            Int?
   status                SchedulingCandidateStatus @default(pending)
   contactedAt           DateTime?
   responseAt            DateTime?

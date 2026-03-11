@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { batchInsert } from './batchInsert.util';
 import { PrismaClient } from '@prisma/client';
+import { DEV_USER_ID } from './users.seeder';
 
 const prisma = new PrismaClient();
 
@@ -9,11 +10,27 @@ type GroupSeed = {
   ownerUserId: string;
 };
 
+const NAMED_GROUPS_FOR_DEV = [
+  'Tennis usuals',
+  'Padel crew',
+  'Weekend players',
+  'Court regulars',
+];
+
 export async function seedGroups(users: { id: string }[]) {
   if (!users.length) return [];
-  const usedNames = new Set<string>();
+  const usedNames = new Set<string>(NAMED_GROUPS_FOR_DEV);
   const groups: GroupSeed[] = [];
-  const groupCount = Math.min(40, users.length);
+
+  // Create named groups for dev user (e.g. Tennis usuals)
+  const devUser = users.find((u) => u.id === DEV_USER_ID);
+  if (devUser) {
+    for (const name of NAMED_GROUPS_FOR_DEV) {
+      groups.push({ name, ownerUserId: devUser.id });
+    }
+  }
+
+  const groupCount = Math.min(40 - groups.length, users.length);
   for (let i = 0; i < groupCount; i++) {
     let name: string;
     do {

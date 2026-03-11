@@ -48,6 +48,7 @@ interface InviteRequest {
   matchFormat: "singles" | "doubles"
   status: "scheduling" | "paused" | "matched" | "expired"
   contacts: {
+    id: string
     name: string
     status: "pending" | "contacted" | "declined" | "accepted" | "no_response"
   }[]
@@ -90,6 +91,7 @@ function mapSchedulingToInviteRequest(
   const timeStr = formatTimeRange(r.startTime, r.endTime)
   const candidates = r.candidates ?? []
   const contacts = candidates.map((c) => ({
+    id: c.id,
     name: c.contactUserName ?? "Unknown",
     status: contactStatusMap[c.status] ?? "pending",
   }))
@@ -234,8 +236,19 @@ export default function PlayPage() {
     toast.info(`Skipping is done via the scheduling flow for ${contactName}`)
   }
 
-  function handleRetryContact(_requestId: string, contactName: string) {
-    toast.info(`Retry is done via the scheduling flow for ${contactName}`)
+  async function handleRetryContact(requestId: string, candidateId: string) {
+    try {
+      const updated = await schedulingService.retry(requestId, candidateId, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? mapped : r))
+        )
+        toast.success("Invite will be retried")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to retry invite")
+    }
   }
 
   function handleShareWhatsApp(request: InviteRequest) {
@@ -408,7 +421,7 @@ export default function PlayPage() {
                         <div className="max-h-48 space-y-1.5 overflow-y-auto pr-2">
                           {request.contacts.map((contact, idx) => (
                             <div
-                              key={contact.name}
+                              key={contact.id}
                               className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
                                 contact.status === "accepted"
                                   ? "bg-green-500/10"
@@ -436,7 +449,7 @@ export default function PlayPage() {
                               {/* Per-contact actions */}
                               {request.status !== "matched" && (contact.status === "contacted" || contact.status === "declined" || contact.status === "no_response") && (
                                 <button
-                                  onClick={() => handleRetryContact(request.id, contact.name)}
+                                  onClick={() => handleRetryContact(request.id, contact.id)}
                                   title="Retry invite"
                                   className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                 >

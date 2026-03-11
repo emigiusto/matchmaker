@@ -55,6 +55,7 @@ export interface CreateSchedulingRequestInput {
   locationText: string
   radiusKm?: number | null
   responseWindowMinutes: number
+  maxParallelCandidates?: number
   hostPartnerUserId?: string | null
   candidateUserIds: string[]
 }
@@ -92,6 +93,13 @@ export const schedulingService = {
     return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/resume`, {
       userId,
     })
+  },
+
+  async retry(requestId: string, candidateId: string, userId: string): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(
+      `/scheduling/${requestId}/retry/${candidateId}`,
+      { userId }
+    )
   },
 
   async cancel(requestId: string, userId: string): Promise<SchedulingRequestDTO> {

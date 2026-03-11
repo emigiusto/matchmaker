@@ -28,3 +28,10 @@ export interface AddGroupMemberInput {
   groupId: string;
   userId: string;
 }
+
+/**
+ * Group with member details for invite flow (name, phone for display/filtering)
+ */
+export interface GroupWithMembersDTO extends GroupDTO {
+  members: { id: string; name: string; phone: string | null }[];
+}

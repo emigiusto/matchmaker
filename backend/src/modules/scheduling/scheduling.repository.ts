@@ -67,13 +67,50 @@ export const schedulingRepository = {
   },
 
   async findFirstPendingCandidate(schedulingRequestId: string) {
-    return prisma.schedulingCandidate.findFirst({
-      where: {
-        schedulingRequestId,
-        status: 'pending',
-      },
-      orderBy: { priorityOrder: 'asc' },
+    const list = await this.findPendingCandidatesOrdered(schedulingRequestId, 1);
+    return list[0] ?? null;
+  },
+
+  async findPendingCandidatesOrdered(
+    schedulingRequestId: string,
+    limit: number
+  ) {
+    // Retried candidates (retryOrder set) first in retry order, then original pendings by priorityOrder
+    const all = await prisma.schedulingCandidate.findMany({
+      where: { schedulingRequestId, status: 'pending' },
       include: { contactUser: true },
+    });
+    all.sort((a, b) => {
+      const aOrder = a.retryOrder ?? 999999;
+      const bOrder = b.retryOrder ?? 999999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.priorityOrder - b.priorityOrder;
+    });
+    return all.slice(0, limit);
+  },
+
+  async countWaitingReplyCandidates(schedulingRequestId: string): Promise<number> {
+    return prisma.schedulingCandidate.count({
+      where: { schedulingRequestId, status: 'waiting_reply' },
+    });
+  },
+
+  async getMaxRetryOrder(schedulingRequestId: string): Promise<number> {
+    const top = await prisma.schedulingCandidate.findFirst({
+      where: { schedulingRequestId, retryOrder: { not: null } },
+      select: { retryOrder: true },
+      orderBy: { retryOrder: 'desc' },
+    });
+    return top?.retryOrder ?? 0;
+  },
+
+  async retryCandidate(
+    candidateId: string,
+    retryOrder: number
+  ) {
+    return prisma.schedulingCandidate.update({
+      where: { id: candidateId },
+      data: { status: 'pending', retryOrder, contactedAt: null, responseAt: null },
     });
   },
 

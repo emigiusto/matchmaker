@@ -17,6 +17,10 @@ import {
   Copy,
   Check,
   Loader2,
+  UserPlus,
+  List,
+  UserCircle,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,6 +49,9 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { usersService } from "@/lib/services/users.service"
+import { groupsService } from "@/lib/services/groups.service"
+import { friendshipsService } from "@/lib/services/friendships.service"
+import { guestContactsService } from "@/lib/services/guest-contacts.service"
 import { getCurrentUserId } from "@/lib/current-user"
 
 interface WizardProps {
@@ -83,6 +90,11 @@ interface Contact {
   name: string
 }
 
+/** User or GuestContact for the "All contacts" picker */
+type AvailableContact =
+  | { id: string; name: string; type: "user" }
+  | { id: string; name: string; type: "guestContact"; phone: string }
+
 export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdProp, onSuccess }: WizardProps) {
   const hostUserId = hostUserIdProp ?? getCurrentUserId()
   const [step, setStep] = useState<Step>(1)
@@ -107,9 +119,17 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     ? 1 / 3 // 20 seconds
     : 60
   const [responseWindow, setResponseWindow] = useState<number>(defaultResponseWindow) // minutes (can be fractional)
-  const [availableContacts, setAvailableContacts] = useState<Contact[]>([])
+  const [maxParallelCandidates, setMaxParallelCandidates] = useState(1) // 1–3 contacts reached out at once
+  const [availableContacts, setAvailableContacts] = useState<AvailableContact[]>([])
+  const [groupsWithMembers, setGroupsWithMembers] = useState<import("@/lib/services/groups.service").GroupWithMembersDTO[]>([])
+  const [friends, setFriends] = useState<import("@/lib/services/friendships.service").Friend[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [manualName, setManualName] = useState("")
+  const [manualPhone, setManualPhone] = useState("")
+  const [searchFromList, setSearchFromList] = useState("")
+  const [searchFriends, setSearchFriends] = useState("")
+  const [searchAllContacts, setSearchAllContacts] = useState("")
 
   function resetWizard() {
     setStep(1)
@@ -124,26 +144,47 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setMatchFormat("singles")
     setSport("tennis")
     setResponseWindow(defaultResponseWindow)
+    setMaxParallelCandidates(1)
     setPriorityList([])
     setDraggedIndex(null)
   }
 
-  // Fetch users with phone for contact picker
+  // Fetch contacts for step 3: users, groups, friends, guest contacts
   useEffect(() => {
     if (!open || !hostUserId) return
     setContactsLoading(true)
-    usersService
-      .getAll()
-      .then((users) => {
+    Promise.all([
+      usersService.getAll(),
+      groupsService.listWithMembers(hostUserId).catch(() => []),
+      friendshipsService.listFriends(hostUserId).catch(() => []),
+      guestContactsService.listByOwner(hostUserId).catch(() => []),
+    ])
+      .then(([users, groups, friendsList, guestContacts]) => {
         const withPhone = users.filter(
           (u) => u.phone && u.id !== hostUserId && (u.name || u.email || u.id)
         )
-        setAvailableContacts(
-          withPhone.map((u) => ({ id: u.id, name: u.name || u.email || "Unknown" }))
-        )
+        const userPhones = new Set(withPhone.map((u) => u.phone).filter(Boolean))
+        const userContacts: AvailableContact[] = withPhone.map((u) => ({
+          id: u.id,
+          name: u.name || u.email || "Unknown",
+          type: "user" as const,
+        }))
+        const gcContacts: AvailableContact[] = guestContacts
+          .filter((c) => !userPhones.has(c.phone))
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            type: "guestContact" as const,
+            phone: c.phone,
+          }))
+        setAvailableContacts([...userContacts, ...gcContacts])
+        setGroupsWithMembers(groups)
+        setFriends(friendsList)
       })
       .catch(() => {
         setAvailableContacts([])
+        setGroupsWithMembers([])
+        setFriends([])
         toast.error("Could not load contacts")
       })
       .finally(() => setContactsLoading(false))
@@ -171,8 +212,59 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     : TIME_SLOTS
 
   function addContact(contact: Contact) {
-    if (priorityList.some(c => c.id === contact.id)) return
-    setPriorityList(prev => [...prev, contact])
+    if (priorityList.some((c) => c.id === contact.id)) return
+    setPriorityList((prev) => [...prev, contact])
+  }
+
+  async function addAvailableContact(ac: AvailableContact) {
+    if (ac.type === "user") {
+      addContact({ id: ac.id, name: ac.name })
+      return
+    }
+    try {
+      const { user } = await guestContactsService.ensureUserByPhone(ac.phone, ac.name)
+      addContact({ id: user.id, name: user.name || ac.name })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to add contact")
+    }
+  }
+
+  function addGroupMembers(group: import("@/lib/services/groups.service").GroupWithMembersDTO) {
+    const toAdd = group.members.filter(
+      (m) => m.id !== hostUserId && m.phone && !priorityList.some((c) => c.id === m.id)
+    )
+    if (toAdd.length === 0) {
+      toast.info("All members from this list are already added or don't have a phone number")
+      return
+    }
+    setPriorityList((prev) => [
+      ...prev,
+      ...toAdd.map((m) => ({ id: m.id, name: m.name })),
+    ])
+    toast.success(`Added ${toAdd.length} from ${group.name}`)
+  }
+
+  function addFriend(friend: import("@/lib/services/friendships.service").Friend) {
+    if (friend.id === hostUserId) return
+    addContact({ id: friend.id, name: friend.name })
+  }
+
+  async function handleAddManualContact() {
+    const name = manualName.trim()
+    const phone = manualPhone.trim()
+    if (!name || !phone) {
+      toast.error("Enter name and phone")
+      return
+    }
+    try {
+      const { user } = await guestContactsService.create(hostUserId, name, phone)
+      setManualName("")
+      setManualPhone("")
+      addContact({ id: user.id, name: user.name || name })
+      toast.success("Contact saved and added to invite list")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to add contact")
+    }
   }
 
   // Remove contact from priority list
@@ -232,6 +324,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         locationText: locationType === "area" ? location : specificPlace,
         radiusKm: locationType === "area" ? radius : null,
         responseWindowMinutes: responseWindow,
+        maxParallelCandidates,
         hostPartnerUserId: null,
         candidateUserIds: priorityList.map((c) => c.id),
       })
@@ -572,47 +665,156 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         {step === 3 && (
           <div className="space-y-4 pt-2">
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="text-base font-medium">Add contacts</Label>
               {contactsLoading ? (
                 <div className="flex items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-6">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full" disabled={availableContacts.length === 0}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Contact
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 p-2" align="start">
-                    <div className="max-h-48 overflow-y-auto space-y-1">
+                <div className="flex flex-wrap gap-2">
+                  {/* Add from lists (groups) */}
+                  {groupsWithMembers.length > 0 && (
+                    <Popover onOpenChange={(open) => !open && setSearchFromList("")}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                          <List className="h-4 w-4" />
+                          From list
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-2" align="start">
+                        <div className="relative mb-2">
+                          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            placeholder="Search lists..."
+                            value={searchFromList}
+                            onChange={(e) => setSearchFromList(e.target.value)}
+                            className="h-8 pl-8"
+                          />
+                        </div>
+                        <div className="max-h-48 overflow-y-auto space-y-0.5">
+                          {groupsWithMembers
+                            .filter((g) => !searchFromList.trim() || g.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
+                            .map((g) => (
+                              <button
+                                key={g.id}
+                                onClick={() => addGroupMembers(g)}
+                                className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted"
+                              >
+                                <span>{g.name}</span>
+                                <span className="text-xs text-muted-foreground">{g.members.length}</span>
+                              </button>
+                            ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  {/* Add friends */}
+                  {friends.filter((f) => f.type === "user").length > 0 && (
+                    <Popover onOpenChange={(open) => !open && setSearchFriends("")}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                          <UserPlus className="h-4 w-4" />
+                          Friends
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-2" align="start">
+                        <div className="relative mb-2">
+                          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            placeholder="Search friends..."
+                            value={searchFriends}
+                            onChange={(e) => setSearchFriends(e.target.value)}
+                            className="h-8 pl-8"
+                          />
+                        </div>
+                        <div className="max-h-48 overflow-y-auto space-y-0.5">
+                          {friends
+                            .filter((f) => f.type === "user" && (!searchFriends.trim() || f.name.toLowerCase().includes(searchFriends.trim().toLowerCase())))
+                            .map((f) => (
+                              <button
+                                key={f.id}
+                                onClick={() => addFriend(f)}
+                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                              >
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                                  {f.name[0] ?? "?"}
+                                </div>
+                                <span className="flex-1 text-left">{f.name}</span>
+                              </button>
+                            ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  {/* Add from all users */}
+                  <Popover onOpenChange={(open) => !open && setSearchAllContacts("")}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1.5" disabled={availableContacts.length === 0}>
+                        <UserCircle className="h-4 w-4" />
+                        All contacts
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2" align="start">
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search contacts..."
+                          value={searchAllContacts}
+                          onChange={(e) => setSearchAllContacts(e.target.value)}
+                          className="h-8 pl-8"
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-0.5">
                       {availableContacts
-                        .filter((c) => !priorityList.some((p) => p.id === c.id))
-                        .map((c) => (
+                        .filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true)
+                        .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
+                        .map((ac) => (
                           <button
-                            key={c.id}
-                            onClick={() => addContact(c)}
+                            key={ac.type === "user" ? ac.id : `gc-${ac.id}`}
+                            onClick={() => addAvailableContact(ac)}
                             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                           >
                             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                              {c.name[0] ?? "?"}
+                              {ac.name[0] ?? "?"}
                             </div>
-                            {c.name}
+                            {ac.name}
                           </button>
                         ))}
-                      {availableContacts.filter((c) => !priorityList.some((p) => p.id === c.id)).length === 0 && (
+                      </div>
+                      {availableContacts.filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true).filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase())).length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                          {availableContacts.length === 0
-                            ? "No contacts with phone found"
-                            : "All contacts added"}
+                          {availableContacts.filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true).length === 0 ? "All added" : "No matches"}
                         </p>
                       )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               )}
+            </div>
+
+            {/* Manual add: name + phone (saves as GuestContact) */}
+            <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-3">
+              <Label className="text-sm font-medium">Add manually (name + phone)</Label>
+              <p className="text-xs text-muted-foreground">Saved to your contacts.</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Name"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  className="flex-1"
+                />
+                <Input
+                  placeholder="Phone"
+                  value={manualPhone}
+                  onChange={(e) => setManualPhone(e.target.value)}
+                  type="tel"
+                  className="flex-1"
+                />
+                <Button variant="secondary" size="sm" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
+                  Add
+                </Button>
+              </div>
             </div>
 
             {/* Priority list */}
@@ -725,6 +927,36 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               </div>
             </div>
 
+            {/* Parallel candidates */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">Contact at once</Label>
+                <span className="text-sm font-semibold text-primary">
+                  {maxParallelCandidates} {maxParallelCandidates === 1 ? "person" : "people"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                How many candidates to reach out to simultaneously (1–3)
+              </p>
+              <div className="flex gap-1.5">
+                {[1, 2, 3].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setMaxParallelCandidates(n)}
+                    className={cn(
+                      "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                      maxParallelCandidates === n
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(2)}>
                 <ChevronLeft className="mr-1 h-5 w-5" />
@@ -815,7 +1047,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               <ul className="space-y-1.5 text-xs text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  Invites are sent via WhatsApp, one at a time
+                  Invites are sent via WhatsApp — up to{" "}
+                  <strong>{maxParallelCandidates} contact{maxParallelCandidates > 1 ? "s" : ""}</strong> at a time
                 </li>
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />

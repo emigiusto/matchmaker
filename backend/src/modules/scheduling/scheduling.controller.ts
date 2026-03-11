@@ -21,6 +21,7 @@ export class SchedulingController {
         responseWindowMinutes: body.responseWindowMinutes != null
           ? Number(body.responseWindowMinutes)
           : undefined,
+        maxParallelCandidates: body.maxParallelCandidates != null ? Number(body.maxParallelCandidates) : undefined,
         hostPartnerUserId: body.hostPartnerUserId ?? null,
         candidateUserIds: body.candidateUserIds || [],
       };
@@ -63,6 +64,20 @@ export class SchedulingController {
       if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
       if (!userId) return res.status(400).json({ error: 'Missing userId' });
       const request = await schedulingService.resumeSchedulingRequest(requestId, userId);
+      res.json(request);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async retryCandidate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      const candidateId = typeof req.params.candidateId === 'string' ? req.params.candidateId : undefined;
+      const { userId } = req.body;
+      if (!requestId || !candidateId) return res.status(400).json({ error: 'Missing requestId or candidateId' });
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const request = await schedulingService.retryCandidate(requestId, candidateId, userId);
       res.json(request);
     } catch (err) {
       next(err);

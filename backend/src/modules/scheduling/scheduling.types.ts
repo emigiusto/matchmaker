@@ -33,6 +33,7 @@ export interface CreateSchedulingRequestInput {
   locationText: string;
   radiusKm?: number | null;
   responseWindowMinutes?: number;
+  maxParallelCandidates?: number;
   hostPartnerUserId?: string | null;
   candidateUserIds: string[];
 }
@@ -50,6 +51,7 @@ export interface SchedulingRequestDTO {
   locationText: string;
   radiusKm: number | null;
   responseWindowMinutes: number;
+  maxParallelCandidates: number;
   inviteToken: string;
   status: SchedulingRequestStatus;
   currentCandidateIndex: number;
@@ -65,6 +67,7 @@ export interface SchedulingCandidateDTO {
   contactUserId: string;
   contactUserName?: string | null;
   priorityOrder: number;
+  retryOrder?: number | null;
   status: SchedulingCandidateStatus;
   contactedAt: string | null;
   responseAt: string | null;
