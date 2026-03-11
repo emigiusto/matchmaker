@@ -1,0 +1,8 @@
+# Render Blueprint - Backend service
+# Set Root Directory to "backend" in Render dashboard if using this repo for backend deploy
+services:
+  - type: web
+    name: matchmaker-api
+    rootDir: backend
+    buildCommand: npm install && npm run prisma:generate && npm run build
+    startCommand: npm run start:prod
