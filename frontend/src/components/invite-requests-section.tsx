@@ -53,17 +53,66 @@ export interface InviteRequest {
   status: "scheduling" | "paused" | "matched" | "expired" | "cancelled"
   matchId: string | null
   whatsappGroupId: string | null
+  responseWindowMinutes: number
   contacts: {
     id: string
     contactUserId: string
     name: string
     status: "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled"
+    contactedAt: string | null
   }[]
   currentIndex: number
 }
 
 const MAX_ACTIVE_REQUESTS = 5
 const SCHEDULING_POLL_INTERVAL_MS = 5000
+
+function formatResponseWindow(minutes: number): string {
+  if (minutes < 60) return `${Math.round(minutes)} min`
+  const hours = minutes / 60
+  if (hours < 24) return `${Math.round(hours)}h`
+  const days = hours / 24
+  return `${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"}`
+}
+
+function formatTimeLeft(contactedAt: string, responseWindowMinutes: number): string {
+  const contacted = new Date(contactedAt).getTime()
+  const expiresAt = contacted + responseWindowMinutes * 60 * 1000
+  const now = Date.now()
+  const msLeft = expiresAt - now
+  if (msLeft <= 0) return "Expired"
+  const mins = Math.floor(msLeft / 60_000)
+  const hours = Math.floor(mins / 60)
+  if (hours >= 1) return `${hours}h ${mins % 60}m left`
+  if (mins >= 1) return `${mins} min left`
+  return "< 1 min left"
+}
+
+/** Renders time left until invite expires; re-renders every 30s for live countdown */
+function TimeLeftBadge({
+  contactedAt,
+  responseWindowMinutes,
+}: {
+  contactedAt: string
+  responseWindowMinutes: number
+}) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
+  const text = formatTimeLeft(contactedAt, responseWindowMinutes)
+  const isExpired = text === "Expired"
+  return (
+    <span
+      className={`text-[10px] font-medium ${
+        isExpired ? "text-muted-foreground" : "text-blue-600"
+      }`}
+    >
+      {text}
+    </span>
+  )
+}
 
 function formatTimeRange(startIso: string, endIso: string): string {
   try {
@@ -102,6 +151,7 @@ function mapSchedulingToInviteRequest(
     contactUserId: c.contactUserId,
     name: c.contactUserName ?? "Unknown",
     status: contactStatusMap[c.status] ?? "pending",
+    contactedAt: c.contactedAt ?? null,
   }))
   return {
     id: r.id,
@@ -115,6 +165,7 @@ function mapSchedulingToInviteRequest(
     status: statusMap[r.status] ?? "scheduling",
     matchId: r.matchId ?? null,
     whatsappGroupId: r.whatsappGroupId ?? null,
+    responseWindowMinutes: r.responseWindowMinutes ?? 240,
     contacts,
     currentIndex: r.currentCandidateIndex,
   }
@@ -478,6 +529,12 @@ export function InviteRequestsSection({
                           <MapPin className="h-4 w-4 text-primary" />
                           {request.location}
                         </span>
+                        {(request.status === "scheduling" || request.status === "paused") && (
+                          <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
+                            <Hourglass className="h-3.5 w-3.5" />
+                            Reply within {formatResponseWindow(request.responseWindowMinutes)}
+                          </span>
+                        )}
                       </div>
 
                       <div className="mt-4 border-t border-border/30 pt-4">
@@ -531,6 +588,14 @@ export function InviteRequestsSection({
                               >
                                 {contact.name}
                               </span>
+                              {contact.status === "contacted" &&
+                                contact.contactedAt &&
+                                (request.status === "scheduling" || request.status === "paused") && (
+                                  <TimeLeftBadge
+                                    contactedAt={contact.contactedAt}
+                                    responseWindowMinutes={request.responseWindowMinutes}
+                                  />
+                                )}
                               {request.status !== "matched" &&
                                 request.status !== "cancelled" &&
                                 (contact.status === "pending" ||
