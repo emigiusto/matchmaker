@@ -1,15 +1,18 @@
 import { useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { UserPlus, Loader2 } from "lucide-react"
+import { UserPlus, Loader2, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth/AuthContext"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 export default function SignupPage() {
   const { signup } = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const redirect = searchParams.get("redirect") ?? "/dashboard"
 
@@ -38,7 +41,16 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-screen flex-col">
+      <header className="flex h-16 shrink-0 items-center border-b border-border/40 bg-card/50 px-6">
+        <Link to="/" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary">
+            <Swords className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span className="text-lg font-bold tracking-tight">{t("common.appName")}</span>
+        </Link>
+      </header>
+      <div className="flex flex-1 items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
@@ -107,6 +119,10 @@ export default function SignupPage() {
           </p>
         </CardContent>
       </Card>
+      </div>
+      <footer className="flex h-14 shrink-0 items-center justify-end border-t border-border/40 bg-card/50 px-6">
+        <LanguageSwitcher />
+      </footer>
     </div>
   )
 }
