@@ -26,7 +26,7 @@ User clicks "Start Scheduling" (POST /scheduling/:id/start)
         ▼
 ┌───────────────────────────────────────────────────────────────────┐
 │  WHATSAPP WEBHOOK (POST /whatsapp/webhook)                         │
-│  Provider (Whapi, etc.) calls this when user replies                │
+│  Provider (Whapi, Wasender, etc.) calls this when user replies      │
 │  • Parse sender phone + message text                               │
 │  • Find User by phone, then SchedulingCandidate (status=waiting)    │
 │  • If YES → completeScheduling (create Match, group, etc.)          │
@@ -174,20 +174,16 @@ Otherwise, with `JOBS_ENABLED=true`, the cron runs every 15 minutes and will exp
 
 ---
 
-## Webhook payload formats
+## Webhook (provider-agnostic)
 
-The controller supports:
-
-- **Whapi**: `body.messages[0]` with `from`, `text.body`, `from_me` (ignores `from_me` messages)
-- **Flat**: `body.sender.phone`, `body.from`, or `body.contacts[0].wa_id` for sender
-- **Message**: `body.body.text`, `body.text.body`, or `body.message` (string)
+Each provider (`whapi`, `wasender`, `mock`) implements `parseWebhookPayload` to convert its own webhook format into `{ senderPhone, messageText }`. The controller delegates parsing to the active provider.
 
 ---
 
 ## Checklist before production
 
-- [ ] Set `WHATSAPP_PROVIDER=whapi` and configure `WHAPI_TOKEN` / `WHAPI_URL`
-- [ ] In Whapi panel: set webhook URL to `https://your-domain/whatsapp/webhook`
+- [ ] Set `WHATSAPP_PROVIDER=whapi` or `WHATSAPP_PROVIDER=wasender` and configure the corresponding API keys
+- [ ] In the provider dashboard: set webhook URL to `https://your-domain/whatsapp/webhook`
 - [ ] Ensure `User.phone` is stored in E.164 (digits only) and matches provider format
 - [ ] Set `JOBS_ENABLED=true` so the expiration cron runs
 - [ ] Test full flow with real WhatsApp

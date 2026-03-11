@@ -2,7 +2,11 @@
 // Mock WhatsApp provider for development and testing - logs all actions instead of calling real API
 
 import type { IWhatsAppProvider, CreateMatchGroupInput } from '../whatsapp.provider.interface';
-import type { SendMessageResult, CreateGroupResult } from '../whatsapp.types';
+import type {
+  SendMessageResult,
+  CreateGroupResult,
+  WebhookIncomingMessage,
+} from '../whatsapp.types';
 import { logger } from '../../../config/logger';
 
 export class MockWhatsAppProvider implements IWhatsAppProvider {
@@ -32,5 +36,28 @@ export class MockWhatsAppProvider implements IWhatsAppProvider {
       preview: message.slice(0, 80) + (message.length > 80 ? '...' : ''),
     });
     return { success: true, messageId: `mock-${Date.now()}` };
+  }
+
+  parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
+    const b = body as Record<string, unknown>;
+    let senderPhone: string | undefined;
+    let messageText: string | undefined;
+    if (b?.sender && typeof b.sender === 'object') {
+      senderPhone = (b.sender as { phone?: string }).phone;
+    }
+    if (!senderPhone && b?.from) senderPhone = String(b.from).replace(/\D/g, '');
+    if (!senderPhone && Array.isArray(b?.contacts) && b.contacts.length > 0) {
+      const c0 = b.contacts[0] as { wa_id?: string };
+      senderPhone = c0?.wa_id;
+    }
+    if (messageText === undefined && b?.body && typeof b.body === 'object') {
+      messageText = (b.body as { text?: string }).text;
+    }
+    if (messageText === undefined && b?.text && typeof b.text === 'object') {
+      messageText = (b.text as { body?: string }).body;
+    }
+    if (messageText === undefined && typeof b?.message === 'string') messageText = b.message;
+    if (!senderPhone || messageText === undefined) return null;
+    return { senderPhone, messageText };
   }
 }

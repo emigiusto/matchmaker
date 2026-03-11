@@ -2,8 +2,9 @@
 // WhatsApp integration service - abstracts providers (Whapi, WasenderApi, etc.)
 
 import type { IWhatsAppProvider } from './whatsapp.provider.interface';
-import type { WhatsAppProvider } from './whatsapp.types';
+import type { WhatsAppProvider, WebhookIncomingMessage } from './whatsapp.types';
 import { WhapiProvider } from './providers/whapi.provider';
+import { WasenderProvider } from './providers/wasender.provider';
 import { MockWhatsAppProvider } from './providers/mock.provider';
 
 function getProvider(): IWhatsAppProvider {
@@ -11,6 +12,8 @@ function getProvider(): IWhatsAppProvider {
   switch (providerName) {
     case 'whapi':
       return new WhapiProvider();
+    case 'wasender':
+      return new WasenderProvider();
     case 'mock':
     default:
       return new MockWhatsAppProvider();
@@ -30,5 +33,10 @@ export const whatsappService = {
 
   async sendGroupMessage(groupId: string, message: string) {
     return provider.sendGroupMessage(groupId, message);
+  },
+
+  /** Parse provider-specific webhook body into normalized message. Returns null if not an incoming 1:1 text. */
+  parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
+    return provider.parseWebhookPayload(body);
   },
 };

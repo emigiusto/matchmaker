@@ -1,0 +1,165 @@
+// wasender.provider.ts
+// WasenderApi WhatsApp API provider
+// Docs: https://wasenderapi.com/api-docs
+
+import type { IWhatsAppProvider, CreateMatchGroupInput } from '../whatsapp.provider.interface';
+import type {
+  SendMessageResult,
+  CreateGroupResult,
+  WebhookIncomingMessage,
+} from '../whatsapp.types';
+
+const WASENDER_BASE =
+  process.env.WASENDER_BASE_URL || process.env.WASENDER_API_URL || 'https://www.wasenderapi.com';
+const WASENDER_TOKEN = process.env.WASENDER_API_KEY || process.env.WASENDER_TOKEN || '';
+
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return digits.startsWith('0') ? digits.slice(1) : digits;
+}
+
+/** Convert phone to WhatsApp JID for groups API */
+function phoneToJid(phone: string): string {
+  const digits = normalizePhone(phone);
+  return `${digits}@s.whatsapp.net`;
+}
+
+export class WasenderProvider implements IWhatsAppProvider {
+  async sendInviteMessage(phoneNumber: string, message: string): Promise<SendMessageResult> {
+    if (!WASENDER_TOKEN) {
+      return { success: false, error: 'WASENDER_API_KEY not configured' };
+    }
+    try {
+      const to = normalizePhone(phoneNumber);
+      const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${WASENDER_TOKEN}`,
+        },
+        body: JSON.stringify({ to: `+${to}`, text: message }),
+      });
+      const data = (await res.json()) as { success?: boolean; data?: { msgId?: string }; error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      return {
+        success: true,
+        messageId: data.data?.msgId != null ? String(data.data.msgId) : undefined,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async createMatchGroup(input: CreateMatchGroupInput): Promise<CreateGroupResult> {
+    if (!WASENDER_TOKEN) {
+      return { success: false, error: 'WASENDER_API_KEY not configured' };
+    }
+    try {
+      const participants = [
+        ...input.participantPhones.map(normalizePhone),
+        ...(input.botPhone ? [normalizePhone(input.botPhone)] : []),
+      ]
+        .filter(Boolean)
+        .filter((p, i, arr) => arr.indexOf(p) === i)
+        .map(phoneToJid);
+
+      const res = await fetch(`${WASENDER_BASE}/api/groups`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${WASENDER_TOKEN}`,
+        },
+        body: JSON.stringify({
+          name: input.groupName,
+          participants,
+        }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        data?: { id?: string };
+        error?: string;
+      };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      const groupId = data.data?.id;
+      if (!groupId) {
+        return { success: false, error: 'No group id in response' };
+      }
+      return { success: true, groupId };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async sendGroupMessage(groupId: string, message: string): Promise<SendMessageResult> {
+    if (!WASENDER_TOKEN) {
+      return { success: false, error: 'WASENDER_API_KEY not configured' };
+    }
+    try {
+      const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${WASENDER_TOKEN}`,
+        },
+        body: JSON.stringify({
+          to: groupId,
+          text: message,
+        }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        data?: { msgId?: string };
+        error?: string;
+      };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      return {
+        success: true,
+        messageId: data.data?.msgId != null ? String(data.data.msgId) : undefined,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
+    const b = body as Record<string, unknown>;
+    const data = b?.data as Record<string, unknown> | undefined;
+    const messages = data?.messages;
+
+    if (!messages || typeof messages !== 'object') return null;
+
+    const msgObj = messages as Record<string, unknown>;
+    const key = msgObj.key as Record<string, unknown> | undefined;
+    if (!key) return null;
+    if (key.fromMe) return null;
+
+    const senderPhone =
+      (key.cleanedSenderPn as string) ??
+      (key.cleanedParticipantPn as string) ??
+      (typeof key.remoteJid === 'string'
+        ? String(key.remoteJid).replace(/@.*$/, '').replace(/\D/g, '')
+        : '');
+    const messageText = msgObj.messageBody as string | undefined;
+
+    if (!senderPhone || messageText === undefined || messageText === '') return null;
+    return {
+      senderPhone: senderPhone.replace(/\D/g, ''),
+      messageText: String(messageText),
+    };
+  }
+}

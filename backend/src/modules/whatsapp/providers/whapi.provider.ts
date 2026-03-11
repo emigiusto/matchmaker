@@ -3,7 +3,11 @@
 // Docs: https://whapi.cloud/docs
 
 import type { IWhatsAppProvider, CreateMatchGroupInput } from '../whatsapp.provider.interface';
-import type { SendMessageResult, CreateGroupResult } from '../whatsapp.types';
+import type {
+  SendMessageResult,
+  CreateGroupResult,
+  WebhookIncomingMessage,
+} from '../whatsapp.types';
 
 const WHAPI_BASE = process.env.WHAPI_BASE_URL || process.env.WHAPI_URL || 'https://gate.whapi.cloud';
 const WHAPI_TOKEN = process.env.WHAPI_API_TOKEN || process.env.WHAPI_TOKEN || '';
@@ -104,5 +108,17 @@ export class WhapiProvider implements IWhatsAppProvider {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
+    const b = body as Record<string, unknown>;
+    const msg = Array.isArray(b?.messages) ? (b.messages as unknown[])[0] : null;
+    const msgObj = msg && typeof msg === 'object' ? (msg as Record<string, unknown>) : null;
+    if (!msgObj || msgObj.from_me) return null;
+    if (msgObj.type !== 'text') return null;
+    const from = msgObj.from ? String(msgObj.from).replace(/\D/g, '') : '';
+    const text = (msgObj.text as { body?: string })?.body;
+    if (!from || text === undefined) return null;
+    return { senderPhone: from, messageText: text };
   }
 }
