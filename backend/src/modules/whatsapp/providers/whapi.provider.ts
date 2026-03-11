@@ -196,18 +196,27 @@ export class WhapiProvider implements IWhatsAppProvider {
     const msg = Array.isArray(b?.messages) ? (b.messages as unknown[])[0] : null;
     const msgObj = msg && typeof msg === 'object' ? (msg as Record<string, unknown>) : null;
     if (!msgObj || msgObj.from_me) return null;
-    const from = msgObj.from ? String(msgObj.from).replace(/\D/g, '') : '';
+
+    // Prefer chat_id for 1:1 chats — more reliable than "from" for button/poll replies
+    // chat_id = "4591616559@s.whatsapp.net" for direct chats
+    const chatId = msgObj.chat_id && typeof msgObj.chat_id === 'string' ? msgObj.chat_id : '';
+    const is1to1 = chatId.endsWith('@s.whatsapp.net') && !chatId.includes('@g.us');
+    const fromChat = is1to1
+      ? chatId.replace(/@.*$/, '').replace(/\D/g, '')
+      : '';
+    const fromField = msgObj.from ? String(msgObj.from).replace(/\D/g, '') : '';
+    const senderPhone = fromChat || fromField;
+    if (!senderPhone) return null;
 
     if (msgObj.type === 'text') {
       const text = (msgObj.text as { body?: string })?.body;
-      if (!from || text === undefined) return null;
-      return { senderPhone: from, messageText: text };
+      if (text === undefined) return null;
+      return { senderPhone, messageText: text };
     }
     if (msgObj.type === 'reply') {
       const reply = msgObj.reply as { type?: string; buttons_reply?: { id?: string; title?: string } } | undefined;
       if (reply?.type === 'buttons_reply' && reply.buttons_reply?.title) {
-        if (!from) return null;
-        return { senderPhone: from, messageText: reply.buttons_reply.title };
+        return { senderPhone, messageText: reply.buttons_reply.title };
       }
     }
     return null;

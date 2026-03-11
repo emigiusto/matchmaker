@@ -264,14 +264,19 @@ export class WasenderProvider implements IWhatsAppProvider {
     const voted = data.pollResult.find((r) => Array.isArray(r.voters) && r.voters.length > 0);
     if (!voted?.name) return null;
 
-    let senderPhone = '';
     const key = data.key;
-    if (key?.remoteJid && typeof key.remoteJid === 'string') {
-      senderPhone = String(key.remoteJid).replace(/@.*$/, '').replace(/\D/g, '');
-    }
-    if (!senderPhone && voted.voters?.[0]) {
-      senderPhone = String(voted.voters[0]).replace(/@.*$/, '').replace(/\D/g, '');
-    }
+    const remoteJid = key?.remoteJid && typeof key.remoteJid === 'string' ? String(key.remoteJid) : '';
+    const voter0 = voted.voters?.[0] ? String(voted.voters[0]) : '';
+
+    const extractPhone = (jid: string) => jid.replace(/@.*$/, '').replace(/\D/g, '');
+
+    // For 1:1 chats: remoteJid = user we sent to (e.g. 4591616559@s.whatsapp.net)
+    // Prefer remoteJid over voters — voters can contain LID format (e.g. 21:32:xxx@lid) that doesn't match our DB
+    const fromRemote = extractPhone(remoteJid);
+    const fromVoter = extractPhone(voter0);
+
+    const is1to1 = remoteJid.endsWith('@s.whatsapp.net') && !remoteJid.includes('@g.us');
+    const senderPhone = is1to1 && fromRemote ? fromRemote : fromVoter || fromRemote;
     if (!senderPhone) return null;
 
     return {

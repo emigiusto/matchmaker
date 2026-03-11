@@ -260,5 +260,24 @@ describe('WhapiProvider', () => {
       const result = provider.parseWebhookPayload(body);
       expect(result).toEqual({ senderPhone: '34612345678', messageText: 'YES' });
     });
+
+    it('uses chat_id for 1:1 when from has wrong format (e.g. LID)', () => {
+      const body = {
+        messages: [
+          {
+            from: '213271047045160',
+            chat_id: '4591616559@s.whatsapp.net',
+            type: 'reply',
+            from_me: false,
+            reply: {
+              type: 'buttons_reply',
+              buttons_reply: { id: 'invite_yes', title: 'YES' },
+            },
+          },
+        ],
+      };
+      const result = provider.parseWebhookPayload(body);
+      expect(result).toEqual({ senderPhone: '4591616559', messageText: 'YES' });
+    });
   });
 });
