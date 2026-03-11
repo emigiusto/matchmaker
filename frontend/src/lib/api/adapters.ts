@@ -25,6 +25,8 @@ export interface BackendMatchDTO {
   location?: string
   date?: string
   time?: string
+  sportType?: "tennis" | "padel"
+  format?: "singles" | "doubles"
 }
 
 // Backend InviteDTO shape (from /invites endpoints)
@@ -258,6 +260,9 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
     undefined
   )
 
+  const sport = (dto.sportType === "padel" || dto.sportType === "tennis" ? dto.sportType : "tennis") as "tennis" | "padel"
+  const format = (dto.format === "doubles" || dto.format === "singles" ? dto.format : participants.length >= 4 ? "doubles" : "singles") as "singles" | "doubles"
+
   return {
     id: dto.id,
     player1,
@@ -269,5 +274,7 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
     status: dto.status as Match["status"],
     participants: participants.map((p) => ({ userId: p.userId, userName: p.userName, team: p.team })),
     showVsLayout,
+    sport,
+    format,
   }
 }

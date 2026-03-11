@@ -60,6 +60,10 @@ export interface Match {
   participants?: { userId: string; userName?: string; team?: "A" | "B" | null }[]
   /** False for doubles before result: teams unknown, hide vs layout */
   showVsLayout?: boolean
+  /** Sport: tennis or padel (from scheduling, or inferred) */
+  sport?: "tennis" | "padel"
+  /** Format: singles or doubles */
+  format?: "singles" | "doubles"
 }
 
 export interface PostMatchQuestionnaire {

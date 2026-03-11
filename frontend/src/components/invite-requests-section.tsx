@@ -22,6 +22,7 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react"
+import { SportFormatBadge } from "@/components/sport-format-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
@@ -427,12 +428,10 @@ export function InviteRequestsSection({
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium capitalize text-foreground">
-                            {request.sport}
-                          </span>
-                          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium capitalize text-muted-foreground">
-                            {request.matchFormat}
-                          </span>
+                          <SportFormatBadge
+                            sport={request.sport}
+                            format={request.matchFormat}
+                          />
                           {request.status === "scheduling" && (
                             <span className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-600">
                               <Loader2 className="h-3 w-3 animate-spin" />

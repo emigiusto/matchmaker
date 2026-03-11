@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/status-badge"
+import { SportFormatBadge } from "@/components/sport-format-badge"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
@@ -160,6 +161,10 @@ export default function MatchDetailPage() {
           )}
           <div className="border-b border-border/40 bg-muted/30 px-6 py-4">
             <div className="flex flex-wrap items-center gap-3">
+              <SportFormatBadge
+                sport={match.sport ?? "tennis"}
+                format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
+              />
               <StatusBadge status={match.status} />
               <span className="text-xs text-muted-foreground">
                 {format(new Date(match.date), "EEEE, MMMM d, yyyy")}

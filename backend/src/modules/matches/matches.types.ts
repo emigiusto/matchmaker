@@ -42,6 +42,10 @@ export interface MatchDTO {
   date?: string;
   /** Time HH:mm (when included) */
   time?: string;
+  /** Sport type (when match created via scheduling) */
+  sportType?: 'tennis' | 'padel';
+  /** Format: singles or doubles (when match created via scheduling) */
+  format?: 'singles' | 'doubles';
 }
 
 export interface CreateMatchInput {

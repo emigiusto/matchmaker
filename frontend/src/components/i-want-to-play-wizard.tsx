@@ -43,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SportFormatBadge } from "@/components/sport-format-badge"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { schedulingService } from "@/lib/services/scheduling.service"
@@ -959,10 +960,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <span>{displayLocation}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Users className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="capitalize">{sport}</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="capitalize">{matchFormat}</span>
+                  <SportFormatBadge sport={sport} format={matchFormat} />
                 </div>
               </div>
             </div>

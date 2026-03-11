@@ -21,6 +21,7 @@ import { whatsappService } from '../whatsapp/whatsapp.service';
 const matchInclude = {
   invite: true,
   availability: true,
+  schedulingRequest: { select: { sportType: true, format: true } },
   participants: { include: { user: { select: { id: true, name: true } } } },
 } as const;
 
@@ -458,6 +459,7 @@ export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<
 
 type EnrichedMatch = Match & {
   availability?: { locationText: string; date: Date; startTime: Date } | null;
+  schedulingRequest?: { sportType: string; format: string } | null;
   participants?: { userId: string; team: string | null; user?: { id: string; name: string | null } }[];
 };
 
@@ -469,6 +471,10 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
       team: (p.team === 'A' || p.team === 'B' ? p.team : null) as 'A' | 'B' | null,
       userName: p.user?.name ?? undefined,
     })) ?? [];
+  const sr = (match as EnrichedMatch).schedulingRequest;
+  const participantCount = participants.length;
+  const format = (sr?.format === 'doubles' || sr?.format === 'singles' ? sr.format : participantCount >= 4 ? 'doubles' : 'singles') as 'singles' | 'doubles';
+  const sportType = (sr?.sportType === 'padel' || sr?.sportType === 'tennis' ? sr.sportType : 'tennis') as 'tennis' | 'padel';
   return {
     id: match.id,
     inviteId: match.inviteId,
@@ -481,6 +487,8 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
     status: match.status,
     type: match.type || 'competitive',
+    sportType,
+    format,
     ...(av && {
       location: av.locationText,
       date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),

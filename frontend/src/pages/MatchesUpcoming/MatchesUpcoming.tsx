@@ -5,6 +5,7 @@ import { Calendar, Clock, History, MapPin, Loader2, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
+import { SportFormatBadge } from "@/components/sport-format-badge"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
@@ -152,7 +153,12 @@ export default function MatchesPage() {
                         className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 p-4 backdrop-blur-sm"
                       >
                         <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <SportFormatBadge
+                              sport={match.sport ?? "tennis"}
+                              format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
+                              size="sm"
+                            />
                             <p className="text-base font-semibold text-foreground">
                               vs {opponent.name}
                             </p>
@@ -223,7 +229,12 @@ export default function MatchesPage() {
                         className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
                       >
                         <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <SportFormatBadge
+                              sport={match.sport ?? "tennis"}
+                              format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
+                              size="sm"
+                            />
                             <p className="text-base font-semibold text-foreground">
                               vs {opponent.name}
                             </p>
@@ -308,6 +319,11 @@ export default function MatchesPage() {
                           className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
                         >
                           <div className="flex flex-wrap items-center gap-2">
+                            <SportFormatBadge
+                              sport={match.sport ?? "tennis"}
+                              format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
+                              size="sm"
+                            />
                             <p className="text-base font-semibold text-foreground">
                               vs {opponent.name}
                             </p>
