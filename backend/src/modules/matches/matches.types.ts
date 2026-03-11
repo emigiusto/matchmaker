@@ -18,6 +18,12 @@ export type MatchStatus = 'scheduled' | 'awaiting_confirmation' | 'completed' | 
 
 export type MatchType = 'competitive' | 'practice';
 
+export interface MatchParticipantDTO {
+  userId: string;
+  team: 'A' | 'B' | null;
+  userName?: string;
+}
+
 export interface MatchDTO {
   id: string;
   inviteId: string | null;
@@ -25,10 +31,7 @@ export interface MatchDTO {
   venueId: string | null;
   playerAId: string | null;
   playerBId: string | null;
-  hostUserId: string;
-  opponentUserId: string;
-  hostPartnerUserId: string | null;
-  opponentPartnerUserId: string | null;
+  participants: MatchParticipantDTO[];
   scheduledAt: string; // ISO string
   createdAt: string;   // ISO string
   status: MatchStatus;
@@ -39,22 +42,15 @@ export interface MatchDTO {
   date?: string;
   /** Time HH:mm (when included) */
   time?: string;
-  /** Host display name (when included) */
-  hostName?: string;
-  /** Opponent display name (when included) */
-  opponentName?: string;
 }
 
 export interface CreateMatchInput {
-  hostUserId: string;
-  opponentUserId: string;
+  participantUserIds: string[];
   scheduledAt: string; // ISO string
   venueId?: string | null;
   playerAId?: string | null;
   playerBId?: string | null;
   inviteId?: string | null;
-  availabilityId?: string | null;
+  availabilityId: string;
   type: MatchType;
-  hostPartnerUserId?: string | null;
-  opponentPartnerUserId?: string | null;
 }

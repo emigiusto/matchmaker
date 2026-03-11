@@ -19,8 +19,7 @@ import { validateResultMatchConsistency } from '../results/results.service';
 const matchInclude = {
   invite: true,
   availability: true,
-  hostUser: true,
-  opponentUser: true,
+  participants: { include: { user: { select: { id: true, name: true } } } },
 } as const;
 
 export async function getMatchById(matchId: string): Promise<MatchDTO> {
@@ -46,13 +45,12 @@ export async function listMatchesForUser(userId: string): Promise<MatchDTO[]> {
   // Defensive: Try to resolve Player for this user
   const player = await prisma.player.findUnique({ where: { userId } });
 
-  // Build query conditions
   const orConditions: Prisma.MatchWhereInput[] = [
     { invite: { inviterUserId: userId } },
     { availability: { userId } },
+    { participants: { some: { userId } } },
   ];
   if (player) {
-    // If user has a Player, include matches where they participate as playerA or playerB
     orConditions.push({ playerAId: player.id });
     orConditions.push({ playerBId: player.id });
   }
@@ -66,7 +64,7 @@ export async function listMatchesForUser(userId: string): Promise<MatchDTO[]> {
   // Deduplicate by match.id (in case of overlapping conditions)
   const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
   // Defensive: filter out any matches missing required relations
-  return uniqueMatches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
+  return uniqueMatches.filter((m) => !!m.availability).map(toMatchDTO);
 }
 
 /**
@@ -89,7 +87,7 @@ export async function listMatchesForPlayer(playerId: string): Promise<MatchDTO[]
   // Deduplicate by match.id (should not be needed, but defensive)
   const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
   // Defensive: filter out any matches missing required relations
-  return uniqueMatches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
+  return uniqueMatches.filter((m) => !!m.availability).map(toMatchDTO);
 }
 
 // Additional service methods for new routes
@@ -103,6 +101,7 @@ export async function listUpcomingMatchesForUser(userId: string): Promise<MatchD
   const orConditions: Prisma.MatchWhereInput[] = [
     { invite: { inviterUserId: userId } },
     { availability: { userId } },
+    { participants: { some: { userId } } },
   ];
   if (player) {
     orConditions.push({ playerAId: player.id });
@@ -117,7 +116,7 @@ export async function listUpcomingMatchesForUser(userId: string): Promise<MatchD
     orderBy: { scheduledAt: 'asc' },
   });
   const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
-  return uniqueMatches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
+  return uniqueMatches.filter((m) => !!m.availability).map(toMatchDTO);
 }
 
 
@@ -130,6 +129,7 @@ export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]
   const orConditions: Prisma.MatchWhereInput[] = [
     { invite: { inviterUserId: userId } },
     { availability: { userId } },
+    { participants: { some: { userId } } },
   ];
   if (player) {
     orConditions.push({ playerAId: player.id });
@@ -144,7 +144,7 @@ export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]
     orderBy: { scheduledAt: 'desc' },
   });
   const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
-  return uniqueMatches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
+  return uniqueMatches.filter((m) => !!m.availability).map(toMatchDTO);
 }
 
 
@@ -287,29 +287,36 @@ export async function completeMatch(matchId: string, currentUserId: string, isAd
  * Cancel a match (scheduled -> cancelled)
  * Only allowed if:
  *   - Match exists
- *   - Only hostUserId can cancel
+ *   - Only the slot owner (availability.userId) can cancel
  *   - status is scheduled
  *   - Now is before scheduledAt
  * Throws AppError on invalid transition.
  */
 export async function cancelMatch(matchId: string, userId: string): Promise<MatchDTO> {
   return await prisma.$transaction(async (tx) => {
-    const match = await tx.match.findUnique({ where: { id: matchId } });
+    const match = await tx.match.findUnique({
+      where: { id: matchId },
+      include: { availability: { select: { userId: true } } },
+    });
     if (!match) throw new AppError('Match not found', 404);
     if (!('status' in match)) throw new AppError('Match missing status field (migration not applied)', 500);
     if (match.status !== 'scheduled') {
       throw new AppError('Match cannot be cancelled: not in scheduled state', 409);
     }
-    if (match.hostUserId !== userId) {
-      throw new AppError('Only the host can cancel this match', 403);
+    const ownerId = match.availability?.userId;
+    if (ownerId !== userId) {
+      throw new AppError('Only the slot owner can cancel this match', 403);
     }
     const now = new Date();
     if (now >= match.scheduledAt) {
       throw new AppError('Cannot cancel match after scheduled time', 409);
     }
     // Update status
-    const updated = await tx.match.update({ where: { id: match.id }, data: { status: 'cancelled' as MatchStatus } });
-    // TODO: Trigger notifications as side effect (after commit)
+    const updated = await tx.match.update({
+      where: { id: match.id },
+      data: { status: 'cancelled' as MatchStatus },
+      include: matchInclude,
+    });
     return toMatchDTO(updated);
   });
 }
@@ -317,58 +324,64 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
 /**
  * Create a new match with the provided input data.
  *
- * Requires hostUserId, opponentUserId, scheduledAt, and availabilityId. Optionally connects venue, playerA, playerB, and invite if provided.
+ * Requires participantUserIds, scheduledAt, availabilityId, and type. Optionally connects venue, playerA, playerB, and invite.
  * Throws AppError if required fields are missing. Uses Prisma's checked MatchCreateInput with nested connect for all relations.
  *
  * @param input - The match creation input, including user IDs, scheduled time, and relation IDs.
+ * @param tx - Optional Prisma transaction client for atomic operations.
  * @returns The created MatchDTO.
  * @throws AppError if required fields are missing or validation fails.
  */
-export async function createMatch(input: CreateMatchInput): Promise<MatchDTO> {
-  // Basic validation (should be expanded for production)
-  if (!input.hostUserId || !input.opponentUserId || !input.scheduledAt) {
-    throw new AppError('Missing required fields: hostUserId, opponentUserId, scheduledAt', 400);
+export async function createMatch(
+  input: CreateMatchInput,
+  tx?: Prisma.TransactionClient
+): Promise<MatchDTO> {
+  if (!input.participantUserIds?.length || !input.scheduledAt || !input.availabilityId) {
+    throw new AppError('Missing required fields: participantUserIds, scheduledAt, availabilityId', 400);
   }
-  // Use Prisma MatchCreateInput with nested connect for relations
-  if (!input.availabilityId) {
-    throw new AppError('Missing required field: availabilityId', 400);
-  }
-  // Validate and set match type
-  let matchType = input.type ?? 'competitive';
+  const matchType = input.type ?? 'competitive';
   if (matchType !== 'competitive' && matchType !== 'practice') {
     throw new AppError('Invalid match type. Must be "competitive" or "practice".', 400);
   }
-  
+
+  const db = tx ?? prisma;
+  const uniqueIds = [...new Set(input.participantUserIds)];
   const data: Prisma.MatchCreateInput = {
-    hostUser: { connect: { id: input.hostUserId } },
-    opponentUser: { connect: { id: input.opponentUserId } },
     scheduledAt: new Date(input.scheduledAt),
     status: 'scheduled',
     availability: { connect: { id: input.availabilityId } },
     type: matchType,
+    participants: {
+      create: uniqueIds.map((userId) => ({ userId, team: null })),
+    },
   };
   if (input.venueId) data.venue = { connect: { id: input.venueId } };
   if (input.playerAId) data.playerA = { connect: { id: input.playerAId } };
   if (input.playerBId) data.playerB = { connect: { id: input.playerBId } };
   if (input.inviteId) data.invite = { connect: { id: input.inviteId } };
-  if (input.hostPartnerUserId) data.hostPartnerUser = { connect: { id: input.hostPartnerUserId } };
-  if (input.opponentPartnerUserId) data.opponentPartnerUser = { connect: { id: input.opponentPartnerUserId } };
-  const match = await prisma.match.create({ data });
+
+  const match = await db.match.create({
+    data,
+    include: { participants: { include: { user: { select: { id: true, name: true } } } }, availability: true },
+  });
   return toMatchDTO(match);
 }
 
 
 
-// Helper: convert DB Match to API MatchDTO (with optional enriched fields)
 type EnrichedMatch = Match & {
   availability?: { locationText: string; date: Date; startTime: Date } | null;
-  hostUser?: { name: string | null } | null;
-  opponentUser?: { name: string | null } | null;
+  participants?: { userId: string; team: string | null; user?: { id: string; name: string | null } }[];
 };
 
 function toMatchDTO(match: EnrichedMatch): MatchDTO {
   const av = match.availability;
-  const scheduled = match.scheduledAt instanceof Date ? match.scheduledAt : new Date(match.scheduledAt);
+  const participants =
+    (match as any).participants?.map((p: { userId: string; team: string | null; user?: { name: string | null } }) => ({
+      userId: p.userId,
+      team: (p.team === 'A' || p.team === 'B' ? p.team : null) as 'A' | 'B' | null,
+      userName: p.user?.name ?? undefined,
+    })) ?? [];
   return {
     id: match.id,
     inviteId: match.inviteId,
@@ -376,10 +389,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     venueId: match.venueId,
     playerAId: match.playerAId,
     playerBId: match.playerBId,
-    hostUserId: match.hostUserId,
-    opponentUserId: match.opponentUserId,
-    hostPartnerUserId: match.hostPartnerUserId ?? null,
-    opponentPartnerUserId: match.opponentPartnerUserId ?? null,
+    participants,
     scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
     status: match.status,
@@ -389,7 +399,5 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
       date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),
       time: av.startTime instanceof Date ? av.startTime.toTimeString().slice(0, 5) : String(av.startTime).slice(0, 5),
     }),
-    hostName: match.hostUser?.name ?? undefined,
-    opponentName: match.opponentUser?.name ?? undefined,
   };
 }

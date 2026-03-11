@@ -167,9 +167,8 @@ export class MatchesController {
   static async createMatch(req: Request, res: Response, next: NextFunction) {
     try {
       const input = req.body;
-      // Validate required fields including type
-      if (!input.hostUserId || !input.opponentUserId || !input.scheduledAt || !input.type) {
-        return res.status(400).json({ error: 'Missing required fields: hostUserId, opponentUserId, scheduledAt, type' });
+      if (!input.participantUserIds?.length || !input.scheduledAt || !input.type || !input.availabilityId) {
+        return res.status(400).json({ error: 'Missing required fields: participantUserIds, scheduledAt, type, availabilityId' });
       }
       // Validate type value
       if (input.type !== 'competitive' && input.type !== 'practice') {

@@ -249,11 +249,15 @@ export class InviteService {
           inviteId: invite.id,
           availabilityId: invite.availabilityId,
           scheduledAt: availability.startTime,
-          hostUserId: availability.userId,
-          opponentUserId: resolvedOpponentUserId,
           playerAId,
           playerBId,
           type: invite.matchType as MatchType,
+          participants: {
+            create: [
+              { userId: availability.userId, team: null },
+              { userId: resolvedOpponentUserId, team: null },
+            ],
+          },
         },
       });
       const updatedInvite = await tx.invite.update({

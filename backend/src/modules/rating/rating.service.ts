@@ -31,9 +31,7 @@ export type RatingTx = {
       scheduledAt: Date;
       createdAt: Date;
       status: string;
-      hostUserId: string;
-      opponentUserId: string;
-      type: string; // Added for match type guard
+      type: string;
     } | null>;
   };
 

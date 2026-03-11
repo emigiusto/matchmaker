@@ -258,17 +258,15 @@ router.post('/:id/cancel', MatchesController.cancelMatch);
  *           schema:
  *             type: object
  *             required:
- *               - hostUserId
- *               - opponentUserId
+ *               - participantUserIds
  *               - scheduledAt
  *               - type
+ *               - availabilityId
  *             properties:
- *               hostUserId:
- *                 type: string
- *                 description: Host user ID
- *               opponentUserId:
- *                 type: string
- *                 description: Opponent user ID
+ *               participantUserIds:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: User IDs of all match participants
  *               scheduledAt:
  *                 type: string
  *                 format: date-time
@@ -291,8 +289,7 @@ router.post('/:id/cancel', MatchesController.cancelMatch);
  *                 description: Invite ID (optional)
  *               availabilityId:
  *                 type: string
- *                 nullable: true
- *                 description: Availability ID (optional)
+ *                 description: Availability ID (required)
  *               type:
  *                 type: string
  *                 enum: [competitive, practice]

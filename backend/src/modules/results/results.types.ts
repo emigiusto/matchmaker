@@ -62,6 +62,8 @@ export interface SubmitMatchResultInput {
   matchId: string;
   sets: AddSetResultInput[];
   currentUserId: string;
+  /** When participants have no teams yet, define who played on each side. Team A = playerAScore, Team B = playerBScore. */
+  teamAssignment?: { teamAUserIds: string[]; teamBUserIds: string[] };
 }
 
 // Note: submitMatchResult may return null for practice matches with no sets

@@ -5,11 +5,17 @@
 
 import type { Match, Player, Invite, Notification } from "@/lib/types"
 
+// Backend participant (from MatchDTO)
+export interface BackendMatchParticipantDTO {
+  userId: string
+  team: "A" | "B" | null
+  userName?: string
+}
+
 // Backend MatchDTO shape (from /matches endpoints)
 export interface BackendMatchDTO {
   id: string
-  hostUserId: string
-  opponentUserId: string
+  participants: BackendMatchParticipantDTO[]
   scheduledAt: string
   status: string
   type: "competitive" | "practice"
@@ -19,10 +25,6 @@ export interface BackendMatchDTO {
   location?: string
   date?: string
   time?: string
-  hostName?: string
-  opponentName?: string
-  hostPlayer?: Partial<Player>
-  opponentPlayer?: Partial<Player>
 }
 
 // Backend InviteDTO shape (from /invites endpoints)
@@ -145,30 +147,41 @@ function minimalPlayer(
 
 /**
  * Map backend MatchDTO to frontend Match.
- * Uses enriched fields (location, date, time, hostName, opponentName) from backend.
+ * Derives player1/player2 from participants (team A rep, team B rep, or first two if no teams).
  */
 export function adaptMatch(dto: BackendMatchDTO): Match {
   const scheduled = new Date(dto.scheduledAt)
   const dateStr = dto.date ?? scheduled.toISOString().slice(0, 10)
   const timeStr = dto.time ?? scheduled.toTimeString().slice(0, 5)
 
-  const hostP = minimalPlayer(
-    dto.hostUserId,
-    dto.playerAId ?? dto.hostUserId,
-    dto.hostName ?? "Host",
-    dto.hostPlayer as PlayerInput | undefined
+  const participants = dto.participants ?? []
+  const teamA = participants.filter((p) => p.team === "A")
+  const teamB = participants.filter((p) => p.team === "B")
+  // Use team reps when assigned, otherwise first two participants
+  const p1 = teamA.length > 0 ? teamA[0] : participants[0]
+  const p2 = teamB.length > 0 ? teamB[0] : participants[1]
+  const userId1 = p1?.userId ?? "unknown"
+  const userId2 = p2?.userId ?? "unknown"
+  const name1 = p1?.userName ?? "Participant 1"
+  const name2 = p2?.userName ?? "Participant 2"
+
+  const player1 = minimalPlayer(
+    userId1,
+    dto.playerAId ?? userId1,
+    name1,
+    undefined
   )
-  const oppP = minimalPlayer(
-    dto.opponentUserId,
-    dto.playerBId ?? dto.opponentUserId,
-    dto.opponentName ?? "Opponent",
-    dto.opponentPlayer as PlayerInput | undefined
+  const player2 = minimalPlayer(
+    userId2,
+    dto.playerBId ?? userId2,
+    name2,
+    undefined
   )
 
   return {
     id: dto.id,
-    player1: hostP,
-    player2: oppP,
+    player1,
+    player2,
     date: dateStr,
     time: timeStr,
     location: dto.location ?? "",

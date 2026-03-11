@@ -45,6 +45,7 @@ type RequestRow = {
   status: string;
   currentCandidateIndex: number;
   matchId: string | null;
+  match?: { whatsappGroupId: string | null } | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -68,6 +69,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     status: r.status as SchedulingRequestDTO['status'],
     currentCandidateIndex: r.currentCandidateIndex,
     matchId: r.matchId,
+    whatsappGroupId: r.match?.whatsappGroupId ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -319,21 +321,37 @@ export const schedulingService = {
     const now = new Date();
 
     if (isAccept) {
-      const updated = await schedulingRepository.updateCandidateFromWaitingReply(candidate.id, 'accepted', now);
-      if (!updated) {
+      const didComplete = await prisma.$transaction(async (tx) => {
+        const updateResult = await tx.schedulingCandidate.updateMany({
+          where: { id: candidate.id, status: 'waiting_reply' },
+          data: { status: 'accepted', responseAt: now },
+        });
+        if (updateResult.count === 0) {
+          return null; // duplicate or expired
+        }
+        const format = (request as RequestRow).format || 'singles';
+        const required = getRequiredAcceptances(format);
+        const candidates = await tx.schedulingCandidate.findMany({
+          where: { schedulingRequestId: request.id },
+          select: { status: true },
+        });
+        const acceptedCount = candidates.filter((c) => c.status === 'accepted').length;
+        if (acceptedCount >= required) {
+          await tx.schedulingRequest.update({
+            where: { id: request.id },
+            data: { status: 'completed' },
+          });
+          return true;
+        }
+        return false;
+      });
+
+      if (didComplete === null) {
         logger.warn('InviteDuplicateResponse', { candidateId: candidate.id, action: 'accept' });
         return { processed: true };
       }
-      const format = (request as RequestRow).format || 'singles';
-      const required = getRequiredAcceptances(format);
-      const fullRequest = await schedulingRepository.findRequestById(request.id);
-      const acceptedCount = (fullRequest?.candidates ?? []).filter((c) => c.status === 'accepted').length;
-      if (acceptedCount >= required) {
-        await prisma.schedulingRequest.update({
-          where: { id: request.id },
-          data: { status: 'completed' },
-        });
-        logger.info('InviteAccepted', { requestId: request.id, candidateId: candidate.id });
+      logger.info('InviteAccepted', { requestId: request.id, candidateId: candidate.id });
+      if (didComplete) {
         await this.completeScheduling(request.id);
       } else {
         await this.contactNextCandidates(request.id);
@@ -401,6 +419,7 @@ export const schedulingService = {
     });
 
     if (!request || request.status !== 'completed') return;
+    if (request.matchId) return; // Already completed; guard against double execution
 
     const format = (request as RequestRow).format || 'singles';
     const acceptedCandidates = (request.candidates ?? []).filter((c) => c.status === 'accepted');
@@ -430,62 +449,75 @@ export const schedulingService = {
       opponentUserId = c1.contactUser.id;
     }
 
-    const availability = await prisma.availability.create({
-      data: {
-        userId: hostUser.id,
-        date: request.date,
-        startTime: request.startTime,
-        endTime: request.endTime,
-        locationText: request.locationText,
-        status: 'matched',
-      },
-    });
+    const participantUserIds = [hostUser.id, opponentUserId];
+    if (hostPartnerUserId) participantUserIds.push(hostPartnerUserId);
+    if (opponentPartnerUserId) participantUserIds.push(opponentPartnerUserId);
 
-    const match = await createMatch({
-      hostUserId: hostUser.id,
-      opponentUserId,
-      scheduledAt: scheduledAt.toISOString(),
-      availabilityId: availability.id,
-      type: matchType,
-      hostPartnerUserId,
-      opponentPartnerUserId,
-    });
+    const match = await prisma.$transaction(async (tx) => {
+      const availability = await tx.availability.create({
+        data: {
+          userId: hostUser.id,
+          date: request.date,
+          startTime: request.startTime,
+          endTime: request.endTime,
+          locationText: request.locationText,
+          status: 'matched',
+        },
+      });
 
-    await prisma.schedulingRequest.update({
-      where: { id: requestId },
-      data: { matchId: match.id },
+      const created = await createMatch(
+        {
+          participantUserIds,
+          scheduledAt: scheduledAt.toISOString(),
+          availabilityId: availability.id,
+          type: matchType,
+        },
+        tx
+      );
+
+      await tx.schedulingRequest.update({
+        where: { id: requestId },
+        data: { matchId: created.id },
+      });
+
+      return created;
     });
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
 
-    const participantPhones: string[] = [];
-    if (hostUser.phone) participantPhones.push(hostUser.phone);
-    if (hostPartnerUserId) {
-      const hp = acceptedCandidates[0]?.contactUser;
-      if (hp?.phone) participantPhones.push(hp.phone);
-    }
-    if (opponentUserId) {
-      const opp = format === 'doubles' ? acceptedCandidates[1]?.contactUser : acceptedCandidates[0]?.contactUser;
-      if (opp?.phone) participantPhones.push(opp.phone);
-    }
-    if (opponentPartnerUserId) {
-      const oppPartner = acceptedCandidates[2]?.contactUser;
-      if (oppPartner?.phone) participantPhones.push(oppPartner.phone);
-    }
+    const userIdsForWhatsApp = match.participants.map((p) => p.userId);
+    const uniqueUserIds = [...new Set(userIdsForWhatsApp)];
+
+    const usersWithPhones = await prisma.user.findMany({
+      where: { id: { in: uniqueUserIds }, phone: { not: null } },
+      select: { phone: true },
+    });
+    const participantPhones = usersWithPhones
+      .map((u) => u.phone)
+      .filter((p): p is string => !!p);
+
+    const whapiBotPhone =
+      process.env.WHATSAPP_BOT_NUMBER ||
+      process.env.WHAPI_BOT_PHONE ||
+      process.env.WHAPI_ACCOUNT_NUMBER;
+
     if (participantPhones.length >= 2) {
       const dayStr = request.date.toLocaleDateString('en-US', { weekday: 'long' });
       const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       const groupName = `${dayStr} ${timeStr} - ${request.locationText}`;
-      const botPhone = process.env.WHATSAPP_BOT_NUMBER || process.env.WHAPI_BOT_PHONE;
 
       const groupResult = await whatsappService.createMatchGroup({
         participantPhones,
         groupName,
-        botPhone: botPhone || undefined,
+        botPhone: whapiBotPhone || undefined,
       });
 
       if (groupResult.success && groupResult.groupId) {
         logger.info('WhatsappGroupCreated', { groupId: groupResult.groupId, matchId: match.id, groupName });
+        await prisma.match.update({
+          where: { id: match.id },
+          data: { whatsappGroupId: groupResult.groupId },
+        });
         const detailsMessage = formatMatchDetailsMessage(request.sportType, format, dayStr, timeStr, request.locationText);
         await whatsappService.sendGroupMessage(groupResult.groupId, detailsMessage);
       }
@@ -602,6 +634,7 @@ export const schedulingService = {
     await schedulingRepository.updateCandidateStatus(candidateId, 'accepted', now);
     const format = (request as RequestRow).format || 'singles';
     const required = getRequiredAcceptances(format);
+    // +1 because we just accepted this candidate (not yet reflected in request.candidates)
     const acceptedCount = (request.candidates ?? []).filter((c) => c.status === 'accepted').length + 1;
     if (acceptedCount >= required) {
       await schedulingRepository.updateRequestStatus(requestId, 'completed');
@@ -792,7 +825,12 @@ export const schedulingService = {
   async listSchedulingRequestsByHost(hostUserId: string): Promise<SchedulingRequestDTO[]> {
     const requests = await prisma.schedulingRequest.findMany({
       where: { hostUserId },
-      include: { hostUser: true, hostPartner: true, candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } } },
+      include: {
+        hostUser: true,
+        hostPartner: true,
+        candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } },
+        match: { select: { whatsappGroupId: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
     return requests.map(toRequestDTOWithCandidates);
@@ -805,7 +843,12 @@ export const schedulingService = {
 
     const requests = await prisma.schedulingRequest.findMany({
       where: { id: { in: requestIds } },
-      include: { hostUser: true, hostPartner: true, candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } } },
+      include: {
+        hostUser: true,
+        hostPartner: true,
+        candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } },
+        match: { select: { whatsappGroupId: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
     return requests.map(toRequestDTOWithCandidates);

@@ -14,7 +14,7 @@ type SchedulingCandidateSeed = {
 };
 
 const MAX_ACCEPTED_SINGLES = 1;
-const MAX_ACCEPTED_DOUBLES = 2;
+const MAX_ACCEPTED_DOUBLES = 3; // host + 3 accepted = 4 players for doubles
 const MAX_IN_PROGRESS = 3;
 
 type Req = {
@@ -63,7 +63,7 @@ export async function seedSchedulingCandidates(
     let acceptedCount: number;
 
     if (reqStatus === 'completed') {
-      acceptedCount = format === 'singles' ? 1 : 2;
+      acceptedCount = format === 'singles' ? 1 : 3;
       previousCount = faker.number.int({ min: acceptedCount, max: Math.min(chosen.length - 1, acceptedCount + 3) });
       previousCount = Math.max(previousCount, acceptedCount);
       inProgressCount = 0;
@@ -119,7 +119,7 @@ export async function seedSchedulingCandidates(
       candidates.push({ ...c, priorityOrder: idx });
     });
 
-    if (acceptedCount > 0 && (format === 'singles' || (format === 'doubles' && acceptedCount === 2))) {
+    if (acceptedCount > 0 && (format === 'singles' || (format === 'doubles' && acceptedCount === 3))) {
       requestsToComplete.push(request.id);
     }
     if (inProgressCount > 0) {

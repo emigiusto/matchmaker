@@ -7,8 +7,8 @@ const prisma = new PrismaClient();
 export async function seedResults(
   matches: {
     id: string;
-    hostUserId: string;
-    opponentUserId: string;
+    teamAUserId: string;
+    teamBUserId: string;
     scheduledAt: Date;
     type: 'competitive' | 'practice';
   }[]
@@ -25,11 +25,11 @@ export async function seedResults(
       { weight: 1, value: 'draft' },
     ]);
 
-    // Always create 2–3 realistic tennis sets
-    const sets = generateTennisSets(match.hostUserId, match.opponentUserId);
+    // Always create 2–3 realistic tennis sets (teamA = playerAScore, teamB = playerBScore)
+    const sets = generateTennisSets(match.teamAUserId, match.teamBUserId);
 
     // Ensure winnerUserId matches the majority of sets won
-    const winnerUserId = computeWinnerFromSets(sets, match.hostUserId, match.opponentUserId);
+    const winnerUserId = computeWinnerFromSets(sets, match.teamAUserId, match.teamBUserId);
 
     // Set result/match status and timestamps according to lifecycleType
     await prisma.$transaction(async (tx) => {
@@ -38,7 +38,7 @@ export async function seedResults(
         matchId: match.id,
         winnerUserId,
         status: lifecycleType,
-        submittedByUserId: lifecycleType !== 'draft' ? match.hostUserId : null,
+        submittedByUserId: lifecycleType !== 'draft' ? match.teamAUserId : null,
         confirmedByHostAt: null,
         confirmedByOpponentAt: null,
       };
@@ -65,13 +65,26 @@ export async function seedResults(
         });
       }
 
-      // Update match status to be consistent with result
+      // Update match status and playerA/playerB for rating (when confirmed/completed)
       let matchStatus: import('@prisma/client').MatchStatus = 'scheduled';
       if (lifecycleType === 'submitted') matchStatus = 'awaiting_confirmation';
       else if (lifecycleType === 'confirmed') matchStatus = 'completed';
+
+      const fullMatch = await tx.match.findUnique({
+        where: { id: match.id },
+        include: { participants: true },
+      });
+      const playerA = fullMatch ? await tx.player.findFirst({ where: { userId: match.teamAUserId } }) : null;
+      const playerB = fullMatch ? await tx.player.findFirst({ where: { userId: match.teamBUserId } }) : null;
+
       await tx.match.update({
         where: { id: match.id },
-        data: { status: matchStatus },
+        data: {
+          status: matchStatus,
+          ...(lifecycleType === 'confirmed' && playerA && playerB
+            ? { playerAId: playerA.id, playerBId: playerB.id }
+            : {}),
+        },
       });
     });
   }
@@ -85,7 +98,7 @@ type TennisSet = {
   tiebreakScoreB: number | null;
 };
 
-function generateTennisSets(hostUserId: string, opponentUserId: string): TennisSet[] {
+function generateTennisSets(teamAUserId: string, teamBUserId: string): TennisSet[] {
   // 2 or 3 sets, realistic scores
   const numSets = faker.helpers.arrayElement([2, 3]);
   const sets: TennisSet[] = [];
@@ -128,12 +141,12 @@ function generateTennisSets(hostUserId: string, opponentUserId: string): TennisS
   return sets;
 }
 
-function computeWinnerFromSets(sets: TennisSet[], hostUserId: string, opponentUserId: string) {
-  let hostSetsWon = 0;
-  let opponentSetsWon = 0;
+function computeWinnerFromSets(sets: TennisSet[], teamAUserId: string, teamBUserId: string) {
+  let teamASetsWon = 0;
+  let teamBSetsWon = 0;
   for (const set of sets) {
-    if (set.playerAScore > set.playerBScore) hostSetsWon++;
-    else if (set.playerBScore > set.playerAScore) opponentSetsWon++;
+    if (set.playerAScore > set.playerBScore) teamASetsWon++;
+    else if (set.playerBScore > set.playerAScore) teamBSetsWon++;
   }
-  return hostSetsWon > opponentSetsWon ? hostUserId : opponentUserId;
+  return teamASetsWon > teamBSetsWon ? teamAUserId : teamBUserId;
 }

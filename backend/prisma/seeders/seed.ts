@@ -51,6 +51,7 @@ async function main() {
   await prisma.schedulingCandidate.deleteMany();
   await prisma.schedulingRequest.deleteMany();
   await prisma.ratingHistory.deleteMany(); // refs Player, Match — before match
+  await prisma.matchParticipant.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.match.deleteMany();
   await prisma.invite.deleteMany();
@@ -88,16 +89,22 @@ async function main() {
   // 11. Scheduling requests and candidates (WhatsApp scheduling flow) — temporarily disabled to test flow from scratch
   // const schedulingRequests = await seedSchedulingRequests(users, users);
   // const schedulingCandidates = await seedSchedulingCandidates(schedulingRequests, users);
-  // Only pass matches with non-null hostUserId/opponentUserId to results seeder
+  // Pass matches with team A/B representatives for results seeder (from participants)
   const matches = matchesRaw
-    .filter((m: any) => m && m.hostUserId && m.opponentUserId && m.scheduledAt && m.type)
-    .map((m: any) => ({
-      id: m.id,
-      hostUserId: m.hostUserId,
-      opponentUserId: m.opponentUserId,
-      scheduledAt: m.scheduledAt,
-      type: m.type,
-    })) as { id: string; hostUserId: string; opponentUserId: string; scheduledAt: Date; type: 'competitive' | 'practice' }[];
+    .filter((m: any) => m && m.participants?.length >= 2 && m.scheduledAt && m.type)
+    .map((m: any) => {
+      const partA = m.participants?.find((p: { team: string }) => p.team === 'A');
+      const partB = m.participants?.find((p: { team: string }) => p.team === 'B');
+      if (!partA || !partB) return null;
+      return {
+        id: m.id,
+        teamAUserId: partA.userId,
+        teamBUserId: partB.userId,
+        scheduledAt: m.scheduledAt,
+        type: m.type,
+      };
+    })
+    .filter(Boolean) as { id: string; teamAUserId: string; teamBUserId: string; scheduledAt: Date; type: 'competitive' | 'practice' }[];
   // 12. Results (for matches)
   await seedResults(matches);
 

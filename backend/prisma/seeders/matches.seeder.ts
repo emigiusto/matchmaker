@@ -70,11 +70,16 @@ export async function seedMatches(
         playerAId: match.playerAId,
         playerBId: match.playerBId,
         scheduledAt: match.scheduledAt,
-        hostUserId: match.hostUserId,
-        opponentUserId: match.opponentUserId,
         status: 'scheduled',
         type: match.type,
-      }
+        participants: {
+          create: [
+            { userId: match.hostUserId, team: 'A' },
+            { userId: match.opponentUserId, team: 'B' },
+          ],
+        },
+      },
+      include: { participants: { select: { userId: true, team: true } } },
     })
   );
 }

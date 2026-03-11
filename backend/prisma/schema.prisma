@@ -38,11 +38,8 @@ model User {
   // Chat
   sentMessages Message[] @relation("SenderMessages")
 
-  // Match participation (host and opponent)
-  matchesAsHost          Match[] @relation("HostUser")
-  matchesAsOpponent      Match[] @relation("OpponentUser")
-  matchesAsHostPartner   Match[] @relation("HostPartnerUser")
-  matchesAsOpponentPartner Match[] @relation("OpponentPartnerUser")
+  // Match participation
+  matchParticipants MatchParticipant[]
 
   resultsWon        Result[]        @relation("WinnerUser")
 
@@ -216,11 +213,8 @@ enum InviteVisibility {
 ////////////////////////////////////////////////////////////
 // MATCH
 ////////////////////////////////////////////////////////////
-/// - hostUserId: REQUIRED, always the owner of the availability (the host)
-/// - opponentUserId: REQUIRED, always the user who accepted the invite (the opponent)
-/// - Both reference User(id) and are indexed. ON DELETE RESTRICT.
-/// - playerAId/playerBId: OPTIONAL enrichments (tennis persona), may be null for guests
-///   (Player relations are optional and not required for match creation)
+/// Participants are stored in MatchParticipant. Teams (A/B) are assigned when result is loaded.
+/// availability.userId = creator/owner of the slot.
 ///
 model Match {
   id               String   @id @default(uuid())
@@ -232,18 +226,14 @@ model Match {
   scheduledAt      DateTime
   createdAt        DateTime @default(now())
 
+  /// WhatsApp group ID for scheduling matches (opened via chat.whatsapp.com)
+  whatsappGroupId  String?
+
   /// Match type (competitive or practice)
   type             MatchType   @default(competitive)
 
   /// Match lifecycle status
   status           MatchStatus @default(scheduled)
-
-  /// REQUIRED: always the owner of the availability (host)
-  hostUserId           String
-  hostPartnerUserId    String?
-  /// REQUIRED: always the user who accepted the invite (opponent)
-  opponentUserId       String
-  opponentPartnerUserId String?
 
   invite         Invite?        @relation(fields: [inviteId], references: [id])
   availability   Availability   @relation(fields: [availabilityId], references: [id])
@@ -252,12 +242,7 @@ model Match {
   playerB        Player?        @relation("PlayerB", fields: [playerBId], references: [id])
   result         Result?
   conversation   Conversation?
-
-  /// User relations (host, opponent, optional doubles partners)
-  hostUser            User    @relation("HostUser", fields: [hostUserId], references: [id], onDelete: Restrict)
-  hostPartnerUser     User?   @relation("HostPartnerUser", fields: [hostPartnerUserId], references: [id], onDelete: SetNull)
-  opponentUser        User    @relation("OpponentUser", fields: [opponentUserId], references: [id], onDelete: Restrict)
-  opponentPartnerUser User?   @relation("OpponentPartnerUser", fields: [opponentPartnerUserId], references: [id], onDelete: SetNull)
+  participants   MatchParticipant[]
 
   schedulingRequest SchedulingRequest? @relation("SchedulingMatch")
 
@@ -267,12 +252,26 @@ model Match {
   @@index([playerBId])
   @@index([scheduledAt])
   @@index([createdAt])
-  @@index([hostUserId])
-  @@index([opponentUserId])
-  @@index([hostPartnerUserId])
-  @@index([opponentPartnerUserId])
   @@index([status])
   @@index([type])
+}
+
+////////////////////////////////////////////////////////////
+// MATCH PARTICIPANT
+////////////////////////////////////////////////////////////
+/// Participant in a match. team is assigned when result is loaded (A vs B).
+model MatchParticipant {
+  id       String   @id @default(uuid())
+  matchId  String
+  userId   String
+  team     String?  // 'A' | 'B' - null until result defines teams
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([matchId, userId])
+  @@index([matchId])
+  @@index([userId])
 }
 
 enum MatchStatus {

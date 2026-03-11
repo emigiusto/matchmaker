@@ -41,9 +41,7 @@ import { createNotification } from '../notifications/notifications.service';
  * - Match must exist.
  * - Match must be in "scheduled" state.
  * - Only one Result is allowed per Match.
- * - winnerUserId must be either:
- *      - match.hostUserId
- *      - match.opponentUserId
+ * - winnerUserId must be a match participant
  *
  * Does NOT:
  * - Mark the match as completed.
@@ -73,10 +71,15 @@ export async function createResult(
       throw new AppError('Cannot create result for practice match', 400);
     }
     await ensureNoExistingResult(tx, matchId);
+    const matchWithParts = await tx.match.findUnique({
+      where: { id: matchId },
+      include: { participants: { select: { userId: true } } },
+    });
+    const participantIds = (matchWithParts?.participants ?? []).map((p: { userId: string }) => p.userId);
     if (winnerUserId) {
-      ensureWinnerIsParticipant(winnerUserId, match.hostUserId, match.opponentUserId);
+      ensureWinnerIsParticipant(winnerUserId, participantIds);
     }
-    assertCanCreateResult(currentUserId, match.hostUserId, match.opponentUserId, isAdmin);
+    assertCanCreateResult(currentUserId, participantIds, isAdmin);
     const result = await tx.result.create({
       data: {
         matchId,
@@ -186,11 +189,8 @@ export async function getResultsByUser(userId: string): Promise<ResultDTO[]> {
   const results = await prisma.result.findMany({
     where: {
       match: {
-        OR: [
-          { hostUserId: userId },
-          { opponentUserId: userId }
-        ]
-      }
+        participants: { some: { userId } },
+      },
     },
     include: { sets: true },
     orderBy: { createdAt: 'desc' }
@@ -243,20 +243,52 @@ export async function getRecentResults(limit = 10): Promise<ResultDTO[]> {
  * - Runs inside a transaction
  * - Does NOT trigger ranking updates, complete match, or send notifications
  */
+function getTeamAAndTeamB(
+  participants: { userId: string; team: string | null }[]
+): { teamAUserIds: string[]; teamBUserIds: string[] } {
+  const teamAUserIds = participants.filter((p) => p.team === 'A').map((p) => p.userId);
+  const teamBUserIds = participants.filter((p) => p.team === 'B').map((p) => p.userId);
+  return { teamAUserIds, teamBUserIds };
+}
+
 export async function submitMatchResult(input: SubmitMatchResultInput): Promise<ResultDTO | null> {
-  const { matchId, sets, currentUserId } = input;
+  const { matchId, sets, currentUserId, teamAssignment } = input;
 
   return prisma.$transaction(async (tx) => {
-    const match = await tx.match.findUnique({ where: { id: matchId } });
+    const match = await tx.match.findUnique({
+      where: { id: matchId },
+      include: { participants: { select: { userId: true, team: true } } },
+    });
     if (!match) throw new AppError('Match not found', 404);
     if (match.status !== MatchStatus.scheduled) {
       throw new AppError('Cannot submit result: Match is not scheduled', 409);
     }
-    if (
-      currentUserId !== match.hostUserId &&
-      currentUserId !== match.opponentUserId
-    ) {
+    const isParticipant = (match as any).participants?.some((p: { userId: string }) => p.userId === currentUserId);
+    if (!isParticipant) {
       throw new AppError('Only match participants can submit result', 403);
+    }
+
+    let teamAUserIds: string[];
+    let teamBUserIds: string[];
+    if (teamAssignment) {
+      teamAUserIds = teamAssignment.teamAUserIds;
+      teamBUserIds = teamAssignment.teamBUserIds;
+      for (const p of (match as any).participants) {
+        const team = teamAUserIds.includes(p.userId) ? 'A' : teamBUserIds.includes(p.userId) ? 'B' : null;
+        if (team) {
+          await tx.matchParticipant.updateMany({
+            where: { matchId, userId: p.userId },
+            data: { team },
+          });
+        }
+      }
+    } else {
+      const teams = getTeamAAndTeamB((match as any).participants ?? []);
+      teamAUserIds = teams.teamAUserIds;
+      teamBUserIds = teams.teamBUserIds;
+      if (teamAUserIds.length === 0 || teamBUserIds.length === 0) {
+        throw new AppError('Teams must be defined when submitting result. Provide teamAssignment.', 400);
+      }
     }
 
     // PRACTICE MATCH: result is optional, allow empty sets
@@ -283,14 +315,10 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       validateSetScore(set);
     }
 
-    // Compute winner server-side
-    const winnerUserId = computeWinnerFromSets(
-      sets,
-      match.hostUserId,
-      match.opponentUserId
-    );
+    const repA = teamAUserIds[0];
+    const repB = teamBUserIds[0];
+    const winnerUserId = computeWinnerFromSets(sets, repA, repB);
 
-    // Set confirmation fields
     const now = new Date();
     const confirmationFields: any = {
       status: 'submitted',
@@ -298,9 +326,9 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       confirmedByHostAt: null,
       confirmedByOpponentAt: null,
     };
-    if (currentUserId === match.hostUserId) {
+    if (teamAUserIds.includes(currentUserId)) {
       confirmationFields.confirmedByHostAt = now;
-    } else if (currentUserId === match.opponentUserId) {
+    } else if (teamBUserIds.includes(currentUserId)) {
       confirmationFields.confirmedByOpponentAt = now;
     }
 
@@ -369,8 +397,11 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
 
   // Short-circuit for practice matches: no lifecycle, rating, or notifications
   const resultDTO = await prisma.$transaction(async (tx) => {
-    // 1. Load Result and Match
-    const result = await tx.result.findUnique({ where: { id: resultId }, include: { match: true } });
+    // 1. Load Result and Match with participants
+    const result = await tx.result.findUnique({
+      where: { id: resultId },
+      include: { match: { include: { participants: { select: { userId: true, team: true } } } } },
+    });
     if (!result) throw new AppError('Result not found', 404);
     const match = result.match;
     if (!match) throw new AppError('Match not found for result', 404);
@@ -379,19 +410,15 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
       throw new AppError('Match type missing', 500);
     }
     if (match.type === 'practice') {
-      // For practice, just return current state, no lifecycle, rating, or notifications
       const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
       return toResultDTO({ ...result, sets });
     }
 
-    // Defensive: Enforce lifecycle consistency
     validateResultMatchConsistency(result, { status: match.status, type: match.type });
 
-    // Preconditions: block disputed first
     if ((result.status as string) === 'disputed' || (match.status as string) === 'disputed') {
       throw new AppError('Cannot confirm a disputed result', 400);
     }
-    // Allow idempotency for already confirmed results
     if ((result.status as string) === 'confirmed') {
       const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
       return toResultDTO({ ...result, sets });
@@ -399,22 +426,23 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
     if (result.status !== 'submitted') throw new AppError('Result is not awaiting confirmation', 400);
     if (match.status !== 'awaiting_confirmation') throw new AppError('Match is not awaiting confirmation', 400);
 
-    // Only host or opponent can confirm
-    const isHost = userId === match.hostUserId;
-    const isOpponent = userId === match.opponentUserId;
-    if (!isHost && !isOpponent) throw new AppError('User is not a participant in this match', 403);
+    const { teamAUserIds, teamBUserIds } = getTeamAAndTeamB((match as any).participants ?? []);
+    if (teamAUserIds.length === 0 || teamBUserIds.length === 0) {
+      throw new AppError('Match participants have no team assignment', 400);
+    }
+    const isTeamA = teamAUserIds.includes(userId);
+    const isTeamB = teamBUserIds.includes(userId);
+    if (!isTeamA && !isTeamB) throw new AppError('User is not a participant in this match', 403);
 
-    // Idempotency: If already confirmed by this user, return current state
-    if ((isHost && result.confirmedByHostAt) || (isOpponent && result.confirmedByOpponentAt)) {
+    if ((isTeamA && result.confirmedByHostAt) || (isTeamB && result.confirmedByOpponentAt)) {
       const sets = await tx.setResult.findMany({ where: { resultId }, orderBy: { setNumber: 'asc' } });
       return toResultDTO({ ...result, sets });
     }
 
-    // 2. Set confirmedByHostAt or confirmedByOpponentAt
     const now = new Date();
     const updateData: any = {};
-    if (isHost && !result.confirmedByHostAt) updateData.confirmedByHostAt = now;
-    if (isOpponent && !result.confirmedByOpponentAt) updateData.confirmedByOpponentAt = now;
+    if (isTeamA && !result.confirmedByHostAt) updateData.confirmedByHostAt = now;
+    if (isTeamB && !result.confirmedByOpponentAt) updateData.confirmedByOpponentAt = now;
     await tx.result.update({ where: { id: resultId }, data: updateData });
 
     // 3. Check if both confirmations are now present
@@ -428,7 +456,23 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
         await tx.result.update({ where: { id: resultId }, data: { status: 'confirmed' } });
       }
       if ((match.status as string) !== 'completed') {
-        await tx.match.update({ where: { id: match.id }, data: { status: 'completed' } });
+        // Set playerA/playerB for rating service (uses representative user per team)
+        const repA = teamAUserIds[0];
+        const repB = teamBUserIds[0];
+        const [playerA, playerB] = await Promise.all([
+          tx.player.findFirst({ where: { userId: repA } }),
+          tx.player.findFirst({ where: { userId: repB } }),
+        ]);
+        const matchUpdateData: { status: MatchStatus; playerAId?: string; playerBId?: string } = {
+          status: 'completed' as MatchStatus,
+        };
+        if (playerA) matchUpdateData.playerAId = playerA.id;
+        if (playerB) matchUpdateData.playerBId = playerB.id;
+
+        await tx.match.update({
+          where: { id: match.id },
+          data: matchUpdateData,
+        });
         transitionedToCompleted = true;
         completedMatchType = match.type;
         completedMatchId = match.id;
@@ -444,9 +488,9 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
       }
       // 5. Prepare notification payload for after transaction
       matchCompletedPayload = { matchId: match.id, winnerId: confirmedResult.winnerUserId };
-      // Defensive: Only notify if both playerAId and playerBId exist
-      playerAUserId = match.playerAId ? (await tx.player.findUnique({ where: { id: match.playerAId } }))?.userId ?? null : null;
-      playerBUserId = match.playerBId ? (await tx.player.findUnique({ where: { id: match.playerBId } }))?.userId ?? null : null;
+      // Notify representative of each team (teamAUserIds[0], teamBUserIds[0])
+      playerAUserId = teamAUserIds[0] ?? null;
+      playerBUserId = teamBUserIds[0] ?? null;
     }
 
     // 6. Return updated ResultDTO
@@ -606,22 +650,16 @@ function toSetResultDTO(set: SetResult): SetResultDTO {
  * Checks if a user is authorized to create a result for a match.
  * Allows host, opponent, or admin.
  * @param currentUserId - ID of the user attempting to create the result
- * @param hostUserId - ID of the match host
- * @param opponentUserId - ID of the match opponent
+ * @param participantIds - IDs of match participants
  * @param isAdmin - Whether the user is an admin
  * @throws AppError if unauthorized
  */
 export function assertCanCreateResult(
   currentUserId: string,
-  hostUserId: string,
-  opponentUserId: string,
+  participantIds: string[],
   isAdmin: boolean
 ) {
-  if (
-    currentUserId !== hostUserId &&
-    currentUserId !== opponentUserId &&
-    !isAdmin
-  ) {
+  if (!participantIds.includes(currentUserId) && !isAdmin) {
     throw new AppError('Only match participants or admin can create the result', 403);
   }
 }
@@ -630,8 +668,8 @@ export function assertCanCreateResult(
  * Computes the winner user ID based on submitted set results.
  *
  * Assumptions:
- * - playerAScore corresponds to match.hostUserId
- * - playerBScore corresponds to match.opponentUserId
+ * - playerAScore corresponds to team A (first param)
+ * - playerBScore corresponds to team B (second param)
  *
  * Rules:
  * - At least one set must exist
@@ -639,44 +677,41 @@ export function assertCanCreateResult(
  * - Total sets won cannot be tied
  *
  * @param sets - Array of AddSetResultInput
- * @param hostUserId - Match host user ID
- * @param opponentUserId - Match opponent user ID
- * @returns winnerUserId
+ * @param teamARepUserId - User ID representing team A (playerAScore)
+ * @param teamBRepUserId - User ID representing team B (playerBScore)
+ * @returns winnerUserId (teamARepUserId or teamBRepUserId)
  * @throws AppError if no winner can be determined
  */
 export function computeWinnerFromSets(
   sets: AddSetResultInput[],
-  hostUserId: string,
-  opponentUserId: string
+  teamARepUserId: string,
+  teamBRepUserId: string
 ): string {
   if (!sets || sets.length === 0) {
     throw new AppError('Cannot compute winner: no sets provided', 400);
   }
 
-  let hostSetsWon = 0;
-  let opponentSetsWon = 0;
+  let teamASetsWon = 0;
+  let teamBSetsWon = 0;
 
   for (const set of sets) {
     if (set.playerAScore > set.playerBScore) {
-      hostSetsWon++;
+      teamASetsWon++;
     } else if (set.playerBScore > set.playerAScore) {
-      opponentSetsWon++;
+      teamBSetsWon++;
     } else {
-      // Should never happen due to validateSetScore
       throw new AppError('Invalid set: tie score detected', 400);
     }
   }
 
-  if (hostSetsWon === opponentSetsWon) {
+  if (teamASetsWon === teamBSetsWon) {
     throw new AppError(
       'Cannot determine winner: total sets are tied',
       400
     );
   }
 
-  return hostSetsWon > opponentSetsWon
-    ? hostUserId
-    : opponentUserId;
+  return teamASetsWon > teamBSetsWon ? teamARepUserId : teamBRepUserId;
 }
 
 /**
@@ -744,8 +779,8 @@ async function ensureNoExistingResult(tx: any, matchId: string) {
   }
 }
 
-function ensureWinnerIsParticipant(winnerUserId: string, hostUserId: string, opponentUserId: string) {
-  if (winnerUserId !== hostUserId && winnerUserId !== opponentUserId) {
+function ensureWinnerIsParticipant(winnerUserId: string, participantIds: string[]) {
+  if (!participantIds.includes(winnerUserId)) {
     throw new AppError('Winner must be a participant of the match', 400);
   }
 }

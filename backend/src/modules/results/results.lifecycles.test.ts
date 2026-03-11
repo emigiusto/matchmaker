@@ -12,7 +12,7 @@ vi.mock('../../prisma', () => {
     match: { findUnique: vi.fn(), update: vi.fn() },
     setResult: { findMany: vi.fn(), create: vi.fn() },
     ratingHistory: { findMany: vi.fn() },
-    player: { findUnique: vi.fn(), update: vi.fn() },
+    player: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   };
 
   const mockPrisma: any = {
@@ -52,6 +52,10 @@ vi.mock('../rating/rating.service', () => {
   };
 });
 
+vi.mock('../notifications/notifications.service', () => ({
+  createNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { RatingService } from '../rating/rating.service';
 
 const updateRatingsForCompletedMatch =
@@ -77,13 +81,20 @@ const baseResult = {
 const baseMatch = {
   id: 'match-1',
   status: 'scheduled',
-  hostUserId: 'userA',
-  opponentUserId: 'userB',
   playerAId: 'playerA',
   playerBId: 'playerB',
   scheduledAt: new Date(Date.now() - 10000),
   type: 'competitive',
 };
+
+const baseMatchWithParticipants = (overrides: Record<string, any> = {}) => ({
+  ...baseMatch,
+  participants: [
+    { userId: 'userA', team: 'A' as const },
+    { userId: 'userB', team: 'B' as const },
+  ],
+  ...overrides,
+});
 
 // ------------------------------------------------------
 // Test Suite
@@ -96,7 +107,7 @@ describe('Result confirmation lifecycle', () => {
       mockTx.result.findUnique.mockResolvedValueOnce({
         ...baseResult,
         status: 'disputed',
-        match: { ...baseMatch, status: 'disputed' },
+        match: baseMatchWithParticipants({ status: 'disputed' }),
         confirmedByHostAt: null,
         confirmedByOpponentAt: null,
       });
@@ -112,10 +123,9 @@ describe('Result confirmation lifecycle', () => {
     it('Disputed match blocks completion and ranking', async () => {
       mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 
-      mockTx.match.findUnique.mockResolvedValueOnce({
-        ...baseMatch,
-        status: 'disputed',
-      });
+      mockTx.match.findUnique.mockResolvedValueOnce(
+        baseMatchWithParticipants({ status: 'disputed' })
+      );
 
       await expect(
         ResultsService.confirmResult('result-1', 'userA')
@@ -157,7 +167,7 @@ describe('Result confirmation lifecycle', () => {
     mockTx.result.findUnique.mockResolvedValueOnce({
       ...baseResult,
       status: 'submitted',
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
       confirmedByHostAt: null,
       confirmedByOpponentAt: null,
     });
@@ -167,7 +177,7 @@ describe('Result confirmation lifecycle', () => {
       ...baseResult,
       status: 'submitted',
       confirmedByHostAt: new Date(),
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
     });
 
     // 3. findUnique after update
@@ -176,7 +186,7 @@ describe('Result confirmation lifecycle', () => {
       status: 'submitted',
       confirmedByHostAt: new Date(),
       confirmedByOpponentAt: null,
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
     });
 
     // 4. Final findUnique before returning DTO
@@ -185,7 +195,7 @@ describe('Result confirmation lifecycle', () => {
       status: 'submitted',
       confirmedByHostAt: new Date(),
       confirmedByOpponentAt: null,
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
     });
 
     mockTx.setResult.findMany.mockResolvedValue([]);
@@ -199,11 +209,15 @@ describe('Result confirmation lifecycle', () => {
   it('Two confirmations complete the match and update ranking once', async () => {
     mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 
+    mockTx.player.findFirst
+      .mockResolvedValueOnce({ id: 'playerA', userId: 'userA' })
+      .mockResolvedValueOnce({ id: 'playerB', userId: 'userB' });
+
     // 1. Initial findUnique (before any confirmation)
     mockTx.result.findUnique.mockResolvedValueOnce({
       ...baseResult,
       status: 'submitted',
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
       confirmedByHostAt: null,
       confirmedByOpponentAt: null,
     });
@@ -212,7 +226,7 @@ describe('Result confirmation lifecycle', () => {
       ...baseResult,
       status: 'submitted',
       confirmedByOpponentAt: new Date(),
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
     });
     // 3. findUnique after update (both confirmed)
     mockTx.result.findUnique.mockResolvedValueOnce({
@@ -220,7 +234,7 @@ describe('Result confirmation lifecycle', () => {
       status: 'submitted',
       confirmedByHostAt: new Date(),
       confirmedByOpponentAt: new Date(),
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
     });
     // 4. update() to set status to confirmed
     mockTx.result.update.mockResolvedValueOnce({
@@ -228,12 +242,14 @@ describe('Result confirmation lifecycle', () => {
       status: 'confirmed',
       confirmedByHostAt: new Date(),
       confirmedByOpponentAt: new Date(),
-      match: { ...baseMatch, status: 'awaiting_confirmation' },
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
     });
-    // 5. update() to set match to completed
+    // 5. update() to set match to completed (with playerAId, playerBId)
     mockTx.match.update.mockResolvedValueOnce({
       ...baseMatch,
       status: 'completed',
+      playerAId: 'playerA',
+      playerBId: 'playerB',
     });
     // 6. setResult.findMany
     mockTx.setResult.findMany.mockResolvedValue([]);
@@ -243,14 +259,13 @@ describe('Result confirmation lifecycle', () => {
       status: 'confirmed',
       confirmedByHostAt: new Date(),
       confirmedByOpponentAt: new Date(),
-      match: { ...baseMatch, status: 'completed' },
+      match: baseMatchWithParticipants({ status: 'completed' }),
     };
     mockTx.result.findUnique.mockResolvedValueOnce(finalConfirmedResult);
     // 8. findUnique for finalMatch (after all updates)
-    mockTx.match.findUnique.mockResolvedValueOnce({
-      ...baseMatch,
-      status: 'completed',
-    });
+    mockTx.match.findUnique.mockResolvedValueOnce(
+      baseMatchWithParticipants({ status: 'completed' })
+    );
     // 9. findUnique for finalResult (for return value)
     mockTx.result.findUnique.mockResolvedValueOnce(finalConfirmedResult);
     const res = await ResultsService.confirmResult('result-1', 'userB');
@@ -260,6 +275,9 @@ describe('Result confirmation lifecycle', () => {
 
   it('Double confirmation is idempotent and does not duplicate ranking', async () => {
     mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+    mockTx.player.findFirst
+      .mockResolvedValueOnce({ id: 'playerA', userId: 'userA' })
+      .mockResolvedValueOnce({ id: 'playerB', userId: 'userB' });
     // Sequence all result.findUnique calls to match service expectations:
     // 1. submitted/awaiting_confirmation (first confirmation)
     // 2. confirmed/completed (after confirmation)
@@ -268,7 +286,7 @@ describe('Result confirmation lifecycle', () => {
       const confirmedResult = {
         ...baseResult,
         status: 'confirmed',
-        match: { ...baseMatch, status: 'completed' },
+        match: baseMatchWithParticipants({ status: 'completed' }),
         confirmedByHostAt: new Date(),
         confirmedByOpponentAt: new Date(),
       };
@@ -276,7 +294,7 @@ describe('Result confirmation lifecycle', () => {
         .mockResolvedValueOnce({
           ...baseResult,
           status: 'submitted',
-          match: { ...baseMatch, status: 'awaiting_confirmation' },
+          match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
           confirmedByHostAt: new Date(),
           confirmedByOpponentAt: null,
         })
@@ -289,17 +307,17 @@ describe('Result confirmation lifecycle', () => {
     mockTx.result.update.mockResolvedValue({
       ...baseResult,
       status: 'confirmed',
-      match: { ...baseMatch, status: 'completed' },
+      match: baseMatchWithParticipants({ status: 'completed' }),
       confirmedByHostAt: new Date(),
       confirmedByOpponentAt: new Date(),
     });
-    mockTx.match.update.mockResolvedValue({ ...baseMatch, status: 'completed' });
+    mockTx.match.update.mockResolvedValue(baseMatchWithParticipants({ status: 'completed' }));
     updateRatingsForCompletedMatch.mockResolvedValue(undefined);
 
     // Add missing match.findUnique mocks for final lifecycle check
     mockTx.match.findUnique
-      .mockResolvedValueOnce({ ...baseMatch, status: 'completed' })
-      .mockResolvedValueOnce({ ...baseMatch, status: 'completed' });
+      .mockResolvedValueOnce(baseMatchWithParticipants({ status: 'completed' }))
+      .mockResolvedValueOnce(baseMatchWithParticipants({ status: 'completed' }));
 
     // First confirmation (should trigger ranking)
     await ResultsService.confirmResult('result-1', 'userB');
@@ -316,7 +334,7 @@ describe('Result confirmation lifecycle', () => {
     mockTx.result.findUnique.mockResolvedValueOnce({
       ...baseResult,
       status: 'disputed',
-      match: { ...baseMatch, status: 'disputed' },
+      match: baseMatchWithParticipants({ status: 'disputed' }),
     });
 
     mockTx.setResult.findMany.mockResolvedValue([]);
@@ -334,7 +352,7 @@ describe('Result confirmation lifecycle', () => {
     mockTx.result.findUnique.mockResolvedValueOnce({
       ...baseResult,
       status: 'confirmed',
-      match: baseMatch,
+      match: baseMatchWithParticipants(),
       sets: [],
     });
 
@@ -358,7 +376,7 @@ describe('Result confirmation lifecycle', () => {
     mockTx.result.findUnique.mockResolvedValueOnce({
       ...baseResult,
       status: 'submitted',
-      match: baseMatch,
+      match: baseMatchWithParticipants(),
     });
 
     const completeMatch = async () => {
