@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react"
-import { format } from "date-fns"
+import { format, startOfDay, isBefore } from "date-fns"
 import {
   Calendar as CalendarIcon,
   MapPin,
@@ -202,7 +202,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
   const locationValid = locationType === "area" ? !!location : !!specificPlace
   const canProceedStep1 = date && startTime && endTime && locationValid && startTime < endTime
-  const spotsNeeded = matchFormat === "doubles" ? 2 : 1 // candidates needed (host+partner fill 2 in doubles)
+  const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
   const displayLocation = locationType === "area" ? `${location} (${radius} km)` : specificPlace
@@ -395,7 +395,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     mode="single"
                     selected={date}
                     onSelect={setDate}
-                    disabled={(d) => d < new Date()}
+                    disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
                     initialFocus
                   />
                 </PopoverContent>
@@ -710,7 +710,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     </Popover>
                   )}
                   {/* Add friends */}
-                  {friends.filter((f) => f.type === "user").length > 0 && (
+                  {friends.filter((f) => f.type === "user" && !priorityList.some((p) => p.id === f.id)).length > 0 && (
                     <Popover onOpenChange={(open) => !open && setSearchFriends("")}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1.5">
@@ -730,7 +730,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         </div>
                         <div className="max-h-48 overflow-y-auto space-y-0.5">
                           {friends
-                            .filter((f) => f.type === "user" && (!searchFriends.trim() || f.name.toLowerCase().includes(searchFriends.trim().toLowerCase())))
+                            .filter((f) => f.type === "user" && !priorityList.some((p) => p.id === f.id))
+                            .filter((f) => !searchFriends.trim() || f.name.toLowerCase().includes(searchFriends.trim().toLowerCase()))
                             .map((f) => (
                               <button
                                 key={f.id}

@@ -8,6 +8,7 @@ export type SchedulingCandidateStatus =
   | "accepted"
   | "declined"
   | "expired"
+  | "cancelled"
 
 export interface SchedulingCandidateDTO {
   id: string
@@ -93,6 +94,57 @@ export const schedulingService = {
     return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/resume`, {
       userId,
     })
+  },
+
+  async addCandidates(
+    requestId: string,
+    candidateUserIds: string[],
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(
+      `/scheduling/${requestId}/candidates`,
+      { userId, candidateUserIds }
+    )
+  },
+
+  async cancelContacted(
+    requestId: string,
+    candidateId: string,
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(
+      `/scheduling/${requestId}/cancel-contacted/${candidateId}`,
+      { userId }
+    )
+  },
+
+  async removeCandidate(
+    requestId: string,
+    candidateId: string,
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(
+      `/scheduling/${requestId}/remove/${candidateId}`,
+      { userId }
+    )
+  },
+
+  async cancelAccepted(
+    requestId: string,
+    candidateId: string,
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(
+      `/scheduling/${requestId}/cancel-accepted/${candidateId}`,
+      { userId }
+    )
+  },
+
+  async manualAccept(requestId: string, candidateId: string, userId: string): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(
+      `/scheduling/${requestId}/accept/${candidateId}`,
+      { userId }
+    )
   },
 
   async retry(requestId: string, candidateId: string, userId: string): Promise<SchedulingRequestDTO> {

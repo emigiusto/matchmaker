@@ -5,7 +5,6 @@ import {
   Clock,
   MapPin,
   Zap,
-  Globe,
   Trash2,
   CheckCircle,
   XCircle,
@@ -16,26 +15,30 @@ import {
   Hourglass,
   Pause,
   Play,
-  SkipForward,
   RotateCcw,
   Link2,
   Copy,
   Check,
-  MoreVertical,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { MatchTypeBadge } from "@/components/match-type-badge"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
+import { AddContactsToInvite } from "@/components/add-contacts-to-invite"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { getCurrentUserId } from "@/lib/current-user"
 import { schedulingService } from "@/lib/services/scheduling.service"
-import { invitesService } from "@/lib/services/invites.service"
-import { adaptInvite } from "@/lib/api/adapters"
-import type { Invite } from "@/lib/types"
-
 // UI shape for scheduling request (mapped from API)
 interface InviteRequest {
   id: string
@@ -46,11 +49,12 @@ interface InviteRequest {
   matchType: "competitive" | "practice"
   sport: "tennis" | "padel"
   matchFormat: "singles" | "doubles"
-  status: "scheduling" | "paused" | "matched" | "expired"
+  status: "scheduling" | "paused" | "matched" | "expired" | "cancelled"
   contacts: {
     id: string
+    contactUserId: string
     name: string
-    status: "pending" | "contacted" | "declined" | "accepted" | "no_response"
+    status: "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled"
   }[]
   currentIndex: number
 }
@@ -71,27 +75,28 @@ function formatTimeRange(startIso: string, endIso: string): string {
 function mapSchedulingToInviteRequest(
   r: import("@/lib/services/scheduling.service").SchedulingRequestDTO
 ): InviteRequest | null {
-  if (r.status === "cancelled") return null
   const statusMap = {
     active: "scheduling" as const,
     paused: "paused" as const,
     completed: "matched" as const,
     expired: "expired" as const,
-    cancelled: "expired" as const,
+    cancelled: "cancelled" as const,
   }
   const contactStatusMap = {
     pending: "pending" as const,
     contacted: "contacted" as const,
     waiting_reply: "contacted" as const,
     accepted: "accepted" as const,
-    declined: "declined" as const,
+    declined: "declined" as const,  // invitee said no (rejected)
     expired: "no_response" as const,
+    cancelled: "cancelled" as const,  // host cancelled
   }
   const dateStr = r.date.slice(0, 10)
   const timeStr = formatTimeRange(r.startTime, r.endTime)
   const candidates = r.candidates ?? []
   const contacts = candidates.map((c) => ({
     id: c.id,
+    contactUserId: c.contactUserId,
     name: c.contactUserName ?? "Unknown",
     status: contactStatusMap[c.status] ?? "pending",
   }))
@@ -113,28 +118,28 @@ function mapSchedulingToInviteRequest(
 export default function PlayPage() {
   const currentUserId = getCurrentUserId()
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [incomingInvitesList, setIncomingInvitesList] = useState<Invite[]>([])
   const [inviteRequests, setInviteRequests] = useState<InviteRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedRequestId, setCopiedRequestId] = useState<string | null>(null)
+  const [acceptConfirm, setAcceptConfirm] = useState<{
+    requestId: string
+    candidateId: string
+    contactName: string
+  } | null>(null)
+  type InviteFilter = "all" | "scheduling" | "no_match" | "completed" | "cancelled"
+  const [inviteFilter, setInviteFilter] = useState<InviteFilter>("all")
 
   async function fetchSchedulingData(isInitial = false) {
     if (isInitial) setLoading(true)
     try {
-      const [requestsRes, openInvitesRes] = await Promise.all([
-        schedulingService.listByHost(currentUserId),
-        invitesService.getOpenInvites().then((list: unknown[]) =>
-          (list as import("@/lib/api/adapters").BackendInviteDTO[]).map((d) => adaptInvite(d))
-        ).catch(() => []),
-      ])
+      const requestsRes = await schedulingService.listByHost(currentUserId)
       const mapped = requestsRes
         .map(mapSchedulingToInviteRequest)
         .filter((r): r is InviteRequest => r !== null)
       setInviteRequests(mapped)
-      setIncomingInvitesList(openInvitesRes)
       return mapped
     } catch {
-      setIncomingInvitesList([])
+      setInviteRequests([])
       return []
     } finally {
       if (isInitial) setLoading(false)
@@ -142,9 +147,7 @@ export default function PlayPage() {
   }
 
   useEffect(() => {
-    let cancelled = false
     fetchSchedulingData(true).catch(() => {})
-    return () => { cancelled = true }
   }, [currentUserId])
 
   // Poll for updates when there are active scheduling requests (candidates expiring, etc.)
@@ -159,38 +162,26 @@ export default function PlayPage() {
     return () => clearInterval(interval)
   }, [inviteRequests, currentUserId])
 
+  const filteredRequests = inviteRequests.filter((r) => {
+    if (inviteFilter === "all") return r.status !== "cancelled"
+    if (inviteFilter === "scheduling") return r.status === "scheduling" || r.status === "paused"
+    if (inviteFilter === "no_match") return r.status === "expired"
+    if (inviteFilter === "completed") return r.status === "matched"
+    if (inviteFilter === "cancelled") return r.status === "cancelled"
+    return true
+  })
+
+  function switchToFilterForStatus(status: InviteRequest["status"]) {
+    if (status === "scheduling" || status === "paused") setInviteFilter("scheduling")
+    else if (status === "expired") setInviteFilter("no_match")
+    else if (status === "cancelled") setInviteFilter("cancelled")
+    else if (status === "matched") setInviteFilter("completed")
+  }
+
   const activeRequestCount = inviteRequests.filter(
     (r) => r.status === "scheduling" || r.status === "paused"
   ).length
   const atCapacity = activeRequestCount >= MAX_ACTIVE_REQUESTS
-
-  const incomingInvites = incomingInvitesList.filter(
-    (i) => i.status === "pending" && i.fromUserId !== currentUserId
-  )
-
-  async function handleAcceptInvite(token: string) {
-    try {
-      await invitesService.accept(token, currentUserId)
-      setIncomingInvitesList((prev) =>
-        prev.map((i) => (i.token === token ? { ...i, status: "accepted" as const } : i))
-      )
-      toast.success("Invite accepted!")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to accept invite")
-    }
-  }
-
-  async function handleDeclineInvite(token: string) {
-    try {
-      await invitesService.decline(token)
-      setIncomingInvitesList((prev) =>
-        prev.map((i) => (i.token === token ? { ...i, status: "declined" as const } : i))
-      )
-      toast.success("Invite declined")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to decline invite")
-    }
-  }
 
   async function handlePauseRequest(id: string) {
     try {
@@ -224,16 +215,84 @@ export default function PlayPage() {
 
   async function handleCancelRequest(id: string) {
     try {
-      await schedulingService.cancel(id, currentUserId)
-      setInviteRequests((prev) => prev.filter((r) => r.id !== id))
+      const updated = await schedulingService.cancel(id, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === id ? mapped : r))
+        )
+        switchToFilterForStatus(mapped.status)
+      }
       toast.success("Invite request cancelled")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to cancel request")
     }
   }
 
-  function handleSkipContact(_requestId: string, contactName: string) {
-    toast.info(`Skipping is done via the scheduling flow for ${contactName}`)
+  async function handleCancelContact(requestId: string, candidateId: string) {
+    try {
+      const updated = await schedulingService.cancelContacted(requestId, candidateId, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? mapped : r))
+        )
+        switchToFilterForStatus(mapped.status)
+        toast.success("Cancelled invite")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to cancel")
+    }
+  }
+
+  async function handleRemoveContact(requestId: string, candidateId: string) {
+    try {
+      const updated = await schedulingService.removeCandidate(requestId, candidateId, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? mapped : r))
+        )
+        switchToFilterForStatus(mapped.status)
+        toast.success("Removed from queue")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to remove")
+    }
+  }
+
+  async function handleCancelAccepted(requestId: string, candidateId: string) {
+    try {
+      const updated = await schedulingService.cancelAccepted(requestId, candidateId, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? mapped : r))
+        )
+        switchToFilterForStatus(mapped.status)
+        toast.success("Acceptance cancelled")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to cancel")
+    }
+  }
+
+  async function handleManualAccept(requestId: string, candidateId: string) {
+    try {
+      const updated = await schedulingService.manualAccept(requestId, candidateId, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated)
+      if (mapped) {
+        setInviteRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? mapped : r))
+        )
+        switchToFilterForStatus(mapped.status)
+        toast.success("Match confirmed!")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to accept")
+    } finally {
+      setAcceptConfirm(null)
+    }
   }
 
   async function handleRetryContact(requestId: string, candidateId: string) {
@@ -244,6 +303,7 @@ export default function PlayPage() {
         setInviteRequests((prev) =>
           prev.map((r) => (r.id === requestId ? mapped : r))
         )
+        switchToFilterForStatus(mapped.status)
         toast.success("Invite will be retried")
       }
     } catch (e) {
@@ -302,19 +362,24 @@ export default function PlayPage() {
       </PageHeader>
 
       <div className="flex flex-1 flex-col gap-6 p-5 lg:p-8">
-        <Tabs defaultValue="requests" className="w-full">
-          <TabsList className="w-full max-w-md">
-            <TabsTrigger value="requests" className="flex-1 text-base">
-              My Requests
-            </TabsTrigger>
-            <TabsTrigger value="incoming" className="flex-1 text-base">
-              Incoming Invites
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex flex-wrap items-center gap-2">
+          {(["all", "scheduling", "no_match", "completed", "cancelled"] as const).map((f) => (
+            <Button
+              key={f}
+              variant={inviteFilter === f ? "default" : "outline"}
+              size="sm"
+              onClick={() => setInviteFilter(f)}
+            >
+              {f === "all" && "Active"}
+              {f === "scheduling" && "Scheduling"}
+              {f === "no_match" && "No Match"}
+              {f === "completed" && "Completed"}
+              {f === "cancelled" && "Cancelled"}
+            </Button>
+          ))}
+        </div>
 
-          {/* My Requests Tab - Shows active invite scheduling */}
-          <TabsContent value="requests" className="mt-6">
-            {loading ? (
+        {loading ? (
               <Card>
                 <CardContent className="flex items-center justify-center py-20">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -328,15 +393,27 @@ export default function PlayPage() {
                 You have reached the limit of {MAX_ACTIVE_REQUESTS} active scheduling requests. Cancel or finish one to start a new one.
               </div>
             )}
-            {inviteRequests.length === 0 ? (
+            {filteredRequests.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-20">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
                     <CirclePlay className="h-8 w-8 text-muted-foreground" />
                   </div>
-                  <p className="mt-4 text-lg font-medium text-foreground">No active requests</p>
+                  <p className="mt-4 text-lg font-medium text-foreground">
+                    {inviteRequests.length === 0
+                      ? "No invites yet"
+                      : inviteFilter === "all"
+                      ? "No active invites"
+                      : inviteFilter === "scheduling"
+                      ? "No scheduling invites"
+                      : inviteFilter === "no_match"
+                      ? "No expired invites"
+                      : inviteFilter === "cancelled"
+                      ? "No cancelled invites"
+                      : "No completed matches"}
+                  </p>
                   <p className="mt-1 text-base text-muted-foreground">
-                    Tap "I Want to Play" to find a match
+                    {inviteRequests.length === 0 ? "Tap \"I Want to Play\" to create your first invite" : "Try another filter"}
                   </p>
                   <Button
                     size="lg"
@@ -350,7 +427,7 @@ export default function PlayPage() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {inviteRequests.map((request) => (
+                {filteredRequests.map((request) => (
                   <Card key={request.id}>
                     <CardContent className="p-5">
                       {/* Header with status */}
@@ -387,14 +464,13 @@ export default function PlayPage() {
                               No match
                             </span>
                           )}
+                          {request.status === "cancelled" && (
+                            <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                              <XCircle className="h-3 w-3" />
+                              Cancelled
+                            </span>
+                          )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
                       </div>
 
                       {/* Match details */}
@@ -427,6 +503,8 @@ export default function PlayPage() {
                                   ? "bg-green-500/10"
                                   : contact.status === "declined"
                                   ? "bg-red-500/10"
+                                  : contact.status === "cancelled"
+                                  ? "bg-amber-500/10"
                                   : contact.status === "no_response"
                                   ? "bg-muted/60"
                                   : contact.status === "contacted"
@@ -438,16 +516,35 @@ export default function PlayPage() {
                               <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                                 {contact.status === "accepted" && <UserCheck className="h-3.5 w-3.5 text-green-600" />}
                                 {contact.status === "declined" && <UserX className="h-3.5 w-3.5 text-red-500" />}
+                                {contact.status === "cancelled" && <XCircle className="h-3.5 w-3.5 text-amber-600" />}
                                 {contact.status === "no_response" && <Hourglass className="h-3.5 w-3.5 text-muted-foreground" />}
                                 {contact.status === "contacted" && <Loader2 className={`h-3.5 w-3.5 text-blue-600 ${request.status === "paused" ? "" : "animate-spin"}`} />}
                                 {contact.status === "pending" && <span className="text-[10px] font-bold text-muted-foreground">{idx + 1}</span>}
                               </span>
                               {/* Name */}
-                              <span className={`flex-1 ${contact.status === "declined" || contact.status === "no_response" ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                              <span className={`flex-1 ${contact.status === "declined" || contact.status === "no_response" || contact.status === "cancelled" ? "text-muted-foreground line-through" : "text-foreground"}`}>
                                 {contact.name}
                               </span>
                               {/* Per-contact actions */}
-                              {request.status !== "matched" && (contact.status === "contacted" || contact.status === "declined" || contact.status === "no_response") && (
+                              {request.status !== "matched" && request.status !== "cancelled" && (contact.status === "pending" || contact.status === "contacted" || contact.status === "no_response" || contact.status === "cancelled") && (
+                                <button
+                                  onClick={() => setAcceptConfirm({ requestId: request.id, candidateId: contact.id, contactName: contact.name })}
+                                  title="Accept"
+                                  className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-700"
+                                >
+                                  <UserCheck className="h-3 w-3" />
+                                </button>
+                              )}
+                              {request.status !== "matched" && request.status !== "cancelled" && contact.status === "pending" && (
+                                <button
+                                  onClick={() => handleRemoveContact(request.id, contact.id)}
+                                  title="Remove from queue"
+                                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                              {request.status !== "matched" && request.status !== "cancelled" && (contact.status === "no_response" || contact.status === "cancelled") && (
                                 <button
                                   onClick={() => handleRetryContact(request.id, contact.id)}
                                   title="Retry invite"
@@ -456,13 +553,22 @@ export default function PlayPage() {
                                   <RotateCcw className="h-3 w-3" />
                                 </button>
                               )}
-                              {request.status !== "matched" && contact.status === "contacted" && (
+                              {request.status !== "matched" && request.status !== "cancelled" && contact.status === "contacted" && (
                                 <button
-                                  onClick={() => handleSkipContact(request.id, contact.name)}
-                                  title="Skip to next"
+                                  onClick={() => handleCancelContact(request.id, contact.id)}
+                                  title="Cancel"
                                   className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                 >
-                                  <SkipForward className="h-3 w-3" />
+                                  <XCircle className="h-3 w-3" />
+                                </button>
+                              )}
+                              {(request.status === "matched" || request.status === "scheduling" || request.status === "paused" || request.status === "expired") && contact.status === "accepted" && (
+                                <button
+                                  onClick={() => handleCancelAccepted(request.id, contact.id)}
+                                  title="Cancel acceptance"
+                                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
+                                >
+                                  <XCircle className="h-3 w-3" />
                                 </button>
                               )}
                             </div>
@@ -473,19 +579,26 @@ export default function PlayPage() {
                       {/* Actions */}
                       {request.status === "expired" && (
                         <div className="mt-4 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 px-4 py-3">
-                          <p className="text-sm text-muted-foreground">No one responded in time. Start a new request to try again.</p>
-                          <div className="mt-3 flex gap-2">
+                          <p className="text-sm text-muted-foreground">
+                            {request.matchFormat === "doubles"
+                              ? "Not enough contacts responded in time. Add more contacts or start a new request."
+                              : "No one responded in time. Add more contacts or start a new request."}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <AddContactsToInvite
+                              requestId={request.id}
+                              existingContactIds={request.contacts.map((c) => c.contactUserId)}
+                              hostUserId={currentUserId}
+                              onSuccess={() => fetchSchedulingData(false)}
+                            />
                             <Button size="sm" onClick={() => setWizardOpen(true)}>
                               <Zap className="mr-1.5 h-3.5 w-3.5" />
                               New request
                             </Button>
-                            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleCancelRequest(request.id)}>
-                              Remove
-                            </Button>
                           </div>
                         </div>
                       )}
-                      {request.status !== "matched" && request.status !== "expired" && (
+                      {request.status !== "matched" && request.status !== "expired" && request.status !== "cancelled" && (
                         <div className="mt-4 space-y-3 border-t border-border/30 pt-4">
                           <div className="flex items-center gap-2">
                             <Button
@@ -510,6 +623,12 @@ export default function PlayPage() {
                                 </>
                               )}
                             </Button>
+                            <AddContactsToInvite
+                              requestId={request.id}
+                              existingContactIds={request.contacts.map((c) => c.contactUserId)}
+                              hostUserId={currentUserId}
+                              onSuccess={() => fetchSchedulingData(false)}
+                            />
                             <Button
                               variant="outline"
                               size="sm"
@@ -559,93 +678,6 @@ export default function PlayPage() {
             )}
               </>
             )}
-          </TabsContent>
-
-          {/* Incoming Invites Tab */}
-          <TabsContent value="incoming" className="mt-6">
-            {loading ? (
-              <Card>
-                <CardContent className="flex items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ) : incomingInvites.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-20">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-                    <Globe className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <p className="mt-4 text-lg font-medium text-foreground">
-                    No incoming invites
-                  </p>
-                  <p className="mt-1 text-base text-muted-foreground">
-                    When someone invites you to play, it will appear here
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {incomingInvites.map((invite) => (
-                  <Card key={invite.id}>
-                    <CardContent className="flex items-center justify-between p-5">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
-                            {invite.fromPlayerName.split(" ").map((n) => n[0]).join("")}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-base font-semibold text-foreground">
-                                {invite.fromPlayerName}
-                              </p>
-                              <MatchTypeBadge type={invite.matchType} />
-                              {invite.isOpen && (
-                                <span className="flex items-center gap-1 rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                                  <Globe className="h-3 w-3" /> Open
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-1.5 flex items-center gap-4 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1.5">
-                                <Calendar className="h-4 w-4" />
-                                {format(new Date(invite.date), "MMM d")}
-                              </span>
-                              <span className="flex items-center gap-1.5">
-                                <Clock className="h-4 w-4" />
-                                {invite.time}
-                              </span>
-                              <span className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4" />
-                                {invite.location}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          className="gap-1.5"
-                          onClick={() => handleAcceptInvite(invite.token)}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          Accept
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="gap-1.5"
-                          onClick={() => handleDeclineInvite(invite.token)}
-                        >
-                          <XCircle className="h-4 w-4" />
-                          Decline
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
       </div>
 
       <IWantToPlayWizard
@@ -661,6 +693,25 @@ export default function PlayPage() {
           }).catch(() => {})
         }}
       />
+
+      <AlertDialog open={!!acceptConfirm} onOpenChange={(open) => !open && setAcceptConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Accept candidate</AlertDialogTitle>
+            <AlertDialogDescription>
+              Accept {acceptConfirm?.contactName ?? "this person"} for this match? This will mark them as confirmed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => acceptConfirm && handleManualAccept(acceptConfirm.requestId, acceptConfirm.candidateId)}
+            >
+              Accept
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

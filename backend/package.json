@@ -15,7 +15,7 @@
     "start:local": "cross-env ENV_FILE=.env.local node dist/server.js",
     "start:prod": "cross-env ENV_FILE=.env.production node dist/server.js",
     "prisma:generate": "node scripts/ensure-database-url.js npx prisma@6.19.2 generate",
-    "migrate:deploy": "node scripts/ensure-database-url.js npx prisma@6.19.2 migrate deploy",
+    "migrate:deploy": "cross-env ENV_FILE=.env.local node scripts/ensure-database-url.js npx prisma@6.19.2 migrate deploy",
     "migrate:deploy:local": "cross-env ENV_FILE=.env.local node scripts/ensure-database-url.js npx prisma@6.19.2 migrate deploy",
     "migrate:deploy:prod": "cross-env ENV_FILE=.env.production node scripts/ensure-database-url.js npx prisma@6.19.2 migrate deploy",
     "migrate:resolve": "node scripts/ensure-database-url.js npx prisma@6.19.2 migrate resolve",

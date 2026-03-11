@@ -555,6 +555,7 @@ enum SchedulingCandidateStatus {
   contacted
   waiting_reply
   accepted
-  declined
-  expired
+  declined  // invitee said no (rejected)
+  expired   // no response in time
+  cancelled // host cancelled/skipped the candidate
 }

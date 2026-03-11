@@ -9,6 +9,34 @@ import type {
 } from '@prisma/client';
 
 export const schedulingRepository = {
+  async getMaxPriorityOrder(schedulingRequestId: string): Promise<number> {
+    const top = await prisma.schedulingCandidate.findFirst({
+      where: { schedulingRequestId },
+      select: { priorityOrder: true },
+      orderBy: { priorityOrder: 'desc' },
+    });
+    return top ? top.priorityOrder + 1 : 0;
+  },
+
+  async addCandidates(
+    schedulingRequestId: string,
+    contactUserIds: string[]
+  ): Promise<SchedulingCandidate[]> {
+    if (contactUserIds.length === 0) return [];
+    const startOrder = await this.getMaxPriorityOrder(schedulingRequestId);
+    const creates = contactUserIds.map((contactUserId, i) =>
+      prisma.schedulingCandidate.create({
+        data: {
+          schedulingRequestId,
+          contactUserId,
+          priorityOrder: startOrder + i,
+          status: 'pending',
+        },
+      })
+    );
+    return Promise.all(creates);
+  },
+
   async createCandidates(
     schedulingRequestId: string,
     contactUserIds: string[]

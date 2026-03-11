@@ -70,6 +70,62 @@ export class SchedulingController {
     }
   }
 
+  static async cancelContactedCandidate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      const candidateId = typeof req.params.candidateId === 'string' ? req.params.candidateId : undefined;
+      const { userId } = req.body;
+      if (!requestId || !candidateId) return res.status(400).json({ error: 'Missing requestId or candidateId' });
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const request = await schedulingService.cancelContactedCandidate(requestId, candidateId, userId);
+      res.json(request);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async removeCandidate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      const candidateId = typeof req.params.candidateId === 'string' ? req.params.candidateId : undefined;
+      const { userId } = req.body;
+      if (!requestId || !candidateId) return res.status(400).json({ error: 'Missing requestId or candidateId' });
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const request = await schedulingService.removeCandidate(requestId, candidateId, userId);
+      res.json(request);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async cancelAcceptedCandidate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      const candidateId = typeof req.params.candidateId === 'string' ? req.params.candidateId : undefined;
+      const { userId } = req.body;
+      if (!requestId || !candidateId) return res.status(400).json({ error: 'Missing requestId or candidateId' });
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const request = await schedulingService.cancelAcceptedCandidate(requestId, candidateId, userId);
+      res.json(request);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async manualAcceptCandidate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      const candidateId = typeof req.params.candidateId === 'string' ? req.params.candidateId : undefined;
+      const { userId } = req.body;
+      if (!requestId || !candidateId) return res.status(400).json({ error: 'Missing requestId or candidateId' });
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const request = await schedulingService.manualAcceptCandidate(requestId, candidateId, userId);
+      res.json(request);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async retryCandidate(req: Request, res: Response, next: NextFunction) {
     try {
       const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
@@ -78,6 +134,20 @@ export class SchedulingController {
       if (!requestId || !candidateId) return res.status(400).json({ error: 'Missing requestId or candidateId' });
       if (!userId) return res.status(400).json({ error: 'Missing userId' });
       const request = await schedulingService.retryCandidate(requestId, candidateId, userId);
+      res.json(request);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async addCandidates(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      const { userId, candidateUserIds } = req.body;
+      if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const ids = Array.isArray(candidateUserIds) ? candidateUserIds : [];
+      const request = await schedulingService.addCandidates(requestId, ids, userId);
       res.json(request);
     } catch (err) {
       next(err);

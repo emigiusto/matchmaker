@@ -7,7 +7,7 @@ import { AppError } from '../../shared/errors/AppError';
 import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
-import { createMatch } from '../matches/matches.service';
+import { createMatch, cancelMatch } from '../matches/matches.service';
 import type {
   CreateSchedulingRequestInput,
   SchedulingRequestDTO,
@@ -17,6 +17,11 @@ import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './sched
 
 const ACCEPT_PATTERNS = /^(yes|y|accept|👍)$|👍/i;
 const DECLINE_PATTERNS = /^(no|n|decline)$/i;
+
+/** Minimum accepted candidates required before marking request completed. Singles: 1. Doubles: 3 (host + 3 = 4 players). */
+function getRequiredAcceptances(format: string): number {
+  return format === 'doubles' ? 3 : 1;
+}
 
 function generateInviteToken(): string {
   return crypto.randomBytes(32).toString('base64url');
@@ -106,6 +111,18 @@ function formatMatchDetailsMessage(sportType: string, format: string, dateStr: s
   return `Match confirmed!\n\n${sportType} · ${formatLabel}\n${dateStr} ${timeStr}\nLocation: ${location}`;
 }
 
+function formatInviteNoLongerAvailableMessage(
+  hostName: string,
+  sportType: string,
+  format: string,
+  dateStr: string,
+  timeStr: string,
+  location: string
+): string {
+  const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
+  return `Hi! The ${sportType} ${formatLabel} invite from ${hostName} for ${dateStr} at ${timeStr} (${location}) is no longer available. You can ignore the previous message.`;
+}
+
 export const schedulingService = {
   async createSchedulingRequest(input: CreateSchedulingRequestInput): Promise<SchedulingRequestDTO> {
     if (!input.candidateUserIds?.length) {
@@ -122,7 +139,16 @@ export const schedulingService = {
 
     let format = input.format ?? 'singles';
     if (input.sportType === 'padel') format = 'doubles';
-
+    const minCandidates = format === 'doubles' ? 3 : 1;
+    const candidateIds = input.candidateUserIds ?? [];
+    if (candidateIds.length < minCandidates) {
+      throw new AppError(
+        format === 'doubles'
+          ? `Doubles matches require at least 3 candidates (you provided ${candidateIds.length})`
+          : `Add at least 1 contact`,
+        400
+      );
+    }
 
     // Round to 3 decimal places to avoid float precision issues
     const rawWindow = input.responseWindowMinutes ?? 240;
@@ -298,12 +324,20 @@ export const schedulingService = {
         logger.warn('InviteDuplicateResponse', { candidateId: candidate.id, action: 'accept' });
         return { processed: true };
       }
-      await prisma.schedulingRequest.update({
-        where: { id: request.id },
-        data: { status: 'completed' },
-      });
-      logger.info('InviteAccepted', { requestId: request.id, candidateId: candidate.id });
-      await this.completeScheduling(request.id, candidate.id);
+      const format = (request as RequestRow).format || 'singles';
+      const required = getRequiredAcceptances(format);
+      const fullRequest = await schedulingRepository.findRequestById(request.id);
+      const acceptedCount = (fullRequest?.candidates ?? []).filter((c) => c.status === 'accepted').length;
+      if (acceptedCount >= required) {
+        await prisma.schedulingRequest.update({
+          where: { id: request.id },
+          data: { status: 'completed' },
+        });
+        logger.info('InviteAccepted', { requestId: request.id, candidateId: candidate.id });
+        await this.completeScheduling(request.id);
+      } else {
+        await this.contactNextCandidates(request.id);
+      }
       return { processed: true };
     }
 
@@ -324,9 +358,24 @@ export const schedulingService = {
   async expireCandidate(candidateId: string): Promise<void> {
     const candidate = await prisma.schedulingCandidate.findUnique({
       where: { id: candidateId },
-      include: { schedulingRequest: true },
+      include: {
+        contactUser: true,
+        schedulingRequest: { include: { hostUser: true } },
+      },
     });
     if (!candidate || candidate.status !== 'waiting_reply') return;
+
+    const phone = candidate.contactUser?.phone;
+    if (phone) {
+      const req = candidate.schedulingRequest;
+      const hostName = req.hostUser?.name ?? 'Someone';
+      const dateStr = req.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const timeStr = req.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const format = (req as RequestRow).format || 'singles';
+      const msg = formatInviteNoLongerAvailableMessage(hostName, req.sportType, format, dateStr, timeStr, req.locationText);
+      const result = await whatsappService.sendInviteMessage(phone, msg);
+      if (!result.success) logger.warn('FailedToNotifyInviteExpired', { candidateId, phone });
+    }
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'expired');
     logger.info('InviteExpired', { requestId: candidate.schedulingRequestId, candidateId });
@@ -341,27 +390,45 @@ export const schedulingService = {
     return candidates.length;
   },
 
-  async completeScheduling(requestId: string, acceptedCandidateId: string): Promise<void> {
+  async completeScheduling(requestId: string): Promise<void> {
     const request = await prisma.schedulingRequest.findUnique({
       where: { id: requestId },
       include: {
         hostUser: true,
         hostPartner: true,
-        candidates: { where: { id: acceptedCandidateId }, include: { contactUser: true } },
+        candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } },
       },
     });
 
     if (!request || request.status !== 'completed') return;
 
-    const candidate = request.candidates[0];
-    if (!candidate) return;
+    const format = (request as RequestRow).format || 'singles';
+    const acceptedCandidates = (request.candidates ?? []).filter((c) => c.status === 'accepted');
+    const required = getRequiredAcceptances(format);
+    if (acceptedCandidates.length < required) return;
 
     const hostUser = request.hostUser;
-    const opponentUser = candidate.contactUser;
-    if (!hostUser || !opponentUser) return;
+    if (!hostUser) return;
 
     const scheduledAt = new Date(request.startTime);
     const matchType = request.matchType === 'practice' ? 'practice' : 'competitive';
+
+    let hostPartnerUserId: string | undefined;
+    let opponentUserId: string;
+    let opponentPartnerUserId: string | undefined;
+
+    if (format === 'doubles') {
+      // host + 3 accepted = 4 players. Use 1st as host partner, 2nd as opponent, 3rd as opponent partner.
+      const [c1, c2, c3] = acceptedCandidates;
+      if (!c1?.contactUser || !c2?.contactUser || !c3?.contactUser) return;
+      hostPartnerUserId = c1.contactUser.id;
+      opponentUserId = c2.contactUser.id;
+      opponentPartnerUserId = c3.contactUser.id;
+    } else {
+      const [c1] = acceptedCandidates;
+      if (!c1?.contactUser) return;
+      opponentUserId = c1.contactUser.id;
+    }
 
     const availability = await prisma.availability.create({
       data: {
@@ -376,12 +443,12 @@ export const schedulingService = {
 
     const match = await createMatch({
       hostUserId: hostUser.id,
-      opponentUserId: opponentUser.id,
+      opponentUserId,
       scheduledAt: scheduledAt.toISOString(),
       availabilityId: availability.id,
       type: matchType,
-      hostPartnerUserId: request.hostPartnerUserId ?? undefined,
-      opponentPartnerUserId: undefined,
+      hostPartnerUserId,
+      opponentPartnerUserId,
     });
 
     await prisma.schedulingRequest.update({
@@ -391,12 +458,20 @@ export const schedulingService = {
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
 
-    const format = (request as RequestRow).format || 'singles';
-
     const participantPhones: string[] = [];
     if (hostUser.phone) participantPhones.push(hostUser.phone);
-    if (format === 'doubles' && request.hostPartner?.phone) participantPhones.push(request.hostPartner.phone);
-    if (opponentUser.phone) participantPhones.push(opponentUser.phone);
+    if (hostPartnerUserId) {
+      const hp = acceptedCandidates[0]?.contactUser;
+      if (hp?.phone) participantPhones.push(hp.phone);
+    }
+    if (opponentUserId) {
+      const opp = format === 'doubles' ? acceptedCandidates[1]?.contactUser : acceptedCandidates[0]?.contactUser;
+      if (opp?.phone) participantPhones.push(opp.phone);
+    }
+    if (opponentPartnerUserId) {
+      const oppPartner = acceptedCandidates[2]?.contactUser;
+      if (oppPartner?.phone) participantPhones.push(oppPartner.phone);
+    }
     if (participantPhones.length >= 2) {
       const dayStr = request.date.toLocaleDateString('en-US', { weekday: 'long' });
       const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -463,8 +538,8 @@ export const schedulingService = {
 
     const candidate = request.candidates?.find((c) => c.id === candidateId);
     if (!candidate) throw new AppError('Candidate not found', 404);
-    const retryable = ['declined', 'expired'].includes(candidate.status);
-    if (!retryable) throw new AppError('Only declined or expired candidates can be retried', 400);
+    const retryable = ['expired', 'cancelled'].includes(candidate.status);
+    if (!retryable) throw new AppError('Only expired or cancelled candidates can be retried (not declined)', 400);
 
     const maxRetry = await schedulingRepository.getMaxRetryOrder(requestId);
     const retryOrder = maxRetry + 1;
@@ -480,12 +555,209 @@ export const schedulingService = {
     return toRequestDTOWithCandidates(updated);
   },
 
+  async addCandidates(requestId: string, candidateUserIds: string[], userId: string): Promise<SchedulingRequestDTO> {
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
+    if (request.hostUserId !== userId) throw new AppError('Only the host can add candidates', 403);
+    if (request.status === 'completed') throw new AppError('Cannot add candidates to a completed match', 400);
+    if (request.status === 'cancelled') throw new AppError('Cannot add candidates to a cancelled request', 400);
+
+    const existingIds = new Set((request.candidates ?? []).map((c) => c.contactUserId));
+    const toAdd = candidateUserIds.filter((id) => !existingIds.has(id));
+    if (toAdd.length === 0) {
+      const updated = await schedulingRepository.findRequestById(requestId);
+      return updated ? toRequestDTOWithCandidates(updated) : toRequestDTOWithCandidates(request);
+    }
+
+    await schedulingRepository.addCandidates(requestId, toAdd);
+
+    if (request.status === 'expired') {
+      await schedulingRepository.updateRequestStatus(requestId, 'active');
+    }
+    await this.contactNextCandidates(requestId);
+
+    const updated = await schedulingRepository.findRequestById(requestId);
+    if (!updated) throw new AppError('Failed to load updated request', 500);
+    logger.info('CandidatesAdded', { requestId, count: toAdd.length, userId });
+    return toRequestDTOWithCandidates(updated);
+  },
+
+  async manualAcceptCandidate(
+    requestId: string,
+    candidateId: string,
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
+    if (request.hostUserId !== userId) throw new AppError('Only the host can accept candidates', 403);
+    if (request.status === 'completed') throw new AppError('Match already completed', 400);
+    if (request.status === 'cancelled') throw new AppError('Cannot accept on a cancelled request', 400);
+
+    const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);
+    if (!candidate) throw new AppError('Candidate not found', 404);
+    if (candidate.status === 'accepted') throw new AppError('Candidate already accepted', 400);
+    if (candidate.status === 'declined') throw new AppError('Candidate declined; cannot manually accept', 400);
+
+    const now = new Date();
+    await schedulingRepository.updateCandidateStatus(candidateId, 'accepted', now);
+    const format = (request as RequestRow).format || 'singles';
+    const required = getRequiredAcceptances(format);
+    const acceptedCount = (request.candidates ?? []).filter((c) => c.status === 'accepted').length + 1;
+    if (acceptedCount >= required) {
+      await schedulingRepository.updateRequestStatus(requestId, 'completed');
+      logger.info('ManualAccept', { requestId, candidateId, userId });
+      await this.completeScheduling(requestId);
+    } else {
+      await this.contactNextCandidates(requestId);
+    }
+
+    const updated = await schedulingRepository.findRequestById(requestId);
+    return updated ? toRequestDTOWithCandidates(updated) : toRequestDTOWithCandidates(request);
+  },
+
+  async cancelContactedCandidate(
+    requestId: string,
+    candidateId: string,
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
+    if (request.hostUserId !== userId) throw new AppError('Only the host can cancel candidates', 403);
+    if (!['active', 'paused'].includes(request.status)) {
+      throw new AppError('Request must be active or paused to cancel a contacted candidate', 400);
+    }
+
+    const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);
+    if (!candidate) throw new AppError('Candidate not found', 404);
+    if (!['contacted', 'waiting_reply'].includes(candidate.status)) {
+      throw new AppError('Only contacted candidates can be cancelled this way', 400);
+    }
+
+    const phone = candidate.contactUser?.phone;
+    if (phone) {
+      const hostName = request.hostUser?.name ?? 'Someone';
+      const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const format = (request as RequestRow).format || 'singles';
+      const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText);
+      const result = await whatsappService.sendInviteMessage(phone, msg);
+      if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId, phone });
+    }
+
+    await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
+    logger.info('ContactedCandidateCancelled', { requestId, candidateId, userId });
+    await this.contactNextCandidates(requestId);
+
+    const updated = await schedulingRepository.findRequestById(requestId);
+    return updated ? toRequestDTOWithCandidates(updated) : toRequestDTOWithCandidates(request);
+  },
+
+  async removeCandidate(
+    requestId: string,
+    candidateId: string,
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
+    if (request.hostUserId !== userId) throw new AppError('Only the host can remove candidates', 403);
+    if (!['active', 'paused', 'expired'].includes(request.status)) {
+      throw new AppError('Request must be active, paused, or expired to remove a candidate', 400);
+    }
+
+    const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);
+    if (!candidate) throw new AppError('Candidate not found', 404);
+    if (candidate.status !== 'pending') {
+      throw new AppError('Only pending candidates can be removed', 400);
+    }
+
+    await prisma.schedulingCandidate.delete({ where: { id: candidateId } });
+    logger.info('CandidateRemoved', { requestId, candidateId, userId });
+
+    const updated = await schedulingRepository.findRequestById(requestId);
+    return updated ? toRequestDTOWithCandidates(updated) : toRequestDTOWithCandidates(request);
+  },
+
+  async cancelAcceptedCandidate(
+    requestId: string,
+    candidateId: string,
+    userId: string
+  ): Promise<SchedulingRequestDTO> {
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
+    if (request.hostUserId !== userId) throw new AppError('Only the host can cancel accepted candidates', 403);
+    if (!['active', 'paused', 'completed', 'expired'].includes(request.status)) {
+      throw new AppError('Request must be active, paused, completed, or expired', 400);
+    }
+
+    const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);
+    if (!candidate) throw new AppError('Candidate not found', 404);
+    if (candidate.status !== 'accepted') throw new AppError('Candidate has not accepted; nothing to cancel', 400);
+
+    const matchId = request.matchId;
+    if (request.status === 'completed' && matchId) {
+      try {
+        await cancelMatch(matchId, userId);
+      } catch (e) {
+        logger.warn('Could not cancel match when reverting acceptance', { matchId, requestId, error: e });
+      }
+    }
+
+    await prisma.schedulingRequest.update({
+      where: { id: requestId },
+      data: { status: 'active', matchId: null },
+    });
+    await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
+    logger.info('AcceptedCandidateCancelled', { requestId, candidateId, userId });
+    await this.contactNextCandidates(requestId);
+
+    const updated = await schedulingRepository.findRequestById(requestId);
+    return updated ? toRequestDTOWithCandidates(updated) : toRequestDTOWithCandidates(request);
+  },
+
   async cancelSchedulingRequest(requestId: string, userId: string): Promise<SchedulingRequestDTO> {
     const request = await schedulingRepository.findRequestById(requestId);
     if (!request) throw new AppError('Scheduling request not found', 404);
     if (request.hostUserId !== userId) throw new AppError('Only the host can cancel', 403);
     if (request.status === 'cancelled') return toRequestDTOWithCandidates(request);
     if (request.status === 'completed') throw new AppError('Cannot cancel a completed match', 400);
+
+    const hostName = request.hostUser?.name ?? 'Someone';
+    const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const format = (request as RequestRow).format || 'singles';
+    const msg = formatInviteNoLongerAvailableMessage(
+      hostName,
+      request.sportType,
+      format,
+      dateStr,
+      timeStr,
+      request.locationText
+    );
+
+    const candidates = request.candidates ?? [];
+    const toNotify = candidates.filter((c) =>
+      ['contacted', 'waiting_reply', 'accepted'].includes(c.status)
+    );
+
+    for (const c of toNotify) {
+      const phone = c.contactUser?.phone;
+      if (phone) {
+        try {
+          const result = await whatsappService.sendInviteMessage(phone, msg);
+          if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId: c.id, phone });
+        } catch (e) {
+          logger.warn('FailedToNotifyInviteCancelled', { candidateId: c.id, error: e });
+        }
+      }
+      await schedulingRepository.updateCandidateStatus(c.id, 'cancelled');
+    }
+
+    const pendingIds = candidates
+      .filter((c) => c.status === 'pending')
+      .map((c) => c.id);
+    for (const id of pendingIds) {
+      await schedulingRepository.updateCandidateStatus(id, 'cancelled');
+    }
 
     await schedulingRepository.updateRequestStatus(requestId, 'cancelled');
     logger.info('SchedulingCancelled', { requestId, userId });
