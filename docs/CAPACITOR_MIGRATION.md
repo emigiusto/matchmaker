@@ -15,6 +15,132 @@ This document describes how to migrate the MatchMaker frontend to run as a nativ
 
 ---
 
+## Technology Discussion: What is Capacitor?
+
+**Capacitor** is an open-source runtime and plugin system created by Ionic. It wraps your existing web app (HTML, CSS, JavaScript) in a native container and provides a bridge to access native device APIs that are unavailable or limited in the browser.
+
+### How It Works
+
+1. **Native container** – A thin native shell (iOS UIWebView/WKWebView, Android WebView) loads your built web assets from `dist/` or a remote URL.
+2. **JavaScript bridge** – The Capacitor core exposes a JavaScript API that communicates with native code via message passing. Plugins extend this bridge.
+3. **Plugin architecture** – Third-party plugins (e.g. `@capacitor-community/contacts`) implement native iOS (Swift) and Android (Kotlin/Java) code and expose a unified JS API.
+4. **Build pipeline** – `npx cap sync` copies your web build into the native projects; you build and sign using Xcode and Android Studio as with any native app.
+
+### Key Characteristics
+
+- **Framework-agnostic** – Works with React, Vue, Angular, Svelte, or vanilla JS. No lock-in to a specific UI framework.
+- **Web-first** – Your app is fundamentally a web app. It runs in a WebView, so rendering, layout, and animations are handled by the browser engine.
+- **Progressive enhancement** – You can ship one codebase for web and mobile; use `Capacitor.isNativePlatform()` to conditionally enable native-only features (e.g. contacts).
+- **Maturity** – Backed by Ionic; widely used in production. Active ecosystem and LTS versions for multiple Capacitor major releases.
+
+---
+
+## Pros and Cons of Capacitor
+
+### Pros
+
+| Benefit | Description |
+|---------|-------------|
+| **Maximum code reuse** | The entire Vite/React frontend runs unchanged. No UI rewrite. |
+| **Low migration effort** | Add Capacitor, configure, build. Contact picking is a small incremental feature. |
+| **Single codebase** | One repo, one set of components, one API layer for web and mobile. |
+| **Fast iteration** | Web tooling (Vite, HMR) and familiar debugging. Deploy to both platforms from one build. |
+| **Native API access** | Plugins give access to contacts, camera, filesystem, push, etc., despite the WebView. |
+| **Proven stack** | React, TypeScript, Tailwind – same skills and patterns as your current web app. |
+| **PWA-friendly** | The web app can remain a PWA; Capacitor is an optional packaging layer. |
+
+### Cons
+
+| Drawback | Description |
+|----------|-------------|
+| **WebView performance** | Scrolling, animations, and complex UIs can feel less fluid than native. Not ideal for highly interactive, 60fps-heavy experiences. |
+| **Not truly native UI** | Buttons, inputs, and gestures are web-rendered. Platform conventions (e.g. iOS back swipe, Android FAB) require manual implementation. |
+| **Bundle size** | The app includes a WebView and your full JS bundle. Typically larger than a minimal native app. |
+| **Platform quirks** | WebView behavior differs between iOS and Android (e.g. input handling, keyboard, safe areas). May need platform-specific CSS/JS. |
+| **Native dependency** | Still need Xcode and Android Studio for builds and signing. Cannot build iOS on Windows without a Mac or CI. |
+| **Plugin availability** | Some native features rely on community plugins; quality and maintenance vary. |
+
+### When Capacitor Fits Well
+
+- You already have a solid web app and want mobile reach quickly.
+- Contact access (and similar device APIs) is the main native need.
+- Your UX is form- and list-heavy rather than gesture- and animation-heavy.
+- You prioritize speed to market and maintenance simplicity over a fully native feel.
+
+---
+
+## Alternative Approaches
+
+### React Native (Expo)
+
+| Aspect | Notes |
+|--------|-------|
+| **What it is** | Build mobile UIs with React components that map to native views (not WebView). |
+| **Contacts** | `expo-contacts` provides native contact access with permission prompts. |
+| **Code reuse** | Shared logic, types, API layer. UI must be rebuilt with RN components (`View`, `Text`, `FlatList`, etc.). |
+| **Pros** | Native performance and feel; large ecosystem; Expo simplifies builds and OTA updates. |
+| **Cons** | Significant effort to port the UI; separate code paths for web vs mobile unless using something like Tamagui/React Native Web. |
+| **Best for** | Long-term mobile-first strategy; apps where native UX and performance matter more than quick reuse. |
+
+### Progressive Web App (PWA)
+
+| Aspect | Notes |
+|--------|-------|
+| **What it is** | Web app with `manifest.json`, service worker, and “Add to Home Screen.” Runs in the browser. |
+| **Contacts** | **Not available.** The Contacts Picker API exists but has limited support and does not provide full contact list access on mobile. |
+| **Code reuse** | 100% – it is your web app. |
+| **Pros** | No store submission; instant updates; no native tooling. |
+| **Cons** | Cannot reliably pull device contacts for invite flows. Limited push/background capabilities on iOS. |
+| **Best for** | Web-first strategy when contact access is not required; lightweight “Add to Home Screen” experience. |
+
+### Cordova (Legacy)
+
+| Aspect | Notes |
+|--------|-------|
+| **What it is** | Older hybrid framework; similar model to Capacitor (WebView + plugins). |
+| **Contacts** | `cordova-plugin-contacts` exists but is deprecated and has compatibility issues. |
+| **Pros** | Mature; many plugins. |
+| **Cons** | Declining maintenance; Capacitor is the modern successor with better tooling and plugin quality. |
+| **Best for** | Existing Cordova apps; not recommended for new projects. |
+
+### Native (Swift / Kotlin)
+
+| Aspect | Notes |
+|--------|-------|
+| **What it is** | Fully native iOS and Android apps. |
+| **Contacts** | Full access via `CNContactStore` (iOS) and `ContactsContract` (Android). |
+| **Code reuse** | Backend and API only. UI and business logic rewritten per platform. |
+| **Pros** | Best performance, UX, and platform integration. |
+| **Cons** | Highest cost; two codebases (or shared logic via KMP/Swift packages); longer time to market. |
+| **Best for** | Apps where native quality and performance are paramount and budget allows separate implementations. |
+
+### Tauri (Mobile)
+
+| Aspect | Notes |
+|--------|-------|
+| **What it is** | Rust-backed framework for desktop and (experimental) mobile apps using web views. |
+| **Contacts** | Would require custom Rust plugins; no established contacts plugin. |
+| **Pros** | Smaller binary; Rust backend. |
+| **Cons** | Mobile support is experimental; smaller ecosystem; more setup for native APIs. |
+| **Best for** | Early adopters; not recommended for production mobile yet. |
+
+---
+
+## Comparison Summary
+
+| Criterion | Capacitor | React Native (Expo) | PWA | Native |
+|-----------|-----------|---------------------|-----|--------|
+| Contact access | ✅ Plugin | ✅ expo-contacts | ❌ Limited | ✅ Full |
+| Code reuse | High (full web UI) | Medium (logic only) | High | Low |
+| Effort to add mobile | Low | High | Low | Very high |
+| Performance | WebView | Native | WebView | Native |
+| Maintenance | Single codebase | Shared + RN UI | Single | Two codebases |
+| Best for | Quick MVP + contacts | Long-term mobile-first | Web-only, no contacts | Highest fidelity |
+
+**Recommendation for MatchMaker:** Capacitor is the most practical choice to enable device contact picking while reusing the existing React frontend. If the app later demands a fully native UX or heavy native features, a React Native or native migration can be planned. See also [NEXT_STEPS_ROADMAP.md](./NEXT_STEPS_ROADMAP.md) for the broader mobile strategy.
+
+---
+
 ## Prerequisites
 
 - **Node.js** 18+
@@ -332,20 +458,6 @@ In native apps, the API base URL must point to your deployed backend, not `local
 | Push notifications | `@capacitor/push-notifications` (for invite reminders) |
 | Secure storage for JWT | `@capacitor/preferences` or `@capacitor-community/secure-storage` |
 | Deep links | Capacitor App plugin `appUrlOpen` |
-
----
-
-## Comparison with React Native (Expo)
-
-| Criterion | Capacitor | React Native (Expo) |
-|-----------|-----------|---------------------|
-| Contact access | ✅ Via plugin | ✅ expo-contacts |
-| Effort | Lower – reuse web UI | Higher – rebuild UI |
-| Performance | WebView | Native |
-| Maintenance | Single codebase | Separate app |
-| Best for | Quick MVP, contacts | Long-term mobile-first |
-
-See [NEXT_STEPS_ROADMAP.md](./NEXT_STEPS_ROADMAP.md) for the full comparison.
 
 ---
 
