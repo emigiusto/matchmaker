@@ -55,33 +55,72 @@ export function toE164(phone: string, defaultCountryCode?: string): string {
   return `+${d}`;
 }
 
-/** Convert ISO 3166-1 alpha-2 code to flag emoji (e.g. ES → 🇪🇸) */
-export function countryCodeToFlag(iso: string): string {
-  if (!iso || iso.length !== 2) return ""
-  return iso
-    .toUpperCase()
-    .split("")
-    .map((c) => String.fromCodePoint(0x1f1e6 - 65 + c.charCodeAt(0)))
-    .join("")
+/** URL for SVG flag (3:2 ratio). Use for reliable cross-platform display. */
+const FLAG_CDN = "https://catamphetamine.gitlab.io/country-flag-icons/3x2";
+
+export function getFlagUrl(iso: string): string {
+  if (!iso || iso.length !== 2 || iso === "OT") return ""
+  return `${FLAG_CDN}/${iso}.svg`
 }
 
-/** Common country codes for UI selector */
+/** Common country codes for UI selector. Ordered: Spain context first. */
 export const COUNTRY_CODES: { code: string; dial: string; name: string }[] = [
-  { code: 'ES', dial: '34', name: 'Spain' },
-  { code: 'AR', dial: '54', name: 'Argentina' },
-  { code: 'MX', dial: '52', name: 'Mexico' },
-  { code: 'US', dial: '1', name: 'USA' },
-  { code: 'GB', dial: '44', name: 'UK' },
-  { code: 'BR', dial: '55', name: 'Brazil' },
-  { code: 'CL', dial: '56', name: 'Chile' },
-  { code: 'CO', dial: '57', name: 'Colombia' },
-  { code: 'PE', dial: '51', name: 'Peru' },
-  { code: 'UY', dial: '598', name: 'Uruguay' },
-  { code: 'FR', dial: '33', name: 'France' },
-  { code: 'DE', dial: '49', name: 'Germany' },
-  { code: 'IT', dial: '39', name: 'Italy' },
-  { code: 'PT', dial: '351', name: 'Portugal' },
-  { code: 'OT', dial: '', name: 'Other' },
+  // Spain & neighbours
+  { code: "ES", dial: "34", name: "Spain" },
+  { code: "PT", dial: "351", name: "Portugal" },
+  { code: "FR", dial: "33", name: "France" },
+  { code: "AD", dial: "376", name: "Andorra" },
+  // Western Europe
+  { code: "GB", dial: "44", name: "UK" },
+  { code: "DE", dial: "49", name: "Germany" },
+  { code: "IT", dial: "39", name: "Italy" },
+  { code: "NL", dial: "31", name: "Netherlands" },
+  { code: "BE", dial: "32", name: "Belgium" },
+  { code: "CH", dial: "41", name: "Switzerland" },
+  { code: "AT", dial: "43", name: "Austria" },
+  { code: "IE", dial: "353", name: "Ireland" },
+  // Americas
+  { code: "US", dial: "1", name: "USA" },
+  { code: "MX", dial: "52", name: "Mexico" },
+  { code: "AR", dial: "54", name: "Argentina" },
+  { code: "CO", dial: "57", name: "Colombia" },
+  { code: "CL", dial: "56", name: "Chile" },
+  { code: "PE", dial: "51", name: "Peru" },
+  { code: "VE", dial: "58", name: "Venezuela" },
+  { code: "EC", dial: "593", name: "Ecuador" },
+  { code: "GT", dial: "502", name: "Guatemala" },
+  { code: "CU", dial: "53", name: "Cuba" },
+  { code: "BO", dial: "591", name: "Bolivia" },
+  { code: "HN", dial: "504", name: "Honduras" },
+  { code: "PY", dial: "595", name: "Paraguay" },
+  { code: "SV", dial: "503", name: "El Salvador" },
+  { code: "NI", dial: "505", name: "Nicaragua" },
+  { code: "CR", dial: "506", name: "Costa Rica" },
+  { code: "PA", dial: "507", name: "Panama" },
+  { code: "UY", dial: "598", name: "Uruguay" },
+  { code: "BR", dial: "55", name: "Brazil" },
+  // Other Europe
+  { code: "PL", dial: "48", name: "Poland" },
+  { code: "RO", dial: "40", name: "Romania" },
+  { code: "CZ", dial: "420", name: "Czech Republic" },
+  { code: "GR", dial: "30", name: "Greece" },
+  { code: "SE", dial: "46", name: "Sweden" },
+  { code: "HU", dial: "36", name: "Hungary" },
+  { code: "RU", dial: "7", name: "Russia" },
+  // Africa & Asia
+  { code: "MA", dial: "212", name: "Morocco" },
+  { code: "CN", dial: "86", name: "China" },
+  { code: "IN", dial: "91", name: "India" },
+  { code: "JP", dial: "81", name: "Japan" },
+  { code: "PH", dial: "63", name: "Philippines" },
+  { code: "ZA", dial: "27", name: "South Africa" },
+  { code: "TR", dial: "90", name: "Turkey" },
+  { code: "EG", dial: "20", name: "Egypt" },
+  { code: "NG", dial: "234", name: "Nigeria" },
+  { code: "PK", dial: "92", name: "Pakistan" },
+  { code: "BD", dial: "880", name: "Bangladesh" },
+  { code: "AU", dial: "61", name: "Australia" },
+  { code: "OT", dial: "", name: "Other" },
 ];
 
 export function getCountryByDial(dial: string) {

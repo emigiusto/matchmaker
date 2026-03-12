@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils"
 import {
   COUNTRY_CODES,
-  countryCodeToFlag,
+  getFlagUrl,
   digitsOnly,
   parseCountryCode,
   validatePhoneE164,
@@ -154,7 +154,13 @@ export function PhoneInput({
                 "Other"
               ) : selectedCountry ? (
                 <span className="flex items-center gap-2 truncate">
-                  <span className="text-base leading-none">{countryCodeToFlag(selectedCountry.code)}</span>
+                  {getFlagUrl(selectedCountry.code) ? (
+                    <img
+                      src={getFlagUrl(selectedCountry.code)}
+                      alt=""
+                      className="h-4 w-6 shrink-0 rounded-sm object-cover"
+                    />
+                  ) : null}
                   <span>+{selectedCountry.dial}</span>
                 </span>
               ) : (
@@ -175,7 +181,13 @@ export function PhoneInput({
                       value={`${c.name} ${c.dial} ${c.code}`}
                       onSelect={() => handleCountrySelect(c.dial)}
                     >
-                      <span className="mr-2 text-base">{countryCodeToFlag(c.code)}</span>
+                      {getFlagUrl(c.code) ? (
+                        <img
+                          src={getFlagUrl(c.code)}
+                          alt=""
+                          className="mr-2 h-4 w-6 shrink-0 rounded-sm object-cover"
+                        />
+                      ) : null}
                       <span>+{c.dial}</span>
                       <span className="ml-2 text-muted-foreground">{c.name}</span>
                     </CommandItem>
