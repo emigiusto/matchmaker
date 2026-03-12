@@ -7,9 +7,12 @@ import { logger } from '../../config/logger';
 
 async function runExpireJob() {
   try {
-    const expiredCount = await schedulingService.expireWaitingCandidates();
-    if (expiredCount > 0) {
-      logger.info('SchedulingExpireJob', { expiredCount });
+    const [expiredCandidates, expiredRequests] = await Promise.all([
+      schedulingService.expireWaitingCandidates(),
+      schedulingService.expireRequestsPastScheduledTime(),
+    ]);
+    if (expiredCandidates > 0 || expiredRequests > 0) {
+      logger.info('SchedulingExpireJob', { expiredCandidates, expiredRequests });
     }
   } catch (err) {
     logger.error('SchedulingExpireJob failed', { error: err instanceof Error ? err.message : err });
@@ -17,8 +20,9 @@ async function runExpireJob() {
 }
 
 /**
- * Expires scheduling candidates that are waiting_reply and were contacted
- * more than responseWindowMinutes ago.
+ * 1. Expires scheduling candidates that are waiting_reply and were contacted
+ *    more than responseWindowMinutes ago.
+ * 2. Expires scheduling requests whose scheduled date+startTime has passed.
  * Idempotent and safe to run multiple times.
  *
  * In development: setInterval every 10 sec (reliable for short timeouts).
@@ -36,8 +40,8 @@ export function scheduleSchedulingExpireJob() {
     runExpireJob(); // run immediately once
     setInterval(runExpireJob, ms);
   } else {
-    cron.schedule('*/15 * * * *', runExpireJob);
+    cron.schedule('*/10 * * * *', runExpireJob);
     // eslint-disable-next-line no-console
-    console.log('[JOBS] SchedulingExpireJob: cron every 15 min');
+    console.log('[JOBS] SchedulingExpireJob: cron every 10 min');
   }
 }

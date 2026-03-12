@@ -88,6 +88,28 @@ export const schedulingRepository = {
     });
   },
 
+  /** Active or paused requests whose scheduled start time has passed */
+  async findActiveOrPausedPastScheduledTime() {
+    const requests = await prisma.schedulingRequest.findMany({
+      where: { status: { in: ['active', 'paused'] } },
+      select: { id: true, date: true, startTime: true },
+    });
+    const now = new Date();
+    return requests.filter((r) => {
+      const d = new Date(r.date);
+      const t = new Date(r.startTime);
+      const scheduled = new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate(),
+        t.getHours(),
+        t.getMinutes(),
+        t.getSeconds()
+      );
+      return scheduled <= now;
+    });
+  },
+
   async hasWaitingReplyCandidate(schedulingRequestId: string): Promise<boolean> {
     const c = await prisma.schedulingCandidate.findFirst({
       where: { schedulingRequestId, status: 'waiting_reply' },

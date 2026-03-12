@@ -177,6 +177,11 @@ export const schedulingService = {
 
     let format = input.format ?? 'singles';
     if (input.sportType === 'padel') format = 'doubles';
+    const invalidCandidate = (input.candidateUserIds ?? []).find((id) => id === input.hostUserId);
+    if (invalidCandidate) {
+      throw new AppError('You cannot invite yourself as a candidate', 400);
+    }
+
     const minCandidates = format === 'doubles' ? 3 : 1;
     const candidateIds = input.candidateUserIds ?? [];
     if (candidateIds.length < minCandidates) {
@@ -493,6 +498,15 @@ export const schedulingService = {
     return candidates.length;
   },
 
+  async expireRequestsPastScheduledTime(): Promise<number> {
+    const requests = await schedulingRepository.findActiveOrPausedPastScheduledTime();
+    for (const r of requests) {
+      await schedulingRepository.updateRequestStatus(r.id, 'expired');
+      logger.info('SchedulingExpired', { requestId: r.id, reason: 'scheduled_time_passed' });
+    }
+    return requests.length;
+  },
+
   async completeScheduling(requestId: string): Promise<void> {
     const request = await prisma.schedulingRequest.findUnique({
       where: { id: requestId },
@@ -687,6 +701,11 @@ export const schedulingService = {
     if (request.hostUserId !== userId) throw new AppError('Only the host can add candidates', 403);
     if (request.status === 'completed') throw new AppError('Cannot add candidates to a completed match', 400);
     if (request.status === 'cancelled') throw new AppError('Cannot add candidates to a cancelled request', 400);
+
+    const invalidCandidate = candidateUserIds.find((id) => id === request.hostUserId);
+    if (invalidCandidate) {
+      throw new AppError('You cannot invite yourself as a candidate', 400);
+    }
 
     const existingIds = new Set((request.candidates ?? []).map((c) => c.contactUserId));
     const toAdd = candidateUserIds.filter((id) => !existingIds.has(id));
