@@ -42,8 +42,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { PhoneInput } from "@/components/phone-input"
 import { SportFormatBadge } from "@/components/sport-format-badge"
 import { toast } from "sonner"
+import { validatePhoneE164 } from "@/lib/phone.utils"
 import { cn } from "@/lib/utils"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { usersService } from "@/lib/services/users.service"
@@ -252,6 +254,11 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     const phone = manualPhone.trim()
     if (!name || !phone) {
       toast.error("Enter name and phone")
+      return
+    }
+    const phoneValidation = validatePhoneE164(phone)
+    if (!phoneValidation.valid) {
+      toast.error(phoneValidation.error)
       return
     }
     try {
@@ -757,21 +764,21 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {/* Manual add: name + phone (saves as GuestContact) */}
             <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-3">
               <Label className="text-sm font-medium">Add manually (name + phone)</Label>
-              <p className="text-xs text-muted-foreground">Saved to your contacts.</p>
-              <div className="flex gap-2">
+              <p className="text-xs text-muted-foreground">Saved to your contacts. Use country code (e.g. +34 for Spain).</p>
+              <div className="flex flex-wrap items-end gap-2">
                 <Input
                   placeholder="Name"
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
-                  className="flex-1"
+                  className="min-w-[120px] flex-1"
                 />
-                <Input
-                  placeholder="Phone"
-                  value={manualPhone}
-                  onChange={(e) => setManualPhone(e.target.value)}
-                  type="tel"
-                  className="flex-1"
-                />
+                <div className="min-w-[200px] flex-1">
+                  <PhoneInput
+                    value={manualPhone}
+                    onChange={setManualPhone}
+                    defaultCountryCode="34"
+                  />
+                </div>
                 <Button variant="secondary" size="sm" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
                   Add
                 </Button>

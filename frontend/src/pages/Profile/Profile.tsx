@@ -20,7 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/page-header"
+import { PhoneInput } from "@/components/phone-input"
 import { useLanguage } from "@/lib/i18n/language-context"
+import { toE164, validatePhoneE164 } from "@/lib/phone.utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { getCurrentUserId } from "@/lib/current-user"
 import { usersService, type User } from "@/lib/services/users.service"
@@ -59,11 +61,21 @@ export default function ProfilePage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    let phoneToSave: string | undefined = form.phone || undefined
+    if (phoneToSave) {
+      const normalized = phoneToSave.trim().startsWith("+") ? phoneToSave : toE164(phoneToSave, "34")
+      const validation = validatePhoneE164(normalized)
+      if (!validation.valid) {
+        toast.error(validation.error)
+        return
+      }
+      phoneToSave = normalized
+    }
     setSaving(true)
     try {
       const updated = await usersService.update(currentUserId, {
         name: form.name || undefined,
-        phone: form.phone || undefined,
+        phone: phoneToSave,
       })
       setUser(updated)
       toast.success(t("success.saved"))
@@ -160,16 +172,15 @@ export default function ProfilePage() {
                   <Phone className="h-4 w-4" />
                   Phone number
                 </Label>
-                <Input
+                <PhoneInput
                   id="phone"
-                  type="tel"
                   value={form.phone}
-                  onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                  placeholder="+34 612 345 678"
+                  onChange={(phone) => setForm((p) => ({ ...p, phone }))}
+                  defaultCountryCode="34"
                   className="max-w-md"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Required for WhatsApp invites and match reminders.
+                  Required for WhatsApp invites and match reminders. Include country code (e.g. +34).
                 </p>
               </div>
 

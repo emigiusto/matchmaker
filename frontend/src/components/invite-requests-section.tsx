@@ -242,12 +242,17 @@ export function InviteRequestsSection({
     return () => clearInterval(interval)
   }, [inviteRequests, currentUserId])
 
+  const getDisplayStatus = (r: InviteRequest) => {
+    const hasActiveContact = r.contacts.some((c) => c.status === "contacted")
+    return r.status === "expired" && hasActiveContact ? "scheduling" : r.status
+  }
   const filteredRequests = inviteRequests.filter((r) => {
-    if (inviteFilter === "all") return r.status !== "cancelled"
-    if (inviteFilter === "scheduling") return r.status === "scheduling"
-    if (inviteFilter === "no_match") return r.status === "expired"
-    if (inviteFilter === "completed") return r.status === "matched"
-    if (inviteFilter === "cancelled") return r.status === "cancelled"
+    const displayStatus = getDisplayStatus(r)
+    if (inviteFilter === "all") return displayStatus !== "cancelled"
+    if (inviteFilter === "scheduling") return displayStatus === "scheduling"
+    if (inviteFilter === "no_match") return displayStatus === "expired"
+    if (inviteFilter === "completed") return displayStatus === "matched"
+    if (inviteFilter === "cancelled") return displayStatus === "cancelled"
     return true
   })
 
@@ -443,7 +448,9 @@ export function InviteRequestsSection({
               </Card>
             ) : (
               <div className="space-y-4">
-                {filteredRequests.map((request) => (
+                {filteredRequests.map((request) => {
+                  const displayStatus = getDisplayStatus(request)
+                  return (
                   <Card key={request.id}>
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between">
@@ -452,13 +459,13 @@ export function InviteRequestsSection({
                             sport={request.sport}
                             format={request.matchFormat}
                           />
-                          {request.status === "scheduling" && (
+                          {displayStatus === "scheduling" && (
                             <span className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-600">
                               <Loader2 className="h-3 w-3 animate-spin" />
                               Scheduling
                             </span>
                           )}
-                          {request.status === "matched" && (
+                          {displayStatus === "matched" && (
                             <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-600">
                               <CheckCircle className="h-3 w-3" />
                               Matched
@@ -470,7 +477,7 @@ export function InviteRequestsSection({
                               No match
                             </span>
                           )}
-                          {request.status === "cancelled" && (
+                          {displayStatus === "cancelled" && (
                             <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                               <XCircle className="h-3 w-3" />
                               Cancelled
@@ -492,7 +499,7 @@ export function InviteRequestsSection({
                           <MapPin className="h-4 w-4 text-primary" />
                           {request.location}
                         </span>
-                        {request.status === "scheduling" && (
+                        {displayStatus === "scheduling" && (
                           <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
                             <Hourglass className="h-3.5 w-3.5" />
                             Reply within {formatResponseWindow(request.responseWindowMinutes)}
@@ -629,7 +636,7 @@ export function InviteRequestsSection({
                         </div>
                       </div>
 
-                      {request.status === "expired" && (
+                      {displayStatus === "expired" && (
                         <div className="mt-4 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 px-4 py-3">
                           <p className="text-sm text-muted-foreground">
                             {request.matchFormat === "doubles"
@@ -650,9 +657,9 @@ export function InviteRequestsSection({
                           </div>
                         </div>
                       )}
-                      {request.status !== "matched" &&
-                        request.status !== "expired" &&
-                        request.status !== "cancelled" && (
+                      {displayStatus !== "matched" &&
+                        displayStatus !== "expired" &&
+                        displayStatus !== "cancelled" && (
                           <div className="mt-4 space-y-3 border-t border-border/30 pt-4">
                             <div className="flex flex-wrap gap-2">
                               <AddContactsToInvite
@@ -741,7 +748,8 @@ export function InviteRequestsSection({
                       )}
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>

@@ -1,7 +1,18 @@
 // scheduling.repository.ts
 // Database operations for scheduling automation
 
+import { logger } from '../../config/logger';
+import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { prisma } from '../../prisma';
+
+/** Match phone digits - exact or suffix (handles 600972124 vs 34600972124 when one lacks country code). */
+function phoneDigitsMatch(senderDigits: string, contactDigits: string): boolean {
+  if (!contactDigits) return false;
+  if (senderDigits === contactDigits) return true;
+  if (senderDigits.endsWith(contactDigits) && contactDigits.length >= 8) return true;
+  if (contactDigits.endsWith(senderDigits) && senderDigits.length >= 8) return true;
+  return false;
+}
 import type {
   SchedulingCandidate,
   SchedulingRequestStatus,
@@ -173,9 +184,8 @@ export const schedulingRepository = {
    * Matches the contact we actually sent the invite to.
    */
   async findCandidateToRecordResponseByPhone(phone: string) {
-    const digits = phone.replace(/\D/g, '').split('@')[0];
-    if (!digits) return null;
-    const normalize = (p: string | null) => (p || '').replace(/\D/g, '');
+    const senderDigits = normalizePhoneToCanonical(phone.split('@')[0]);
+    if (!senderDigits) return null;
 
     const candidates = await prisma.schedulingCandidate.findMany({
       where: { status: { in: ['waiting_reply', 'contacted', 'expired'] } },
@@ -184,14 +194,28 @@ export const schedulingRepository = {
         contactUser: true,
       },
     });
+
     for (const c of candidates) {
-      if (normalize(c.contactUser?.phone ?? '') !== digits) continue;
+      const contactDigits = normalizePhoneToCanonical(c.contactUser?.phone);
+      if (!phoneDigitsMatch(senderDigits, contactDigits)) continue;
       if (c.status === 'waiting_reply' || c.status === 'contacted') return c;
       if (c.status === 'expired' && !c.responseAt && c.contactedAt) {
         const GRACE_MS = 5 * 60 * 1000;
         if (Date.now() - c.contactedAt.getTime() <= GRACE_MS) return c;
       }
     }
+
+    logger.info('FindCandidateByPhoneNoMatch', {
+      senderPhone: phone,
+      senderDigits,
+      candidateCount: candidates.length,
+      samplePhones: candidates.slice(0, 5).map((c) => ({
+        candidateId: c.id,
+        contactPhone: c.contactUser?.phone ?? null,
+        contactDigits: normalizePhoneToCanonical(c.contactUser?.phone),
+        status: c.status,
+      })),
+    });
     return null;
   },
 
