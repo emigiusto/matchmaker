@@ -82,6 +82,10 @@ vi.mock('../matches/matches.service', () => ({
   notifyMatchParticipantsOnCreate: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../notifications/notifications.service', () => ({
+  createNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../config/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));

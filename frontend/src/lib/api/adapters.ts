@@ -109,6 +109,7 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, Notification["type"]> = {
   "match.created": "invite_accepted",
   "match.completed": "match_completed",
   "match.cancelled": "match_cancelled",
+  "scheduling.no_match": "scheduling_no_match",
   "result_pending": "result_pending",
   "rating_change": "rating_change",
 }
@@ -128,6 +129,8 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
       return "Result pending"
     case "rating_change":
       return "Rating updated"
+    case "scheduling.no_match":
+      return "No match"
     default:
       return type.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   }
@@ -164,6 +167,13 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
       if (timeStr) parts.push(`at ${timeStr}`)
       if (location) parts.push(location)
       return parts.length > 0 ? `Match cancelled: ${parts.join(" · ")}` : "Your match was cancelled."
+    }
+    case "scheduling.no_match": {
+      const parts: string[] = []
+      if (dateStr) parts.push(dateStr)
+      if (timeStr) parts.push(`at ${timeStr}`)
+      if (location) parts.push(location)
+      return parts.length > 0 ? `No match: ${parts.join(" · ")}` : "Your scheduling request did not get a match."
     }
     case "invite_received":
       return "You received a new match invite."

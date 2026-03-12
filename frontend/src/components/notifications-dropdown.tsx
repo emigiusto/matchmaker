@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
-import { Bell, Mail, CheckCircle, TrendingUp, Swords, Loader2 } from "lucide-react"
+import { Bell, Mail, CheckCircle, TrendingUp, Swords, Loader2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -20,6 +20,8 @@ const iconMap: Record<string, typeof Bell> = {
   match_completed: Swords,
   rating_change: TrendingUp,
   invite_accepted: CheckCircle,
+  match_cancelled: XCircle,
+  scheduling_no_match: XCircle,
 }
 
 export function NotificationsDropdown() {
@@ -89,7 +91,9 @@ export function NotificationsDropdown() {
             const Icon = iconMap[notification.type] || Bell
             const matchLink = notification.metadata?.matchId
               ? `/matches/${notification.metadata.matchId}`
-              : null
+              : notification.type === "scheduling_no_match" && notification.metadata?.requestId
+                ? "/play"
+                : null
             const content = (
               <>
                 <div

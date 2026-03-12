@@ -9,6 +9,7 @@ import {
   Check,
   Loader2,
   ArrowRight,
+  XCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -24,6 +25,8 @@ const iconMap: Record<string, typeof Bell> = {
   match_completed: Swords,
   rating_change: TrendingUp,
   invite_accepted: CheckCircle,
+  match_cancelled: XCircle,
+  scheduling_no_match: XCircle,
 }
 
 export default function NotificationsPage() {

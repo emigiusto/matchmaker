@@ -8,6 +8,7 @@ import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
+import { createNotification } from '../notifications/notifications.service';
 import type {
   CreateSchedulingRequestInput,
   SchedulingRequestDTO,
@@ -168,6 +169,82 @@ function formatInviteNoLongerAvailableMessage(
   return `Hi! The ${sportType} ${formatLabel} invite from ${hostName} for ${dateStr} at ${timeStr} (${loc}) is no longer available. You can ignore the previous message.`;
 }
 
+/** Reason codes when a scheduling request expires (No match) */
+type SchedulingExpiredReason = 'no_more_candidates' | 'all_candidates_exhausted' | 'scheduled_time_passed';
+
+function formatNoMatchWhatsAppMessage(
+  sportType: string,
+  format: string,
+  dateStr: string,
+  timeStr: string,
+  location: string,
+  reason: SchedulingExpiredReason
+): string {
+  const sport = sportType.charAt(0).toUpperCase() + sportType.slice(1).toLowerCase();
+  const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
+  const loc = (location && location.trim()) || 'TBD';
+  const details = `${sport} · ${formatLabel}\n${dateStr} ${timeStr}\n${loc}`;
+  const reasonText =
+    reason === 'no_more_candidates'
+      ? 'No quedaban más candidatos para contactar.'
+      : reason === 'all_candidates_exhausted'
+        ? 'Todos los candidatos rechazaron o no respondieron a tiempo.'
+        : 'Se pasó la hora programada sin confirmar partido.';
+  return `❌ Tu solicitud de partido no tuvo match.\n\n${details}\n\n${reasonText}\n\nPuedes añadir más contactos o crear una nueva solicitud.`;
+}
+
+async function notifyHostSchedulingNoMatch(
+  request: {
+    id: string;
+    hostUserId: string;
+    sportType: string;
+    format: string;
+    date: Date;
+    startTime: Date;
+    endTime: Date;
+    locationText: string;
+    hostUser?: { id: string; name: string | null; phone: string | null } | null;
+  },
+  reason: SchedulingExpiredReason
+): Promise<void> {
+  const dateStr = request.date.toLocaleDateString('es-ES', { weekday: 'short', month: 'short', day: 'numeric' });
+  const timeStr = `${request.startTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} - ${request.endTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+  const payload = {
+    requestId: request.id,
+    reason,
+    sportType: request.sportType,
+    format: request.format,
+    date: request.date.toISOString(),
+    time: timeStr,
+    location: request.locationText,
+  };
+
+  try {
+    await createNotification(request.hostUserId, 'scheduling.no_match', payload);
+    logger.info('NotificationCreated', { type: 'scheduling.no_match', requestId: request.id, hostUserId: request.hostUserId });
+  } catch (e) {
+    logger.warn('FailedToCreateNoMatchNotification', { requestId: request.id, error: e });
+  }
+
+  const hostPhone = request.hostUser?.phone;
+  if (hostPhone) {
+    const msg = formatNoMatchWhatsAppMessage(
+      request.sportType,
+      request.format,
+      dateStr,
+      timeStr,
+      request.locationText,
+      reason
+    );
+    const result = await whatsappService.sendInviteMessage(hostPhone, msg);
+    if (result.success) {
+      logger.info('NoMatchWhatsAppSent', { requestId: request.id, hostUserId: request.hostUserId });
+    } else {
+      logger.warn('FailedToSendNoMatchWhatsApp', { requestId: request.id, error: result.error });
+    }
+  }
+}
+
 export const schedulingService = {
   async createSchedulingRequest(input: CreateSchedulingRequestInput): Promise<SchedulingRequestDTO> {
     if (!input.candidateUserIds?.length) {
@@ -271,6 +348,7 @@ export const schedulingService = {
     if (!pending) {
       await schedulingRepository.updateRequestStatus(requestId, 'expired');
       logger.info('SchedulingExpired', { requestId, reason: 'no_more_candidates' });
+      await notifyHostSchedulingNoMatch(request, 'no_more_candidates');
       return toRequestDTOWithCandidates({ ...request, status: 'expired' });
     }
 
@@ -295,6 +373,7 @@ export const schedulingService = {
       if (pendingCount === 0 && waitingReplyCount === 0) {
         await schedulingRepository.updateRequestStatus(requestId, 'expired');
         logger.info('SchedulingExpired', { requestId, reason: 'all_candidates_exhausted' });
+        await notifyHostSchedulingNoMatch(request, 'all_candidates_exhausted');
       }
       return;
     }
@@ -495,6 +574,10 @@ export const schedulingService = {
     for (const r of requests) {
       await schedulingRepository.updateRequestStatus(r.id, 'expired');
       logger.info('SchedulingExpired', { requestId: r.id, reason: 'scheduled_time_passed' });
+      const fullRequest = await schedulingRepository.findRequestById(r.id);
+      if (fullRequest) {
+        await notifyHostSchedulingNoMatch(fullRequest, 'scheduled_time_passed');
+      }
     }
     return requests.length;
   },
