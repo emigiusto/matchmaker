@@ -26,6 +26,7 @@ export const createPlayerSchema = z.object({
   levelConfidence: z.number().min(0).max(1).optional(),
   preferredSurfaces: z.array(z.string()).optional(),
   defaultCity: z.string().optional(),
+  preferredClub: z.string().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
 });
@@ -40,6 +41,7 @@ export const updatePlayerSchema = z.object({
   levelConfidence: z.number().min(0).max(1).optional(),
   preferredSurfaces: z.array(z.string()).optional(),
   defaultCity: z.string().optional(),
+  preferredClub: z.string().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
 });

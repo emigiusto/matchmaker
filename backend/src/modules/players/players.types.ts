@@ -39,6 +39,8 @@ export interface PlayerDTO {
   preferredSurfaces?: string[];
   /** Default city for matches */
   defaultCity?: string;
+  /** Preferred court/club for I Want to Play default */
+  preferredClub?: string;
   /** Latitude for geolocation */
   latitude?: number;
   /** Longitude for geolocation */
@@ -55,6 +57,7 @@ export interface CreatePlayerInput {
   levelConfidence?: number;
   preferredSurfaces?: string[];
   defaultCity?: string;
+  preferredClub?: string;
   latitude?: number;
   longitude?: number;
 }
@@ -69,6 +72,7 @@ export interface UpdatePlayerInput {
   levelConfidence?: number;
   preferredSurfaces?: string[];
   defaultCity?: string;
+  preferredClub?: string;
   latitude?: number;
   longitude?: number;
 }

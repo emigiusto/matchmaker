@@ -182,6 +182,7 @@ export class PlayersService {
         levelValue: data.levelValue,
         levelConfidence: data.levelConfidence,
         defaultCity: data.defaultCity,
+        preferredClub: data.preferredClub,
         latitude: data.latitude,
         longitude: data.longitude,
       },
@@ -232,6 +233,7 @@ export class PlayersService {
         levelValue: data.levelValue,
         levelConfidence: data.levelConfidence,
         defaultCity: data.defaultCity,
+        preferredClub: data.preferredClub,
       },
     });
     // Replace all PlayerSurface entries (no duplicates) if provided
@@ -273,6 +275,7 @@ export class PlayersService {
       lastMatchAt: lastMatchAt ?? undefined,
       preferredSurfaces: preferredSurfaces ?? [],
       defaultCity: player.defaultCity ?? undefined,
+      preferredClub: (player as any).preferredClub ?? undefined,
       latitude: player.latitude ?? undefined,
       longitude: player.longitude ?? undefined,
     };

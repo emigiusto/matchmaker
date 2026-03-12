@@ -7,6 +7,7 @@ import {
   Settings,
   Loader2,
   Save,
+  MapPin,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ import { toE164, validatePhoneE164 } from "@/lib/phone.utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { getCurrentUserId } from "@/lib/current-user"
 import { usersService, type User } from "@/lib/services/users.service"
+import { playersService } from "@/lib/services/players.service"
 import { toast } from "sonner"
 
 export default function ProfilePage() {
@@ -36,6 +38,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: "", phone: "" })
+  const [player, setPlayer] = useState<{ id: string; preferredClub?: string; defaultCity?: string } | null>(null)
+  const [locationForm, setLocationForm] = useState({ preferredClub: "", defaultCity: "" })
+  const [savingLocation, setSavingLocation] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -58,6 +63,50 @@ export default function ProfilePage() {
       })
     return () => { cancelled = true }
   }, [currentUserId])
+
+  useEffect(() => {
+    let cancelled = false
+    playersService
+      .getByUser(currentUserId)
+      .then((p) => {
+        if (!cancelled) {
+          setPlayer(p)
+          setLocationForm({
+            preferredClub: (p as { preferredClub?: string }).preferredClub ?? "",
+            defaultCity: (p as { defaultCity?: string }).defaultCity ?? "",
+          })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPlayer(null)
+      })
+    return () => { cancelled = true }
+  }, [currentUserId])
+
+  async function handleSaveLocation(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingLocation(true)
+    try {
+      const preferredClub = locationForm.preferredClub.trim() || undefined
+      const defaultCity = locationForm.defaultCity.trim() || undefined
+      if (player) {
+        await playersService.update(player.id, { preferredClub, defaultCity })
+      } else {
+        const created = await playersService.create(currentUserId, {
+          displayName: user?.name ?? "Player",
+          preferredClub,
+          defaultCity,
+        })
+        setPlayer(created)
+      }
+      toast.success(t("success.saved"))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save"
+      toast.error(msg)
+    } finally {
+      setSavingLocation(false)
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -218,23 +267,50 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Future preferences - useful for scheduling service */}
-        <Card className="border-dashed opacity-75">
+        {/* Location preferences — for I Want to Play wizard defaults */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium text-muted-foreground">
-              More preferences (coming soon)
+            <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
+              <MapPin className="h-5 w-5 text-primary" />
+              Location preferences
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Default location for &quot;I Want to Play&quot; — your preferred club and city.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-1 text-sm text-muted-foreground">
-            <p>Proposed settings for scheduling:</p>
-            <ul className="ml-4 list-disc space-y-0.5">
-              <li>Default city — for "find players near me" and default location in requests</li>
-              <li>Timezone — to show match times correctly</li>
-              <li>Default sport — tennis or padel for new scheduling requests</li>
-              <li>Default search radius — km for matching nearby players</li>
-              <li>WhatsApp reminders — toggle on/off for match reminders</li>
-              <li>Response window — default minutes to wait for invite replies</li>
-            </ul>
+          <CardContent>
+            <form onSubmit={handleSaveLocation} className="space-y-4 max-w-md">
+              <div className="space-y-2">
+                <Label htmlFor="preferredClub">Preferred club / court</Label>
+                <Input
+                  id="preferredClub"
+                  value={locationForm.preferredClub}
+                  onChange={(e) =>
+                    setLocationForm((p) => ({ ...p, preferredClub: e.target.value }))
+                  }
+                  placeholder="e.g. Club Tennis Barcelona"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="defaultCity">Default city</Label>
+                <Input
+                  id="defaultCity"
+                  value={locationForm.defaultCity}
+                  onChange={(e) =>
+                    setLocationForm((p) => ({ ...p, defaultCity: e.target.value }))
+                  }
+                  placeholder="e.g. Barcelona"
+                />
+              </div>
+              <Button type="submit" disabled={savingLocation} className="gap-2">
+                {savingLocation ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Save location
+              </Button>
+            </form>
           </CardContent>
         </Card>
 

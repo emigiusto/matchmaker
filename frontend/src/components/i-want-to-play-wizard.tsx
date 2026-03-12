@@ -51,6 +51,7 @@ import { validatePhoneE164 } from "@/lib/phone.utils"
 import { cn } from "@/lib/utils"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { usersService } from "@/lib/services/users.service"
+import { playersService } from "@/lib/services/players.service"
 import { groupsService } from "@/lib/services/groups.service"
 import { friendshipsService } from "@/lib/services/friendships.service"
 import { guestContactsService } from "@/lib/services/guest-contacts.service"
@@ -83,9 +84,7 @@ function addOneHour(time: string): string {
   return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`
 }
 
-// Radius stops for area-based location
-const RADIUS_STOPS = [2, 5, 8, 10, 15, 50] as const
-type LocationType = "area" | "specific"
+type LocationType = "place" | "city"
 
 interface Contact {
   id: string
@@ -103,10 +102,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
-  const [locationType, setLocationType] = useState<LocationType>("area")
-  const [location, setLocation] = useState("My current location")
-  const [radius, setRadius] = useState(10)
+  const [locationType, setLocationType] = useState<LocationType>("place")
   const [specificPlace, setSpecificPlace] = useState("")
+  const [cityValue, setCityValue] = useState("")
   
   // Step 2: Match type + format + sport (v1: always practice; competitive/practice hidden)
   const [matchType, setMatchType] = useState<"competitive" | "practice">("practice")
@@ -139,10 +137,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setDate(undefined)
     setStartTime("")
     setEndTime("")
-    setLocationType("area")
-    setLocation("My current location")
-    setRadius(10)
+    setLocationType("place")
     setSpecificPlace("")
+    setCityValue("")
     setMatchType("practice")
     setMatchFormat("singles")
     setSport("tennis")
@@ -152,6 +149,18 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setDraggedIndex(null)
     setShowManualAdd(false)
   }
+
+  // Fetch player preferences (preferredClub, defaultCity) for location defaults
+  useEffect(() => {
+    if (!open || !hostUserId) return
+    playersService.getByUser(hostUserId).catch(() => null).then((player) => {
+      if (player && typeof player === "object") {
+        const p = player as { preferredClub?: string; defaultCity?: string }
+        setSpecificPlace((prev) => prev || (p.preferredClub ?? ""))
+        setCityValue((prev) => prev || (p.defaultCity ?? ""))
+      }
+    })
+  }, [open, hostUserId])
 
   // Fetch contacts for step 3: users, groups, friends, guest contacts
   useEffect(() => {
@@ -204,12 +213,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setEndTime(addOneHour(val))
   }
 
-  const locationValid = locationType === "area" ? !!location : !!specificPlace
-  const canProceedStep1 = date && startTime && endTime && locationValid && startTime < endTime
+  const canProceedStep1 = date && startTime && endTime && startTime < endTime
   const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
-  const displayLocation = locationType === "area" ? `${location} (${radius} km)` : specificPlace
+  const locationText = locationType === "place" ? specificPlace : cityValue
+  const displayLocation = locationText.trim() || "To be decided"
 
   const endTimeSlots = startTime
     ? TIME_SLOTS.filter((t) => t > startTime)
@@ -330,8 +339,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         date: dateStr,
         startTime: startDateTime.toISOString(),
         endTime: endDateTime.toISOString(),
-        locationText: locationType === "area" ? location : specificPlace,
-        radiusKm: locationType === "area" ? radius : null,
+        locationText: (locationType === "place" ? specificPlace : cityValue).trim(),
+        radiusKm: null,
         responseWindowMinutes: responseWindow,
         maxParallelCandidates,
         hostPartnerUserId: null,
@@ -453,79 +462,61 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               </div>
             </div>
 
-            {/* Location */}
+            {/* Location — optional: Place (court/club) or City, defaults to user's preferred club */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-medium">
-                  Location <span className="text-destructive">*</span>
+                  Location <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
                 <div className="flex rounded-lg border border-border/60 bg-muted/30 p-0.5 text-xs">
                   <button
                     type="button"
-                    onClick={() => setLocationType("area")}
+                    onClick={() => setLocationType("place")}
                     className={cn(
                       "rounded-md px-2.5 py-1 font-medium transition-all",
-                      locationType === "area"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Area
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLocationType("specific")}
-                    className={cn(
-                      "rounded-md px-2.5 py-1 font-medium transition-all",
-                      locationType === "specific"
+                      locationType === "place"
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     Place
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocationType("city")}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 font-medium transition-all",
+                      locationType === "city"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    City
+                  </button>
                 </div>
               </div>
 
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                {locationType === "area" ? (
+                {locationType === "place" ? (
                   <Input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Your location or address"
+                    value={specificPlace}
+                    onChange={(e) => setSpecificPlace(e.target.value)}
+                    placeholder="Court, club, or venue (e.g. Club Tennis Barcelona)"
                     className="pl-11 text-base"
                   />
                 ) : (
                   <Input
-                    value={specificPlace}
-                    onChange={(e) => setSpecificPlace(e.target.value)}
-                    placeholder="Club name, court, or venue"
+                    value={cityValue}
+                    onChange={(e) => setCityValue(e.target.value)}
+                    placeholder="City (e.g. Barcelona)"
                     className="pl-11 text-base"
                   />
                 )}
               </div>
-
-              {locationType === "area" && (
-                <div className="flex items-center gap-1.5">
-                  <span className="shrink-0 text-xs text-muted-foreground">Radius</span>
-                  {RADIUS_STOPS.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setRadius(r)}
-                      className={cn(
-                        "flex-1 rounded-md py-1 text-xs font-medium transition-all",
-                        radius === r
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {r} km
-                    </button>
-                  ))}
-                </div>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Leave blank to decide later. Place defaults to your preferred club from profile.
+              </p>
             </div>
 
             <Button

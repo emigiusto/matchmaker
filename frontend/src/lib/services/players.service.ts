@@ -1,6 +1,13 @@
 import { apiClient } from "./api-client"
 import type { Player } from "../types"
 
+export interface PlayerPreferences {
+  id: string
+  userId: string
+  defaultCity?: string
+  preferredClub?: string
+}
+
 export const playersService = {
   async getAll(): Promise<Player[]> {
     return apiClient.get<Player[]>("/players")
@@ -10,11 +17,25 @@ export const playersService = {
     return apiClient.get<Player[]>(`/players/by-city/${city}`)
   },
 
-  async getByUser(userId: string): Promise<Player> {
-    return apiClient.get<Player>(`/players/by-user/${userId}`)
+  async getByUser(userId: string): Promise<Player & PlayerPreferences> {
+    return apiClient.get<Player & PlayerPreferences>(`/players/by-user/${userId}`)
   },
 
   async getById(playerId: string): Promise<Player> {
     return apiClient.get<Player>(`/players/${playerId}`)
+  },
+
+  async create(
+    userId: string,
+    data: { displayName?: string; preferredClub?: string; defaultCity?: string }
+  ): Promise<PlayerPreferences> {
+    return apiClient.post<PlayerPreferences>("/players", { userId, ...data })
+  },
+
+  async update(
+    playerId: string,
+    data: { preferredClub?: string; defaultCity?: string }
+  ): Promise<PlayerPreferences> {
+    return apiClient.patch<PlayerPreferences>(`/players/${playerId}`, data)
   },
 }

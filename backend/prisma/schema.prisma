@@ -64,6 +64,7 @@ model Player {
   levelValue      Float?
   levelConfidence Float?
   defaultCity     String?
+  preferredClub   String?  // Preferred court/club for I Want to Play default
   latitude        Float?
   longitude       Float?
   createdAt       DateTime @default(now())

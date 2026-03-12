@@ -16,7 +16,7 @@ export class SchedulingController {
         date: body.date,
         startTime: body.startTime,
         endTime: body.endTime,
-        locationText: body.locationText,
+        locationText: body.locationText ?? "",
         radiusKm: body.radiusKm ?? null,
         responseWindowMinutes: body.responseWindowMinutes != null
           ? Number(body.responseWindowMinutes)

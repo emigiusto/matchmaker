@@ -129,7 +129,8 @@ function formatInviteMessage(
 ): string {
   const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
   const timeLeft = formatResponseWindow(responseWindowMinutes);
-  const base = `${hostName} wants to play ${sportType} ${formatLabel} with you.\n\n${dateStr} ${timeStr}\nLocation: ${location}\n\nReply within ${timeLeft}`;
+  const loc = (location && location.trim()) || 'TBD';
+  const base = `${hostName} wants to play ${sportType} ${formatLabel} with you.\n\n${dateStr} ${timeStr}\nLocation: ${loc}\n\nReply within ${timeLeft}`;
   return withButtons ? base : `${base}\n\nReply YES to accept\nReply NO to decline`;
 }
 
@@ -148,9 +149,10 @@ function formatMatchDetailsMessage(
 ): string {
   const sport = sportType.charAt(0).toUpperCase() + sportType.slice(1).toLowerCase();
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
+  const loc = (location && location.trim()) || 'TBD';
   const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
   const signupUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/signup`;
-  return `✅ Match confirmed!\n\n${sport} · ${formatLabel}\nWhen: ${whenStr}\nWhere: ${location}\n\n🔗 View match: ${matchUrl}\n\nCreate an account to manage matches: ${signupUrl}`;
+  return `✅ Match confirmed!\n\n${sport} · ${formatLabel}\nWhen: ${whenStr}\nWhere: ${loc}\n\n🔗 View match: ${matchUrl}\n\nCreate an account to manage matches: ${signupUrl}`;
 }
 
 function formatInviteNoLongerAvailableMessage(
@@ -162,7 +164,8 @@ function formatInviteNoLongerAvailableMessage(
   location: string
 ): string {
   const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
-  return `Hi! The ${sportType} ${formatLabel} invite from ${hostName} for ${dateStr} at ${timeStr} (${location}) is no longer available. You can ignore the previous message.`;
+  const loc = (location && location.trim()) || 'TBD';
+  return `Hi! The ${sportType} ${formatLabel} invite from ${hostName} for ${dateStr} at ${timeStr} (${loc}) is no longer available. You can ignore the previous message.`;
 }
 
 export const schedulingService = {
@@ -227,7 +230,7 @@ export const schedulingService = {
           date,
           startTime,
           endTime,
-          locationText: input.locationText,
+          locationText: (input.locationText ?? "").trim(),
           radiusKm: input.radiusKm ?? null,
           responseWindowMinutes: responseWindow,
           maxParallelCandidates: maxParallel,

@@ -357,7 +357,7 @@ export function InviteRequestsSection({
 
   function handleShareWhatsApp(request: InviteRequest) {
     const message = encodeURIComponent(
-      `Want to play ${request.sport} on ${format(new Date(request.date), "EEE, MMM d")} (${request.time}) at ${request.location}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
+      `Want to play ${request.sport} on ${format(new Date(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || "TBD"}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
     )
     window.open(`https://wa.me/?text=${message}`, "_blank")
   }
@@ -497,7 +497,7 @@ export function InviteRequestsSection({
                         </span>
                         <span className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-primary" />
-                          {request.location}
+                          {request.location?.trim() || "TBD"}
                         </span>
                         {displayStatus === "scheduling" && (
                           <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
