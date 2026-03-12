@@ -71,6 +71,9 @@ export function PhoneInput({
       const nat = p.dial === dial ? p.national : digitsOnly(value)
       setNational(nat)
       emit(dial, nat)
+    } else if (dial === "_other") {
+      setNational(digitsOnly(value))
+      onChange(value || "")
     }
   }
 
@@ -86,7 +89,7 @@ export function PhoneInput({
   const validation = validatePhoneE164(value)
   const showError = touched && (error || (!validation.valid && value))
 
-  const isOther = countryDial === ""
+  const isOther = countryDial === "_other"
 
   if (isOther) {
     return (
@@ -131,7 +134,7 @@ export function PhoneInput({
                 +{c.dial} {c.name}
               </SelectItem>
             ))}
-            <SelectItem value="">Other</SelectItem>
+            <SelectItem value="_other">Other</SelectItem>
           </SelectContent>
         </Select>
         <Input
