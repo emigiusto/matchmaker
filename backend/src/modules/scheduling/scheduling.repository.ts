@@ -156,6 +156,35 @@ export const schedulingRepository = {
     });
   },
 
+  /** Finds a candidate to record a response: waiting_reply, contacted (mid-retry), or recently expired with no response yet (late webhook) */
+  async findCandidateToRecordResponseByContactUserId(contactUserId: string) {
+    const waiting = await this.findWaitingReplyCandidateByContactUserId(contactUserId);
+    if (waiting) return waiting;
+    // contacted = invite just sent, waiting for waiting_reply (retry or race)
+    const contacted = await prisma.schedulingCandidate.findFirst({
+      where: { contactUserId, status: 'contacted' },
+      include: {
+        schedulingRequest: { include: { hostUser: true, hostPartner: true } },
+        contactUser: true,
+      },
+    });
+    if (contacted) return contacted;
+    const GRACE_MS = 5 * 60 * 1000;
+    const since = new Date(Date.now() - GRACE_MS);
+    return prisma.schedulingCandidate.findFirst({
+      where: {
+        contactUserId,
+        status: 'expired',
+        responseAt: null,
+        contactedAt: { gte: since },
+      },
+      include: {
+        schedulingRequest: { include: { hostUser: true, hostPartner: true } },
+        contactUser: true,
+      },
+    });
+  },
+
   async findWaitingReplyCandidatesToExpire() {
     const candidates = await prisma.schedulingCandidate.findMany({
       where: { status: 'waiting_reply' },

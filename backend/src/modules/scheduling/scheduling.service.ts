@@ -353,7 +353,7 @@ export const schedulingService = {
       return { processed: false };
     }
 
-    const candidate = await schedulingRepository.findWaitingReplyCandidateByContactUserId(user.id);
+    const candidate = await schedulingRepository.findCandidateToRecordResponseByContactUserId(user.id);
     if (!candidate) {
       logger.info('InviteResponseIgnored', { reason: 'no_waiting_candidate', userId: user.id, phone: senderPhoneNumber });
       return { processed: false };
@@ -369,7 +369,8 @@ export const schedulingService = {
     }
 
     const request = candidate.schedulingRequest;
-    if (request.status !== 'active') {
+    const isLateResponse = candidate.status === 'expired';
+    if (request.status !== 'active' && !isLateResponse) {
       logger.warn('InviteIgnored', { reason: 'request_not_active', requestId: request.id });
       return { processed: true };
     }
@@ -377,9 +378,16 @@ export const schedulingService = {
     const now = new Date();
 
     if (isAccept) {
+      if (isLateResponse) {
+        logger.info('InviteResponseIgnored', { reason: 'accept_after_expiry', candidateId: candidate.id });
+        return { processed: true };
+      }
       const didComplete = await prisma.$transaction(async (tx) => {
         const updateResult = await tx.schedulingCandidate.updateMany({
-          where: { id: candidate.id, status: 'waiting_reply' },
+          where: {
+            id: candidate.id,
+            status: { in: ['waiting_reply', 'contacted'] },
+          },
           data: { status: 'accepted', responseAt: now },
         });
         if (updateResult.count === 0) {
@@ -416,13 +424,34 @@ export const schedulingService = {
     }
 
     if (isDecline) {
-      const updated = await schedulingRepository.updateCandidateFromWaitingReply(candidate.id, 'declined', now);
+      let updated: boolean;
+      if (candidate.status === 'waiting_reply') {
+        updated = await schedulingRepository.updateCandidateFromWaitingReply(candidate.id, 'declined', now);
+      } else if (candidate.status === 'contacted') {
+        const result = await prisma.schedulingCandidate.updateMany({
+          where: { id: candidate.id, status: 'contacted' },
+          data: { status: 'declined', responseAt: now },
+        });
+        updated = result.count > 0;
+      } else {
+        const result = await prisma.schedulingCandidate.updateMany({
+          where: { id: candidate.id, status: 'expired', responseAt: null },
+          data: { status: 'declined', responseAt: now },
+        });
+        updated = result.count > 0;
+      }
       if (!updated) {
         logger.warn('InviteDuplicateResponse', { candidateId: candidate.id, action: 'decline' });
         return { processed: true };
       }
-      logger.info('InviteDeclined', { requestId: request.id, candidateId: candidate.id });
-      await this.contactNextCandidates(request.id);
+      logger.info('InviteDeclined', {
+        requestId: request.id,
+        candidateId: candidate.id,
+        lateResponse: isLateResponse,
+      });
+      if (request.status === 'active') {
+        await this.contactNextCandidates(request.id);
+      }
       return { processed: true };
     }
 
