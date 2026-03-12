@@ -44,32 +44,6 @@ export class SchedulingController {
     }
   }
 
-  static async pauseSchedulingRequest(req: Request, res: Response, next: NextFunction) {
-    try {
-      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
-      const { userId } = req.body;
-      if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
-      if (!userId) return res.status(400).json({ error: 'Missing userId' });
-      const request = await schedulingService.pauseSchedulingRequest(requestId, userId);
-      res.json(request);
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  static async resumeSchedulingRequest(req: Request, res: Response, next: NextFunction) {
-    try {
-      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
-      const { userId } = req.body;
-      if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
-      if (!userId) return res.status(400).json({ error: 'Missing userId' });
-      const request = await schedulingService.resumeSchedulingRequest(requestId, userId);
-      res.json(request);
-    } catch (err) {
-      next(err);
-    }
-  }
-
   static async cancelContactedCandidate(req: Request, res: Response, next: NextFunction) {
     try {
       const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;

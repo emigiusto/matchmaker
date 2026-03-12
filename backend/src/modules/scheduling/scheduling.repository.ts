@@ -77,21 +77,10 @@ export const schedulingRepository = {
     });
   },
 
-  async findActiveOrPausedById(id: string) {
-    return prisma.schedulingRequest.findFirst({
-      where: { id, status: { in: ['active', 'paused'] } },
-      include: {
-        hostUser: true,
-        hostPartner: true,
-        candidates: { orderBy: { priorityOrder: 'asc' }, include: { contactUser: true } },
-      },
-    });
-  },
-
-  /** Active or paused requests whose scheduled start time has passed */
-  async findActiveOrPausedPastScheduledTime() {
+  /** Active requests whose scheduled start time has passed */
+  async findActivePastScheduledTime() {
     const requests = await prisma.schedulingRequest.findMany({
-      where: { status: { in: ['active', 'paused'] } },
+      where: { status: 'active' },
       select: { id: true, date: true, startTime: true },
     });
     const now = new Date();
@@ -248,7 +237,7 @@ export const schedulingRepository = {
     return prisma.schedulingCandidate.findMany({
       where: {
         contactUserId: userId,
-        schedulingRequest: { status: { in: ['active', 'paused'] } },
+        schedulingRequest: { status: 'active' },
       },
       include: {
         schedulingRequest: {

@@ -25,7 +25,7 @@ type RequestData = {
   radiusKm: number | null;
   responseWindowMinutes: number;
   inviteToken: string;
-  status: 'active' | 'paused' | 'completed' | 'expired';
+  status: 'active' | 'completed' | 'expired';
 };
 
 export async function seedSchedulingRequests(
@@ -107,7 +107,6 @@ export async function seedSchedulingRequests(
 
     const status = faker.helpers.weightedArrayElement([
       { weight: 5, value: 'active' },
-      { weight: 2, value: 'paused' },
       { weight: 2, value: 'completed' },
       { weight: 1, value: 'expired' },
     ]);

@@ -7,7 +7,7 @@ export type SchedulingFormat = 'singles' | 'doubles';
 
 export type SchedulingMatchType = 'competitive' | 'practice';
 
-export type SchedulingRequestStatus = 'active' | 'paused' | 'completed' | 'expired' | 'cancelled';
+export type SchedulingRequestStatus = 'active' | 'completed' | 'expired' | 'cancelled';
 
 export type SchedulingCandidateStatus =
   | 'pending'

@@ -540,7 +540,6 @@ model SchedulingRequest {
 
 enum SchedulingRequestStatus {
   active
-  paused
   completed
   expired
   cancelled

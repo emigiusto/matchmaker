@@ -252,17 +252,8 @@ export const schedulingService = {
   },
 
   async startScheduling(requestId: string): Promise<SchedulingRequestDTO | null> {
-    const request = await schedulingRepository.findActiveOrPausedById(requestId);
+    const request = await schedulingRepository.findActiveRequestById(requestId);
     if (!request) return null;
-    if (request.status === 'paused') {
-      const hasWaiting = await schedulingRepository.hasWaitingReplyCandidate(requestId);
-      if (hasWaiting) {
-        await schedulingRepository.updateRequestStatus(requestId, 'active');
-        const updated = await schedulingRepository.findRequestById(requestId);
-        return updated ? toRequestDTOWithCandidates(updated) : null;
-      }
-      await schedulingRepository.updateRequestStatus(requestId, 'active');
-    }
 
     const activeCount = await schedulingRepository.countActiveByHostUserId(request.hostUserId);
     if (activeCount > MAX_ACTIVE_SCHEDULING_REQUESTS) {
@@ -499,7 +490,7 @@ export const schedulingService = {
   },
 
   async expireRequestsPastScheduledTime(): Promise<number> {
-    const requests = await schedulingRepository.findActiveOrPausedPastScheduledTime();
+    const requests = await schedulingRepository.findActivePastScheduledTime();
     for (const r of requests) {
       await schedulingRepository.updateRequestStatus(r.id, 'expired');
       logger.info('SchedulingExpired', { requestId: r.id, reason: 'scheduled_time_passed' });
@@ -634,46 +625,12 @@ export const schedulingService = {
     logger.info('SchedulingCompleted', { requestId, matchId: match.id });
   },
 
-  async pauseSchedulingRequest(requestId: string, userId: string): Promise<SchedulingRequestDTO> {
-    const request = await schedulingRepository.findActiveRequestById(requestId);
-    if (!request) throw new AppError('Scheduling request not found or not active', 404);
-    if (request.hostUserId !== userId) throw new AppError('Only the host can pause', 403);
-
-    const updated = await prisma.schedulingRequest.update({
-      where: { id: requestId },
-      data: { status: 'paused' },
-      include: { hostUser: true, hostPartner: true, candidates: { include: { contactUser: true } } },
-    });
-    logger.info('SchedulingPaused', { requestId, userId });
-    return toRequestDTOWithCandidates(updated);
-  },
-
-  async resumeSchedulingRequest(requestId: string, userId: string): Promise<SchedulingRequestDTO> {
-    const request = await schedulingRepository.findActiveOrPausedById(requestId);
-    if (!request) throw new AppError('Scheduling request not found', 404);
-    if (request.hostUserId !== userId) throw new AppError('Only the host can resume', 403);
-    if (request.status !== 'paused') throw new AppError('Request is not paused', 400);
-
-    const activeCount = await schedulingRepository.countActiveByHostUserId(userId);
-    if (activeCount >= MAX_ACTIVE_SCHEDULING_REQUESTS) {
-      throw new AppError(`Maximum ${MAX_ACTIVE_SCHEDULING_REQUESTS} active scheduling requests allowed`, 400);
-    }
-
-    const updated = await prisma.schedulingRequest.update({
-      where: { id: requestId },
-      data: { status: 'active' },
-      include: { hostUser: true, hostPartner: true, candidates: { include: { contactUser: true } } },
-    });
-    logger.info('SchedulingResumed', { requestId, userId });
-    return toRequestDTOWithCandidates(updated);
-  },
-
   async retryCandidate(requestId: string, candidateId: string, userId: string): Promise<SchedulingRequestDTO> {
     const request = await schedulingRepository.findRequestById(requestId);
     if (!request) throw new AppError('Scheduling request not found', 404);
     if (request.hostUserId !== userId) throw new AppError('Only the host can retry', 403);
-    if (!['active', 'paused', 'expired'].includes(request.status)) {
-      throw new AppError('Request must be active, paused, or expired to retry', 400);
+    if (!['active', 'expired'].includes(request.status)) {
+      throw new AppError('Request must be active or expired to retry', 400);
     }
 
     const candidate = request.candidates?.find((c) => c.id === candidateId);
@@ -685,7 +642,7 @@ export const schedulingService = {
     const retryOrder = maxRetry + 1;
     await schedulingRepository.retryCandidate(candidateId, retryOrder);
 
-    if (request.status === 'paused' || request.status === 'expired') {
+    if (request.status === 'expired') {
       await schedulingRepository.updateRequestStatus(requestId, 'active');
     }
     await this.contactNextCandidates(requestId);
@@ -769,8 +726,8 @@ export const schedulingService = {
     const request = await schedulingRepository.findRequestById(requestId);
     if (!request) throw new AppError('Scheduling request not found', 404);
     if (request.hostUserId !== userId) throw new AppError('Only the host can cancel candidates', 403);
-    if (!['active', 'paused'].includes(request.status)) {
-      throw new AppError('Request must be active or paused to cancel a contacted candidate', 400);
+    if (request.status !== 'active') {
+      throw new AppError('Request must be active to cancel a contacted candidate', 400);
     }
 
     const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);
@@ -806,8 +763,8 @@ export const schedulingService = {
     const request = await schedulingRepository.findRequestById(requestId);
     if (!request) throw new AppError('Scheduling request not found', 404);
     if (request.hostUserId !== userId) throw new AppError('Only the host can remove candidates', 403);
-    if (!['active', 'paused', 'expired'].includes(request.status)) {
-      throw new AppError('Request must be active, paused, or expired to remove a candidate', 400);
+    if (!['active', 'expired'].includes(request.status)) {
+      throw new AppError('Request must be active or expired to remove a candidate', 400);
     }
 
     const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);
@@ -831,8 +788,8 @@ export const schedulingService = {
     const request = await schedulingRepository.findRequestById(requestId);
     if (!request) throw new AppError('Scheduling request not found', 404);
     if (request.hostUserId !== userId) throw new AppError('Only the host can cancel accepted candidates', 403);
-    if (!['active', 'paused', 'completed', 'expired'].includes(request.status)) {
-      throw new AppError('Request must be active, paused, completed, or expired', 400);
+    if (!['active', 'completed', 'expired'].includes(request.status)) {
+      throw new AppError('Request must be active, completed, or expired', 400);
     }
 
     const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);

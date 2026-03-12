@@ -1,6 +1,6 @@
 import { apiClient } from "./api-client"
 
-export type SchedulingRequestStatus = "active" | "paused" | "completed" | "expired" | "cancelled"
+export type SchedulingRequestStatus = "active" | "completed" | "expired" | "cancelled"
 export type SchedulingCandidateStatus =
   | "pending"
   | "contacted"
@@ -82,18 +82,6 @@ export const schedulingService = {
   async getActiveCount(hostUserId: string): Promise<{ active: number; max: number }> {
     return apiClient.get<{ active: number; max: number }>("/scheduling/active-count", {
       hostUserId,
-    })
-  },
-
-  async pause(requestId: string, userId: string): Promise<SchedulingRequestDTO> {
-    return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/pause`, {
-      userId,
-    })
-  },
-
-  async resume(requestId: string, userId: string): Promise<SchedulingRequestDTO> {
-    return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/resume`, {
-      userId,
     })
   },
 

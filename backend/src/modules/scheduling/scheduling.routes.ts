@@ -17,8 +17,6 @@ router.get('/by-token/:token', SchedulingController.getSchedulingRequestByToken)
 router.get('/:requestId/invite-link', SchedulingController.getInviteLink);
 router.get('/:requestId', SchedulingController.getSchedulingRequest);
 router.post('/:requestId/start', SchedulingController.startScheduling);
-router.post('/:requestId/pause', SchedulingController.pauseSchedulingRequest);
-router.post('/:requestId/resume', SchedulingController.resumeSchedulingRequest);
 router.post('/:requestId/accept/:candidateId', SchedulingController.manualAcceptCandidate);
 router.post('/:requestId/cancel-accepted/:candidateId', SchedulingController.cancelAcceptedCandidate);
 router.post('/:requestId/cancel-contacted/:candidateId', SchedulingController.cancelContactedCandidate);

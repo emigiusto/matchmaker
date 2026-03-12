@@ -14,8 +14,6 @@ import {
   UserCheck,
   UserX,
   Hourglass,
-  Pause,
-  Play,
   RotateCcw,
   Link2,
   Copy,
@@ -50,7 +48,7 @@ export interface InviteRequest {
   matchType: "competitive" | "practice"
   sport: "tennis" | "padel"
   matchFormat: "singles" | "doubles"
-  status: "scheduling" | "paused" | "matched" | "expired" | "cancelled"
+  status: "scheduling" | "matched" | "expired" | "cancelled"
   matchId: string | null
   whatsappGroupId: string | null
   responseWindowMinutes: number
@@ -129,7 +127,6 @@ function mapSchedulingToInviteRequest(
 ): InviteRequest | null {
   const statusMap = {
     active: "scheduling" as const,
-    paused: "paused" as const,
     completed: "matched" as const,
     expired: "expired" as const,
     cancelled: "cancelled" as const,
@@ -237,9 +234,7 @@ export function InviteRequestsSection({
   }, [refreshTrigger])
 
   useEffect(() => {
-    const hasActive = inviteRequests.some(
-      (r) => r.status === "scheduling" || r.status === "paused"
-    )
+    const hasActive = inviteRequests.some((r) => r.status === "scheduling")
     if (!hasActive) return
     const interval = setInterval(() => {
       fetchSchedulingData(false)
@@ -249,7 +244,7 @@ export function InviteRequestsSection({
 
   const filteredRequests = inviteRequests.filter((r) => {
     if (inviteFilter === "all") return r.status !== "cancelled"
-    if (inviteFilter === "scheduling") return r.status === "scheduling" || r.status === "paused"
+    if (inviteFilter === "scheduling") return r.status === "scheduling"
     if (inviteFilter === "no_match") return r.status === "expired"
     if (inviteFilter === "completed") return r.status === "matched"
     if (inviteFilter === "cancelled") return r.status === "cancelled"
@@ -258,42 +253,16 @@ export function InviteRequestsSection({
 
   function switchToFilterForStatus(status: InviteRequest["status"], forceSwitch = false) {
     if (inviteFilter === "all" && !forceSwitch) return
-    if (status === "scheduling" || status === "paused") setInviteFilter("scheduling")
+    if (status === "scheduling") setInviteFilter("scheduling")
     else if (status === "expired") setInviteFilter("no_match")
     else if (status === "cancelled") setInviteFilter("cancelled")
     else if (status === "matched") setInviteFilter("completed")
   }
 
   const activeRequestCount = inviteRequests.filter(
-    (r) => r.status === "scheduling" || r.status === "paused"
+    (r) => r.status === "scheduling"
   ).length
   const atCapacity = activeRequestCount >= MAX_ACTIVE_REQUESTS
-
-  async function handlePauseRequest(id: string) {
-    try {
-      const updated = await schedulingService.pause(id, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
-      if (mapped) {
-        setInviteRequests((prev) => prev.map((r) => (r.id === id ? mapped : r)))
-        toast.success("Invite request updated")
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to update request")
-    }
-  }
-
-  async function handleResumeRequest(id: string) {
-    try {
-      const updated = await schedulingService.resume(id, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
-      if (mapped) {
-        setInviteRequests((prev) => prev.map((r) => (r.id === id ? mapped : r)))
-        toast.success("Invite request resumed")
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to resume request")
-    }
-  }
 
   async function handleCancelRequest(id: string) {
     try {
@@ -489,12 +458,6 @@ export function InviteRequestsSection({
                               Scheduling
                             </span>
                           )}
-                          {request.status === "paused" && (
-                            <span className="flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600">
-                              <Pause className="h-3 w-3" />
-                              Paused
-                            </span>
-                          )}
                           {request.status === "matched" && (
                             <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-600">
                               <CheckCircle className="h-3 w-3" />
@@ -529,7 +492,7 @@ export function InviteRequestsSection({
                           <MapPin className="h-4 w-4 text-primary" />
                           {request.location}
                         </span>
-                        {(request.status === "scheduling" || request.status === "paused") && (
+                        {request.status === "scheduling" && (
                           <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
                             <Hourglass className="h-3.5 w-3.5" />
                             Reply within {formatResponseWindow(request.responseWindowMinutes)}
@@ -574,7 +537,7 @@ export function InviteRequestsSection({
                                 )}
                                 {contact.status === "contacted" && (
                                   <Loader2
-                                    className={`h-3.5 w-3.5 text-blue-600 ${request.status === "paused" ? "" : "animate-spin"}`}
+                                    className="h-3.5 w-3.5 text-blue-600 animate-spin"
                                   />
                                 )}
                                 {contact.status === "pending" && (
@@ -590,7 +553,7 @@ export function InviteRequestsSection({
                               </span>
                               {contact.status === "contacted" &&
                                 contact.contactedAt &&
-                                (request.status === "scheduling" || request.status === "paused") && (
+                                request.status === "scheduling" && (
                                   <TimeLeftBadge
                                     contactedAt={contact.contactedAt}
                                     responseWindowMinutes={request.responseWindowMinutes}
@@ -649,9 +612,7 @@ export function InviteRequestsSection({
                                     <XCircle className="h-3 w-3" />
                                   </button>
                                 )}
-                              {(request.status === "scheduling" ||
-                                request.status === "paused" ||
-                                request.status === "expired") &&
+                              {(request.status === "scheduling" || request.status === "expired") &&
                                 contact.status === "accepted" && (
                                   <button
                                     onClick={() =>
@@ -694,28 +655,6 @@ export function InviteRequestsSection({
                         request.status !== "cancelled" && (
                           <div className="mt-4 space-y-3 border-t border-border/30 pt-4">
                             <div className="flex flex-wrap gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5"
-                                onClick={() =>
-                                  request.status === "paused"
-                                    ? handleResumeRequest(request.id)
-                                    : handlePauseRequest(request.id)
-                                }
-                              >
-                                {request.status === "paused" ? (
-                                  <>
-                                    <Play className="h-3.5 w-3.5" />
-                                    Resume
-                                  </>
-                                ) : (
-                                  <>
-                                    <Pause className="h-3.5 w-3.5" />
-                                    Pause
-                                  </>
-                                )}
-                              </Button>
                               <AddContactsToInvite
                                 requestId={request.id}
                                 existingContactIds={request.contacts.map((c) => c.contactUserId)}
