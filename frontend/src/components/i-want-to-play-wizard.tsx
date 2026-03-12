@@ -5,7 +5,6 @@ import {
   MapPin,
   ChevronRight,
   ChevronLeft,
-  ChevronDown,
   ChevronUp,
   GripVertical,
   X,
