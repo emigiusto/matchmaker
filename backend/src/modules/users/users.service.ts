@@ -4,6 +4,7 @@
 import { cacheGet, cacheSet } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
+import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { UserDTO } from './users.types';
 import type { User as PrismaUser } from '@prisma/client';
 
@@ -39,7 +40,7 @@ export async function findUserById(id: string): Promise<UserDTO> {
 }
 
 /**
- * Find a user by their phone number.
+ * Find a user by their phone number (exact match).
  * @param phone User phone number
  * @returns UserDTO object
  * @throws AppError if user not found
@@ -48,6 +49,21 @@ export async function findUserByPhone(phone: string): Promise<UserDTO> {
   const user = await prisma.user.findUnique({ where: { phone } });
   if (!user) throw new AppError('User not found', 404);
   return toDTO(user);
+}
+
+/**
+ * Find a user by phone using normalized digits. Handles multiple formats
+ * (e.g. "34600972124", "+34 600 972 124") mapping to the same user.
+ * Used when adding candidates to ensure one phone = one userId.
+ * @param phone Phone in any format
+ * @returns UserDTO or null if not found
+ */
+export async function findUserByNormalizedPhone(phone: string): Promise<UserDTO | null> {
+  const canonical = normalizePhoneToCanonical(phone);
+  if (!canonical) return null;
+  const users = await prisma.user.findMany({ where: { phone: { not: null } } });
+  const match = users.find((u) => u.phone && normalizePhoneToCanonical(u.phone) === canonical);
+  return match ? toDTO(match) : null;
 }
 
 /**
