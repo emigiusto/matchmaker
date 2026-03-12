@@ -167,6 +167,34 @@ export const schedulingRepository = {
     });
   },
 
+  /**
+   * Finds a candidate to record a response by PHONE (not userId).
+   * Use this when multiple User records can share the same phone (e.g. different formats).
+   * Matches the contact we actually sent the invite to.
+   */
+  async findCandidateToRecordResponseByPhone(phone: string) {
+    const digits = phone.replace(/\D/g, '').split('@')[0];
+    if (!digits) return null;
+    const normalize = (p: string | null) => (p || '').replace(/\D/g, '');
+
+    const candidates = await prisma.schedulingCandidate.findMany({
+      where: { status: { in: ['waiting_reply', 'contacted', 'expired'] } },
+      include: {
+        schedulingRequest: { include: { hostUser: true, hostPartner: true } },
+        contactUser: true,
+      },
+    });
+    for (const c of candidates) {
+      if (normalize(c.contactUser?.phone ?? '') !== digits) continue;
+      if (c.status === 'waiting_reply' || c.status === 'contacted') return c;
+      if (c.status === 'expired' && !c.responseAt && c.contactedAt) {
+        const GRACE_MS = 5 * 60 * 1000;
+        if (Date.now() - c.contactedAt.getTime() <= GRACE_MS) return c;
+      }
+    }
+    return null;
+  },
+
   /** Finds a candidate to record a response: waiting_reply, contacted (mid-retry), or recently expired with no response yet (late webhook) */
   async findCandidateToRecordResponseByContactUserId(contactUserId: string) {
     const waiting = await this.findWaitingReplyCandidateByContactUserId(contactUserId);

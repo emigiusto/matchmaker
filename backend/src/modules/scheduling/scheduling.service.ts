@@ -347,15 +347,9 @@ export const schedulingService = {
   },
 
   async handleCandidateResponse(senderPhoneNumber: string, messageText: string): Promise<{ processed: boolean }> {
-    const user = await schedulingRepository.findUserByPhone(senderPhoneNumber);
-    if (!user) {
-      logger.info('InviteResponseIgnored', { reason: 'user_not_found', phone: senderPhoneNumber });
-      return { processed: false };
-    }
-
-    const candidate = await schedulingRepository.findCandidateToRecordResponseByContactUserId(user.id);
+    const candidate = await schedulingRepository.findCandidateToRecordResponseByPhone(senderPhoneNumber);
     if (!candidate) {
-      logger.info('InviteResponseIgnored', { reason: 'no_waiting_candidate', userId: user.id, phone: senderPhoneNumber });
+      logger.info('InviteResponseIgnored', { reason: 'no_waiting_candidate', phone: senderPhoneNumber });
       return { processed: false };
     }
 
