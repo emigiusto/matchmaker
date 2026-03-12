@@ -340,7 +340,7 @@ export const schedulingService = {
         logger.error('InviteSendFailed', { candidateId: candidate.id, contactName, error: result.error });
         await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
       } else {
-        logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId, contactName });
+        logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId, contactName, phone });
       }
     }
     await this.contactNextCandidates(requestId);
