@@ -42,9 +42,44 @@ function getProvider(): IWhatsAppProvider {
 
 const provider = getProvider();
 
+const MIN_SEND_INTERVAL_MS =
+  Number(process.env.WHATSAPP_MIN_SEND_INTERVAL_MS || '5000') || 0;
+
+let lastSendAt = 0;
+let sendChain: Promise<unknown> = Promise.resolve();
+
+async function delay(ms: number): Promise<void> {
+  if (ms > 0) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+}
+
+function withRateLimit<T>(task: () => Promise<T>): Promise<T> {
+  const run = async () => {
+    if (MIN_SEND_INTERVAL_MS > 0) {
+      const now = Date.now();
+      const elapsed = now - lastSendAt;
+      const wait = MIN_SEND_INTERVAL_MS - elapsed;
+      if (wait > 0) {
+        await delay(wait);
+      }
+    }
+    const result = await task();
+    lastSendAt = Date.now();
+    return result;
+  };
+
+  const next = sendChain.then(run, run);
+  sendChain = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
 export const whatsappService = {
   async sendInviteMessage(phoneNumber: string, message: string, options?: InviteMessageOptions) {
-    return provider.sendInviteMessage(phoneNumber, message, options);
+    return withRateLimit(() => provider.sendInviteMessage(phoneNumber, message, options));
   },
 
   async createMatchGroup(input: {
@@ -127,7 +162,7 @@ export const whatsappService = {
     const errors: string[] = [];
 
     for (const phone of missing) {
-      const res = await provider.sendInviteMessage(phone, fullMessage);
+      const res = await withRateLimit(() => provider.sendInviteMessage(phone, fullMessage));
       if (res.success) {
         sentTo.push(phone);
         logger.info('GroupInviteLinkSent', { groupId, phone });

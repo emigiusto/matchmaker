@@ -59,20 +59,48 @@ export class WasenderProvider implements IWhatsAppProvider {
         body.text = message;
       }
 
-      const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${WASENDER_TOKEN}`,
-        },
-        body: JSON.stringify(body),
-      });
-      const data = (await res.json()) as { success?: boolean; data?: { msgId?: string }; error?: string; message?: string };
-      if (!res.ok) {
+      type WasenderResponse = {
+        success?: boolean;
+        data?: { msgId?: string };
+        error?: string;
+        message?: string;
+        retry_after?: number;
+      };
+
+      const sendOnce = async (): Promise<{ ok: boolean; res: Response; data: WasenderResponse }> => {
+        const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${WASENDER_TOKEN}`,
+          },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json()) as WasenderResponse;
+        return { ok: res.ok, res, data };
+      };
+
+      let { ok, res, data } = await sendOnce();
+
+      // Handle Wasender "Account Protection" rate limiting with a single retry after the suggested delay.
+      if (
+        !ok &&
+        data &&
+        typeof data.retry_after === 'number' &&
+        data.retry_after > 0 &&
+        (data.message || data.error || '').includes('You have account protection enabled')
+      ) {
+        const delayMs = data.retry_after * 1000;
+        await new Promise((r) => setTimeout(r, delayMs));
+        ({ ok, res, data } = await sendOnce());
+      }
+
+      if (!ok) {
         const errMsg = data.error || data.message || res.statusText;
         const extra = typeof data === 'object' && data !== null ? JSON.stringify(data) : '';
         return { success: false, error: extra ? `${errMsg} (${extra})` : errMsg };
       }
+
       return {
         success: true,
         messageId: data.data?.msgId != null ? String(data.data.msgId) : undefined,
