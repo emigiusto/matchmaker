@@ -560,7 +560,7 @@ export const schedulingService = {
       process.env.WHAPI_BOT_PHONE ||
       process.env.WHAPI_ACCOUNT_NUMBER;
 
-    if (participantPhones.length >= 2) {
+    if (participantPhones.length >= 1) {
       const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
       const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       const groupName = `${dateStr} ${timeStr}`;
