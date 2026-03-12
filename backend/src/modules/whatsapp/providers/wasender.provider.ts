@@ -134,20 +134,40 @@ export class WasenderProvider implements IWhatsAppProvider {
     if (!WASENDER_TOKEN) {
       return { success: false, error: 'WASENDER_API_KEY not configured' };
     }
-    try {
+    const tryFetch = async (): Promise<GetGroupInviteLinkResult> => {
       const jid = toGroupJid(groupId);
       const res = await fetch(`${WASENDER_BASE}/api/groups/${encodeURIComponent(jid)}/invite-link`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${WASENDER_TOKEN}` },
       });
-      const data = (await res.json()) as { success?: boolean; inviteLink?: string; error?: string };
+      const data = (await res.json()) as {
+        success?: boolean;
+        inviteLink?: string;
+        data?: { inviteLink?: string };
+        error?: string;
+        message?: string;
+      };
       if (!res.ok) {
-        return { success: false, error: data.error || res.statusText };
+        return { success: false, error: data.error || data.message || res.statusText };
       }
-      if (!data.inviteLink) {
-        return { success: false, error: 'No invite link in response' };
+      const inviteLink = data.inviteLink ?? data.data?.inviteLink;
+      if (!inviteLink) {
+        const apiMsg = data.error || data.message;
+        return {
+          success: false,
+          error: apiMsg ? `No invite link in response: ${apiMsg}` : 'No invite link in response',
+        };
       }
-      return { success: true, inviteLink: data.inviteLink };
+      return { success: true, inviteLink };
+    };
+
+    try {
+      let result = await tryFetch();
+      if (!result.success && result.error?.includes('No invite link')) {
+        await new Promise((r) => setTimeout(r, 1500));
+        result = await tryFetch();
+      }
+      return result;
     } catch (err) {
       return {
         success: false,

@@ -1,10 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#16a34a">
-  <!-- Sword 1 blade -->
-  <path d="M5.5 4 4 5.5 4 4 5.5 4 17 15.5 16 16.5 15 17.5 14 16.5 5.5 4Z"/>
-  <!-- Sword 1 tip -->
-  <path d="M15 17 13 19 14 20 16 18 15 17Z"/>
-  <!-- Sword 2 blade -->
-  <path d="M18.5 4 20 5.5 20 4 18.5 4 7 14.5 8 15.5 9 14.5 10 15.5 18.5 7 19 6 20 5 21 4 21 5 20 6 18.5 4Z"/>
-  <!-- Sword 2 tip -->
-  <path d="M6 16 5 17 4 18 5 19 7 17 6 16Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Dark green rounded-square background (squircle-like) -->
+  <rect width="32" height="32" rx="7" fill="#166534"/>
+  <!-- Crossed white swords -->
+  <g fill="white">
+    <!-- Sword 1: top-left to bottom-right -->
+    <path d="M7 7 L9 5 L25 21 L23 23 Z"/>
+    <!-- Sword 2: top-right to bottom-left -->
+    <path d="M25 7 L23 5 L7 21 L9 23 Z"/>
+  </g>
 </svg>
