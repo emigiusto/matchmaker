@@ -18,8 +18,8 @@ export type SchedulingCandidateStatus =
   | 'expired'
   | 'cancelled';
 
-// minutes: 20s, 1m, 5m, 15m, 30m, 1h, 2h, 4h, 10h, 24h (0.333 = 20 seconds for testing)
-export const RESPONSE_WINDOW_OPTIONS = [1 / 3, 1, 5, 15, 30, 60, 120, 240, 600, 1440] as const;
+// minutes: 15m, 30m, 1h, 2h, 4h, 12h, 24h, 72h. Dev-only: 10/60 (10 sec)
+export const RESPONSE_WINDOW_OPTIONS = [15, 30, 60, 120, 240, 720, 1440, 4320] as const;
 
 export const MAX_ACTIVE_SCHEDULING_REQUESTS = 5;
 

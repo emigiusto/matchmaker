@@ -131,14 +131,41 @@ function formatInviteMessage(
   const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
   const timeLeft = formatResponseWindow(responseWindowMinutes);
   const loc = (location && location.trim()) || 'TBD';
-  const base = `${hostName} wants to play ${sportType} ${formatLabel} with you.\n\n${dateStr} ${timeStr}\nLocation: ${loc}\n\nReply within ${timeLeft}`;
-  return withButtons ? base : `${base}\n\nReply YES to accept\nReply NO to decline`;
+
+  const header = `🎾 *Match invite from ${hostName}*`;
+  const bodyLines = [
+    `*Sport:* ${sportType} ${formatLabel}`,
+    `*When:* ${dateStr} · ${timeStr}`,
+    `*Where:* ${loc}`,
+    '',
+    `*Reply within:* ${timeLeft}`,
+  ];
+
+  const base = `${header}\n\n${bodyLines.join('\n')}`;
+
+  if (withButtons) {
+    // Providers that support quick-reply buttons will render YES / NO actions.
+    return base;
+  }
+
+  const footer = ['',
+    '*How to respond:*',
+    '- Reply *YES* to accept',
+    '- Reply *NO* to decline',
+  ].join('\n');
+
+  return `${base}\n\n${footer}`;
 }
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
 function formatGroupInviteFallbackMessage(): string {
-  return "You couldn't be added directly to the match group (possibly due to WhatsApp privacy settings). Use this link to join:";
+  return [
+    'ℹ️ *Match group invite*',
+    '',
+    "You couldn't be added directly to the WhatsApp group (this is usually due to privacy settings).",
+    'Use this link to join the group:',
+  ].join('\n');
 }
 
 function formatMatchDetailsMessage(
@@ -153,7 +180,16 @@ function formatMatchDetailsMessage(
   const loc = (location && location.trim()) || 'TBD';
   const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
   const signupUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/signup`;
-  return `✅ Match confirmed!\n\n${sport} · ${formatLabel}\nWhen: ${whenStr}\nWhere: ${loc}\n\n🔗 View match: ${matchUrl}\n\nCreate an account to manage matches: ${signupUrl}`;
+  return [
+    '✅ *Match confirmed!*',
+    '',
+    `${sport} · ${formatLabel}`,
+    `*When:* ${whenStr}`,
+    `*Where:* ${loc}`,
+    '',
+    `🔗 *View match:* ${matchUrl}`,
+    `👤 Create an account to manage your matches: ${signupUrl}`,
+  ].join('\n');
 }
 
 function formatInviteNoLongerAvailableMessage(
@@ -166,7 +202,15 @@ function formatInviteNoLongerAvailableMessage(
 ): string {
   const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
   const loc = (location && location.trim()) || 'TBD';
-  return `Hi! The ${sportType} ${formatLabel} invite from ${hostName} for ${dateStr} at ${timeStr} (${loc}) is no longer available. You can ignore the previous message.`;
+  return [
+    'ℹ️ *Invite no longer available*',
+    '',
+    `The ${sportType} ${formatLabel} invite from ${hostName} is no longer available.`,
+    `*When:* ${dateStr} · ${timeStr}`,
+    `*Where:* ${loc}`,
+    '',
+    'You can ignore the previous invite message.',
+  ].join('\n');
 }
 
 /** Reason codes when a scheduling request expires (No match) */
@@ -183,14 +227,22 @@ function formatNoMatchWhatsAppMessage(
   const sport = sportType.charAt(0).toUpperCase() + sportType.slice(1).toLowerCase();
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
   const loc = (location && location.trim()) || 'TBD';
-  const details = `${sport} · ${formatLabel}\n${dateStr} ${timeStr}\n${loc}`;
+  const details = `${sport} · ${formatLabel}\n*When:* ${dateStr} · ${timeStr}\n*Where:* ${loc}`;
   const reasonText =
     reason === 'no_more_candidates'
-      ? 'No quedaban más candidatos para contactar.'
+      ? 'No quedaban más candidatos disponibles para contactar.'
       : reason === 'all_candidates_exhausted'
         ? 'Todos los candidatos rechazaron o no respondieron a tiempo.'
-        : 'Se pasó la hora programada sin confirmar partido.';
-  return `❌ Tu solicitud de partido no tuvo match.\n\n${details}\n\n${reasonText}\n\nPuedes añadir más contactos o crear una nueva solicitud.`;
+        : 'Se pasó la hora programada sin confirmar el partido.';
+  return [
+    '❌ *Tu solicitud de partido no tuvo match*',
+    '',
+    details,
+    '',
+    reasonText,
+    '',
+    'Puedes añadir más contactos o crear una nueva solicitud desde Matchmaker.',
+  ].join('\n');
 }
 
 async function notifyHostSchedulingNoMatch(
@@ -280,10 +332,10 @@ export const schedulingService = {
     // Round to 3 decimal places to avoid float precision issues
     const rawWindow = input.responseWindowMinutes ?? 240;
     const responseWindow = Math.round(rawWindow * 1000) / 1000;
-    // Min 10 seconds (0.167 min) for testing, max 24 hours (1440 min)
-    if (responseWindow < 10 / 60 || responseWindow > 1440) {
+    // Min 10 seconds (0.167 min) for dev testing, max 72 hours (4320 min)
+    if (responseWindow < 10 / 60 || responseWindow > 4320) {
       throw new AppError(
-        'Invalid responseWindowMinutes. Use 0.167 (10 sec), 0.333 (20 sec), 1, 5, 15, 30, 60, 120, 240, 600, or 1440 (minutes)',
+        'Invalid responseWindowMinutes. Use 15, 30, 60, 120, 240, 720, 1440, or 4320 (minutes). Dev: 0.167 (10 sec).',
         400
       );
     }

@@ -238,7 +238,7 @@ describe('SchedulingService', () => {
       await expect(
         schedulingService.createSchedulingRequest({
           ...baseInput,
-          responseWindowMinutes: 2000,
+          responseWindowMinutes: 5000, // exceeds max 4320 (72h)
         })
       ).rejects.toThrow(/Invalid responseWindowMinutes/);
     });

@@ -412,7 +412,14 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
   const groupId = match.whatsappGroupId;
   if (groupId && groupId.trim()) {
     try {
-      const message = `⚠️ Match cancelled\n\n${dateStr}${timeStr ? ` at ${timeStr}` : ''}\n📍 ${location}\n\nThe match has been cancelled.`;
+      const message = [
+        '⚠️ *Match cancelled*',
+        '',
+        `${dateStr}${timeStr ? ` · ${timeStr}` : ''}`,
+        `📍 ${location}`,
+        '',
+        'This match has been cancelled. Thanks for your understanding.',
+      ].join('\n');
       await whatsappService.sendGroupMessage(groupId, message);
       logger.info('MatchCancelledWhatsAppSent', { matchId: match.id, groupId });
     } catch (err) {

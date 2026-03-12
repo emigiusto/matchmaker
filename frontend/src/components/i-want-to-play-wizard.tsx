@@ -113,9 +113,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   // Step 3: Contact priority list
   const [priorityList, setPriorityList] = useState<Contact[]>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  // 20 sec (1/3 min) default for local testing; 60 min for production
+  // 10 sec default for local testing; 60 min for production
   const defaultResponseWindow = typeof import.meta !== "undefined" && import.meta.env?.DEV
-    ? 1 / 3 // 20 seconds
+    ? 10 / 60 // 10 seconds
     : 60
   const [responseWindow, setResponseWindow] = useState<number>(defaultResponseWindow) // minutes (can be fractional)
   const [maxParallelCandidates, setMaxParallelCandidates] = useState(1) // 1–3 contacts reached out at once
@@ -883,10 +883,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { value: 10 / 60, label: "10s" },
-                  { value: 1 / 3, label: "20s" },
-                  { value: 1, label: "1m" },
-                  { value: 5, label: "5m" },
+                  ...(typeof import.meta !== "undefined" && import.meta.env?.DEV
+                    ? [{ value: 10 / 60, label: "10s" }]
+                    : []),
                   { value: 15, label: "15m" },
                   { value: 30, label: "30m" },
                   { value: 60, label: "1h" },
@@ -894,6 +893,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   { value: 240, label: "4h" },
                   { value: 720, label: "12h" },
                   { value: 1440, label: "24h" },
+                  { value: 4320, label: "72h" },
                 ].map(({ value, label }) => (
                   <button
                     key={label}

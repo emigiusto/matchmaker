@@ -27,7 +27,15 @@ function formatMatchMessage(match: {
   const opponentStr = opponents.length > 0 ? opponents.join(' & ') : 'your opponent';
   const typeLabel = match.type === 'competitive' ? 'Match' : 'Practice';
 
-  return `⏰ MatchMaker Reminder\n\nYour ${typeLabel} vs ${opponentStr} is coming up!\n📅 ${dateStr}${timeStr ? ` at ${timeStr}` : ''}\n📍 ${location}\n\nSee you on court! 🎾`;
+  return [
+    '⏰ *Matchmaker reminder*',
+    '',
+    `Your ${typeLabel.toLowerCase()} vs ${opponentStr} is coming up.`,
+    `📅 ${dateStr}${timeStr ? ` · ${timeStr}` : ''}`,
+    `📍 ${location}`,
+    '',
+    'Good luck and have fun! 🎾',
+  ].join('\n');
 }
 
 /**
