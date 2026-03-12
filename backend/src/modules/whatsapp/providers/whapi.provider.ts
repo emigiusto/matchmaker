@@ -11,6 +11,8 @@ import type {
 import type {
   SendMessageResult,
   CreateGroupResult,
+  GetGroupInviteLinkResult,
+  GetGroupParticipantsResult,
   WebhookIncomingMessage,
 } from '../whatsapp.types';
 
@@ -108,6 +110,65 @@ export class WhapiProvider implements IWhatsAppProvider {
       }
       const groupId = data.id || data.group_id;
       return { success: true, groupId };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async getGroupInviteLink(groupId: string): Promise<GetGroupInviteLinkResult> {
+    if (!WHAPI_TOKEN) {
+      return { success: false, error: 'WHAPI_API_TOKEN not configured' };
+    }
+    try {
+      const res = await fetch(`${WHAPI_BASE}/groups/${encodeURIComponent(groupId)}/invite`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${WHAPI_TOKEN}` },
+      });
+      const data = (await res.json()) as { invite_code?: string; invite_code_expire?: number; error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      const code = data.invite_code;
+      if (!code) {
+        return { success: false, error: 'No invite_code in response' };
+      }
+      const inviteLink = `https://chat.whatsapp.com/${code}`;
+      return { success: true, inviteLink };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async getGroupParticipants(groupId: string): Promise<GetGroupParticipantsResult> {
+    if (!WHAPI_TOKEN) {
+      return { success: false, error: 'WHAPI_API_TOKEN not configured' };
+    }
+    try {
+      const res = await fetch(`${WHAPI_BASE}/groups/${encodeURIComponent(groupId)}/participants`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${WHAPI_TOKEN}` },
+      });
+      const data = (await res.json()) as {
+        participants?: Array<{ id?: string; participant?: string }>;
+        error?: string;
+      };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      const participants = data.participants ?? [];
+      const phones = participants
+        .map((p) => {
+          const id = p.id ?? p.participant ?? '';
+          return normalizePhone(String(id));
+        })
+        .filter(Boolean);
+      return { success: true, participantPhones: phones };
     } catch (err) {
       return {
         success: false,

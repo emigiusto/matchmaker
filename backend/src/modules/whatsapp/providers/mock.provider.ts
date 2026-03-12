@@ -10,6 +10,8 @@ import type {
 import type {
   SendMessageResult,
   CreateGroupResult,
+  GetGroupInviteLinkResult,
+  GetGroupParticipantsResult,
   WebhookIncomingMessage,
 } from '../whatsapp.types';
 import { logger } from '../../../config/logger';
@@ -50,6 +52,16 @@ export class MockWhatsAppProvider implements IWhatsAppProvider {
       preview: message.slice(0, 80) + (message.length > 80 ? '...' : ''),
     });
     return { success: true, messageId: `mock-${Date.now()}` };
+  }
+
+  async getGroupInviteLink(groupId: string): Promise<GetGroupInviteLinkResult> {
+    logger.info('[MOCK WhatsApp] getGroupInviteLink', { groupId });
+    return { success: true, inviteLink: `https://chat.whatsapp.com/mock-${groupId}` };
+  }
+
+  async getGroupParticipants(groupId: string): Promise<GetGroupParticipantsResult> {
+    logger.info('[MOCK WhatsApp] getGroupParticipants', { groupId });
+    return { success: true, participantPhones: [] };
   }
 
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {

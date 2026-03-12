@@ -76,6 +76,70 @@ export const whatsappService = {
     return provider.sendGroupMessage(groupId, message);
   },
 
+  /**
+   * Ensures all expected participants are in the group. If any couldn't be added directly
+   * (e.g. WhatsApp privacy settings), sends them the group invite link via private message.
+   * Excludes botPhone from the expected set.
+   */
+  async ensureParticipantsReceiveGroupInvite(
+    groupId: string,
+    participantPhones: string[],
+    inviteMessage: string,
+    botPhone?: string
+  ): Promise<{ sentTo: string[]; errors: string[] }> {
+    const expectedSet = new Set(
+      participantPhones
+        .map(normalizePhone)
+        .filter(Boolean)
+        .filter((p) => !botPhone || normalizePhone(botPhone) !== p)
+    );
+    if (expectedSet.size === 0) return { sentTo: [], errors: [] };
+
+    const participantsRes = await provider.getGroupParticipants(groupId);
+    if (!participantsRes.success || !participantsRes.participantPhones) {
+      logger.warn('CouldNotGetGroupParticipants', {
+        groupId,
+        error: participantsRes.error,
+      });
+      return { sentTo: [], errors: [participantsRes.error ?? 'Unknown error'] };
+    }
+
+    const actualSet = new Set(
+      (participantsRes.participantPhones ?? []).map(normalizePhone).filter(Boolean)
+    );
+    const missing: string[] = [];
+    for (const p of expectedSet) {
+      if (!actualSet.has(p)) missing.push(p);
+    }
+    if (missing.length === 0) return { sentTo: [], errors: [] };
+
+    const linkRes = await provider.getGroupInviteLink(groupId);
+    if (!linkRes.success || !linkRes.inviteLink) {
+      logger.warn('CouldNotGetGroupInviteLink', {
+        groupId,
+        error: linkRes.error,
+      });
+      return { sentTo: [], errors: [linkRes.error ?? 'No invite link'] };
+    }
+
+    const fullMessage = `${inviteMessage}\n\n${linkRes.inviteLink}`;
+    const sentTo: string[] = [];
+    const errors: string[] = [];
+
+    for (const phone of missing) {
+      const res = await provider.sendInviteMessage(phone, fullMessage);
+      if (res.success) {
+        sentTo.push(phone);
+        logger.info('GroupInviteLinkSent', { groupId, phone });
+      } else {
+        errors.push(`${phone}: ${res.error ?? 'send failed'}`);
+        logger.warn('GroupInviteLinkSendFailed', { groupId, phone, error: res.error });
+      }
+    }
+
+    return { sentTo, errors };
+  },
+
   /** Parse provider-specific webhook body into normalized message. Returns null if not an incoming 1:1 text. */
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
     return provider.parseWebhookPayload(body);

@@ -13,6 +13,18 @@ export interface CreateGroupResult {
   error?: string;
 }
 
+export interface GetGroupInviteLinkResult {
+  success: boolean;
+  inviteLink?: string;
+  error?: string;
+}
+
+export interface GetGroupParticipantsResult {
+  success: boolean;
+  participantPhones?: string[];
+  error?: string;
+}
+
 /** Normalized webhook payload - same shape regardless of provider */
 export interface WebhookIncomingMessage {
   senderPhone: string;

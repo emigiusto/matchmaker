@@ -135,6 +135,10 @@ function formatInviteMessage(
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
+function formatGroupInviteFallbackMessage(): string {
+  return "You couldn't be added directly to the match group (possibly due to WhatsApp privacy settings). Use this link to join:";
+}
+
 function formatMatchDetailsMessage(
   sportType: string,
   format: string,
@@ -619,6 +623,26 @@ export const schedulingService = {
           match.id
         );
         await whatsappService.sendGroupMessage(groupResult.groupId, detailsMessage);
+
+        const inviteFallback = await whatsappService.ensureParticipantsReceiveGroupInvite(
+          groupResult.groupId,
+          participantPhones,
+          formatGroupInviteFallbackMessage(),
+          whapiBotPhone || undefined
+        );
+        if (inviteFallback.sentTo.length > 0) {
+          logger.info('GroupInviteLinksSent', {
+            groupId: groupResult.groupId,
+            sentTo: inviteFallback.sentTo,
+            count: inviteFallback.sentTo.length,
+          });
+        }
+        if (inviteFallback.errors.length > 0) {
+          logger.warn('GroupInviteLinkErrors', {
+            groupId: groupResult.groupId,
+            errors: inviteFallback.errors,
+          });
+        }
       }
     }
 

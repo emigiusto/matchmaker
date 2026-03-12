@@ -4,6 +4,8 @@
 import type {
   SendMessageResult,
   CreateGroupResult,
+  GetGroupInviteLinkResult,
+  GetGroupParticipantsResult,
   WebhookIncomingMessage,
 } from './whatsapp.types';
 
@@ -38,6 +40,17 @@ export interface IWhatsAppProvider {
    * Update the group subject/name. Requires admin.
    */
   updateGroupSubject(groupId: string, subject: string): Promise<SendMessageResult>;
+
+  /**
+   * Get the invite link for a group. Requires admin. Used as fallback when a participant
+   * cannot be added directly (e.g. WhatsApp privacy settings block direct add).
+   */
+  getGroupInviteLink(groupId: string): Promise<GetGroupInviteLinkResult>;
+
+  /**
+   * Get participant phone numbers in a group (digits only). Returns empty array if group not found.
+   */
+  getGroupParticipants(groupId: string): Promise<GetGroupParticipantsResult>;
 
   /**
    * Parse provider-specific webhook body into normalized incoming message.

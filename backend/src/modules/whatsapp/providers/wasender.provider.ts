@@ -11,6 +11,8 @@ import type {
 import type {
   SendMessageResult,
   CreateGroupResult,
+  GetGroupInviteLinkResult,
+  GetGroupParticipantsResult,
   WebhookIncomingMessage,
 } from '../whatsapp.types';
 
@@ -27,6 +29,14 @@ function normalizePhone(phone: string): string {
 function phoneToJid(phone: string): string {
   const digits = normalizePhone(phone);
   return `${digits}@s.whatsapp.net`;
+}
+
+/** Ensure group ID is in JID format (xxx@g.us) */
+function toGroupJid(groupId: string): string {
+  const clean = String(groupId).trim();
+  if (clean.endsWith('@g.us')) return clean;
+  const digits = clean.replace(/\D/g, '');
+  return digits ? `${digits}@g.us` : clean;
 }
 
 export class WasenderProvider implements IWhatsAppProvider {
@@ -112,6 +122,63 @@ export class WasenderProvider implements IWhatsAppProvider {
         return { success: false, error: 'No group id in response' };
       }
       return { success: true, groupId };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async getGroupInviteLink(groupId: string): Promise<GetGroupInviteLinkResult> {
+    if (!WASENDER_TOKEN) {
+      return { success: false, error: 'WASENDER_API_KEY not configured' };
+    }
+    try {
+      const jid = toGroupJid(groupId);
+      const res = await fetch(`${WASENDER_BASE}/api/groups/${encodeURIComponent(jid)}/invite-link`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${WASENDER_TOKEN}` },
+      });
+      const data = (await res.json()) as { success?: boolean; inviteLink?: string; error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      if (!data.inviteLink) {
+        return { success: false, error: 'No invite link in response' };
+      }
+      return { success: true, inviteLink: data.inviteLink };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  async getGroupParticipants(groupId: string): Promise<GetGroupParticipantsResult> {
+    if (!WASENDER_TOKEN) {
+      return { success: false, error: 'WASENDER_API_KEY not configured' };
+    }
+    try {
+      const jid = toGroupJid(groupId);
+      const res = await fetch(
+        `${WASENDER_BASE}/api/groups/${encodeURIComponent(jid)}/participants`,
+        { method: 'GET', headers: { Authorization: `Bearer ${WASENDER_TOKEN}` } },
+      );
+      const data = (await res.json()) as { success?: boolean; data?: Array<{ id?: string }>; error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      const participants = data.data ?? [];
+      const phones = participants
+        .map((p) => {
+          if (!p.id) return '';
+          const beforeAt = String(p.id).split('@')[0] ?? '';
+          return beforeAt.replace(/\D/g, '');
+        })
+        .filter(Boolean);
+      return { success: true, participantPhones: phones };
     } catch (err) {
       return {
         success: false,
