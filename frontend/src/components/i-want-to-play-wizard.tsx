@@ -5,6 +5,8 @@ import {
   MapPin,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   GripVertical,
   X,
   Zap,
@@ -127,6 +129,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [submitting, setSubmitting] = useState(false)
   const [manualName, setManualName] = useState("")
   const [manualPhone, setManualPhone] = useState("")
+  const [showManualAdd, setShowManualAdd] = useState(false)
   const [searchFromList, setSearchFromList] = useState("")
   const [searchFriends, setSearchFriends] = useState("")
   const [searchAllContacts, setSearchAllContacts] = useState("")
@@ -147,6 +150,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setMaxParallelCandidates(1)
     setPriorityList([])
     setDraggedIndex(null)
+    setShowManualAdd(false)
   }
 
   // Fetch contacts for step 3: users, groups, friends, guest contacts
@@ -762,28 +766,51 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             </div>
 
             {/* Manual add: name + phone (saves as GuestContact) */}
-            <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-3">
-              <Label className="text-sm font-medium">Add manually (name + phone)</Label>
-              <p className="text-xs text-muted-foreground">Saved to your contacts. Use country code (e.g. +34 for Spain).</p>
-              <div className="flex flex-wrap items-end gap-2">
-                <Input
-                  placeholder="Name"
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  className="min-w-[120px] flex-1"
-                />
-                <div className="min-w-[200px] flex-1">
-                  <PhoneInput
-                    value={manualPhone}
-                    onChange={setManualPhone}
-                    defaultCountryCode="34"
-                  />
+            {showManualAdd ? (
+              <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Add manually (name + phone)</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto gap-1 py-1 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowManualAdd(false)}
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                    Hide
+                  </Button>
                 </div>
-                <Button variant="secondary" size="sm" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
-                  Add
-                </Button>
+                <p className="text-xs text-muted-foreground">Saved to your contacts. Use country code (e.g. +34 for Spain).</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(140px,1fr)_minmax(260px,2fr)_auto] sm:items-end">
+                  <Input
+                    placeholder="Name"
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    className="w-full"
+                  />
+                  <div className="min-w-0">
+                    <PhoneInput
+                      value={manualPhone}
+                      onChange={setManualPhone}
+                      defaultCountryCode="34"
+                    />
+                  </div>
+                  <Button variant="secondary" size="sm" className="shrink-0 sm:self-end" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
+                    Add
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-center gap-2 border-dashed py-5 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                onClick={() => setShowManualAdd(true)}
+              >
+                <UserPlus className="h-4 w-4" />
+                Add manual contacts
+              </Button>
+            )}
 
             {/* Priority list */}
             <div className="space-y-2">

@@ -1,15 +1,24 @@
 import * as React from "react"
+import { ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import {
   COUNTRY_CODES,
+  countryCodeToFlag,
   digitsOnly,
   parseCountryCode,
   validatePhoneE164,
@@ -89,6 +98,7 @@ export function PhoneInput({
   const validation = validatePhoneE164(value)
   const showError = touched && (error || (!validation.valid && value))
 
+  const [countryOpen, setCountryOpen] = React.useState(false)
   const isOther = countryDial === "_other"
 
   if (isOther) {
@@ -121,22 +131,63 @@ export function PhoneInput({
     )
   }
 
+  const handleCountrySelect = (dial: string) => {
+    handleCountryChange(dial)
+    setCountryOpen(false)
+  }
+
+  const selectedCountry = COUNTRY_CODES.find((c) => c.dial === countryDial)
+
   return (
     <div className={cn("space-y-1", className)}>
       <div className="flex gap-2">
-        <Select value={countryDial} onValueChange={handleCountryChange}>
-          <SelectTrigger className="w-[130px] shrink-0">
-            <SelectValue placeholder="Country" />
-          </SelectTrigger>
-          <SelectContent>
-            {COUNTRY_CODES.filter((c) => c.dial).map((c) => (
-              <SelectItem key={c.code} value={c.dial}>
-                +{c.dial} {c.name}
-              </SelectItem>
-            ))}
-            <SelectItem value="_other">Other</SelectItem>
-          </SelectContent>
-        </Select>
+        <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              role="combobox"
+              aria-expanded={countryOpen}
+              className="h-10 w-[130px] shrink-0 justify-between gap-1 px-3 font-normal"
+            >
+              {countryDial === "_other" ? (
+                "Other"
+              ) : selectedCountry ? (
+                <span className="flex items-center gap-2 truncate">
+                  <span className="text-base leading-none">{countryCodeToFlag(selectedCountry.code)}</span>
+                  <span>+{selectedCountry.dial}</span>
+                </span>
+              ) : (
+                "Country"
+              )}
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[240px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search country or code..." />
+              <CommandList>
+                <CommandEmpty>No country found.</CommandEmpty>
+                <CommandGroup>
+                  {COUNTRY_CODES.filter((c) => c.dial).map((c) => (
+                    <CommandItem
+                      key={c.code}
+                      value={`${c.name} ${c.dial} ${c.code}`}
+                      onSelect={() => handleCountrySelect(c.dial)}
+                    >
+                      <span className="mr-2 text-base">{countryCodeToFlag(c.code)}</span>
+                      <span>+{c.dial}</span>
+                      <span className="ml-2 text-muted-foreground">{c.name}</span>
+                    </CommandItem>
+                  ))}
+                  <CommandItem value="Other" onSelect={() => handleCountrySelect("_other")}>
+                    Other
+                  </CommandItem>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         <Input
           type="tel"
           inputMode="numeric"
@@ -151,7 +202,7 @@ export function PhoneInput({
           onChange={handleNationalChange}
           onBlur={() => setTouched(true)}
           aria-invalid={!!showError}
-          className={cn("flex-1", showError && "border-destructive")}
+          className={cn("min-w-[100px] flex-1", showError && "border-destructive")}
           {...props}
         />
       </div>

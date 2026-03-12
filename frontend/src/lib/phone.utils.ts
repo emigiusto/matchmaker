@@ -55,6 +55,16 @@ export function toE164(phone: string, defaultCountryCode?: string): string {
   return `+${d}`;
 }
 
+/** Convert ISO 3166-1 alpha-2 code to flag emoji (e.g. ES → 🇪🇸) */
+export function countryCodeToFlag(iso: string): string {
+  if (!iso || iso.length !== 2) return ""
+  return iso
+    .toUpperCase()
+    .split("")
+    .map((c) => String.fromCodePoint(0x1f1e6 - 65 + c.charCodeAt(0)))
+    .join("")
+}
+
 /** Common country codes for UI selector */
 export const COUNTRY_CODES: { code: string; dial: string; name: string }[] = [
   { code: 'ES', dial: '34', name: 'Spain' },
