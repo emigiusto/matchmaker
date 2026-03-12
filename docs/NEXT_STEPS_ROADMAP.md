@@ -77,6 +77,8 @@ if (status === 'granted') {
 
 ### Alternative: Capacitor (Wrap Existing Web App)
 
+> **Detailed guide:** See [docs/CAPACITOR_MIGRATION.md](CAPACITOR_MIGRATION.md) for the full migration document.
+
 | Factor | Notes |
 |--------|-------|
 | **Code reuse** | Reuse the full Vite/React frontend. |

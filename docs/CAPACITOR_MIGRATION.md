@@ -1,0 +1,366 @@
+# Capacitor Migration – Mobile App with Native Contacts
+
+This document describes how to migrate the MatchMaker frontend to run as a native mobile app using Capacitor, enabling device contact access for the I Want to Play and Add Contacts flows.
+
+---
+
+## Overview
+
+| Aspect | Details |
+|--------|---------|
+| **Goal** | Run the existing Vite/React frontend on iOS and Android, with native contact picking |
+| **Approach** | Wrap the web app in Capacitor; add `@capacitor-community/contacts` for device contacts |
+| **Code reuse** | Full reuse of frontend logic, API client, and UI |
+| **Trade-off** | WebView-based (not native UI); acceptable for quick MVP and contact access |
+
+---
+
+## Prerequisites
+
+- **Node.js** 18+
+- **Xcode** (macOS) for iOS builds
+- **Android Studio** for Android builds
+- **Apple Developer account** for iOS deployment
+- **Google Play Console** for Android deployment (optional for dev/testing)
+
+---
+
+## Phase 1: Add Capacitor to the Frontend
+
+### 1.1 Install Capacitor
+
+```bash
+cd frontend
+npm install @capacitor/core @capacitor/cli
+npx cap init "MatchMaker" "com.matchmaker.app"
+```
+
+This creates `capacitor.config.ts` and `ios/` / `android/` folders.
+
+### 1.2 Configure Capacitor
+
+Edit `frontend/capacitor.config.ts`:
+
+```ts
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.matchmaker.app',
+  appName: 'MatchMaker',
+  webDir: 'dist',
+  server: {
+    // Optional: point to Vite dev server for live reload during development
+    // url: 'http://YOUR_IP:5173',
+    // cleartext: true,
+  },
+  plugins: {
+    // Optional: splash screen, status bar, etc.
+  },
+};
+```
+
+> **Note:** For local dev, you may want `server.url` to point to your Vite dev server (`http://YOUR_IP:5173`) so hot reload works. For production builds, remove or adjust `server` so the app loads from the bundled `webDir`.
+
+### 1.3 Build and Add Platforms
+
+```bash
+npm run build
+npx cap add ios
+npx cap add android
+```
+
+### 1.4 Sync and Run
+
+```bash
+npx cap sync
+npx cap open ios    # Opens Xcode
+npx cap open android # Opens Android Studio
+```
+
+---
+
+## Phase 2: Add the Contacts Plugin
+
+### 2.1 Install the Plugin
+
+```bash
+cd frontend
+npm install @capacitor-community/contacts
+npx cap sync
+```
+
+### 2.2 Configure Permissions
+
+**iOS** – Add to `ios/App/App/Info.plist`:
+
+```xml
+<key>NSContactsUsageDescription</key>
+<string>MatchMaker needs access to your contacts to let you invite friends to play.</string>
+```
+
+**Android** – Add to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.READ_CONTACTS" />
+<uses-permission android:name="android.permission.WRITE_CONTACTS" />
+```
+
+> For read-only contact picking, `READ_CONTACTS` is sufficient. Add `WRITE_CONTACTS` only if you plan to create/update contacts.
+
+### 2.3 API Overview
+
+```ts
+import { Contacts } from '@capacitor-community/contacts';
+
+// Request permission (returns { contacts: 'granted' | 'denied' | 'limited' | ... })
+const perm = await Contacts.requestPermissions();
+if (perm.contacts !== 'granted' && perm.contacts !== 'limited') { /* handle denied */ }
+
+// Option A: Get all contacts with phone numbers
+const { contacts } = await Contacts.getContacts({
+  projection: { name: true, phones: true },
+});
+// Each contact: { contactId, name: { display, given }, phones: [{ number, type }] }
+
+// Option B: Native picker (single contact – uses system UI)
+const { contact } = await Contacts.pickContact({
+  projection: { name: true, phones: true },
+});
+```
+
+---
+
+## Phase 3: Implement Platform-Aware Contact Picker
+
+### 3.1 Create a Contacts Service
+
+Create `frontend/src/lib/services/contacts.service.ts`:
+
+```ts
+import { Capacitor } from '@capacitor/core';
+
+export interface DeviceContact {
+  id: string;
+  name: string;
+  phones: string[];
+}
+
+export const contactsService = {
+  isNative(): boolean {
+    return Capacitor.isNativePlatform();
+  },
+
+  async requestPermission(): Promise<'granted' | 'denied' | 'prompt'> {
+    if (!this.isNative()) return 'denied';
+    const { Contacts } = await import('@capacitor-community/contacts');
+    const { contacts } = await Contacts.requestPermissions();
+    return contacts === 'granted' || contacts === 'limited' ? 'granted' : (contacts as 'denied');
+  },
+
+  async getContacts(): Promise<DeviceContact[]> {
+    if (!this.isNative()) return [];
+    const { Contacts } = await import('@capacitor-community/contacts');
+    const { contacts } = await Contacts.getContacts({
+      projection: { name: true, phones: true },
+    });
+    return contacts.map((c) => ({
+      id: c.contactId ?? '',
+      name: c.name?.display ?? c.name?.given ?? 'Unknown',
+      phones: (c.phones ?? []).map((p) => (p.number ?? '').trim()).filter(Boolean),
+    }));
+  },
+};
+```
+
+### 3.2 Normalize Phone Numbers
+
+The backend expects E.164 (e.g. `+34612345678`). Device contacts may have varied formats. Use the existing `frontend/src/lib/phone.utils.ts` and extend if needed:
+
+```ts
+// In contacts.service.ts or a helper
+import { parseCountryCode, digitsOnly } from '@/lib/phone.utils';
+
+function toE164(phone: string, defaultCountryCode = '34'): string {
+  const digits = digitsOnly(phone);
+  if (!digits) return '';
+  const parsed = parseCountryCode(digits);
+  const dial = parsed?.dial ?? defaultCountryCode;
+  const national = parsed?.national ?? digits;
+  return `+${dial}${national}`;
+}
+```
+
+### 3.3 Integrate with Add Contacts Flow
+
+Extend `AddContactsToInvite` (`frontend/src/components/add-contacts-to-invite.tsx`) to show a "Pick from device" button when running in the Capacitor app:
+
+```tsx
+// When contactsService.isNative():
+// 1. Show "Pick from device" button
+// 2. On click: request permission → getContacts() → show picker UI
+// 3. For each selected contact: guestContactsService.ensureUserByPhone(phone, name)
+// 4. schedulingService.addCandidates(requestId, userIds, hostUserId)
+```
+
+Example integration pattern:
+
+```tsx
+if (contactsService.isNative()) {
+  // Add "Pick from device" button
+  // On click:
+  const status = await contactsService.requestPermission();
+  if (status !== 'granted') {
+    toast.error('Contacts permission is required to pick from your device');
+    return;
+  }
+  const deviceContacts = await contactsService.getContacts();
+  // Show modal/drawer to select contacts
+  // For each selected: ensureUserByPhone(phone, name) → collect user IDs
+  // Then: schedulingService.addCandidates(requestId, userIds, hostUserId)
+}
+```
+
+### 3.4 Integrate with I Want to Play Wizard
+
+The I Want to Play wizard (`i-want-to-play-wizard.tsx`) already uses `guestContactsService.ensureUserByPhone` and `guestContactsService.create`. Add a step or button:
+
+- "Pick from device contacts" → opens contact picker → maps to `AvailableContact[]` with `type: 'guestContact'` and `phone`
+- Existing logic then calls `ensureUserByPhone` and passes `candidateUserIds` to `schedulingService.create`
+
+---
+
+## Phase 4: Flow: Device Contacts → Backend
+
+### 4.1 Backend Support
+
+No schema changes are required. The backend already supports:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /guest-contacts/ensure-user` | Find or create `User` by phone; returns `{ user: { id, name } }` |
+| `POST /scheduling/:requestId/candidates` | Add candidates by `candidateUserIds` |
+
+### 4.2 Frontend Flow
+
+1. User taps "Pick from device" (only visible when `Capacitor.isNativePlatform()`).
+2. Request contacts permission; if denied, show message and exit.
+3. Fetch contacts via `Contacts.getContacts`.
+4. User selects one or more contacts (with phone numbers).
+5. For each selected contact:
+   - Normalize phone to E.164.
+   - Call `guestContactsService.ensureUserByPhone(phone, name)`.
+   - Collect `user.id`.
+6. Call `schedulingService.addCandidates(requestId, userIds, hostUserId)`.
+7. Refresh the UI.
+
+### 4.3 Edge Cases
+
+- **No phone number** – Skip or show warning.
+- **Duplicate phones** – `ensureUserByPhone` returns the same user; dedupe by `user.id` before `addCandidates`.
+- **Permission denied** – Fall back to manual entry (PhoneInput) or groups/friends.
+
+---
+
+## Phase 5: Build and Deploy
+
+### 5.1 Build Commands
+
+```bash
+cd frontend
+npm run build
+npx cap sync
+```
+
+### 5.2 iOS
+
+```bash
+npx cap open ios
+# In Xcode: select device/simulator, run (⌘R)
+```
+
+For release: Product → Archive → Distribute to App Store or Ad Hoc.
+
+### 5.3 Android
+
+```bash
+npx cap open android
+# In Android Studio: Run on device/emulator
+```
+
+For release: Build → Generate Signed Bundle/APK.
+
+---
+
+## Project Structure After Migration
+
+```
+frontend/
+├── src/
+│   ├── lib/
+│   │   └── services/
+│   │       ├── api-client.ts
+│   │       ├── contacts.service.ts    # NEW – Capacitor contacts wrapper
+│   │       ├── guest-contacts.service.ts
+│   │       └── scheduling.service.ts
+│   └── components/
+│       ├── add-contacts-to-invite.tsx # UPDATED – "Pick from device" button
+│       └── i-want-to-play-wizard.tsx  # UPDATED – device contact picker option
+├── ios/           # Capacitor iOS project
+├── android/       # Capacitor Android project
+├── capacitor.config.ts
+├── package.json   # + @capacitor/core, @capacitor/cli, @capacitor-community/contacts
+└── dist/          # Vite build output (served by Capacitor)
+```
+
+---
+
+## Environment and API Base URL
+
+In native apps, the API base URL must point to your deployed backend, not `localhost`. Options:
+
+1. **Build-time** – Set `VITE_API_BASE_URL` in `.env.production` and use it in `api-client.ts` (already supported).
+2. **Runtime** – Use Capacitor's `Preferences` or a config endpoint to override the API URL for different environments.
+
+---
+
+## Optional Enhancements
+
+| Enhancement | Plugin / Approach |
+|-------------|-------------------|
+| Splash screen | `@capacitor/splash-screen` |
+| Status bar styling | `@capacitor/status-bar` |
+| Push notifications | `@capacitor/push-notifications` (for invite reminders) |
+| Secure storage for JWT | `@capacitor/preferences` or `@capacitor-community/secure-storage` |
+| Deep links | Capacitor App plugin `appUrlOpen` |
+
+---
+
+## Comparison with React Native (Expo)
+
+| Criterion | Capacitor | React Native (Expo) |
+|-----------|-----------|---------------------|
+| Contact access | ✅ Via plugin | ✅ expo-contacts |
+| Effort | Lower – reuse web UI | Higher – rebuild UI |
+| Performance | WebView | Native |
+| Maintenance | Single codebase | Separate app |
+| Best for | Quick MVP, contacts | Long-term mobile-first |
+
+See [NEXT_STEPS_ROADMAP.md](./NEXT_STEPS_ROADMAP.md) for the full comparison.
+
+---
+
+## Checklist
+
+- [ ] Install Capacitor and add iOS/Android platforms
+- [ ] Install `@capacitor-community/contacts` and configure permissions
+- [ ] Create `contacts.service.ts` with platform detection and permission handling
+- [ ] Add "Pick from device" to `AddContactsToInvite`
+- [ ] Add device contact option to I Want to Play wizard
+- [ ] Test on iOS simulator and Android emulator
+- [ ] Test contact permission denied flow
+- [ ] Configure production API URL
+- [ ] Document build/sign process for team
+
+---
+
+*Last updated: 2026-03*
