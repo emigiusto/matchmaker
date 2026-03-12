@@ -6,7 +6,7 @@
 // It does NOT handle social (friends) or matchmaking logic.
 
 import { Player } from '@prisma/client';
-import { cacheGet, cacheSet } from '../../shared/cache/redis';
+import { cacheGet, cacheSet, cacheDel } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types';
@@ -225,6 +225,7 @@ export class PlayersService {
     // Not transactional with PlayerSurface changes
     const player = await prisma.player.findUnique({ where: { id: playerId } });
     if (!player) throw new AppError('Player not found', 404);
+    await cacheDel(`playerdto:${player.userId}`);
     // Update Player fields (tennis persona)
     const updatedPlayer = await prisma.player.update({
       where: { id: playerId },

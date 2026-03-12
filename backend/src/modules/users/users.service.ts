@@ -1,7 +1,7 @@
 // users.service.ts
 // All business logic here. Throws AppError on error.
 // Guest-first: users may exist forever as guests.
-import { cacheGet, cacheSet } from '../../shared/cache/redis';
+import { cacheGet, cacheSet, cacheDel } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
@@ -129,11 +129,12 @@ export async function createGuestUser(name?: string, email?: string, phone?: str
  * @returns Updated UserDTO object
  * @throws AppError if user not found, phone/email exists, or update fails
  */
-export async function updateUser(id: string, name?: string, phone?: string): Promise<UserDTO> {
+export async function updateUser(id: string, name?: string, phone?: string | null): Promise<UserDTO> {
   try {
-    const data: { name?: string; phone?: string } = {};
+    const data: { name?: string; phone?: string | null } = {};
     if (name !== undefined) data.name = name;
     if (phone !== undefined) data.phone = phone;
+    await cacheDel(`userdto:${id}`);
     const user = await prisma.user.update({
       where: { id },
       data,
@@ -212,6 +213,35 @@ export async function findUsersByIdsCached(userIds: string[]): Promise<UserDTO[]
     }
   }
   return result;
+}
+
+/**
+ * Find profile (user + player) by user ID. Single source for profile view.
+ * Player is null if user has no Player.
+ */
+export async function findProfileByUserId(userId: string): Promise<{
+  user: UserDTO;
+  player: { id: string; displayName?: string; defaultCity?: string; preferredClub?: string } | null;
+}> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError('User not found', 404);
+
+  const player = await prisma.player.findUnique({
+    where: { userId },
+    include: { preferredSurfaces: { select: { surface: true } } },
+  });
+
+  return {
+    user: toDTO(user),
+    player: player
+      ? {
+          id: player.id,
+          displayName: player.displayName ?? undefined,
+          defaultCity: player.defaultCity ?? undefined,
+          preferredClub: (player as { preferredClub?: string }).preferredClub ?? undefined,
+        }
+      : null,
+  };
 }
 
 /**

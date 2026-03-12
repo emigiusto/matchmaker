@@ -2,7 +2,7 @@
 // Express routes for User identity/contact info only.
 
 import { Router } from 'express';
-import { createGuestUserController, createUserController, findUserByIdController, updateUserController, deleteUserController, findAllUsersController } from './users.controller';
+import { createGuestUserController, createUserController, findUserByIdController, findProfileByIdController, updateUserController, deleteUserController, findAllUsersController } from './users.controller';
 
 const router = Router();
 
@@ -84,6 +84,26 @@ router.get('/', findAllUsersController);
 
 /**
  * @openapi
+ * /users/{id}/profile:
+ *   get:
+ *     summary: Get user profile (merged user + player)
+ *     description: Returns user and player data in one response for profile view.
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Profile with user and player (player may be null)
+ */
+router.get('/:id/profile', findProfileByIdController);
+
+/**
+ * @openapi
  * /users/{id}:
  *   get:
  *     summary: Get user by id
@@ -106,8 +126,6 @@ router.get('/', findAllUsersController);
  *               $ref: '#/components/schemas/User'
  */
 router.get('/:id', findUserByIdController);
-
-
 
 /**
  * @openapi

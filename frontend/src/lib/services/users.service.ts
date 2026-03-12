@@ -10,7 +10,13 @@ export interface User {
 
 export interface UpdateUserInput {
   name?: string
-  phone?: string
+  /** Pass null to clear phone */
+  phone?: string | null
+}
+
+export interface ProfileResponse {
+  user: User
+  player: { id: string; displayName?: string; defaultCity?: string; preferredClub?: string } | null
 }
 
 export const usersService = {
@@ -20,6 +26,10 @@ export const usersService = {
 
   async getById(userId: string): Promise<User> {
     return apiClient.get<User>(`/users/${userId}`)
+  },
+
+  async getProfile(userId: string): Promise<ProfileResponse> {
+    return apiClient.get<ProfileResponse>(`/users/${userId}/profile`)
   },
 
   async update(userId: string, data: UpdateUserInput): Promise<User> {

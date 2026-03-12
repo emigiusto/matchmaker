@@ -9,15 +9,17 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z.object({
   name: z.string().optional(),
   phone: z
-    .string()
+    .union([z.string(), z.null()])
     .optional()
     .transform((v) => {
-      if (!v || !v.trim()) return undefined;
+      if (v === null || v === undefined) return null;
+      if (!v || !v.trim()) return null;
       const digits = v.trim().replace(/\D/g, '');
-      return digits ? `+${digits}` : undefined;
+      return digits ? `+${digits}` : null;
     })
     .refine(
       (v) =>
+        v === null ||
         v === undefined ||
         (v.startsWith('+') && /^\+\d+$/.test(v) && v.replace(/\D/g, '').length >= 8 && v.replace(/\D/g, '').length <= 15),
       'Phone must have 8–15 digits with country code (e.g. +34)',

@@ -57,6 +57,11 @@ export async function cacheSet(key: string, value: string, ttlSeconds?: number) 
   }
 }
 
+export async function cacheDel(key: string) {
+  if (!redisAvailable()) return;
+  await client!.del(key);
+}
+
 export async function deleteKeysByPattern(pattern: string) {
   const client = getRedisClient();
   if (!client) return;

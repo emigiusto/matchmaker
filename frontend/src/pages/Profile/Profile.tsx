@@ -42,17 +42,52 @@ export default function ProfilePage() {
   const [locationForm, setLocationForm] = useState({ preferredClub: "", defaultCity: "" })
   const [savingLocation, setSavingLocation] = useState(false)
 
+  async function refetchProfile() {
+    try {
+      const profile = await usersService.getProfile(currentUserId)
+      setUser(profile.user)
+      setForm({
+        name: profile.user.name ?? "",
+        phone: profile.user.phone ?? "",
+      })
+      if (profile.player) {
+        setPlayer(profile.player)
+        setLocationForm({
+          preferredClub: profile.player.preferredClub ?? "",
+          defaultCity: profile.player.defaultCity ?? "",
+        })
+      } else {
+        setPlayer(null)
+        setLocationForm({ preferredClub: "", defaultCity: "" })
+      }
+    } catch {
+      setUser(null)
+      setPlayer(null)
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     usersService
-      .getById(currentUserId)
-      .then((u) => {
+      .getProfile(currentUserId)
+      .then((profile) => {
         if (!cancelled) {
-          setUser(u)
+          setUser(profile.user)
           setForm({
-            name: u.name ?? "",
-            phone: u.phone ?? "",
+            name: profile.user.name ?? "",
+            phone: profile.user.phone ?? "",
           })
+          if (profile.player) {
+            setPlayer(profile.player)
+            setLocationForm({
+              preferredClub: profile.player.preferredClub ?? "",
+              defaultCity: profile.player.defaultCity ?? "",
+            })
+          } else {
+            setPlayer(null)
+            setLocationForm({ preferredClub: "", defaultCity: "" })
+          }
         }
       })
       .catch(() => {
@@ -60,25 +95,6 @@ export default function ProfilePage() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [currentUserId])
-
-  useEffect(() => {
-    let cancelled = false
-    playersService
-      .getByUser(currentUserId)
-      .then((p) => {
-        if (!cancelled) {
-          setPlayer(p)
-          setLocationForm({
-            preferredClub: (p as { preferredClub?: string }).preferredClub ?? "",
-            defaultCity: (p as { defaultCity?: string }).defaultCity ?? "",
-          })
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setPlayer(null)
       })
     return () => { cancelled = true }
   }, [currentUserId])
@@ -100,6 +116,7 @@ export default function ProfilePage() {
         setPlayer(created)
       }
       toast.success(t("success.saved"))
+      await refetchProfile()
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save"
       toast.error(msg)
@@ -110,9 +127,9 @@ export default function ProfilePage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    let phoneToSave: string | undefined = form.phone || undefined
+    let phoneToSave: string | null | undefined = form.phone?.trim() ? form.phone.trim() : null
     if (phoneToSave) {
-      const normalized = phoneToSave.trim().startsWith("+") ? phoneToSave : toE164(phoneToSave, "34")
+      const normalized = phoneToSave.startsWith("+") ? phoneToSave : toE164(phoneToSave, "34")
       const validation = validatePhoneE164(normalized)
       if (!validation.valid) {
         toast.error(validation.error)
@@ -122,12 +139,12 @@ export default function ProfilePage() {
     }
     setSaving(true)
     try {
-      const updated = await usersService.update(currentUserId, {
+      await usersService.update(currentUserId, {
         name: form.name || undefined,
         phone: phoneToSave,
       })
-      setUser(updated)
       toast.success(t("success.saved"))
+      await refetchProfile()
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save"
       toast.error(msg)

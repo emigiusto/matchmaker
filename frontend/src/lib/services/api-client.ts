@@ -41,6 +41,7 @@ export const apiClient = {
     }
     const response = await fetch(url.toString(), {
       headers: getAuthHeaders(),
+      cache: "no-store",
     })
     return handleResponse<T>(response)
   },
