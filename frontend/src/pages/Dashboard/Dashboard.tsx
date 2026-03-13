@@ -12,6 +12,7 @@ import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { ResultUploadDialog } from "@/components/result-upload-dialog"
+import { CancelMatchButton } from "@/components/cancel-match-button"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
@@ -36,6 +37,15 @@ export default function Dashboard() {
   const [matchesLoading, setMatchesLoading] = useState(true)
   const { t } = useTranslation()
   const today = format(new Date(), "yyyy-MM-dd")
+
+  async function refreshMatches() {
+    try {
+      const list = await matchesService.getUpcoming(currentUserId)
+      setUpcomingMatches(list)
+    } catch {
+      // keep existing state on refresh failure
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -233,6 +243,12 @@ export default function Dashboard() {
                               compact
                             />
                             <ResultUploadDialog match={match} />
+                            <CancelMatchButton
+                              matchId={match.id}
+                              userId={currentUserId}
+                              onSuccess={refreshMatches}
+                              compact
+                            />
                           </div>
                         </div>
                       )
@@ -309,6 +325,12 @@ export default function Dashboard() {
                               ? undefined
                               : opponent.name
                           }
+                              compact
+                            />
+                            <CancelMatchButton
+                              matchId={match.id}
+                              userId={currentUserId}
+                              onSuccess={refreshMatches}
                               compact
                             />
                           </div>
