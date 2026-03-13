@@ -130,33 +130,34 @@ function formatInviteMessage(
   withButtons: boolean,
   responseWindowMinutes: number
 ): string {
-  const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
+  const sportEmoji = sportType === 'padel' ? '🏓' : '🎾';
+  const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
+  const sportLabel = `${sportType.charAt(0).toUpperCase()}${sportType.slice(1)} ${formatLabel}`;
   const timeLeft = formatResponseWindow(responseWindowMinutes);
   const loc = (location && location.trim()) || 'TBD';
 
-  const header = `🎾 *Match invite from ${hostName}*`;
-  const bodyLines = [
-    `*Sport:* ${sportType} ${formatLabel}`,
-    `*When:* ${dateStr} · ${timeStr}`,
-    `*Where:* ${loc}`,
+  const lines = [
+    `${sportEmoji} *${hostName} wants to play with you!*`,
     '',
-    `*Reply within:* ${timeLeft}`,
+    `📅  ${dateStr}  ·  ${timeStr}`,
+    `📍  ${loc}`,
+    `🏅  ${sportLabel}`,
+    '',
+    `⏳ You have *${timeLeft}* to respond`,
   ];
 
-  const base = `${header}\n\n${bodyLines.join('\n')}`;
+  const base = lines.join('\n');
 
   if (withButtons) {
-    // Providers that support quick-reply buttons will render YES / NO actions.
     return base;
   }
 
-  const footer = ['',
-    '*How to respond:*',
-    '- Reply *YES* to accept',
-    '- Reply *NO* to decline',
+  const footer = [
+    '',
+    'Reply *YES* ✅ to accept or *NO* ❌ to decline',
   ].join('\n');
 
-  return `${base}\n\n${footer}`;
+  return `${base}\n${footer}`;
 }
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';

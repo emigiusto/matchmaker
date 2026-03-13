@@ -97,7 +97,7 @@ export function NotificationsDropdown() {
                 onClick={handleMarkAllRead}
               >
                 <Check className="mr-1 h-3 w-3" />
-                Mark all
+                Mark all as read
               </Button>
             )}
           </div>
@@ -118,8 +118,10 @@ export function NotificationsDropdown() {
             const matchLink = notification.metadata?.matchId
               ? `/matches/${notification.metadata.matchId}`
               : notification.type === "scheduling_no_match" && notification.metadata?.requestId
-                ? "/play"
-                : null
+                ? `/play/${notification.metadata.requestId}`
+                : notification.type === "invite_received"
+                  ? "/play"
+                  : null
             const content = (
               <>
                 <div

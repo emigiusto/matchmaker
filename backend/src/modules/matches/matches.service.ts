@@ -392,11 +392,17 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
   const participants = (match as any).participants ?? [];
 
   for (const p of participants) {
+    const opponentNames = participants
+      .filter((o: any) => o.userId !== p.userId)
+      .map((o: any) => o.user?.name ?? o.userName ?? 'Opponent')
+      .filter(Boolean)
+      .join(', ');
     const payload = {
       matchId: match.id,
       date: av?.date ? new Date(av.date).toISOString().slice(0, 10) : undefined,
       time: timeStr || undefined,
       location,
+      opponentNames: opponentNames || undefined,
     };
     try {
       await createNotification(p.userId, 'match.cancelled', payload);

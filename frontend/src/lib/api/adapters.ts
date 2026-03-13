@@ -120,9 +120,11 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
     case "invite.accepted":
       return "Invite accepted"
     case "match.created":
-      return "Match scheduled"
+      return "Match confirmed"
     case "match.completed":
       return "Match completed"
+    case "match.cancelled":
+      return "Match cancelled"
     case "invite_received":
       return "New invite"
     case "result_pending":
@@ -130,7 +132,7 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
     case "rating_change":
       return "Rating updated"
     case "scheduling.no_match":
-      return "No match"
+      return "No players found"
     default:
       return type.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   }
@@ -146,11 +148,12 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
           ? new Date(payload.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
           : null)
   const timeStr = payload.time && typeof payload.time === "string" ? payload.time : null
-  const location = payload.location && typeof payload.location === "string" ? payload.location : null
+  const location = payload.location && typeof payload.location === "string" ? payload.location.trim() : null
   const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
+
   switch (type) {
     case "invite.accepted":
-      return dateStr ? `A match was scheduled for ${dateStr}` : "A match was scheduled."
+      return dateStr ? `A match was scheduled for ${dateStr}.` : "A match was scheduled."
     case "match.created": {
       const parts: string[] = []
       if (opponents) parts.push(`vs ${opponents}`)
@@ -163,17 +166,30 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
       return "Your match result was confirmed."
     case "match.cancelled": {
       const parts: string[] = []
+      if (opponents) parts.push(`vs ${opponents}`)
       if (dateStr) parts.push(dateStr)
       if (timeStr) parts.push(`at ${timeStr}`)
-      if (location) parts.push(location)
-      return parts.length > 0 ? `Match cancelled: ${parts.join(" · ")}` : "Your match was cancelled."
+      if (location) parts.push(`· ${location}`)
+      return parts.length > 0 ? parts.join(" · ") + " was cancelled." : "Your match was cancelled."
     }
     case "scheduling.no_match": {
+      const sportType = payload.sportType && typeof payload.sportType === "string" ? payload.sportType : null
+      const format = payload.format && typeof payload.format === "string" ? payload.format : null
+      const sportLabel = sportType
+        ? `${sportType.charAt(0).toUpperCase()}${sportType.slice(1)}${format ? ` ${format}` : ""}`
+        : null
+      const reason = payload.reason && typeof payload.reason === "string" ? payload.reason : null
+      const reasonText =
+        reason === "scheduled_time_passed"
+          ? "The match time passed before enough players confirmed."
+          : "None of your contacts accepted in time."
       const parts: string[] = []
+      if (sportLabel) parts.push(sportLabel)
       if (dateStr) parts.push(dateStr)
       if (timeStr) parts.push(`at ${timeStr}`)
-      if (location) parts.push(location)
-      return parts.length > 0 ? `No match: ${parts.join(" · ")}` : "Your scheduling request did not get a match."
+      if (location) parts.push(`· ${location}`)
+      const header = parts.length > 0 ? `Your ${parts.join(" ")} invite didn't find a match.` : "Your invite didn't find a match."
+      return `${header} ${reasonText}`
     }
     case "invite_received":
       return "You received a new match invite."

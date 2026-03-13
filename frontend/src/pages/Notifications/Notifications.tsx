@@ -171,6 +171,24 @@ export default function NotificationsPage() {
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     )}
+                    {notification.type === "scheduling_no_match" && notification.metadata?.requestId && (
+                      <Link
+                        to={`/play/${notification.metadata.requestId}`}
+                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                      >
+                        View invite
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
+                    {notification.type === "invite_received" && (
+                      <Link
+                        to="/play"
+                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                      >
+                        View invites
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>
