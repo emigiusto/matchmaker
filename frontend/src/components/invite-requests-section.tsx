@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
 import { Link } from "react-router-dom"
 import {
@@ -515,11 +515,9 @@ export function InviteRequestsSection({
                       ? "No invites yet"
                       : inviteFilter === "all"
                         ? "No active invites"
-                        : inviteFilter === "scheduling"
-                          ? "No scheduling invites"
-                          : inviteFilter === "no_match"
-                            ? "No expired invites"
-                            : inviteFilter === "cancelled"
+                        : inviteFilter === "past"
+                          ? "No expired invites"
+                          : inviteFilter === "cancelled"
                               ? "No cancelled invites"
                               : "No confirmed matches"}
                   </p>
