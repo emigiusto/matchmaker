@@ -1136,6 +1136,7 @@ export const schedulingService = {
   },
 
   async listSchedulingRequestsByHost(hostUserId: string): Promise<SchedulingRequestDTO[]> {
+    await this.expireRequestsPastScheduledTime();
     const requests = await prisma.schedulingRequest.findMany({
       where: { hostUserId },
       include: {

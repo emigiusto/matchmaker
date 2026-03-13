@@ -90,23 +90,9 @@ export const schedulingRepository = {
 
   /** Active requests whose scheduled start time has passed */
   async findActivePastScheduledTime() {
-    const requests = await prisma.schedulingRequest.findMany({
-      where: { status: 'active' },
+    return prisma.schedulingRequest.findMany({
+      where: { status: 'active', startTime: { lte: new Date() } },
       select: { id: true, date: true, startTime: true },
-    });
-    const now = new Date();
-    return requests.filter((r) => {
-      const d = new Date(r.date);
-      const t = new Date(r.startTime);
-      const scheduled = new Date(
-        d.getFullYear(),
-        d.getMonth(),
-        d.getDate(),
-        t.getHours(),
-        t.getMinutes(),
-        t.getSeconds()
-      );
-      return scheduled <= now;
     });
   },
 

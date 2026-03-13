@@ -123,8 +123,10 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
       return "Match confirmed"
     case "match.completed":
       return "Match completed"
-    case "match.cancelled":
-      return "Match cancelled"
+    case "match.cancelled": {
+      const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
+      return opponents ? `Match vs ${opponents} cancelled` : "Match cancelled"
+    }
     case "invite_received":
       return "New invite"
     case "result_pending":

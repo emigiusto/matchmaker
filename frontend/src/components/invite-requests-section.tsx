@@ -48,6 +48,7 @@ export interface InviteRequest {
   inviteToken: string
   date: string
   time: string
+  startTime: string
   location: string
   matchType: "competitive" | "practice"
   sport: "tennis" | "padel"
@@ -159,6 +160,7 @@ function mapSchedulingToInviteRequest(
     inviteToken: r.inviteToken,
     date: dateStr,
     time: timeStr,
+    startTime: r.startTime,
     location: r.locationText,
     matchType: r.matchType,
     sport: r.sportType,
@@ -207,7 +209,7 @@ export function InviteRequestsSection({
     candidateId: string
     contactName: string
   } | null>(null)
-  type InviteFilter = "all" | "scheduling" | "no_match" | "completed" | "cancelled"
+  type InviteFilter = "all" | "past" | "completed" | "cancelled"
   const [inviteFilter, setInviteFilter] = useState<InviteFilter>("all")
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
   const [historyMap, setHistoryMap] = useState<Record<string, SchedulingInviteEventDTO[]>>({})
@@ -221,6 +223,17 @@ export function InviteRequestsSection({
         .map(mapSchedulingToInviteRequest)
         .filter((r): r is InviteRequest => r !== null)
       setInviteRequests(mapped)
+      // Refresh history for any card that has already been expanded
+      setHistoryMap((prev) => {
+        const loadedIds = Object.keys(prev)
+        if (loadedIds.length === 0) return prev
+        loadedIds.forEach((id) => {
+          schedulingService.getEvents(id).then((events) => {
+            setHistoryMap((m) => ({ ...m, [id]: events }))
+          }).catch(() => {})
+        })
+        return prev
+      })
       return mapped
     } catch {
       setInviteRequests([])
@@ -253,21 +266,33 @@ export function InviteRequestsSection({
     const hasActiveContact = r.contacts.some((c) => c.status === "contacted")
     return r.status === "expired" && hasActiveContact ? "scheduling" : r.status
   }
-  const filteredRequests = inviteRequests.filter((r) => {
-    const displayStatus = getDisplayStatus(r)
-    if (inviteFilter === "all") return displayStatus !== "cancelled"
-    if (inviteFilter === "scheduling") return displayStatus === "scheduling"
-    if (inviteFilter === "no_match") return displayStatus === "expired"
-    if (inviteFilter === "completed") return displayStatus === "matched"
-    if (inviteFilter === "cancelled") return displayStatus === "cancelled"
-    return true
-  })
 
-  function switchToFilterForStatus(status: InviteRequest["status"], forceSwitch = false) {
+  const isInThePast = (r: InviteRequest) => {
+    const dt = new Date(r.startTime)
+    return !isNaN(dt.getTime()) && dt < new Date()
+  }
+
+  const filteredRequests = inviteRequests
+    .filter((r) => {
+      const displayStatus = getDisplayStatus(r)
+      const past = isInThePast(r)
+      if (inviteFilter === "all") return !past && (displayStatus === "scheduling" || displayStatus === "expired")
+      if (inviteFilter === "past") return past && (displayStatus === "scheduling" || displayStatus === "expired")
+      if (inviteFilter === "completed") return displayStatus === "matched"
+      if (inviteFilter === "cancelled") return displayStatus === "cancelled"
+      return true
+    })
+    .sort((a, b) => {
+      if (inviteFilter !== "all") return 0
+      const rank = (r: InviteRequest) => (getDisplayStatus(r) === "scheduling" ? 0 : 1)
+      return rank(a) - rank(b)
+    })
+
+  function switchToFilterForStatus(status: InviteRequest["status"], request?: InviteRequest, forceSwitch = false) {
     if (inviteFilter === "all" && !forceSwitch) return
-    if (status === "scheduling") setInviteFilter("scheduling")
-    else if (status === "expired") setInviteFilter("no_match")
-    else if (status === "cancelled") setInviteFilter("cancelled")
+    if (status === "scheduling" || status === "expired") {
+      setInviteFilter(request && isInThePast(request) ? "past" : "all")
+    } else if (status === "cancelled") setInviteFilter("cancelled")
     else if (status === "matched") setInviteFilter("completed")
   }
 
@@ -282,7 +307,7 @@ export function InviteRequestsSection({
       const mapped = mapSchedulingToInviteRequest(updated)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === id ? mapped : r)))
-        switchToFilterForStatus(mapped.status, true)
+        switchToFilterForStatus(mapped.status, mapped, true)
       }
       toast.success("Invite request cancelled")
     } catch (e) {
@@ -296,7 +321,7 @@ export function InviteRequestsSection({
       const mapped = mapSchedulingToInviteRequest(updated)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
-        switchToFilterForStatus(mapped.status)
+        switchToFilterForStatus(mapped.status, mapped)
         toast.success("Cancelled invite")
       }
     } catch (e) {
@@ -310,7 +335,7 @@ export function InviteRequestsSection({
       const mapped = mapSchedulingToInviteRequest(updated)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
-        switchToFilterForStatus(mapped.status)
+        switchToFilterForStatus(mapped.status, mapped)
         toast.success("Removed from queue")
       }
     } catch (e) {
@@ -324,7 +349,7 @@ export function InviteRequestsSection({
       const mapped = mapSchedulingToInviteRequest(updated)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
-        switchToFilterForStatus(mapped.status)
+        switchToFilterForStatus(mapped.status, mapped)
         toast.success("Acceptance cancelled")
       }
     } catch (e) {
@@ -338,7 +363,7 @@ export function InviteRequestsSection({
       const mapped = mapSchedulingToInviteRequest(updated)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
-        switchToFilterForStatus(mapped.status)
+        switchToFilterForStatus(mapped.status, mapped)
         toast.success("Match confirmed!")
       }
     } catch (e) {
@@ -354,7 +379,7 @@ export function InviteRequestsSection({
       const mapped = mapSchedulingToInviteRequest(updated)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
-        switchToFilterForStatus(mapped.status)
+        switchToFilterForStatus(mapped.status, mapped)
         toast.success("Invite will be retried")
       }
     } catch (e) {
@@ -430,7 +455,6 @@ export function InviteRequestsSection({
       return
     }
     setExpandedHistoryId(requestId)
-    if (historyMap[requestId]) return
     setHistoryLoadingId(requestId)
     try {
       const events = await schedulingService.getEvents(requestId)
@@ -448,7 +472,7 @@ export function InviteRequestsSection({
         <div className="flex items-center justify-end">{headerAction}</div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-          {(["all", "scheduling", "no_match", "completed", "cancelled"] as const).map((f) => (
+          {(["all", "past", "completed", "cancelled"] as const).map((f) => (
             <Button
               key={f}
               variant={inviteFilter === f ? "default" : "outline"}
@@ -456,8 +480,7 @@ export function InviteRequestsSection({
               onClick={() => setInviteFilter(f)}
             >
               {f === "all" && "Active"}
-              {f === "scheduling" && "Scheduling"}
-              {f === "no_match" && "No Match"}
+              {f === "past" && "Expired"}
               {f === "completed" && "Confirmed"}
               {f === "cancelled" && "Cancelled"}
             </Button>
