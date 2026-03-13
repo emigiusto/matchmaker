@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
-import { Bell, Mail, CheckCircle, TrendingUp, Swords, Loader2, XCircle } from "lucide-react"
+import { Bell, Mail, CheckCircle, TrendingUp, Swords, Loader2, XCircle, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -54,6 +54,19 @@ export function NotificationsDropdown() {
     }
   }
 
+  async function handleMarkAllRead() {
+    const unread = notifications.filter((n) => !n.read)
+    if (unread.length === 0) return
+    try {
+      await notificationsService.markAllAsRead(notifications)
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    } catch {
+      // Partial failure: refresh list from backend
+      const data = await notificationsService.getAll(currentUserId)
+      setNotifications(data)
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -70,11 +83,24 @@ export function NotificationsDropdown() {
       <DropdownMenuContent align="end" className="w-96">
         <DropdownMenuLabel className="flex items-center justify-between py-3">
           <span className="text-base font-semibold">Notifications</span>
-          {unreadCount > 0 && (
-            <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary">
-              {unreadCount} new
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary">
+                {unreadCount} new
+              </span>
+            )}
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={handleMarkAllRead}
+              >
+                <Check className="mr-1 h-3 w-3" />
+                Mark all
+              </Button>
+            )}
+          </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {loading ? (

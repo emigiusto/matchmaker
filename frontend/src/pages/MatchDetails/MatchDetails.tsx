@@ -298,6 +298,11 @@ export default function MatchDetailPage() {
                       : [match.player1.name, match.player2.name]
                   }
                   matchType={match.matchType}
+                  opponentName={
+                    (match.participants ?? []).length >= 4
+                      ? undefined
+                      : opponent.name
+                  }
                 />
                 <CancelMatchButton
                   matchId={match.id}

@@ -193,6 +193,11 @@ export default function MatchesPage() {
                                 : [match.player1.name, match.player2.name]
                             }
                             matchType={match.matchType}
+                            opponentName={
+                              (match.participants ?? []).length >= 4
+                                ? undefined
+                                : opponent.name
+                            }
                             compact
                           />
                           <ResultUploadDialog match={match} />
@@ -273,6 +278,11 @@ export default function MatchesPage() {
                                 : [match.player1.name, match.player2.name]
                             }
                             matchType={match.matchType}
+                            opponentName={
+                              (match.participants ?? []).length >= 4
+                                ? undefined
+                                : opponent.name
+                            }
                             compact
                           />
                           <CancelMatchButton
