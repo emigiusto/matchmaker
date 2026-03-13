@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { Link, useParams, useNavigate } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { format } from "date-fns"
 import {
   ArrowLeft,
@@ -128,7 +128,6 @@ function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
 
 export default function InviteDetailsPage() {
   const { requestId } = useParams<{ requestId: string }>()
-  const navigate = useNavigate()
   const currentUserId = getCurrentUserId()
 
   const [request, setRequest] = useState<SchedulingRequestDTO | null>(null)
