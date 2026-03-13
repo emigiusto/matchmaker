@@ -15,6 +15,7 @@ router.get('/_debug-dev-user', SchedulingController.debugDevUserCount);
 router.get('/incoming', SchedulingController.listIncomingInvites);
 router.get('/by-token/:token', SchedulingController.getSchedulingRequestByToken);
 router.get('/:requestId/invite-link', SchedulingController.getInviteLink);
+router.get('/:requestId/events', SchedulingController.getEventHistory);
 router.get('/:requestId', SchedulingController.getSchedulingRequest);
 router.post('/:requestId/start', SchedulingController.startScheduling);
 router.post('/:requestId/accept/:candidateId', SchedulingController.manualAcceptCandidate);

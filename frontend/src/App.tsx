@@ -17,6 +17,7 @@ import Signup from '@/pages/Signup/Signup'
 // import Suggested from '@/pages/Suggested/Suggested'
 // import MatchesPast from '@/pages/MatchesPast/MatchesPast'
 import MatchDetails from '@/pages/MatchDetails/MatchDetails'
+import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
 import ProfileView from '@/pages/ProfileView/ProfileView'
 // import Reminders from '@/pages/Reminders/Reminders'
@@ -50,6 +51,7 @@ function App() {
               >
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/play" element={<Play />} />
+                <Route path="/play/:requestId" element={<InviteDetails />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/matches" element={<MatchesUpcoming />} />

@@ -47,3 +47,5 @@ coverage/
 # Others
 *.swp
 *.swo
+
+.claude

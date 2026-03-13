@@ -213,6 +213,17 @@ export class SchedulingController {
     }
   }
 
+  static async getEventHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
+      const events = await schedulingService.getEventHistory(requestId);
+      res.json(events);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async listIncomingInvites(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;

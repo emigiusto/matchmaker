@@ -19,7 +19,11 @@ import {
   Copy,
   Check,
   ExternalLink,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
+import type { SchedulingInviteEventDTO } from "@/lib/services/scheduling.service"
 import { SportFormatBadge } from "@/components/sport-format-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -205,6 +209,9 @@ export function InviteRequestsSection({
   } | null>(null)
   type InviteFilter = "all" | "scheduling" | "no_match" | "completed" | "cancelled"
   const [inviteFilter, setInviteFilter] = useState<InviteFilter>("all")
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
+  const [historyMap, setHistoryMap] = useState<Record<string, SchedulingInviteEventDTO[]>>({})
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null)
 
   async function fetchSchedulingData(isInitial = false) {
     if (isInitial) setLoading(true)
@@ -379,6 +386,62 @@ export function InviteRequestsSection({
     }
   }
 
+  function getEventLabel(event: SchedulingInviteEventDTO): string {
+    const name = event.candidateUserName ?? "Unknown"
+    switch (event.action) {
+      case "invite_sent": return `Invite sent to ${name}`
+      case "invite_accepted": return `${name} accepted`
+      case "invite_declined": return `${name} declined`
+      case "invite_expired": return `No response from ${name}`
+      case "candidate_cancelled": return `${name} cancelled`
+      case "candidate_retried": return `${name} queued for retry`
+      case "candidates_added": {
+        const count = (event.metadata?.count as number) ?? 1
+        return `${count} contact${count === 1 ? "" : "s"} added`
+      }
+      case "request_started": return "Scheduling started"
+      case "request_cancelled": return "Request cancelled"
+      case "request_completed": return "Match confirmed"
+      case "request_expired": return "No match found"
+      default: return event.action
+    }
+  }
+
+  function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
+    switch (action) {
+      case "invite_sent": return <Loader2 className="h-3 w-3 text-blue-500" />
+      case "invite_accepted": return <UserCheck className="h-3 w-3 text-green-600" />
+      case "invite_declined": return <UserX className="h-3 w-3 text-red-500" />
+      case "invite_expired": return <Hourglass className="h-3 w-3 text-muted-foreground" />
+      case "candidate_cancelled": return <XCircle className="h-3 w-3 text-amber-500" />
+      case "candidate_retried": return <RotateCcw className="h-3 w-3 text-muted-foreground" />
+      case "candidates_added": return <UserCheck className="h-3 w-3 text-muted-foreground" />
+      case "request_started": return <CirclePlay className="h-3 w-3 text-blue-500" />
+      case "request_cancelled": return <XCircle className="h-3 w-3 text-muted-foreground" />
+      case "request_completed": return <CheckCircle className="h-3 w-3 text-green-600" />
+      case "request_expired": return <XCircle className="h-3 w-3 text-muted-foreground" />
+      default: return <Clock className="h-3 w-3 text-muted-foreground" />
+    }
+  }
+
+  async function toggleHistory(requestId: string) {
+    if (expandedHistoryId === requestId) {
+      setExpandedHistoryId(null)
+      return
+    }
+    setExpandedHistoryId(requestId)
+    if (historyMap[requestId]) return
+    setHistoryLoadingId(requestId)
+    try {
+      const events = await schedulingService.getEvents(requestId)
+      setHistoryMap((prev) => ({ ...prev, [requestId]: events }))
+    } catch {
+      setHistoryMap((prev) => ({ ...prev, [requestId]: [] }))
+    } finally {
+      setHistoryLoadingId(null)
+    }
+  }
+
   const content = (
     <div className="flex flex-col gap-4">
       {headerAction && variant === "embedded" && (
@@ -453,37 +516,43 @@ export function InviteRequestsSection({
                   return (
                   <Card key={request.id}>
                     <CardContent className="p-5">
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <SportFormatBadge
                             sport={request.sport}
                             format={request.matchFormat}
                           />
                           {displayStatus === "scheduling" && (
-                            <span className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-600">
-                              <Loader2 className="h-3 w-3 animate-spin" />
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-200/60 bg-blue-500/8 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-400">
+                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                               Scheduling
                             </span>
                           )}
                           {displayStatus === "matched" && (
-                            <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-600">
-                              <CheckCircle className="h-3 w-3" />
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-green-200/60 bg-green-500/8 px-2.5 py-1 text-xs font-medium text-green-700 dark:border-green-800/40 dark:bg-green-500/10 dark:text-green-400">
+                              <CheckCircle className="h-3.5 w-3.5 shrink-0" />
                               Matched
                             </span>
                           )}
                           {request.status === "expired" && (
-                            <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                              <XCircle className="h-3 w-3" />
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                              <XCircle className="h-3.5 w-3.5 shrink-0" />
                               No match
                             </span>
                           )}
                           {displayStatus === "cancelled" && (
-                            <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                              <XCircle className="h-3 w-3" />
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                              <XCircle className="h-3.5 w-3.5 shrink-0" />
                               Cancelled
                             </span>
                           )}
                         </div>
+                        <Link
+                          to={`/play/${request.id}`}
+                          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-foreground">
@@ -634,6 +703,42 @@ export function InviteRequestsSection({
                             </div>
                           ))}
                         </div>
+                      </div>
+
+                      <div className="mt-3 border-t border-border/20 pt-3">
+                        <button
+                          className="flex w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => toggleHistory(request.id)}
+                        >
+                          <History className="h-3.5 w-3.5 shrink-0" />
+                          <span className="font-medium">History</span>
+                          {expandedHistoryId === request.id ? (
+                            <ChevronUp className="ml-auto h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronDown className="ml-auto h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        {expandedHistoryId === request.id && (
+                          <div className="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
+                            {historyLoadingId === request.id ? (
+                              <div className="flex items-center justify-center py-3">
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (historyMap[request.id] ?? []).length === 0 ? (
+                              <p className="py-2 text-center text-xs text-muted-foreground">No events recorded yet</p>
+                            ) : (
+                              (historyMap[request.id] ?? []).map((event) => (
+                                <div key={event.id} className="flex items-start gap-2 rounded px-1 py-1 text-xs">
+                                  <span className="mt-0.5 shrink-0">{getEventIcon(event.action)}</span>
+                                  <span className="flex-1 text-foreground">{getEventLabel(event)}</span>
+                                  <span className="shrink-0 text-muted-foreground">
+                                    {format(new Date(event.createdAt), "MMM d, HH:mm")}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {displayStatus === "expired" && (

@@ -13,6 +13,8 @@ import type {
   CreateSchedulingRequestInput,
   SchedulingRequestDTO,
   SchedulingCandidateDTO,
+  SchedulingInviteEventAction,
+  SchedulingInviteEventDTO,
 } from './scheduling.types';
 import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './scheduling.types';
 
@@ -259,6 +261,28 @@ function formatNoMatchWhatsAppMessage(
   ].join('\n');
 }
 
+async function recordEvent(data: {
+  schedulingRequestId: string;
+  action: SchedulingInviteEventAction;
+  candidateId?: string | null;
+  actorUserId?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): Promise<void> {
+  try {
+    await prisma.schedulingInviteEvent.create({
+      data: {
+        schedulingRequestId: data.schedulingRequestId,
+        action: data.action,
+        candidateId: data.candidateId ?? null,
+        actorUserId: data.actorUserId ?? null,
+        metadata: data.metadata ? (data.metadata as object) : undefined,
+      },
+    });
+  } catch (e) {
+    logger.warn('FailedToRecordSchedulingEvent', { action: data.action, requestId: data.schedulingRequestId, error: e });
+  }
+}
+
 async function notifyHostSchedulingNoMatch(
   request: {
     id: string;
@@ -410,10 +434,13 @@ export const schedulingService = {
       throw new AppError(`Maximum ${MAX_ACTIVE_SCHEDULING_REQUESTS} active scheduling requests allowed`, 400);
     }
 
+    void recordEvent({ schedulingRequestId: requestId, action: 'request_started', actorUserId: request.hostUserId });
+
     const pending = await schedulingRepository.findFirstPendingCandidate(requestId);
     if (!pending) {
       await schedulingRepository.updateRequestStatus(requestId, 'expired');
       logger.info('SchedulingExpired', { requestId, reason: 'no_more_candidates' });
+      void recordEvent({ schedulingRequestId: requestId, action: 'request_expired', metadata: { reason: 'no_more_candidates' } });
       await notifyHostSchedulingNoMatch(request, 'no_more_candidates');
       return toRequestDTOWithCandidates({ ...request, status: 'expired' });
     }
@@ -439,6 +466,7 @@ export const schedulingService = {
       if (pendingCount === 0 && waitingReplyCount === 0) {
         await schedulingRepository.updateRequestStatus(requestId, 'expired');
         logger.info('SchedulingExpired', { requestId, reason: 'all_candidates_exhausted' });
+        void recordEvent({ schedulingRequestId: requestId, action: 'request_expired', metadata: { reason: 'all_candidates_exhausted' } });
         await notifyHostSchedulingNoMatch(request, 'all_candidates_exhausted');
       }
       return;
@@ -489,6 +517,7 @@ export const schedulingService = {
         await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
       } else {
         logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId, contactName, phone });
+        void recordEvent({ schedulingRequestId: requestId, action: 'invite_sent', candidateId: candidate.id });
       }
     }
     await this.contactNextCandidates(requestId);
@@ -557,6 +586,7 @@ export const schedulingService = {
         return { processed: true };
       }
       logger.info('InviteAccepted', { requestId: request.id, candidateId: candidate.id });
+      void recordEvent({ schedulingRequestId: request.id, action: 'invite_accepted', candidateId: candidate.id });
       if (didComplete) {
         await this.completeScheduling(request.id);
       } else {
@@ -591,6 +621,7 @@ export const schedulingService = {
         candidateId: candidate.id,
         lateResponse: isLateResponse,
       });
+      void recordEvent({ schedulingRequestId: request.id, action: 'invite_declined', candidateId: candidate.id });
       if (request.status === 'active') {
         await this.contactNextCandidates(request.id);
       }
@@ -624,6 +655,7 @@ export const schedulingService = {
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'expired');
     logger.info('InviteExpired', { requestId: candidate.schedulingRequestId, candidateId });
+    void recordEvent({ schedulingRequestId: candidate.schedulingRequestId, action: 'invite_expired', candidateId });
     await this.contactNextCandidates(candidate.schedulingRequestId);
   },
 
@@ -640,6 +672,7 @@ export const schedulingService = {
     for (const r of requests) {
       await schedulingRepository.updateRequestStatus(r.id, 'expired');
       logger.info('SchedulingExpired', { requestId: r.id, reason: 'scheduled_time_passed' });
+      void recordEvent({ schedulingRequestId: r.id, action: 'request_expired', metadata: { reason: 'scheduled_time_passed' } });
       const fullRequest = await schedulingRepository.findRequestById(r.id);
       if (fullRequest) {
         await notifyHostSchedulingNoMatch(fullRequest, 'scheduled_time_passed');
@@ -825,6 +858,7 @@ export const schedulingService = {
       }
     }
 
+    void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { matchId: match.id } });
     logger.info('SchedulingCompleted', { requestId, matchId: match.id });
   },
 
@@ -844,6 +878,7 @@ export const schedulingService = {
     const maxRetry = await schedulingRepository.getMaxRetryOrder(requestId);
     const retryOrder = maxRetry + 1;
     await schedulingRepository.retryCandidate(candidateId, retryOrder);
+    void recordEvent({ schedulingRequestId: requestId, action: 'candidate_retried', candidateId, actorUserId: userId });
 
     if (request.status === 'expired') {
       await schedulingRepository.updateRequestStatus(requestId, 'active');
@@ -875,6 +910,7 @@ export const schedulingService = {
     }
 
     await schedulingRepository.addCandidates(requestId, toAdd);
+    void recordEvent({ schedulingRequestId: requestId, action: 'candidates_added', actorUserId: userId, metadata: { count: toAdd.length } });
 
     if (request.status === 'expired') {
       await schedulingRepository.updateRequestStatus(requestId, 'active');
@@ -951,6 +987,7 @@ export const schedulingService = {
     }
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
+    void recordEvent({ schedulingRequestId: requestId, action: 'candidate_cancelled', candidateId, actorUserId: userId });
     logger.info('ContactedCandidateCancelled', { requestId, candidateId, userId });
     await this.contactNextCandidates(requestId);
 
@@ -1013,6 +1050,7 @@ export const schedulingService = {
       data: { status: 'active', matchId: null },
     });
     await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
+    void recordEvent({ schedulingRequestId: requestId, action: 'candidate_cancelled', candidateId, actorUserId: userId });
     logger.info('AcceptedCandidateCancelled', { requestId, candidateId, userId });
     await this.contactNextCandidates(requestId);
 
@@ -1066,6 +1104,7 @@ export const schedulingService = {
     }
 
     await schedulingRepository.updateRequestStatus(requestId, 'cancelled');
+    void recordEvent({ schedulingRequestId: requestId, action: 'request_cancelled', actorUserId: userId });
     logger.info('SchedulingCancelled', { requestId, userId });
     const updated = await schedulingRepository.findRequestById(requestId);
     return updated ? toRequestDTOWithCandidates(updated) : toRequestDTO(request);
@@ -1107,6 +1146,34 @@ export const schedulingService = {
       orderBy: { createdAt: 'desc' },
     });
     return requests.map(toRequestDTOWithCandidates);
+  },
+
+  async getEventHistory(requestId: string): Promise<SchedulingInviteEventDTO[]> {
+    const events = await prisma.schedulingInviteEvent.findMany({
+      where: { schedulingRequestId: requestId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        candidate: { include: { contactUser: { select: { name: true } } } },
+      },
+    });
+
+    const actorIds = [...new Set(events.map((e) => e.actorUserId).filter((id): id is string => !!id))];
+    const actors = actorIds.length > 0
+      ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+      : [];
+    const actorMap = new Map(actors.map((u) => [u.id, u.name]));
+
+    return events.map((e) => ({
+      id: e.id,
+      schedulingRequestId: e.schedulingRequestId,
+      candidateId: e.candidateId,
+      candidateUserName: e.candidate?.contactUser?.name ?? null,
+      actorUserId: e.actorUserId,
+      actorUserName: e.actorUserId ? (actorMap.get(e.actorUserId) ?? null) : null,
+      action: e.action as SchedulingInviteEventDTO['action'],
+      metadata: e.metadata as Record<string, unknown> | null,
+      createdAt: e.createdAt.toISOString(),
+    }));
   },
 
   async listIncomingInvites(userId: string): Promise<SchedulingRequestDTO[]> {

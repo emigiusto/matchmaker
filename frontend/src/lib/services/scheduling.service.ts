@@ -62,6 +62,31 @@ export interface CreateSchedulingRequestInput {
   candidateUserIds: string[]
 }
 
+export type SchedulingInviteEventAction =
+  | 'invite_sent'
+  | 'invite_accepted'
+  | 'invite_declined'
+  | 'invite_expired'
+  | 'candidate_cancelled'
+  | 'candidate_retried'
+  | 'candidates_added'
+  | 'request_started'
+  | 'request_cancelled'
+  | 'request_completed'
+  | 'request_expired'
+
+export interface SchedulingInviteEventDTO {
+  id: string
+  schedulingRequestId: string
+  candidateId: string | null
+  candidateUserName: string | null
+  actorUserId: string | null
+  actorUserName: string | null
+  action: SchedulingInviteEventAction
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
 export const schedulingService = {
   async create(input: CreateSchedulingRequestInput): Promise<SchedulingRequestDTO> {
     return apiClient.post<SchedulingRequestDTO>("/scheduling", input)
@@ -147,6 +172,14 @@ export const schedulingService = {
     return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/cancel`, {
       userId,
     })
+  },
+
+  async getById(requestId: string): Promise<SchedulingRequestDTO | null> {
+    return apiClient.get<SchedulingRequestDTO>(`/scheduling/${requestId}`)
+  },
+
+  async getEvents(requestId: string): Promise<SchedulingInviteEventDTO[]> {
+    return apiClient.get<SchedulingInviteEventDTO[]>(`/scheduling/${requestId}/events`)
   },
 
   async getInviteLink(requestId: string, baseUrl?: string): Promise<string> {

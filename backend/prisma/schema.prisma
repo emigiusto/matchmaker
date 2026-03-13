@@ -532,6 +532,7 @@ model SchedulingRequest {
   hostUser       User                 @relation("SchedulingHost", fields: [hostUserId], references: [id], onDelete: Restrict)
   hostPartner    User?                @relation("SchedulingHostPartner", fields: [hostPartnerUserId], references: [id], onDelete: SetNull)
   candidates     SchedulingCandidate[]
+  events         SchedulingInviteEvent[]
   match          Match?               @relation("SchedulingMatch", fields: [matchId], references: [id], onDelete: SetNull)
 
   @@index([hostUserId])
@@ -575,11 +576,27 @@ model SchedulingCandidate {
 
   schedulingRequest SchedulingRequest @relation(fields: [schedulingRequestId], references: [id], onDelete: Cascade)
   contactUser       User               @relation("SchedulingContact", fields: [contactUserId], references: [id], onDelete: Restrict)
+  events            SchedulingInviteEvent[]
 
   @@index([schedulingRequestId])
   @@index([contactUserId])
   @@index([priorityOrder])
   @@index([status])
+}
+
+model SchedulingInviteEvent {
+  id                  String    @id @default(uuid())
+  schedulingRequestId String
+  candidateId         String?
+  actorUserId         String?
+  action              String
+  metadata            Json?
+  createdAt           DateTime  @default(now())
+
+  schedulingRequest SchedulingRequest    @relation(fields: [schedulingRequestId], references: [id], onDelete: Cascade)
+  candidate         SchedulingCandidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
+  @@index([schedulingRequestId])
 }
 
 enum SchedulingCandidateStatus {
