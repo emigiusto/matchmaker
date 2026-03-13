@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Link, useParams } from "react-router-dom"
 import { format } from "date-fns"
 import {
@@ -135,6 +135,7 @@ export default function InviteDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [eventsLoading, setEventsLoading] = useState(true)
   const [copiedLink, setCopiedLink] = useState(false)
+  const historyBottomRef = useRef<HTMLDivElement>(null)
   const [acceptConfirm, setAcceptConfirm] = useState<{
     candidateId: string
     contactName: string
@@ -169,6 +170,10 @@ export default function InviteDetailsPage() {
     fetchRequest(true)
     fetchEvents()
   }, [fetchRequest, fetchEvents])
+
+  useEffect(() => {
+    historyBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  }, [events])
 
   // Poll when active
   useEffect(() => {
@@ -569,6 +574,7 @@ export default function InviteDetailsPage() {
                       </div>
                     </div>
                   ))}
+                  <div ref={historyBottomRef} />
                 </div>
               </div>
             )}

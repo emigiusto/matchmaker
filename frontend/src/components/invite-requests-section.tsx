@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { format } from "date-fns"
 import { Link } from "react-router-dom"
 import {
@@ -209,6 +209,7 @@ export function InviteRequestsSection({
     candidateId: string
     contactName: string
   } | null>(null)
+  const [cancelConfirm, setCancelConfirm] = useState<string | null>(null)
   type InviteFilter = "all" | "past" | "completed" | "cancelled"
   const [inviteFilter, setInviteFilter] = useState<InviteFilter>("all")
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
@@ -302,6 +303,7 @@ export function InviteRequestsSection({
   const atCapacity = activeRequestCount >= MAX_ACTIVE_REQUESTS
 
   async function handleCancelRequest(id: string) {
+    setCancelConfirm(null)
     try {
       const updated = await schedulingService.cancel(id, currentUserId)
       const mapped = mapSchedulingToInviteRequest(updated)
@@ -742,7 +744,10 @@ export function InviteRequestsSection({
                           )}
                         </button>
                         {expandedHistoryId === request.id && (
-                          <div className="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
+                          <div
+                            className="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1"
+                            ref={(el) => { if (el) el.scrollTop = el.scrollHeight }}
+                          >
                             {historyLoadingId === request.id ? (
                               <div className="flex items-center justify-center py-3">
                                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -781,6 +786,15 @@ export function InviteRequestsSection({
                             <Button size="sm" onClick={() => setWizardOpen(true)}>
                               <Zap className="mr-1.5 h-3.5 w-3.5" />
                               New request
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => setCancelConfirm(request.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Cancel request
                             </Button>
                           </div>
                         </div>
@@ -827,10 +841,10 @@ export function InviteRequestsSection({
                                 variant="ghost"
                                 size="sm"
                                 className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => handleCancelRequest(request.id)}
+                                onClick={() => setCancelConfirm(request.id)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
-                                Cancel
+                                Cancel request
                               </Button>
                             </div>
                           </div>
@@ -945,6 +959,29 @@ export function InviteRequestsSection({
           }}
         />
       )}
+
+      <AlertDialog
+        open={!!cancelConfirm}
+        onOpenChange={(open) => !open && setCancelConfirm(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel invite request</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel the invite request and notify any contacted candidates. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => cancelConfirm && handleCancelRequest(cancelConfirm)}
+            >
+              Cancel request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!acceptConfirm}
