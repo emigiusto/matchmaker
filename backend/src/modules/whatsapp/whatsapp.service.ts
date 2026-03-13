@@ -119,7 +119,7 @@ export const whatsappService = {
   async ensureParticipantsReceiveGroupInvite(
     groupId: string,
     participantPhones: string[],
-    inviteMessage: string,
+    inviteMessage: string | ((phone: string) => string),
     botPhone?: string
   ): Promise<{ sentTo: string[]; errors: string[] }> {
     const expectedSet = new Set(
@@ -157,11 +157,13 @@ export const whatsappService = {
       return { sentTo: [], errors: [linkRes.error ?? 'No invite link'] };
     }
 
-    const fullMessage = `${inviteMessage}\n\n${linkRes.inviteLink}`;
     const sentTo: string[] = [];
     const errors: string[] = [];
 
     for (const phone of missing) {
+      const base =
+        typeof inviteMessage === 'function' ? inviteMessage(phone) : inviteMessage;
+      const fullMessage = `${base}\n\n${linkRes.inviteLink}`;
       const res = await withRateLimit(() => provider.sendInviteMessage(phone, fullMessage));
       if (res.success) {
         sentTo.push(phone);

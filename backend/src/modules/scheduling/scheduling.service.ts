@@ -159,11 +159,25 @@ function formatInviteMessage(
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
-function formatGroupInviteFallbackMessage(): string {
+function formatGroupInviteFallbackMessage(input: {
+  sportType: string;
+  format: string;
+  whenStr: string;
+  location: string;
+  rivalOrPlayersStr?: string;
+}): string {
+  const sport = input.sportType.charAt(0).toUpperCase() + input.sportType.slice(1).toLowerCase();
+  const formatLabel = input.format === 'doubles' ? 'Doubles' : 'Singles';
+  const loc = (input.location && input.location.trim()) || 'TBD';
   return [
     'ℹ️ *Match group invite*',
     '',
-    "You couldn't be added directly to the WhatsApp group (this is usually due to privacy settings).",
+    `${sport} · ${formatLabel}`,
+    `*When:* ${input.whenStr}`,
+    `*Where:* ${loc}`,
+    ...(input.rivalOrPlayersStr ? [`*Opponent/Players:* ${input.rivalOrPlayersStr}`] : []),
+    '',
+    "We couldn't add you directly to the WhatsApp group (this is usually due to privacy settings).",
     'Use this link to join the group:',
   ].join('\n');
 }
@@ -719,11 +733,9 @@ export const schedulingService = {
 
     const usersWithPhones = await prisma.user.findMany({
       where: { id: { in: uniqueUserIds }, phone: { not: null } },
-      select: { phone: true },
+      select: { id: true, name: true, phone: true },
     });
-    const participantPhones = usersWithPhones
-      .map((u) => u.phone)
-      .filter((p): p is string => !!p);
+    const participantPhones = usersWithPhones.map((u) => u.phone).filter((p): p is string => !!p);
 
     const whapiBotPhone =
       process.env.WHATSAPP_BOT_NUMBER ||
@@ -731,9 +743,22 @@ export const schedulingService = {
       process.env.WHAPI_ACCOUNT_NUMBER;
 
     if (participantPhones.length >= 1) {
-      const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const dateStr = request.date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      });
       const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       const groupName = `${dateStr} ${timeStr}`;
+      const whenStr = `${dateStr} · ${timeStr}`;
+
+      const normalizeDigits = (phone: string) => phone.replace(/\D/g, '');
+      const participantByDigits = new Map(
+        usersWithPhones
+          .filter((u) => !!u.phone)
+          .map((u) => [normalizeDigits(u.phone as string), { id: u.id, name: u.name || '' }])
+      );
+      const allNames = usersWithPhones.map((u) => u.name).filter((n): n is string => !!n && n.trim().length > 0);
 
       const groupResult = await whatsappService.createMatchGroup({
         participantPhones,
@@ -750,7 +775,7 @@ export const schedulingService = {
         const detailsMessage = formatMatchDetailsMessage(
           request.sportType,
           format,
-          `${dateStr} at ${timeStr}`,
+          whenStr,
           request.locationText,
           match.id
         );
@@ -759,7 +784,29 @@ export const schedulingService = {
         const inviteFallback = await whatsappService.ensureParticipantsReceiveGroupInvite(
           groupResult.groupId,
           participantPhones,
-          formatGroupInviteFallbackMessage(),
+          (missingDigitsPhone: string) => {
+            const recipient = participantByDigits.get(normalizeDigits(missingDigitsPhone));
+            const recipientName = recipient?.name?.trim();
+            const others = usersWithPhones
+              .filter((u) => u.id !== recipient?.id)
+              .map((u) => u.name)
+              .filter((n): n is string => !!n && n.trim().length > 0);
+
+            const rivalOrPlayersStr =
+              format === 'singles'
+                ? others[0] || (allNames.length >= 2 ? allNames.filter((n) => n !== recipientName)[0] : undefined)
+                : others.length > 0
+                  ? others.join(', ')
+                  : undefined;
+
+            return formatGroupInviteFallbackMessage({
+              sportType: request.sportType,
+              format,
+              whenStr,
+              location: request.locationText,
+              rivalOrPlayersStr,
+            });
+          },
           whapiBotPhone || undefined
         );
         if (inviteFallback.sentTo.length > 0) {
