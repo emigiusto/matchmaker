@@ -1,17 +1,43 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
 import { SuggestionCard } from "@/components/suggestion-card"
-// TODO: wire to API — replace with matchmakingService.getSuggestions()
-import { mockSuggestions } from "@/lib/mock-data"
-import { SlidersHorizontal } from "lucide-react"
+import { SlidersHorizontal, Loader2 } from "lucide-react"
+import { matchmakingService } from "@/lib/services/matchmaking.service"
+import { getCurrentUserId } from "@/lib/current-user"
+import type { SuggestedOpponent } from "@/lib/types"
 
 export default function SuggestedOpponentsPage() {
+  const currentUserId = getCurrentUserId()
   const [distanceRadius, setDistanceRadius] = useState([10])
   const [levelRange, setLevelRange] = useState([2.0, 6.0])
-  const filtered = mockSuggestions.filter((s) => {
+  const [suggestions, setSuggestions] = useState<SuggestedOpponent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await matchmakingService.getSuggestions(currentUserId)
+        if (!cancelled) setSuggestions(data)
+      } catch {
+        if (!cancelled) setError("Failed to load suggestions. Please try again.")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
+
+  const filtered = suggestions.filter((s) => {
     const matchDist = s.distance <= distanceRadius[0]
     const matchLevel =
       s.player.levelValue >= levelRange[0] && s.player.levelValue <= levelRange[1]
@@ -59,32 +85,47 @@ export default function SuggestedOpponentsPage() {
                   onValueChange={setLevelRange}
                 />
               </div>
-              {/* Match type filter hidden in v1; default to practice */}
             </CardContent>
           </Card>
 
           {/* Results */}
           <div className="lg:col-span-3">
-            <p className="mb-4 text-sm text-muted-foreground">
-              {filtered.length} player{filtered.length !== 1 ? "s" : ""} found
-            </p>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <Card className="border-border/50">
+                <CardContent className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ) : error ? (
               <Card className="border-border/50">
                 <CardContent className="py-16 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No opponents match your filters. Try widening your search criteria.
-                  </p>
+                  <p className="text-sm text-destructive">{error}</p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {filtered.map((suggestion) => (
-                  <SuggestionCard
-                    key={suggestion.player.id}
-                    suggestion={suggestion}
-                  />
-                ))}
-              </div>
+              <>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  {filtered.length} player{filtered.length !== 1 ? "s" : ""} found
+                </p>
+                {filtered.length === 0 ? (
+                  <Card className="border-border/50">
+                    <CardContent className="py-16 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No opponents match your filters. Try widening your search criteria.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {filtered.map((suggestion) => (
+                      <SuggestionCard
+                        key={suggestion.player.id}
+                        suggestion={suggestion}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

@@ -158,10 +158,22 @@ export function AddReminderDialog({
     }
   }
 
+  function getScheduledDate(): Date | null {
+    try {
+      return new Date(computeScheduledAt())
+    } catch {
+      return null
+    }
+  }
+
+  const scheduledDate = getScheduledDate()
+  const isScheduledInPast = scheduledDate !== null && scheduledDate <= new Date()
+
   const canSubmit =
-    mode === "preset" ||
+    !isScheduledInPast &&
+    (mode === "preset" ||
     (mode === "relative" && parseInt(relativeAmount) > 0) ||
-    (mode === "exact" && exactDate && exactTime)
+    (mode === "exact" && exactDate && exactTime))
 
   return (
     <Dialog open={open} onOpenChange={(val) => { setOpen(val); if (!val) resetForm() }}>
@@ -309,7 +321,11 @@ export function AddReminderDialog({
                       mode="single"
                       selected={exactDate}
                       onSelect={setExactDate}
-                      disabled={(d) => d > new Date(matchDate)}
+                      disabled={(d) => {
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        return d < today || d > new Date(matchDate)
+                      }}
                       initialFocus
                     />
                   </PopoverContent>
@@ -328,6 +344,12 @@ export function AddReminderDialog({
                 </div>
               </div>
             </div>
+          )}
+
+          {isScheduledInPast && (
+            <p className="text-sm text-destructive">
+              The reminder date must be in the future.
+            </p>
           )}
 
           <Button type="submit" size="lg" className="w-full gap-2" disabled={!canSubmit || loading}>

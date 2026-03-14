@@ -18,7 +18,7 @@ export async function createReminder(input: CreateReminderInput) {
     throw new AppError('Invalid scheduledAt date', 400);
   }
   if (scheduled <= new Date()) {
-    throw new AppError('scheduledAt must be in the future', 400);
+    throw new AppError('The reminder date must be in the future', 400);
   }
 
   const match = await prisma.match.findUnique({
