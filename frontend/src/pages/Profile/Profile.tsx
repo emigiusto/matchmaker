@@ -53,7 +53,7 @@ export default function ProfilePage() {
 
   // Club connections state
   const [memberships, setMemberships] = useState<ClubMembershipDTO[]>([])
-  const [clubForm, setClubForm] = useState({
+  const [clubForm, setClubForm] = useState<{ clubSlug: string; socioNumber: string; password: string }>({
     clubSlug: SUPPORTED_CLUBS[0].clubSlug,
     socioNumber: "",
     password: "",
@@ -437,7 +437,6 @@ export default function ProfilePage() {
               <div className="space-y-3">
                 {memberships.map((m) => {
                   const club = SUPPORTED_CLUBS.find((c) => c.clubSlug === m.clubSlug)
-                  const isEditing = editingClub === m.clubSlug
                   return (
                     <div key={m.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4">
                       <div className="flex items-start justify-between gap-3">
