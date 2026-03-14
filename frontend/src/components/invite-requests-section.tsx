@@ -14,6 +14,7 @@ import {
   UserCheck,
   UserX,
   Hourglass,
+  PhoneOff,
   RotateCcw,
   Link2,
   Copy,
@@ -61,7 +62,7 @@ export interface InviteRequest {
     id: string
     contactUserId: string
     name: string
-    status: "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled"
+    status: "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled" | "send_failed"
     contactedAt: string | null
   }[]
   currentIndex: number
@@ -144,6 +145,7 @@ function mapSchedulingToInviteRequest(
     declined: "declined" as const,
     expired: "no_response" as const,
     cancelled: "cancelled" as const,
+    send_failed: "send_failed" as const,
   }
   const dateStr = r.date.slice(0, 10)
   const timeStr = formatTimeRange(r.startTime, r.endTime)
@@ -265,7 +267,12 @@ export function InviteRequestsSection({
 
   const getDisplayStatus = (r: InviteRequest) => {
     const hasActiveContact = r.contacts.some((c) => c.status === "contacted")
-    return r.status === "expired" && hasActiveContact ? "scheduling" : r.status
+    if (r.status === "expired" && hasActiveContact) return "scheduling"
+    if (r.status === "scheduling" && r.contacts.length > 0) {
+      const hasInProgress = r.contacts.some((c) => c.status === "pending" || c.status === "contacted")
+      if (!hasInProgress) return "expired"
+    }
+    return r.status
   }
 
   const isInThePast = (r: InviteRequest) => {
@@ -616,7 +623,9 @@ export function InviteRequestsSection({
                                       ? "bg-amber-500/10"
                                       : contact.status === "no_response"
                                         ? "bg-muted/60"
-                                        : contact.status === "contacted"
+                                        : contact.status === "send_failed"
+                                          ? "bg-orange-500/10"
+                                          : contact.status === "contacted"
                                           ? "bg-blue-500/10"
                                           : "bg-muted/30"
                               }`}
@@ -634,10 +643,16 @@ export function InviteRequestsSection({
                                 {contact.status === "no_response" && (
                                   <Hourglass className="h-3.5 w-3.5 text-muted-foreground" />
                                 )}
-                                {contact.status === "contacted" && (
+                                {contact.status === "send_failed" && (
+                                  <PhoneOff className="h-3.5 w-3.5 text-orange-500" />
+                                )}
+                                {contact.status === "contacted" && displayStatus === "scheduling" && (
                                   <Loader2
                                     className="h-3.5 w-3.5 text-blue-600 animate-spin"
                                   />
+                                )}
+                                {contact.status === "contacted" && displayStatus !== "scheduling" && (
+                                  <Hourglass className="h-3.5 w-3.5 text-muted-foreground" />
                                 )}
                                 {contact.status === "pending" && (
                                   <span className="text-[10px] font-bold text-muted-foreground">
@@ -646,7 +661,7 @@ export function InviteRequestsSection({
                                 )}
                               </span>
                               <span
-                                className={`flex-1 ${contact.status === "declined" || contact.status === "no_response" || contact.status === "cancelled" ? "text-muted-foreground line-through" : "text-foreground"}`}
+                                className={`flex-1 ${contact.status === "declined" || contact.status === "no_response" || contact.status === "cancelled" || contact.status === "send_failed" ? "text-muted-foreground line-through" : "text-foreground"}`}
                               >
                                 {contact.name}
                               </span>
@@ -691,7 +706,7 @@ export function InviteRequestsSection({
                                 )}
                               {request.status !== "matched" &&
                                 request.status !== "cancelled" &&
-                                (contact.status === "no_response" || contact.status === "cancelled") && (
+                                (contact.status === "no_response" || contact.status === "cancelled" || contact.status === "send_failed") && (
                                   <button
                                     onClick={() => handleRetryContact(request.id, contact.id)}
                                     title="Retry invite"

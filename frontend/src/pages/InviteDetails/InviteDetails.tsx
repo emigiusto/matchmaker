@@ -12,6 +12,7 @@ import {
   UserCheck,
   UserX,
   Hourglass,
+  PhoneOff,
   RotateCcw,
   Link2,
   Copy,
@@ -47,7 +48,7 @@ import {
 
 const POLL_INTERVAL_MS = 5000
 
-type ContactStatus = "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled"
+type ContactStatus = "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled" | "send_failed"
 
 function mapCandidateStatus(s: SchedulingCandidateDTO["status"]): ContactStatus {
   const map: Record<SchedulingCandidateDTO["status"], ContactStatus> = {
@@ -58,6 +59,7 @@ function mapCandidateStatus(s: SchedulingCandidateDTO["status"]): ContactStatus 
     declined: "declined",
     expired: "no_response",
     cancelled: "cancelled",
+    send_failed: "send_failed",
   }
   return map[s] ?? "pending"
 }
@@ -79,11 +81,20 @@ function formatTimeRange(startIso: string, endIso: string): string {
 }
 
 function getDisplayStatus(r: SchedulingRequestDTO) {
-  const hasActiveContact = (r.candidates ?? []).some(
+  const candidates = r.candidates ?? []
+  const hasActiveContact = candidates.some(
     (c) => c.status === "contacted" || c.status === "waiting_reply"
   )
   if (r.status === "expired" && hasActiveContact) return "scheduling"
-  if (r.status === "active") return "scheduling"
+  if (r.status === "active") {
+    if (candidates.length > 0) {
+      const hasInProgress = candidates.some(
+        (c) => c.status === "pending" || c.status === "contacted" || c.status === "waiting_reply"
+      )
+      if (!hasInProgress) return "expired"
+    }
+    return "scheduling"
+  }
   if (r.status === "completed") return "matched"
   return r.status
 }
@@ -463,9 +474,11 @@ export default function InviteDetailsPage() {
                           ? "bg-amber-500/10"
                           : uiStatus === "no_response"
                             ? "bg-muted/60"
-                            : uiStatus === "contacted"
-                              ? "bg-blue-500/10"
-                              : "bg-muted/30"
+                            : uiStatus === "send_failed"
+                              ? "bg-orange-500/10"
+                              : uiStatus === "contacted"
+                                ? "bg-blue-500/10"
+                                : "bg-muted/30"
                   }`}
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -473,14 +486,16 @@ export default function InviteDetailsPage() {
                     {uiStatus === "declined" && <UserX className="h-4 w-4 text-red-500" />}
                     {uiStatus === "cancelled" && <XCircle className="h-4 w-4 text-amber-600" />}
                     {uiStatus === "no_response" && <Hourglass className="h-4 w-4 text-muted-foreground" />}
-                    {uiStatus === "contacted" && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+                    {uiStatus === "send_failed" && <PhoneOff className="h-4 w-4 text-orange-500" />}
+                    {uiStatus === "contacted" && displayStatus === "scheduling" && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+                    {uiStatus === "contacted" && displayStatus !== "scheduling" && <Hourglass className="h-4 w-4 text-muted-foreground" />}
                     {uiStatus === "pending" && (
                       <span className="text-xs font-bold text-muted-foreground">{idx + 1}</span>
                     )}
                   </span>
                   <span
                     className={`flex-1 ${
-                      uiStatus === "declined" || uiStatus === "no_response" || uiStatus === "cancelled"
+                      uiStatus === "declined" || uiStatus === "no_response" || uiStatus === "cancelled" || uiStatus === "send_failed"
                         ? "text-muted-foreground line-through"
                         : "text-foreground"
                     }`}
@@ -514,7 +529,7 @@ export default function InviteDetailsPage() {
                       )}
                     {displayStatus !== "matched" &&
                       displayStatus !== "cancelled" &&
-                      (uiStatus === "no_response" || uiStatus === "cancelled") && (
+                      (uiStatus === "no_response" || uiStatus === "cancelled" || uiStatus === "send_failed") && (
                         <button
                           onClick={() => handleRetry(candidate.id)}
                           title="Retry invite"

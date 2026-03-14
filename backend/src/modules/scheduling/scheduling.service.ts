@@ -168,20 +168,24 @@ function formatGroupInviteFallbackMessage(input: {
   whenStr: string;
   location: string;
   rivalOrPlayersStr?: string;
+  matchId?: string;
 }): string {
+  const sportEmoji = input.sportType === 'padel' ? '🏓' : '🎾';
   const sport = input.sportType.charAt(0).toUpperCase() + input.sportType.slice(1).toLowerCase();
   const formatLabel = input.format === 'doubles' ? 'Doubles' : 'Singles';
   const loc = (input.location && input.location.trim()) || 'TBD';
+  const matchUrl = input.matchId ? `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${input.matchId}` : null;
   return [
-    'ℹ️ *Match group invite*',
+    `${sportEmoji} *Your match is confirmed!*`,
     '',
-    `${sport} · ${formatLabel}`,
-    `*When:* ${input.whenStr}`,
-    `*Where:* ${loc}`,
-    ...(input.rivalOrPlayersStr ? [`*Opponent/Players:* ${input.rivalOrPlayersStr}`] : []),
+    `📅  ${input.whenStr}`,
+    `📍  ${loc}`,
+    `🏅  ${sport} ${formatLabel}`,
+    ...(input.rivalOrPlayersStr ? [`👥  ${input.rivalOrPlayersStr}`] : []),
     '',
-    "We couldn't add you directly to the WhatsApp group (this is usually due to privacy settings).",
-    'Use this link to join the group:',
+    ...(matchUrl ? [`🔗 *View match:* ${matchUrl}`, ''] : []),
+    "⚠️ We couldn't add you directly to the WhatsApp group (privacy settings).",
+    'Use the link below to join and chat with the other players:',
   ].join('\n');
 }
 
@@ -196,7 +200,6 @@ function formatMatchDetailsMessage(
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
   const loc = (location && location.trim()) || 'TBD';
   const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
-  const signupUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/signup`;
   return [
     '✅ *Match confirmed!*',
     '',
@@ -204,8 +207,7 @@ function formatMatchDetailsMessage(
     `*When:* ${whenStr}`,
     `*Where:* ${loc}`,
     '',
-    `🔗 *View match:* ${matchUrl}`,
-    `👤 Create an account to manage your matches: ${signupUrl}`,
+    `🔗 *View match:* ${matchUrl}`
   ].join('\n');
 }
 
@@ -493,7 +495,8 @@ export const schedulingService = {
       const contactName = candidate.contactUser?.name ?? candidate.contactUser?.email ?? candidate.contactUserId;
       if (!phone) {
         logger.warn('InviteSkipped', { candidateId: candidate.id, contactName, reason: 'no_phone' });
-        await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
+        await schedulingRepository.updateCandidateStatus(candidate.id, 'send_failed');
+        void recordEvent({ schedulingRequestId: requestId, action: 'invite_sent', candidateId: candidate.id, metadata: { failed: true, reason: 'no_phone' } });
         continue;
       }
 
@@ -515,7 +518,8 @@ export const schedulingService = {
 
       if (!result.success) {
         logger.error('InviteSendFailed', { candidateId: candidate.id, contactName, error: result.error });
-        await schedulingRepository.updateCandidateStatus(candidate.id, 'expired');
+        await schedulingRepository.updateCandidateStatus(candidate.id, 'send_failed');
+        void recordEvent({ schedulingRequestId: requestId, action: 'invite_sent', candidateId: candidate.id, metadata: { failed: true, reason: result.error } });
       } else {
         logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId, contactName, phone });
         void recordEvent({ schedulingRequestId: requestId, action: 'invite_sent', candidateId: candidate.id });
@@ -839,6 +843,7 @@ export const schedulingService = {
               whenStr,
               location: request.locationText,
               rivalOrPlayersStr,
+              matchId: match.id,
             });
           },
           whapiBotPhone || undefined

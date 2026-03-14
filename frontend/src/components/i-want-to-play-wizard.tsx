@@ -1,4 +1,20 @@
 import { useState, useCallback, useEffect } from "react"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { format, startOfDay, isBefore } from "date-fns"
 import {
   Calendar as CalendarIcon,
@@ -95,10 +111,56 @@ type AvailableContact =
   | { id: string; name: string; type: "user" }
   | { id: string; name: string; type: "guestContact"; phone: string }
 
+function SortableContactItem({
+  contact,
+  index,
+  onRemove,
+}: {
+  contact: Contact
+  index: number
+  onRemove: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: contact.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-colors",
+        isDragging ? "border-primary bg-primary/5 shadow-md opacity-80" : "border-border/40 hover:border-primary/30"
+      )}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4 shrink-0" />
+      </button>
+      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+        {index + 1}
+      </div>
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+        {contact.name[0]}
+      </div>
+      <span className="flex-1 text-sm font-medium">{contact.name}</span>
+      <button
+        onClick={() => onRemove(contact.id)}
+        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
 export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdProp, onSuccess }: WizardProps) {
   const hostUserId = hostUserIdProp ?? getCurrentUserId()
   const [step, setStep] = useState<Step>(1)
   const [date, setDate] = useState<Date | undefined>(undefined)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [locationType, setLocationType] = useState<LocationType>("place")
@@ -112,7 +174,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   
   // Step 3: Contact priority list
   const [priorityList, setPriorityList] = useState<Contact[]>([])
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   // 10 sec default for local testing; 60 min for production
   const defaultResponseWindow = typeof import.meta !== "undefined" && import.meta.env?.DEV
     ? 10 / 60 // 10 seconds
@@ -145,7 +206,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setResponseWindow(defaultResponseWindow)
     setMaxParallelCandidates(1)
     setPriorityList([])
-    setDraggedIndex(null)
     setShowManualAdd(false)
   }
 
@@ -289,26 +349,21 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setPriorityList(prev => prev.filter(c => c.id !== id))
   }
 
-  // Drag and drop handlers
-  const handleDragStart = useCallback((index: number) => {
-    setDraggedIndex(index)
-  }, [])
+  // Drag and drop sensors (mouse + touch)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  )
 
-  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    if (draggedIndex === null || draggedIndex === index) return
-    
-    setPriorityList(prev => {
-      const newList = [...prev]
-      const [removed] = newList.splice(draggedIndex, 1)
-      newList.splice(index, 0, removed)
-      return newList
-    })
-    setDraggedIndex(index)
-  }, [draggedIndex])
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedIndex(null)
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      setPriorityList(prev => {
+        const oldIndex = prev.findIndex(c => c.id === active.id)
+        const newIndex = prev.findIndex(c => c.id === over.id)
+        return arrayMove(prev, oldIndex, newIndex)
+      })
+    }
   }, [])
 
   const [linkCopied, setLinkCopied] = useState(false)
@@ -394,7 +449,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {/* Date */}
             <div className="space-y-2">
               <Label className="text-base font-medium">Date</Label>
-              <Popover>
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -411,7 +466,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <Calendar
                     mode="single"
                     selected={date}
-                    onSelect={setDate}
+                    onSelect={(d) => { setDate(d); setDatePickerOpen(false); }}
                     disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
                     initialFocus
                   />
@@ -829,38 +884,20 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   </p>
                 </div>
               ) : (
-                <div className="space-y-1.5">
-                  {priorityList.map((contact, index) => (
-                    <div
-                      key={contact.id}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-all",
-                        draggedIndex === index
-                          ? "border-primary bg-primary/5 shadow-md"
-                          : "border-border/40 hover:border-primary/30"
-                      )}
-                    >
-                      <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                        {index + 1}
-                      </div>
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                        {contact.name[0]}
-                      </div>
-                      <span className="flex-1 text-sm font-medium">{contact.name}</span>
-                      <button
-                        onClick={() => removeContact(contact.id)}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={priorityList.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-1.5">
+                      {priorityList.map((contact, index) => (
+                        <SortableContactItem
+                          key={contact.id}
+                          contact={contact}
+                          index={index}
+                          onRemove={removeContact}
+                        />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
 

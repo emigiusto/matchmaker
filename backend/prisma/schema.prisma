@@ -604,7 +604,8 @@ enum SchedulingCandidateStatus {
   contacted
   waiting_reply
   accepted
-  declined  // invitee said no (rejected)
-  expired   // no response in time
-  cancelled // host cancelled/skipped the candidate
+  declined    // invitee said no (rejected)
+  expired     // no response in time
+  cancelled   // host cancelled/skipped the candidate
+  send_failed // WhatsApp message could not be delivered (bad/unreachable number)
 }

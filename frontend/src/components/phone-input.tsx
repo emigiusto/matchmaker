@@ -106,7 +106,7 @@ export function PhoneInput({
       <div className={cn("flex gap-2", className)}>
         <Input
           type="tel"
-          placeholder="+34 612 345 678"
+          placeholder="+XX 6XX XXX XXX"
           value={value}
           onChange={(e) => {
             const v = e.target.value
@@ -205,10 +205,10 @@ export function PhoneInput({
           inputMode="numeric"
           placeholder={
             countryDial === "1"
-              ? "555 123 4567"
+              ? "XXX XXX XXXX"
               : countryDial === "34"
-                ? "612 345 678"
-                : "Local number"
+                ? "6XX XXX XXX"
+                : "XXX XXX XXX"
           }
           value={national}
           onChange={handleNationalChange}

@@ -26,16 +26,17 @@ function buildCalendarParts(props: AddToCalendarButtonProps) {
   const isDoubles = participantNames.length >= 4
 
   let title: string
+  const locationSuffix = location ? ` - ${location}` : ""
   if (isDoubles) {
     const teamA = participantNames.slice(0, 2).join(" & ")
     const teamB = participantNames.slice(2, 4).join(" & ")
-    title = `Doubles match: ${teamA} vs ${teamB} - ${location}`
+    title = `Doubles match: ${teamA} vs ${teamB}${locationSuffix}`
   } else {
     const opponent =
       opponentName ||
       (participantNames.length >= 2 ? participantNames[1] : participantNames[0] ?? "Opponent")
     const prefix = matchType === "practice" ? "Practice match" : "Match"
-    title = `${prefix} vs ${opponent} - ${location}`
+    title = `${prefix} vs ${opponent}${locationSuffix}`
   }
 
   const descriptionLines = [

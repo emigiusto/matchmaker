@@ -9,6 +9,7 @@ export type SchedulingCandidateStatus =
   | "declined"
   | "expired"
   | "cancelled"
+  | "send_failed"
 
 export interface SchedulingCandidateDTO {
   id: string
