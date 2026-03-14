@@ -259,6 +259,24 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         setAvailableContacts([...userContacts, ...gcContacts])
         setGroupsWithMembers(groups)
         setFriends(friendsList)
+
+        // Pre-populate gcMeta for guest contacts that already have a registered user account.
+        // These appear as type "user" in the picker (phone matched), so addAvailableContact
+        // won't populate gcMeta for them. Cross-reference by phone number here.
+        const phoneToUserId = new Map(withPhone.map((u) => [u.phone, u.id]))
+        const preloaded: Record<string, { gcId: string; socioNumber: string }> = {}
+        const preloadedEdits: Record<string, string> = {}
+        for (const gc of guestContacts) {
+          const userId = phoneToUserId.get(gc.phone)
+          if (userId) {
+            preloaded[userId] = { gcId: gc.id, socioNumber: gc.socioNumber ?? "" }
+            preloadedEdits[userId] = gc.socioNumber ?? ""
+          }
+        }
+        if (Object.keys(preloaded).length > 0) {
+          setGcMeta((prev) => ({ ...prev, ...preloaded }))
+          setSocioEdits((prev) => ({ ...prev, ...preloadedEdits }))
+        }
       })
       .catch(() => {
         setAvailableContacts([])
