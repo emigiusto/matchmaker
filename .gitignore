@@ -49,3 +49,4 @@ coverage/
 *.swo
 
 .claude
+backend/tsconfig.tsbuildinfo
