@@ -110,7 +110,7 @@ interface Contact {
 /** User or GuestContact for the "All contacts" picker */
 type AvailableContact =
   | { id: string; name: string; type: "user" }
-  | { id: string; name: string; type: "guestContact"; phone: string }
+  | { id: string; name: string; type: "guestContact"; phone: string; socioNumber?: string }
 
 function SortableContactItem({
   contact,
@@ -186,6 +186,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [friends, setFriends] = useState<import("@/lib/services/friendships.service").Friend[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [bookingEnabled, setBookingEnabled] = useState(false)
+  // Maps userId → { gcId, socioNumber } for guest contacts in the priority list
+  const [gcMeta, setGcMeta] = useState<Record<string, { gcId: string; socioNumber: string }>>({})
+  const [socioEdits, setSocioEdits] = useState<Record<string, string>>({})
+  const [savingSocio, setSavingSocio] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [manualName, setManualName] = useState("")
   const [manualPhone, setManualPhone] = useState("")
@@ -250,6 +254,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             name: c.name,
             type: "guestContact" as const,
             phone: c.phone,
+            socioNumber: c.socioNumber,
           }))
         setAvailableContacts([...userContacts, ...gcContacts])
         setGroupsWithMembers(groups)
@@ -298,6 +303,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     try {
       const { user } = await guestContactsService.ensureUserByPhone(ac.phone, ac.name)
       addContact({ id: user.id, name: user.name || ac.name })
+      setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: ac.id, socioNumber: ac.socioNumber ?? "" } }))
+      setSocioEdits((prev) => ({ ...prev, [user.id]: ac.socioNumber ?? "" }))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to add contact")
     }
@@ -318,6 +325,22 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     toast.success(`Added ${toAdd.length} from ${group.name}`)
   }
 
+  async function handleSaveSocio(userId: string) {
+    const meta = gcMeta[userId]
+    if (!meta) return
+    const value = (socioEdits[userId] ?? "").trim()
+    setSavingSocio(userId)
+    try {
+      await guestContactsService.updateSocioNumber(meta.gcId, hostUserId, value)
+      setGcMeta((prev) => ({ ...prev, [userId]: { ...prev[userId], socioNumber: value } }))
+      toast.success("Socio number saved")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save")
+    } finally {
+      setSavingSocio(null)
+    }
+  }
+
   function addFriend(friend: import("@/lib/services/friendships.service").Friend) {
     if (friend.id === hostUserId) return
     addContact({ id: friend.id, name: friend.name })
@@ -336,10 +359,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       return
     }
     try {
-      const { user } = await guestContactsService.create(hostUserId, name, phone)
+      const { guestContact, user } = await guestContactsService.create(hostUserId, name, phone)
       setManualName("")
       setManualPhone("")
       addContact({ id: user.id, name: user.name || name })
+      setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: guestContact.id, socioNumber: "" } }))
+      setSocioEdits((prev) => ({ ...prev, [user.id]: "" }))
       toast.success("Contact saved and added to invite list")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to add contact")
@@ -903,6 +928,33 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 </DndContext>
               )}
             </div>
+
+            {/* Socio numbers for guest contacts */}
+            {priorityList.some((c) => gcMeta[c.id]) && (
+              <div className="space-y-2">
+                <Label className="text-base font-medium">Socio numbers</Label>
+                <p className="text-xs text-muted-foreground">Required for automatic court booking.</p>
+                <div className="space-y-2">
+                  {priorityList.filter((c) => gcMeta[c.id]).map((c) => (
+                    <div key={c.id} className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                        {c.name[0]}
+                      </div>
+                      <span className="min-w-0 flex-1 text-sm font-medium truncate">{c.name}</span>
+                      <Input
+                        className="h-8 w-28 text-sm"
+                        placeholder="Socio #"
+                        value={socioEdits[c.id] ?? gcMeta[c.id]?.socioNumber ?? ""}
+                        onChange={(e) => setSocioEdits((p) => ({ ...p, [c.id]: e.target.value }))}
+                        onBlur={() => handleSaveSocio(c.id)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleSaveSocio(c.id) }}
+                      />
+                      {savingSocio === c.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Response window */}
             <div className="space-y-2">
