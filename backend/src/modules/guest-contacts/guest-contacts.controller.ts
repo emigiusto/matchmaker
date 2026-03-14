@@ -47,9 +47,10 @@ export class GuestContactsController {
 
   static async updateSocioNumber(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      const { ownerUserId, socioNumber } = req.body;
-      if (!ownerUserId || typeof socioNumber !== 'string') {
+      const id = req.params.id as string;
+      const ownerUserId = req.body.ownerUserId as string;
+      const socioNumber = req.body.socioNumber as string;
+      if (!ownerUserId || !socioNumber) {
         return res.status(400).json({ error: 'Missing ownerUserId or socioNumber' });
       }
       const contact = await GuestContactsService.updateGuestContactSocioNumber(id, ownerUserId, socioNumber);

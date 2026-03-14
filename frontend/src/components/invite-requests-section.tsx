@@ -13,6 +13,7 @@ import {
   Loader2,
   UserCheck,
   UserX,
+  ShieldCheck,
   Hourglass,
   PhoneOff,
   RotateCcw,
@@ -425,6 +426,7 @@ export function InviteRequestsSection({
     switch (event.action) {
       case "invite_sent": return `Invite sent to ${name}`
       case "invite_accepted": return `${name} accepted`
+      case "invite_manually_accepted": return `${name} manually accepted by host`
       case "invite_declined": return `${name} declined`
       case "invite_expired": return `No response from ${name}`
       case "candidate_cancelled": return `${name} cancelled`
@@ -445,6 +447,7 @@ export function InviteRequestsSection({
     switch (action) {
       case "invite_sent": return <Loader2 className="h-3 w-3 text-blue-500" />
       case "invite_accepted": return <UserCheck className="h-3 w-3 text-green-600" />
+      case "invite_manually_accepted": return <ShieldCheck className="h-3 w-3 text-green-600" />
       case "invite_declined": return <UserX className="h-3 w-3 text-red-500" />
       case "invite_expired": return <Hourglass className="h-3 w-3 text-muted-foreground" />
       case "candidate_cancelled": return <XCircle className="h-3 w-3 text-amber-500" />

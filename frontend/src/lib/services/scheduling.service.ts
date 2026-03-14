@@ -67,6 +67,7 @@ export interface CreateSchedulingRequestInput {
 export type SchedulingInviteEventAction =
   | 'invite_sent'
   | 'invite_accepted'
+  | 'invite_manually_accepted'
   | 'invite_declined'
   | 'invite_expired'
   | 'candidate_cancelled'

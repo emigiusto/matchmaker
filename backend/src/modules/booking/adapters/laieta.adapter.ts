@@ -1,5 +1,5 @@
 // laieta.adapter.ts
-// Booking adapter for Club Tennis La Salut (Laieta) via miclubonline.net (Drupal/Puppeteer).
+// Booking adapter for Club Tennis Laieta via miclubonline.net (Drupal/Puppeteer).
 // Availability scraping logic adapted from existing aceUp implementation.
 
 import puppeteer, { type Browser, type Page } from 'puppeteer'
@@ -157,6 +157,23 @@ export class LaietaAdapter implements BookingAdapter {
     }, targetHour)
   }
 
+  // ─── Helpers ──────────────────────────────────────────────────────
+
+  /** Throws if the page contains a .alert.alert-block.alert-danger block. */
+  private async checkForPageError(page: Page): Promise<void> {
+    const errorText = await page.evaluate(() => {
+      const el = document.querySelector('.alert.alert-block.alert-danger')
+      if (!el) return null
+      // Clone and remove invisible heading nodes (e.g. "Missatge d'error") before reading text
+      const clone = el.cloneNode(true) as HTMLElement
+      clone.querySelectorAll('.element-invisible, .close').forEach((n) => n.remove())
+      return clone.textContent?.trim() ?? null
+    })
+    if (errorText) {
+      throw new AppError(errorText, 409, 'BOOKING_PAGE_ERROR')
+    }
+  }
+
   // ─── BookingAdapter implementation ────────────────────────────────
 
   async testConnection(creds: ClubCredentials): Promise<boolean> {
@@ -173,6 +190,11 @@ export class LaietaAdapter implements BookingAdapter {
     }
   }
 
+  /** Convert YYYY-MM-DD → YYYYMMDD as required by miclubonline URLs */
+  private toUrlDate(date: string): string {
+    return date.replace(/-/g, '')
+  }
+
   async checkAvailability(
     creds: ClubCredentials,
     date: string,
@@ -187,7 +209,7 @@ export class LaietaAdapter implements BookingAdapter {
     try {
       browser = await this.launchBrowser()
       const sessionValue = await this.login(browser, creds)
-      const url = `${BASE_URL}/infopistas/${sportId}/${date}`
+      const url = `${BASE_URL}/infopistas/${sportId}/${this.toUrlDate(date)}`
 
       logger.info(`[laieta] Checking availability: ${url} (sport=${sport}, hour=${targetHour})`)
       const page = await this.openWithSession(browser, url, sessionValue)
@@ -222,7 +244,7 @@ export class LaietaAdapter implements BookingAdapter {
     try {
       browser = await this.launchBrowser()
       const sessionValue = await this.login(browser, creds)
-      const url = `${BASE_URL}/infopistas/${sportId}/${date}`
+      const url = `${BASE_URL}/infopistas/${sportId}/${this.toUrlDate(date)}`
 
       logger.info(`[laieta] Starting booking: court=${courtId}, ${date} ${targetHour}:00, sport=${sport}`)
       const page = await this.openWithSession(browser, url, sessionValue)
@@ -259,8 +281,18 @@ export class LaietaAdapter implements BookingAdapter {
       // ── Step 2: Popup → click "Continua" ───────────────────────────
       // The popup button id encodes the slot, e.g. "21:PADEL   A:16:0"
       // We match by class since only one popup opens at a time.
+      // Use evaluate-based click to bypass Puppeteer's interactability check
+      // (the popup overlay can cause page.click() to throw "not clickable").
       await page.waitForSelector('.a_button_popup_fix.a_pistas_hora_sel', { timeout: 10000 })
-      await page.click('.a_button_popup_fix.a_pistas_hora_sel')
+      // Clicking "Continua" triggers a full page navigation — start listening before the click
+      const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
+      await page.evaluate(() => {
+        (document.querySelector('.a_button_popup_fix.a_pistas_hora_sel') as HTMLElement)?.click()
+      })
+      await navigationPromise
+
+      // Check for page-level errors (e.g. booking quota exceeded)
+      await this.checkForPageError(page)
 
       // ── Step 3: Participant entry form ──────────────────────────────
       await page.waitForSelector('#edit-add', { timeout: 10000 })
@@ -276,20 +308,8 @@ export class LaietaAdapter implements BookingAdapter {
         // Wait for the form to process (participant added or error shown)
         await new Promise((r) => setTimeout(r, 2000))
 
-        // Check for an inline error (participant over booking quota or not found)
-        const errorText = await page.evaluate(() => {
-          const el = document.querySelector(
-            '.messages--error, .alert-danger, .error-message, [class*="error"]:not(input):not(button)',
-          )
-          return el?.textContent?.trim() ?? null
-        })
-        if (errorText) {
-          throw new AppError(
-            `Could not add participant ${socioNumber}: ${errorText}`,
-            409,
-            'PARTICIPANT_BOOKING_LIMIT',
-          )
-        }
+        // Check for page-level errors (quota exceeded, participant not found, etc.)
+        await this.checkForPageError(page)
       }
 
       // ── Step 4: Submit booking ──────────────────────────────────────
@@ -297,38 +317,40 @@ export class LaietaAdapter implements BookingAdapter {
       // participants (2 or 4 depending on sport/format) have been successfully added.
       await page.waitForFunction(
         () => {
-          const btn = document.querySelector('input#edit-submit[name="reserva"]') as HTMLInputElement | null
+          const btn = document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement | null
           return btn !== null && !btn.disabled
         },
         { timeout: 15000 },
       )
 
-      // ── [TEST MODE] Screenshot before submit ────────────────────────
-      const screenshotPath = `/tmp/laieta-booking-${Date.now()}.png`
-      await page.screenshot({ path: screenshotPath, fullPage: true })
-      logger.info(`[laieta][TEST MODE] Screenshot saved: ${screenshotPath}`)
-      logger.info(`[laieta][TEST MODE] Submit button is enabled — would click input#edit-submit[name="reserva"]`)
-      logger.info(`[laieta][TEST MODE] Booking params: court=${courtId}, date=${date}, time=${targetHour}:00, sport=${sport}, participants=${participantSocioNumbers.join(', ')}`)
+      if (process.env.BOOKING_SUBMIT_ENABLED !== 'true') {
+        const screenshotPath = `/tmp/laieta-booking-${Date.now()}.png`
+        await page.screenshot({ path: screenshotPath, fullPage: true })
+        const externalId = `[TEST-MODE]::${courtId}::${date}::${targetHour}`
+        logger.info(`[laieta][TEST MODE] Submit skipped (BOOKING_SUBMIT_ENABLED != true). Screenshot: ${screenshotPath}`)
+        logger.info(`[laieta][TEST MODE] Would book: court=${courtId}, date=${date}, time=${targetHour}:00, sport=${sport}, participants=${participantSocioNumbers.join(', ')}`)
+        return { externalId, courtName: courtId }
+      }
 
-      // await page.click('input#edit-submit[name="reserva"]')
+      await page.click('button#edit-submit[name="reserva"]')
 
-      // // Wait for post-submit navigation or inline confirmation
-      // await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {
-      //   // Some flows show a confirmation inline without navigating — that's fine
-      // })
+      // Wait for post-submit navigation or inline confirmation
+      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {
+        // Some flows show a confirmation inline without navigating — that's fine
+      })
 
-      // // Try to extract a booking reference from the confirmation page
-      // const bookingRef = await page.evaluate(() => {
-      //   const text = document.body.textContent ?? ''
-      //   const match = text.match(/reserva\s*[:#]?\s*([A-Z0-9\-]{4,})/i)
-      //   return match?.[1] ?? null
-      // })
+      // Check for errors on confirmation page
+      await this.checkForPageError(page)
 
-      // const externalId = bookingRef ?? `${courtId}::${date}::${targetHour}`
-      // logger.info(`[laieta] Booking confirmed: court=${courtId}, ref=${externalId}`)
+      // Try to extract a booking reference from the confirmation page
+      const bookingRef = await page.evaluate(() => {
+        const text = document.body.textContent ?? ''
+        const match = text.match(/reserva\s*[:#]?\s*([A-Z0-9\-]{4,})/i)
+        return match?.[1] ?? null
+      })
 
-      const externalId = `[TEST-MODE]::${courtId}::${date}::${targetHour}`
-      logger.info(`[laieta][TEST MODE] Returning mock booking result: ${externalId}`)
+      const externalId = bookingRef ?? `${courtId}::${date}::${targetHour}`
+      logger.info(`[laieta] Booking confirmed: court=${courtId}, ref=${externalId}`)
 
       return { externalId, courtName: courtId }
     } finally {

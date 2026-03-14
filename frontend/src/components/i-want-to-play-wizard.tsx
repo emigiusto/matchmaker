@@ -193,6 +193,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [submitting, setSubmitting] = useState(false)
   const [manualName, setManualName] = useState("")
   const [manualPhone, setManualPhone] = useState("")
+  const [manualSocio, setManualSocio] = useState("")
   const [showManualAdd, setShowManualAdd] = useState(false)
   const [searchFromList, setSearchFromList] = useState("")
   const [searchFriends, setSearchFriends] = useState("")
@@ -377,12 +378,14 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       return
     }
     try {
-      const { guestContact, user } = await guestContactsService.create(hostUserId, name, phone)
+      const socio = manualSocio.trim()
+      const { guestContact, user } = await guestContactsService.create(hostUserId, name, phone, socio || undefined)
       setManualName("")
       setManualPhone("")
+      setManualSocio("")
       addContact({ id: user.id, name: user.name || name })
-      setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: guestContact.id, socioNumber: "" } }))
-      setSocioEdits((prev) => ({ ...prev, [user.id]: "" }))
+      setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: guestContact.id, socioNumber: socio } }))
+      setSocioEdits((prev) => ({ ...prev, [user.id]: socio }))
       toast.success("Contact saved and added to invite list")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to add contact")
@@ -872,7 +875,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">Saved to your contacts. Use country code (e.g. +34 for Spain).</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(140px,1fr)_minmax(260px,2fr)_auto] sm:items-end">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(120px,1fr)_minmax(200px,2fr)_90px_auto] sm:items-end">
                   <Input
                     placeholder="Name"
                     value={manualName}
@@ -886,6 +889,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       defaultCountryCode="34"
                     />
                   </div>
+                  <Input
+                    placeholder="Socio #"
+                    value={manualSocio}
+                    onChange={(e) => setManualSocio(e.target.value)}
+                    className="w-full"
+                  />
                   <Button variant="secondary" size="sm" className="shrink-0 sm:self-end" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
                     Add
                   </Button>
@@ -947,13 +956,13 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               )}
             </div>
 
-            {/* Socio numbers for guest contacts */}
-            {priorityList.some((c) => gcMeta[c.id]) && (
+            {/* Socio numbers — shown for all contacts when booking is enabled */}
+            {priorityList.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-base font-medium">Socio numbers</Label>
                 <p className="text-xs text-muted-foreground">Required for automatic court booking.</p>
                 <div className="space-y-2">
-                  {priorityList.filter((c) => gcMeta[c.id]).map((c) => (
+                  {priorityList.map((c) => (
                     <div key={c.id} className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
                       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                         {c.name[0]}
@@ -964,8 +973,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         placeholder="Socio #"
                         value={socioEdits[c.id] ?? gcMeta[c.id]?.socioNumber ?? ""}
                         onChange={(e) => setSocioEdits((p) => ({ ...p, [c.id]: e.target.value }))}
-                        onBlur={() => handleSaveSocio(c.id)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleSaveSocio(c.id) }}
+                        onBlur={() => { if (gcMeta[c.id]) handleSaveSocio(c.id) }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && gcMeta[c.id]) handleSaveSocio(c.id) }}
                       />
                       {savingSocio === c.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                     </div>

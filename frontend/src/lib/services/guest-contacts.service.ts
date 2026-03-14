@@ -15,11 +15,12 @@ export interface CreateGuestContactResult {
 }
 
 export const guestContactsService = {
-  async create(ownerUserId: string, name: string, phone: string): Promise<CreateGuestContactResult> {
+  async create(ownerUserId: string, name: string, phone: string, socioNumber?: string): Promise<CreateGuestContactResult> {
     return apiClient.post<CreateGuestContactResult>("/guest-contacts", {
       ownerUserId,
       name,
       phone,
+      ...(socioNumber ? { socioNumber } : {}),
     })
   },
 

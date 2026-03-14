@@ -7,6 +7,7 @@ import { AppError } from '../../shared/errors/AppError'
 import { encrypt, decrypt } from '../../shared/utils/crypto.utils'
 import { getAdapter } from './adapters/adapter.registry'
 import { logger } from '../../config/logger'
+import { whatsappService } from '../whatsapp/whatsapp.service'
 import type {
   UpsertClubMembershipInput,
   ClubMembershipDTO,
@@ -211,31 +212,51 @@ async function runBookingJob(
       return
     }
 
-    const hostUserId = match.availability?.userId
+    // Resolve host user ID: prefer scheduling request host, fall back to availability owner
+    const schedulingRequest = await prisma.schedulingRequest.findUnique({ where: { matchId } })
+    const hostUserId = schedulingRequest?.hostUserId ?? match.availability?.userId ?? membership.userId
+
+    logger.info(`[booking] hostUserId resolved: ${hostUserId} (schedulingRequest=${schedulingRequest?.id ?? 'none'}, availability.userId=${match.availability?.userId ?? 'none'}, membership.userId=${membership.userId})`)
+
     const otherParticipants = match.participants.filter((p) => p.userId !== hostUserId)
+    logger.info(`[booking] Participants: total=${match.participants.length}, other=${otherParticipants.length}, ids=${otherParticipants.map(p => `${p.userId}(${p.user?.name})`).join(', ')}`)
 
     // Collect socio numbers for other participants
     const participantSocioNumbers: string[] = []
     for (const participant of otherParticipants) {
-      // Check ClubMembership for registered users
+      logger.info(`[booking] Looking up socio for participant ${participant.user?.name} (userId=${participant.userId}, phone=${participant.user?.phone ?? 'none'})`)
+
+      // 1. Check ClubMembership (registered user with their own club account)
       const participantMembership = await prisma.clubMembership.findFirst({
         where: { userId: participant.userId, clubSlug: membership.clubSlug },
       })
+      logger.info(`[booking] ClubMembership lookup: found=${!!participantMembership}, socioNumber=${participantMembership?.socioNumber ?? 'none'}`)
       if (participantMembership?.socioNumber) {
         participantSocioNumbers.push(participantMembership.socioNumber)
         continue
       }
 
-      // Check GuestContact for guest users
-      const guestContact = await prisma.guestContact.findFirst({
-        where: {
-          phone: participant.user?.phone ?? '',
-          ownerUserId: hostUserId ?? '',
-        },
-      })
-      if (guestContact?.socioNumber) {
-        participantSocioNumbers.push(guestContact.socioNumber)
-        continue
+      // 2. Check GuestContact by phone.
+      // GuestContact.phone may carry a uniqueness suffix (e.g. "+18806693669-023e-1") from
+      // seeded/test data or a deduplication mechanism. Strip everything after the first dash
+      // before comparing — real E.164 numbers never contain dashes.
+      const phone = participant.user?.phone
+      if (phone) {
+        const hostGuestContacts = await prisma.guestContact.findMany({
+          where: { ownerUserId: hostUserId },
+        })
+        const normalizeGcPhone = (p: string) => p.split('-')[0].replace(/\s+/g, '')
+        const participantPhoneNorm = phone.replace(/\s+/g, '')
+        const guestContact = hostGuestContacts.find(
+          (gc) => normalizeGcPhone(gc.phone) === participantPhoneNorm
+        ) ?? null
+        logger.info(`[booking] GuestContact phone match: participantPhone=${participantPhoneNorm}, found=${!!guestContact}, socioNumber=${guestContact?.socioNumber ?? 'none'}`)
+        if (guestContact?.socioNumber) {
+          participantSocioNumbers.push(guestContact.socioNumber)
+          continue
+        }
+      } else {
+        logger.info(`[booking] Participant has no phone — skipping GuestContact lookup`)
       }
 
       await failAttempt(
@@ -258,7 +279,7 @@ async function runBookingJob(
       ? new Date(match.availability.startTime).toTimeString().slice(0, 5)
       : new Date(match.scheduledAt).toTimeString().slice(0, 5)
 
-    const sport = (match as { sport?: string | null }).sport ?? 'tennis'
+    const sport = schedulingRequest?.sportType ?? 'tennis'
     const sportOptions = { sport }
 
     // Check availability and pick first available court
@@ -283,6 +304,14 @@ async function runBookingJob(
 
     logBookingEvent(matchId, 'booking_success', { courtName: result.courtName, externalId: result.externalId }).catch(() => {})
     logger.info(`[booking] Court booked for match ${matchId}: ${result.courtName} (${result.externalId})`)
+
+    // Notify the WhatsApp group
+    if (match.whatsappGroupId) {
+      const message = `✅ *Court booked!*\n\n🏟️ ${result.courtName}\n📅 ${date} · ${time}`
+      whatsappService.sendGroupMessage(match.whatsappGroupId, message).catch((err) => {
+        logger.warn(`[booking] Failed to send WhatsApp group notification for match ${matchId}:`, err)
+      })
+    }
   } catch (err) {
     const offline = isOfflineError(err)
     const message = offline

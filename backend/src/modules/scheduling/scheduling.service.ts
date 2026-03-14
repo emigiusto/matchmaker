@@ -966,6 +966,7 @@ export const schedulingService = {
 
     const now = new Date();
     await schedulingRepository.updateCandidateStatus(candidateId, 'accepted', now);
+    void recordEvent({ schedulingRequestId: requestId, action: 'invite_manually_accepted', candidateId, actorUserId: userId });
     const format = (request as RequestRow).format || 'singles';
     const required = getRequiredAcceptances(format);
     // +1 because we just accepted this candidate (not yet reflected in request.candidates)

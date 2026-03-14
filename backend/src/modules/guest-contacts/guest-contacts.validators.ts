@@ -22,6 +22,7 @@ export const createGuestContactSchema = z.object({
   ownerUserId: z.string().uuid('Invalid ownerUserId'),
   name: z.string().min(1, 'Name is required'),
   phone: phoneE164,
+  socioNumber: z.string().optional(),
 });
 
 export const ensureUserByPhoneSchema = z.object({

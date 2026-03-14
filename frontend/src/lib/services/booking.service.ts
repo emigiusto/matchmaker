@@ -25,7 +25,7 @@ export interface ClubMembershipDTO {
 }
 
 export const SUPPORTED_CLUBS = [
-  { clubSlug: "laieta", label: "Club Tennis La Salut (Laieta)", adapterType: "miclubonline" },
+  { clubSlug: "laieta", label: "Club Tennis  (Laieta)", adapterType: "miclubonline" },
 ] as const
 
 export const bookingService = {
