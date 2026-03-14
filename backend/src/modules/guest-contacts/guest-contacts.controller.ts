@@ -44,4 +44,18 @@ export class GuestContactsController {
       next(err);
     }
   }
+
+  static async updateSocioNumber(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { ownerUserId, socioNumber } = req.body;
+      if (!ownerUserId || typeof socioNumber !== 'string') {
+        return res.status(400).json({ error: 'Missing ownerUserId or socioNumber' });
+      }
+      const contact = await GuestContactsService.updateGuestContactSocioNumber(id, ownerUserId, socioNumber);
+      return res.json(contact);
+    } catch (err) {
+      next(err);
+    }
+  }
 }

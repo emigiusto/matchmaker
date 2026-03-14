@@ -9,5 +9,6 @@ const router = Router();
 router.post('/', GuestContactsController.create);
 router.post('/ensure-user', GuestContactsController.ensureUserByPhone);
 router.get('/', GuestContactsController.listByOwner);
+router.patch('/:id/socio-number', GuestContactsController.updateSocioNumber);
 
 export default router;

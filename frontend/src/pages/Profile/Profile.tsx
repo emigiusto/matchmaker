@@ -16,6 +16,7 @@ import {
   Wifi,
   Eye,
   EyeOff,
+  Pencil,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,6 +38,7 @@ import { getCurrentUserId } from "@/lib/current-user"
 import { usersService, type User } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
 import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO } from "@/lib/services/booking.service"
+import { guestContactsService, type GuestContactDTO } from "@/lib/services/guest-contacts.service"
 import { toast } from "sonner"
 
 export default function ProfilePage() {
@@ -62,6 +64,36 @@ export default function ProfilePage() {
   const [savingClub, setSavingClub] = useState(false)
   const [testingClub, setTestingClub] = useState<string | null>(null)
   const [editingClub, setEditingClub] = useState<string | null>(null)
+
+  // Contacts
+  const [contacts, setContacts] = useState<GuestContactDTO[]>([])
+  const [editingSocio, setEditingSocio] = useState<string | null>(null)
+  const [socioInputs, setSocioInputs] = useState<Record<string, string>>({})
+  const [savingSocio, setSavingSocio] = useState<string | null>(null)
+
+  async function fetchContacts() {
+    try {
+      const list = await guestContactsService.listByOwner(currentUserId)
+      setContacts(list)
+    } catch {
+      // non-critical
+    }
+  }
+
+  async function handleSaveSocio(contactId: string) {
+    const value = (socioInputs[contactId] ?? "").trim()
+    setSavingSocio(contactId)
+    try {
+      const updated = await guestContactsService.updateSocioNumber(contactId, currentUserId, value)
+      setContacts((prev) => prev.map((c) => c.id === contactId ? updated : c))
+      setEditingSocio(null)
+      toast.success("Socio number saved")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save")
+    } finally {
+      setSavingSocio(null)
+    }
+  }
 
   async function fetchMemberships() {
     try {
@@ -131,6 +163,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetchMemberships()
+    fetchContacts()
   }, [currentUserId])
 
   async function handleSaveLocation(e: React.FormEvent) {
@@ -603,6 +636,75 @@ export default function ProfilePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Contacts */}
+        {contacts.length > 0 && (
+          <Card className="border-border/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold tracking-tight">Contacts</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Set a socio number for each contact so they can be added to court bookings.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {contacts.map((c) => (
+                <div key={c.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">{c.phone}</p>
+                  </div>
+                  {editingSocio === c.id ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        className="h-8 w-28 text-sm"
+                        placeholder="Socio #"
+                        value={socioInputs[c.id] ?? ""}
+                        onChange={(e) => setSocioInputs((p) => ({ ...p, [c.id]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveSocio(c.id)
+                          if (e.key === "Escape") setEditingSocio(null)
+                        }}
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleSaveSocio(c.id)}
+                        disabled={savingSocio === c.id}
+                      >
+                        {savingSocio === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingSocio(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {c.socioNumber ? (
+                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
+                          #{c.socioNumber}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">No socio #</span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          setSocioInputs((p) => ({ ...p, [c.id]: c.socioNumber ?? "" }))
+                          setEditingSocio(c.id)
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* ==== COMMENTED OUT FOR V1 - Personal progress, stats, rivals, insights, level history, match history ==== */}
         {/*

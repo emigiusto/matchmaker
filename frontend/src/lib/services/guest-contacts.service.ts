@@ -5,6 +5,7 @@ export interface GuestContactDTO {
   ownerUserId: string
   name: string
   phone: string
+  socioNumber?: string
   createdAt: string
 }
 
@@ -30,5 +31,9 @@ export const guestContactsService = {
 
   async ensureUserByPhone(phone: string, name: string): Promise<{ user: { id: string; name: string | null } }> {
     return apiClient.post("/guest-contacts/ensure-user", { phone, name })
+  },
+
+  async updateSocioNumber(id: string, ownerUserId: string, socioNumber: string): Promise<GuestContactDTO> {
+    return apiClient.patch<GuestContactDTO>(`/guest-contacts/${id}/socio-number`, { ownerUserId, socioNumber })
   },
 }
