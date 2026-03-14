@@ -33,13 +33,17 @@ export default function MatchesPage() {
   const today = format(new Date(), "yyyy-MM-dd")
 
   const fetchAllMatches = useCallback(async () => {
-    const [upcoming, past] = await Promise.all([
-      matchesService.getUpcoming(currentUserId),
-      matchesService.getPast(currentUserId),
-    ])
-    setUpcomingMatches(upcoming)
-    setPastMatches(past)
-  }, [currentUserId])
+    try {
+      const [upcoming, past] = await Promise.all([
+        matchesService.getUpcoming(currentUserId),
+        matchesService.getPast(currentUserId),
+      ])
+      setUpcomingMatches(upcoming)
+      setPastMatches(past.filter((m) => m.date <= today))
+    } catch {
+      // silently keep existing state on refetch failure
+    }
+  }, [currentUserId, today])
 
   useEffect(() => {
     let cancelled = false
@@ -52,7 +56,7 @@ export default function MatchesPage() {
         ])
         if (!cancelled) {
           setUpcomingMatches(upcoming)
-          setPastMatches(past)
+          setPastMatches(past.filter((m) => m.date <= today))
         }
       } catch {
         if (!cancelled) {
@@ -73,7 +77,7 @@ export default function MatchesPage() {
     (m) => m.date === today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
   )
   const matchesLater = upcomingMatches.filter(
-    (m) => m.date !== today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
+    (m) => m.date > today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
   )
   const hasUpcoming = matchesToday.length > 0 || matchesLater.length > 0
 
@@ -87,7 +91,7 @@ export default function MatchesPage() {
         title="Matches"
         description="Your upcoming and past matches"
       />
-      <div className="flex flex-1 flex-col gap-6 p-5 lg:p-8">
+      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-8">
         {loading ? (
           <Card>
             <CardContent className="flex items-center justify-center py-20">
@@ -116,7 +120,7 @@ export default function MatchesPage() {
           <div className="space-y-8">
             {/* Upcoming matches */}
             <section>
-              <h2 className="mb-4 text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
                 <Calendar className="h-5 w-5 text-primary" />
                 Upcoming matches
               </h2>
@@ -135,176 +139,176 @@ export default function MatchesPage() {
               ) : (
                 <div className="space-y-4">
                   {matchesToday.length > 0 && (
-              <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold tracking-tight">
-                    Today
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-0">
-                  {matchesToday.map((match) => {
-                    const opponent =
-                      match.player1.userId === currentUserId
-                        ? match.player2
-                        : match.player1
-                    return (
-                      <div
-                        key={match.id}
-                        className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 p-4 backdrop-blur-sm"
-                      >
-                        <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <SportFormatBadge
-                              sport={match.sport ?? "tennis"}
-                              format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
-                              size="sm"
-                            />
-                            <p className="text-base font-semibold text-foreground">
-                              vs {opponent.name}
-                            </p>
-                          </div>
-                          <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="h-4 w-4" />
-                              {match.time}
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <MapPin className="h-4 w-4" />
-                              {match.location}
-                            </span>
-                          </div>
-                        </Link>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <AddReminderDialog
-                            matchId={match.id}
-                            matchDate={match.date}
-                            matchTime={match.time}
-                            opponent={opponent.name}
-                            location={match.location}
-                            userId={currentUserId}
-                          />
-                          <AddToCalendarButton
-                            date={match.date}
-                            time={match.time}
-                            location={match.location}
-                            participants={
-                              (match.participants ?? []).length >= 4
-                                ? (match.participants ?? []).map((p) => p.userName ?? "").filter(Boolean)
-                                : [match.player1.name, match.player2.name]
-                            }
-                            matchType={match.matchType}
-                            opponentName={
-                              (match.participants ?? []).length >= 4
-                                ? undefined
-                                : opponent.name
-                            }
-                            compact
-                          />
-                          <ResultUploadDialog match={match} />
-                          <CancelMatchButton
-                            matchId={match.id}
-                            userId={currentUserId}
-                            onSuccess={handleMatchCancelled}
-                            compact
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </CardContent>
-              </Card>
-            )}
+                    <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg font-bold tracking-tight">Today</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pt-0">
+                        {matchesToday.map((match) => {
+                          const opponent =
+                            match.player1.userId === currentUserId
+                              ? match.player2
+                              : match.player1
+                          return (
+                            <div
+                              key={match.id}
+                              className="rounded-xl border border-border/60 bg-background/80 p-4 backdrop-blur-sm"
+                            >
+                              {/* Match info */}
+                              <Link to={`/matches/${match.id}`} className="block">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <SportFormatBadge
+                                    sport={match.sport ?? "tennis"}
+                                    format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
+                                    size="sm"
+                                  />
+                                  <p className="text-base font-semibold text-foreground">
+                                    vs {opponent.name}
+                                  </p>
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                  <span className="flex items-center gap-1.5">
+                                    <Clock className="h-4 w-4 shrink-0" />
+                                    {match.time}
+                                  </span>
+                                  <span className="flex items-center gap-1.5">
+                                    <MapPin className="h-4 w-4 shrink-0" />
+                                    {match.location}
+                                  </span>
+                                </div>
+                              </Link>
+                              {/* Actions */}
+                              <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
+                                <AddReminderDialog
+                                  matchId={match.id}
+                                  matchDate={match.date}
+                                  matchTime={match.time}
+                                  opponent={opponent.name}
+                                  location={match.location}
+                                  userId={currentUserId}
+                                />
+                                <AddToCalendarButton
+                                  date={match.date}
+                                  time={match.time}
+                                  location={match.location}
+                                  participants={
+                                    (match.participants ?? []).length >= 4
+                                      ? (match.participants ?? []).map((p) => p.userName ?? "").filter(Boolean)
+                                      : [match.player1.name, match.player2.name]
+                                  }
+                                  matchType={match.matchType}
+                                  opponentName={
+                                    (match.participants ?? []).length >= 4
+                                      ? undefined
+                                      : opponent.name
+                                  }
+                                  compact
+                                />
+                                <ResultUploadDialog match={match} />
+                                <CancelMatchButton
+                                  matchId={match.id}
+                                  userId={currentUserId}
+                                  onSuccess={handleMatchCancelled}
+                                  compact
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </CardContent>
+                    </Card>
+                  )}
 
-            {matchesLater.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold tracking-tight">
-                    Coming up
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-0">
-                  {matchesLater.map((match) => {
-                    const opponent =
-                      match.player1.userId === currentUserId
-                        ? match.player2
-                        : match.player1
-                    return (
-                      <div
-                        key={match.id}
-                        className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
-                      >
-                        <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <SportFormatBadge
-                              sport={match.sport ?? "tennis"}
-                              format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
-                              size="sm"
-                            />
-                            <p className="text-base font-semibold text-foreground">
-                              vs {opponent.name}
-                            </p>
-                          </div>
-                          <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1.5">
-                              <Calendar className="h-4 w-4" />
-                              {safeFormatDate(match.date, "EEE, MMM d")}
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="h-4 w-4" />
-                              {match.time}
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <MapPin className="h-4 w-4" />
-                              {match.location}
-                            </span>
-                          </div>
-                        </Link>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <AddReminderDialog
-                            matchId={match.id}
-                            matchDate={match.date}
-                            matchTime={match.time}
-                            opponent={opponent.name}
-                            location={match.location}
-                            userId={currentUserId}
-                          />
-                          <AddToCalendarButton
-                            date={match.date}
-                            time={match.time}
-                            location={match.location}
-                            participants={
-                              (match.participants ?? []).length >= 4
-                                ? (match.participants ?? []).map((p) => p.userName ?? "").filter(Boolean)
-                                : [match.player1.name, match.player2.name]
-                            }
-                            matchType={match.matchType}
-                            opponentName={
-                              (match.participants ?? []).length >= 4
-                                ? undefined
-                                : opponent.name
-                            }
-                            compact
-                          />
-                          <CancelMatchButton
-                            matchId={match.id}
-                            userId={currentUserId}
-                            onSuccess={handleMatchCancelled}
-                            compact
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </CardContent>
-              </Card>
-            )}
+                  {matchesLater.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg font-bold tracking-tight">Coming up</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pt-0">
+                        {matchesLater.map((match) => {
+                          const opponent =
+                            match.player1.userId === currentUserId
+                              ? match.player2
+                              : match.player1
+                          return (
+                            <div
+                              key={match.id}
+                              className="rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
+                            >
+                              {/* Match info */}
+                              <Link to={`/matches/${match.id}`} className="block">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <SportFormatBadge
+                                    sport={match.sport ?? "tennis"}
+                                    format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
+                                    size="sm"
+                                  />
+                                  <p className="text-base font-semibold text-foreground">
+                                    vs {opponent.name}
+                                  </p>
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                  <span className="flex items-center gap-1.5">
+                                    <Calendar className="h-4 w-4 shrink-0" />
+                                    {safeFormatDate(match.date, "EEE, MMM d")}
+                                  </span>
+                                  <span className="flex items-center gap-1.5">
+                                    <Clock className="h-4 w-4 shrink-0" />
+                                    {match.time}
+                                  </span>
+                                  <span className="flex items-center gap-1.5">
+                                    <MapPin className="h-4 w-4 shrink-0" />
+                                    {match.location}
+                                  </span>
+                                </div>
+                              </Link>
+                              {/* Actions */}
+                              <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
+                                <AddReminderDialog
+                                  matchId={match.id}
+                                  matchDate={match.date}
+                                  matchTime={match.time}
+                                  opponent={opponent.name}
+                                  location={match.location}
+                                  userId={currentUserId}
+                                />
+                                <AddToCalendarButton
+                                  date={match.date}
+                                  time={match.time}
+                                  location={match.location}
+                                  participants={
+                                    (match.participants ?? []).length >= 4
+                                      ? (match.participants ?? []).map((p) => p.userName ?? "").filter(Boolean)
+                                      : [match.player1.name, match.player2.name]
+                                  }
+                                  matchType={match.matchType}
+                                  opponentName={
+                                    (match.participants ?? []).length >= 4
+                                      ? undefined
+                                      : opponent.name
+                                  }
+                                  compact
+                                />
+                                <CancelMatchButton
+                                  matchId={match.id}
+                                  userId={currentUserId}
+                                  onSuccess={handleMatchCancelled}
+                                  compact
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               )}
             </section>
 
             {/* Past matches */}
             <section>
-              <h2 className="mb-4 text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
                 <History className="h-5 w-5 text-muted-foreground" />
                 Past matches
               </h2>
@@ -326,7 +330,7 @@ export default function MatchesPage() {
                         <Link
                           key={match.id}
                           to={`/matches/${match.id}`}
-                          className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
+                          className="block rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
                         >
                           <div className="flex flex-wrap items-center gap-2">
                             <SportFormatBadge
@@ -357,13 +361,13 @@ export default function MatchesPage() {
                                       : "Past"}
                             </span>
                           </div>
-                          <div className="flex gap-4 text-sm text-muted-foreground">
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1.5">
-                              <Calendar className="h-4 w-4" />
+                              <Calendar className="h-4 w-4 shrink-0" />
                               {safeFormatDate(match.date, "MMM d")}
                             </span>
                             <span className="flex items-center gap-1.5">
-                              <MapPin className="h-4 w-4" />
+                              <MapPin className="h-4 w-4 shrink-0" />
                               {match.location}
                             </span>
                           </div>

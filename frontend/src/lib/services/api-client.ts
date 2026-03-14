@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"
-const AUTH_TOKEN_KEY = "matchmaker_auth_token"
+export const AUTH_TOKEN_KEY = "matchmaker_auth_token"
 
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem(AUTH_TOKEN_KEY) : null

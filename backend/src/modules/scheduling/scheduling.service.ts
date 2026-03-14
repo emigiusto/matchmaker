@@ -707,7 +707,17 @@ export const schedulingService = {
     const hostUser = request.hostUser;
     if (!hostUser) return;
 
-    const scheduledAt = new Date(request.startTime);
+    // Derive scheduledAt from request.date (authoritative date) + time from request.startTime.
+    const reqDate = new Date(request.date);
+    const reqTime = new Date(request.startTime);
+    const scheduledAt = new Date(Date.UTC(
+      reqDate.getUTCFullYear(),
+      reqDate.getUTCMonth(),
+      reqDate.getUTCDate(),
+      reqTime.getUTCHours(),
+      reqTime.getUTCMinutes(),
+      reqTime.getUTCSeconds(),
+    ));
     const matchType = request.matchType === 'practice' ? 'practice' : 'competitive';
 
     let hostPartnerUserId: string | undefined;

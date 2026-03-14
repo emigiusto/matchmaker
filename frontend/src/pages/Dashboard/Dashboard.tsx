@@ -70,7 +70,7 @@ export default function Dashboard() {
     (m) => m.date === today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
   )
   const matchesLater = upcomingMatches.filter(
-    (m) => m.date !== today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
+    (m) => m.date > today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
   )
 
   return (
@@ -117,12 +117,12 @@ export default function Dashboard() {
         {/* Tabs: Invites | Upcoming Matches - avoids long scroll with many invites */}
         <Tabs defaultValue="invites" className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <TabsList className="h-11 rounded-xl bg-muted/60 px-1.5 py-1">
-              <TabsTrigger value="invites" className="gap-2 rounded-lg px-4 data-[state=active]:shadow-md">
+            <TabsList className="h-11 w-full rounded-xl bg-muted/60 px-1.5 py-1 sm:w-auto">
+              <TabsTrigger value="invites" className="flex-1 gap-2 rounded-lg px-4 data-[state=active]:shadow-md sm:flex-none">
                 <CirclePlay className="h-4 w-4" />
                 Invites
               </TabsTrigger>
-              <TabsTrigger value="matches" className="gap-2 rounded-lg px-4 data-[state=active]:shadow-md">
+              <TabsTrigger value="matches" className="flex-1 gap-2 rounded-lg px-4 data-[state=active]:shadow-md sm:flex-none">
                 <Swords className="h-4 w-4" />
                 Upcoming Matches
               </TabsTrigger>
@@ -192,9 +192,9 @@ export default function Dashboard() {
                       return (
                         <div
                           key={match.id}
-                          className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 p-4 backdrop-blur-sm"
+                          className="rounded-xl border border-border/60 bg-background/80 p-4 backdrop-blur-sm"
                         >
-                          <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
+                          <Link to={`/matches/${match.id}`} className="block">
                             <div className="flex flex-wrap items-center gap-2">
                               <SportFormatBadge
                                 sport={match.sport ?? "tennis"}
@@ -205,18 +205,18 @@ export default function Dashboard() {
                                 vs {opponent.name}
                               </p>
                             </div>
-                            <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1.5">
-                                <Clock className="h-4 w-4" />
+                                <Clock className="h-4 w-4 shrink-0" />
                                 {match.time}
                               </span>
                               <span className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4" />
+                                <MapPin className="h-4 w-4 shrink-0" />
                                 {match.location}
                               </span>
                             </div>
                           </Link>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
                             <AddReminderDialog
                               matchId={match.id}
                               matchDate={match.date}
@@ -235,11 +235,11 @@ export default function Dashboard() {
                                   : [match.player1.name, match.player2.name]
                               }
                               matchType={match.matchType}
-                          opponentName={
-                            (match.participants ?? []).length >= 4
-                              ? undefined
-                              : opponent.name
-                          }
+                              opponentName={
+                                (match.participants ?? []).length >= 4
+                                  ? undefined
+                                  : opponent.name
+                              }
                               compact
                             />
                             <ResultUploadDialog match={match} />
@@ -273,9 +273,9 @@ export default function Dashboard() {
                       return (
                         <div
                           key={match.id}
-                          className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
+                          className="rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
                         >
-                          <Link to={`/matches/${match.id}`} className="flex-1 min-w-0">
+                          <Link to={`/matches/${match.id}`} className="block">
                             <div className="flex flex-wrap items-center gap-2">
                               <SportFormatBadge
                                 sport={match.sport ?? "tennis"}
@@ -286,22 +286,22 @@ export default function Dashboard() {
                                 vs {opponent.name}
                               </p>
                             </div>
-                            <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1.5">
-                                <Calendar className="h-4 w-4" />
+                                <Calendar className="h-4 w-4 shrink-0" />
                                 {safeFormatDate(match.date, "EEE, MMM d")}
                               </span>
                               <span className="flex items-center gap-1.5">
-                                <Clock className="h-4 w-4" />
+                                <Clock className="h-4 w-4 shrink-0" />
                                 {match.time}
                               </span>
                               <span className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4" />
+                                <MapPin className="h-4 w-4 shrink-0" />
                                 {match.location}
                               </span>
                             </div>
                           </Link>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
                             <AddReminderDialog
                               matchId={match.id}
                               matchDate={match.date}
@@ -320,11 +320,11 @@ export default function Dashboard() {
                                   : [match.player1.name, match.player2.name]
                               }
                               matchType={match.matchType}
-                          opponentName={
-                            (match.participants ?? []).length >= 4
-                              ? undefined
-                              : opponent.name
-                          }
+                              opponentName={
+                                (match.participants ?? []).length >= 4
+                                  ? undefined
+                                  : opponent.name
+                              }
                               compact
                             />
                             <CancelMatchButton

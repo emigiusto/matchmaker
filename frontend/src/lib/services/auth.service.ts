@@ -1,6 +1,4 @@
-import { apiClient } from "./api-client"
-
-const AUTH_TOKEN_KEY = "matchmaker_auth_token"
+import { apiClient, AUTH_TOKEN_KEY } from "./api-client"
 
 export interface AuthUser {
   id: string

@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Link } from "react-router-dom"
-import { Search, TrendingUp } from "lucide-react"
+import { Search, TrendingUp, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -11,14 +11,44 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/page-header"
-// TODO: wire to API — replace with playersService (rankings endpoint)
-import { mockPlayers, CURRENT_USER_ID } from "@/lib/mock-data"
+import { playersService } from "@/lib/services/players.service"
+import { getCurrentUserId } from "@/lib/current-user"
+import type { Player } from "@/lib/types"
 
 export default function RankingsPage() {
+  const currentUserId = getCurrentUserId()
+  const [players, setPlayers] = useState<Player[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [cityFilter, setCityFilter] = useState("all")
 
-  const sorted = [...mockPlayers].sort((a, b) => b.levelValue - a.levelValue)
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await playersService.getAll()
+        if (!cancelled) setPlayers(data)
+      } catch {
+        if (!cancelled) setError("Failed to load rankings.")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const cities = useMemo(
+    () => Array.from(new Set(players.map((p) => p.city).filter(Boolean))).sort(),
+    [players]
+  )
+
+  const sorted = [...players].sort((a, b) => b.levelValue - a.levelValue)
   const filtered = sorted.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
     const matchCity = cityFilter === "all" || p.city === cityFilter
@@ -46,67 +76,93 @@ export default function RankingsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Cities</SelectItem>
-              <SelectItem value="Barcelona">Barcelona</SelectItem>
+              {cities.map((city) => (
+                <SelectItem key={city} value={city}>
+                  {city}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         {/* Rankings Table */}
-        <div className="space-y-3">
-          {filtered.map((player, index) => {
-            const rank = index + 1
-            const isCurrentUser = player.userId === CURRENT_USER_ID
-            return (
-              <Link key={player.id} to={`/profile/${player.userId}`}>
-                <Card
-                  className={`transition-all hover:shadow-lg ${
-                    isCurrentUser ? "border-primary/30 bg-primary/5" : ""
-                  }`}
-                >
-                  <CardContent className="flex items-center gap-5 p-5">
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-mono text-base font-bold ${
-                        rank === 1
-                          ? "bg-primary text-primary-foreground"
-                          : rank <= 3
-                            ? "bg-primary/10 text-primary"
-                            : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {rank}
-                    </div>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
-                      {player.name.split(" ").map((n) => n[0]).join("")}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-base font-semibold text-foreground">{player.name}</p>
-                        {isCurrentUser && (
-                          <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                            You
+        {loading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : error ? (
+          <Card>
+            <CardContent className="py-20 text-center">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        ) : filtered.length === 0 ? (
+          <Card>
+            <CardContent className="py-20 text-center">
+              <p className="text-sm text-muted-foreground">No players found.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((player, index) => {
+              const rank = index + 1
+              const isCurrentUser = player.userId === currentUserId
+              return (
+                <Link key={player.id} to={`/profile/${player.userId}`}>
+                  <Card
+                    className={`transition-all hover:shadow-lg ${
+                      isCurrentUser ? "border-primary/30 bg-primary/5" : ""
+                    }`}
+                  >
+                    <CardContent className="flex items-center gap-5 p-5">
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-mono text-base font-bold ${
+                          rank === 1
+                            ? "bg-primary text-primary-foreground"
+                            : rank <= 3
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {rank}
+                      </div>
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
+                        {player.name.split(" ").map((n) => n[0]).join("")}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-base font-semibold text-foreground">{player.name}</p>
+                          {isCurrentUser && (
+                            <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {player.city} &middot; {player.matchesPlayed} matches &middot;{" "}
+                          {player.matchesPlayed > 0
+                            ? ((player.wins / player.matchesPlayed) * 100).toFixed(0)
+                            : 0}% win rate
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono text-2xl font-bold text-foreground">{player.levelValue.toFixed(1)}</p>
+                        <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground">
+                          <TrendingUp className="h-3.5 w-3.5" />
+                          <span>
+                            Confidence {Math.round(player.levelConfidence * 100)}%
                           </span>
-                        )}
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {player.city} &middot; {player.matchesPlayed} matches &middot;{" "}
-                        {((player.wins / player.matchesPlayed) * 100).toFixed(0)}% win rate
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-2xl font-bold text-foreground">{player.levelValue.toFixed(1)}</p>
-                      <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        <span>
-                          Confidence {Math.round(player.levelConfidence * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            )
-          })}
-        </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </div>
     </>
   )

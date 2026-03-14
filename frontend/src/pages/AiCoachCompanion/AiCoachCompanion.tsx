@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   BrainCircuit,
   Target,
@@ -14,16 +14,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
-import {
-  // TODO: wire to API — replace with matchesService.getUpcoming()
-  mockMatches,
-  CURRENT_USER_ID,
-} from "@/lib/mock-data"
+import { matchesService } from "@/lib/services/matches.service"
+import { getCurrentUserId } from "@/lib/current-user"
+import type { Match } from "@/lib/types"
 
-// Mock upcoming matches for the selector
-const upcomingMatches = mockMatches.filter((m) => m.status === "scheduled")
-
-// Pre-built strategy output (mock AI result)
+// Pre-built strategy output (mock AI result — placeholder until AI service is wired)
 const mockStrategy = {
   opponent: "Maria Santos",
   opponentLevel: 5.0,
@@ -76,14 +71,36 @@ const mockStrategy = {
 }
 
 export default function AIMatchCompanionPage() {
+  const currentUserId = getCurrentUserId()
+  const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([])
+  const [loadingMatches, setLoadingMatches] = useState(true)
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [strategy, setStrategy] = useState<typeof mockStrategy | null>(null)
 
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoadingMatches(true)
+      try {
+        const data = await matchesService.getUpcoming(currentUserId)
+        if (!cancelled) setUpcomingMatches(data.filter((m) => m.status === "scheduled"))
+      } catch {
+        if (!cancelled) setUpcomingMatches([])
+      } finally {
+        if (!cancelled) setLoadingMatches(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
+
   function handleGenerate() {
     if (!selectedMatchId) return
     setGenerating(true)
-    // Simulate AI generation
+    // Simulate AI generation — placeholder until AI service is wired
     setTimeout(() => {
       setStrategy(mockStrategy)
       setGenerating(false)
@@ -125,7 +142,11 @@ export default function AIMatchCompanionPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {upcomingMatches.length === 0 ? (
+            {loadingMatches ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : upcomingMatches.length === 0 ? (
               <p className="py-8 text-center text-base text-muted-foreground">
                 No upcoming matches. Schedule one to get a custom strategy.
               </p>
@@ -133,7 +154,7 @@ export default function AIMatchCompanionPage() {
               <div className="space-y-3">
                 {upcomingMatches.map((match) => {
                   const opp =
-                    match.player1.userId === CURRENT_USER_ID
+                    match.player1.userId === currentUserId
                       ? match.player2
                       : match.player1
                   const isSelected = selectedMatchId === match.id

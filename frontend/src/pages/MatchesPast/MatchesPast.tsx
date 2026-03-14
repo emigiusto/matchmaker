@@ -1,19 +1,57 @@
+import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { format } from "date-fns"
-import { Calendar, MapPin, TrendingUp, Clock as ClockIcon } from "lucide-react"
+import { Calendar, MapPin, TrendingUp, Clock as ClockIcon, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
-// TODO: wire to API — replace with matchesService.getPast()
-import { mockMatches, CURRENT_USER_ID } from "@/lib/mock-data"
+import { matchesService } from "@/lib/services/matches.service"
+import { getCurrentUserId } from "@/lib/current-user"
+import type { Match } from "@/lib/types"
 
 export default function PastMatchesPage() {
-  const pastMatches = mockMatches.filter((m) => m.status === "completed")
+  const currentUserId = getCurrentUserId()
+  const [pastMatches, setPastMatches] = useState<Match[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const today = new Date().toISOString().slice(0, 10)
+        const data = await matchesService.getPast(currentUserId)
+        if (!cancelled) setPastMatches(data.filter((m) => m.date <= today))
+      } catch {
+        if (!cancelled) setError("Failed to load past matches.")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
 
   return (
     <>
       <PageHeader title="Past Matches" description="Your match history" />
       <div className="flex flex-1 flex-col gap-4 p-5 lg:p-8">
-        {pastMatches.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : error ? (
+          <Card>
+            <CardContent className="py-20 text-center">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        ) : pastMatches.length === 0 ? (
           <Card>
             <CardContent className="py-20 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
@@ -26,8 +64,8 @@ export default function PastMatchesPage() {
           <div className="space-y-3">
             {pastMatches.map((match) => {
               const opponent =
-                match.player1.userId === CURRENT_USER_ID ? match.player2 : match.player1
-              const isWinner = match.result?.winnerId === "player-001"
+                match.player1.userId === currentUserId ? match.player2 : match.player1
+              const isWinner = match.result?.winnerId === currentUserId
               return (
                 <Link key={match.id} to={`/matches/${match.id}`}>
                   <Card className="transition-all hover:shadow-lg">

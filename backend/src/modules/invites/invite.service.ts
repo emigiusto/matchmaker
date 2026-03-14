@@ -217,7 +217,19 @@ export class InviteService {
       }
       const availability = await tx.availability.findUnique({ where: { id: invite.availabilityId } });
       if (!availability) throw new AppError('Availability not found', 404);
-      scheduledAt = availability.startTime;
+      // Derive scheduledAt from availability.date (authoritative date) + time from availability.startTime.
+      // Using startTime alone risks a stale/wrong date component if the two fields ever diverge.
+      const avDate = new Date(availability.date);
+      const avTime = new Date(availability.startTime);
+      const combined = new Date(Date.UTC(
+        avDate.getUTCFullYear(),
+        avDate.getUTCMonth(),
+        avDate.getUTCDate(),
+        avTime.getUTCHours(),
+        avTime.getUTCMinutes(),
+        avTime.getUTCSeconds(),
+      ));
+      scheduledAt = combined;
       availabilityId = availability.id;
 
       // Validate acceptor user
@@ -249,7 +261,7 @@ export class InviteService {
         data: {
           inviteId: invite.id,
           availabilityId: invite.availabilityId,
-          scheduledAt: availability.startTime,
+          scheduledAt: combined,
           playerAId,
           playerBId,
           type: invite.matchType as MatchType,
