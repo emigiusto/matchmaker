@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Link, useParams } from "react-router-dom"
 import { format } from "date-fns"
 import {
@@ -54,6 +54,7 @@ export default function MatchDetailPage() {
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [bookingAttempt, setBookingAttempt] = useState<BookingAttemptDTO | null>(null)
   const [retryingBooking, setRetryingBooking] = useState(false)
+  const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function fetchReminders() {
     if (!currentUserId) return
@@ -89,9 +90,35 @@ export default function MatchDetailPage() {
     if (id && currentUserId) fetchReminders()
   }, [id, currentUserId])
 
+  const stopBookingPoll = useCallback(() => {
+    if (bookingPollRef.current) {
+      clearInterval(bookingPollRef.current)
+      bookingPollRef.current = null
+    }
+  }, [])
+
+  const startBookingPoll = useCallback((matchId: string) => {
+    stopBookingPoll()
+    bookingPollRef.current = setInterval(async () => {
+      try {
+        const attempt = await bookingService.getAttempt(matchId)
+        setBookingAttempt(attempt)
+        if (!attempt || attempt.status !== "pending") {
+          stopBookingPoll()
+        }
+      } catch {
+        stopBookingPoll()
+      }
+    }, 3000)
+  }, [stopBookingPoll])
+
   useEffect(() => {
     if (!id) return
-    bookingService.getAttempt(id).then(setBookingAttempt).catch(() => {})
+    bookingService.getAttempt(id).then((attempt) => {
+      setBookingAttempt(attempt)
+      if (attempt?.status === "pending") startBookingPoll(id)
+    }).catch(() => {})
+    return stopBookingPoll
   }, [id])
 
   async function handleRetryBooking() {
@@ -101,6 +128,7 @@ export default function MatchDetailPage() {
       await bookingService.retryBooking(id)
       setBookingAttempt((prev) => prev ? { ...prev, status: "pending" } : prev)
       toast.success("Booking retry queued")
+      startBookingPoll(id)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to retry booking")
     } finally {
