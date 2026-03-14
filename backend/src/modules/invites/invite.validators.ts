@@ -17,7 +17,7 @@ export const createInviteSchema = z.object({
   availabilityId: z.string().uuid(),
   inviterUserId: z.string().uuid(),
   matchType: z.enum(['competitive', 'practice']).optional(),
-  // Additional fields can be added as needed
+  bookingEnabled: z.boolean().optional(),
 });
 
 /**

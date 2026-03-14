@@ -44,6 +44,8 @@ model User {
 
   reminders Reminder[]
 
+  clubMemberships ClubMembership[]
+
   resultsWon        Result[]        @relation("WinnerUser")
 
   schedulingRequestsAsHost     SchedulingRequest[] @relation("SchedulingHost")
@@ -108,6 +110,7 @@ model GuestContact {
   ownerUserId String
   name        String
   phone       String
+  socioNumber String?  // optional club member number for court booking
   createdAt   DateTime @default(now())
 
   owner       User         @relation(fields: [ownerUserId], references: [id])
@@ -187,6 +190,7 @@ model Invite {
   radiusKm       Float?
   expiresAt      DateTime
   createdAt      DateTime         @default(now())
+  bookingEnabled Boolean          @default(false)
 
   inviter      User         @relation("InvitesSent", fields: [inviterUserId], references: [id])
   availability Availability @relation(fields: [availabilityId], references: [id])
@@ -245,6 +249,7 @@ model Match {
   playerA        Player?        @relation("PlayerA", fields: [playerAId], references: [id])
   playerB        Player?        @relation("PlayerB", fields: [playerBId], references: [id])
   result         Result?
+  bookingAttempt BookingAttempt?
   conversation   Conversation?
   participants   MatchParticipant[]
   reminders      Reminder[]
@@ -524,6 +529,7 @@ model SchedulingRequest {
   maxParallelCandidates Int                   @default(1)
   inviteToken           String                @unique
   status                SchedulingRequestStatus @default(active)
+  bookingEnabled        Boolean               @default(false)
   currentCandidateIndex Int                   @default(0)
   matchId               String?               @unique
   createdAt             DateTime             @default(now())
@@ -608,4 +614,64 @@ enum SchedulingCandidateStatus {
   expired     // no response in time
   cancelled   // host cancelled/skipped the candidate
   send_failed // WhatsApp message could not be delivered (bad/unreachable number)
+}
+
+////////////////////////////////////////////////////////////
+// CLUB MEMBERSHIP — user's credentials/identity at a club
+////////////////////////////////////////////////////////////
+
+model ClubMembership {
+  id                String              @id @default(uuid())
+  userId            String
+  clubSlug          String              // e.g. "laieta"
+  adapterType       String              // e.g. "miclubonline"
+  socioNumber       String
+  encryptedPassword String?             // only needed for hosts who book courts
+  status            ClubMembershipStatus @default(unverified)
+  lastVerifiedAt    DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingAttempts BookingAttempt[]
+
+  @@unique([userId, clubSlug])
+  @@index([userId])
+  @@index([clubSlug])
+}
+
+enum ClubMembershipStatus {
+  unverified
+  active
+  invalid_credentials
+}
+
+////////////////////////////////////////////////////////////
+// BOOKING ATTEMPT — court booking attempt for a match
+////////////////////////////////////////////////////////////
+
+model BookingAttempt {
+  id                 String         @id @default(uuid())
+  matchId            String         @unique
+  clubMembershipId   String
+  status             BookingStatus  @default(pending)
+  externalBookingId  String?        // reference from the external booking system
+  courtName          String?
+  errorMessage       String?
+  attemptedAt        DateTime       @default(now())
+  completedAt        DateTime?
+
+  match          Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  clubMembership ClubMembership @relation(fields: [clubMembershipId], references: [id])
+
+  @@index([matchId])
+  @@index([clubMembershipId])
+  @@index([status])
+}
+
+enum BookingStatus {
+  pending
+  success
+  failed
+  cancelled
 }

@@ -8,6 +8,14 @@ import {
   Loader2,
   Save,
   MapPin,
+  Building2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Trash2,
+  Wifi,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,6 +36,7 @@ import { useTranslation } from "@/lib/i18n/use-translation"
 import { getCurrentUserId } from "@/lib/current-user"
 import { usersService, type User } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
+import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO } from "@/lib/services/booking.service"
 import { toast } from "sonner"
 
 export default function ProfilePage() {
@@ -41,6 +50,27 @@ export default function ProfilePage() {
   const [player, setPlayer] = useState<{ id: string; preferredClub?: string; defaultCity?: string } | null>(null)
   const [locationForm, setLocationForm] = useState({ preferredClub: "", defaultCity: "" })
   const [savingLocation, setSavingLocation] = useState(false)
+
+  // Club connections state
+  const [memberships, setMemberships] = useState<ClubMembershipDTO[]>([])
+  const [clubForm, setClubForm] = useState({
+    clubSlug: SUPPORTED_CLUBS[0].clubSlug,
+    socioNumber: "",
+    password: "",
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [savingClub, setSavingClub] = useState(false)
+  const [testingClub, setTestingClub] = useState<string | null>(null)
+  const [editingClub, setEditingClub] = useState<string | null>(null)
+
+  async function fetchMemberships() {
+    try {
+      const list = await bookingService.listMemberships(currentUserId)
+      setMemberships(list)
+    } catch {
+      // non-critical
+    }
+  }
 
   async function refetchProfile() {
     try {
@@ -99,6 +129,10 @@ export default function ProfilePage() {
     return () => { cancelled = true }
   }, [currentUserId])
 
+  useEffect(() => {
+    fetchMemberships()
+  }, [currentUserId])
+
   async function handleSaveLocation(e: React.FormEvent) {
     e.preventDefault()
     setSavingLocation(true)
@@ -151,6 +185,61 @@ export default function ProfilePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleSaveClub(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingClub(true)
+    try {
+      const club = SUPPORTED_CLUBS.find((c) => c.clubSlug === clubForm.clubSlug)!
+      await bookingService.upsertMembership({
+        userId: currentUserId,
+        clubSlug: clubForm.clubSlug,
+        adapterType: club.adapterType,
+        socioNumber: clubForm.socioNumber.trim(),
+        password: clubForm.password.trim() || undefined,
+      })
+      toast.success("Club connection saved")
+      setClubForm((p) => ({ ...p, socioNumber: "", password: "" }))
+      setEditingClub(null)
+      await fetchMemberships()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save club connection")
+    } finally {
+      setSavingClub(false)
+    }
+  }
+
+  async function handleTestConnection(clubSlug: string) {
+    setTestingClub(clubSlug)
+    try {
+      const ok = await bookingService.testConnection(currentUserId, clubSlug)
+      if (ok) {
+        toast.success("Connection verified successfully")
+      } else {
+        toast.error("Invalid credentials — check your socio number and password")
+      }
+      await fetchMemberships()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Connection test failed")
+    } finally {
+      setTestingClub(null)
+    }
+  }
+
+  async function handleDeleteMembership(clubSlug: string) {
+    try {
+      await bookingService.deleteMembership(currentUserId, clubSlug)
+      toast.success("Club connection removed")
+      await fetchMemberships()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove connection")
+    }
+  }
+
+  function handleEditMembership(m: ClubMembershipDTO) {
+    setEditingClub(m.clubSlug)
+    setClubForm({ clubSlug: m.clubSlug, socioNumber: m.socioNumber, password: "" })
   }
 
   if (loading) {
@@ -328,6 +417,191 @@ export default function ProfilePage() {
                 Save location
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Club Connections */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
+              <Building2 className="h-5 w-5 text-primary" />
+              Club Connections
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Connect your club membership to enable automatic court booking when matches are confirmed.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Existing memberships */}
+            {memberships.length > 0 && (
+              <div className="space-y-3">
+                {memberships.map((m) => {
+                  const club = SUPPORTED_CLUBS.find((c) => c.clubSlug === m.clubSlug)
+                  const isEditing = editingClub === m.clubSlug
+                  return (
+                    <div key={m.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground">{club?.label ?? m.clubSlug}</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">Socio #{m.socioNumber}</p>
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            {m.status === "active" ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                <span className="text-xs text-green-600 dark:text-green-400">Verified</span>
+                              </>
+                            ) : m.status === "invalid_credentials" ? (
+                              <>
+                                <XCircle className="h-3.5 w-3.5 text-destructive" />
+                                <span className="text-xs text-destructive">Invalid credentials</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Not verified</span>
+                              </>
+                            )}
+                            {m.lastVerifiedAt && (
+                              <span className="text-xs text-muted-foreground/60">
+                                · {new Date(m.lastVerifiedAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            disabled={testingClub === m.clubSlug}
+                            onClick={() => handleTestConnection(m.clubSlug)}
+                          >
+                            {testingClub === m.clubSlug ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Wifi className="h-3.5 w-3.5" />
+                            )}
+                            Test
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditMembership(m)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteMembership(m.clubSlug)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Add / Edit form */}
+            {(memberships.length === 0 || editingClub !== null) && (
+              <form onSubmit={handleSaveClub} className="space-y-4 max-w-md">
+                {editingClub !== null && (
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Editing connection
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="clubSlug">Club</Label>
+                  <Select
+                    value={clubForm.clubSlug}
+                    onValueChange={(v) => setClubForm((p) => ({ ...p, clubSlug: v }))}
+                    disabled={editingClub !== null}
+                  >
+                    <SelectTrigger id="clubSlug">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_CLUBS.map((c) => (
+                        <SelectItem key={c.clubSlug} value={c.clubSlug}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="socioNumber">Socio number</Label>
+                  <Input
+                    id="socioNumber"
+                    value={clubForm.socioNumber}
+                    onChange={(e) => setClubForm((p) => ({ ...p, socioNumber: e.target.value }))}
+                    placeholder="e.g. 12345"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clubPassword">
+                    Password{" "}
+                    <span className="font-normal text-muted-foreground">(required for automatic booking)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="clubPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={clubForm.password}
+                      onChange={(e) => setClubForm((p) => ({ ...p, password: e.target.value }))}
+                      placeholder={editingClub ? "Leave blank to keep existing" : "Your club portal password"}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowPassword((v) => !v)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Stored encrypted. Only used to log in to the club portal on your behalf.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={savingClub} className="gap-2">
+                    {savingClub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    {editingClub ? "Update connection" : "Save connection"}
+                  </Button>
+                  {editingClub && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingClub(null)
+                        setClubForm({ clubSlug: SUPPORTED_CLUBS[0].clubSlug, socioNumber: "", password: "" })
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {/* Add new button when memberships exist and not editing */}
+            {memberships.length > 0 && editingClub === null && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setEditingClub("")}
+              >
+                + Add another club
+              </Button>
+            )}
           </CardContent>
         </Card>
 

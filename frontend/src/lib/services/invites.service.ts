@@ -1,6 +1,15 @@
 import { apiClient } from "./api-client"
 import type { Invite } from "../types"
 
+export interface InviteEventDTO {
+  id: string
+  inviteId: string
+  action: string
+  actorUserId: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
 export interface CreateInviteDto {
   fromUserId: string
   toUserId?: string
@@ -39,5 +48,9 @@ export const invitesService = {
 
   async decline(token: string): Promise<Invite> {
     return apiClient.post<Invite>(`/invites/${token}/decline`)
+  },
+
+  async getEvents(inviteId: string): Promise<InviteEventDTO[]> {
+    return apiClient.get<InviteEventDTO[]>(`/invites/by-id/${inviteId}/events`)
   },
 }

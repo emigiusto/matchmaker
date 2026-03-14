@@ -37,6 +37,7 @@ import {
   Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
@@ -184,6 +185,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [groupsWithMembers, setGroupsWithMembers] = useState<import("@/lib/services/groups.service").GroupWithMembersDTO[]>([])
   const [friends, setFriends] = useState<import("@/lib/services/friendships.service").Friend[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
+  const [bookingEnabled, setBookingEnabled] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [manualName, setManualName] = useState("")
   const [manualPhone, setManualPhone] = useState("")
@@ -399,6 +401,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         maxParallelCandidates,
         hostPartnerUserId: null,
         candidateUserIds: priorityList.map((c) => c.id),
+        bookingEnabled,
       })
       await schedulingService.start(req.id)
       toast.success("Scheduling started! Invites will be sent via WhatsApp.", {
@@ -1090,6 +1093,24 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   Once accepted, a match is created and a WhatsApp group is set up
                 </li>
               </ul>
+            </div>
+
+            {/* Court booking option */}
+            <div className="rounded-xl border border-border/40 bg-card px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Auto-book a court</p>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically reserve a court when someone accepts.
+                    Requires a club connection in your profile.
+                  </p>
+                </div>
+                <Switch
+                  checked={bookingEnabled}
+                  onCheckedChange={setBookingEnabled}
+                  aria-label="Auto-book a court"
+                />
+              </div>
             </div>
 
             {/* Copy invite link */}

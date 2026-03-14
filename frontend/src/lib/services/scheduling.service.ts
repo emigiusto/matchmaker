@@ -61,6 +61,7 @@ export interface CreateSchedulingRequestInput {
   maxParallelCandidates?: number
   hostPartnerUserId?: string | null
   candidateUserIds: string[]
+  bookingEnabled?: boolean
 }
 
 export type SchedulingInviteEventAction =
@@ -75,6 +76,9 @@ export type SchedulingInviteEventAction =
   | 'request_cancelled'
   | 'request_completed'
   | 'request_expired'
+  | 'booking_pending'
+  | 'booking_success'
+  | 'booking_failed'
 
 export interface SchedulingInviteEventDTO {
   id: string

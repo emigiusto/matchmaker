@@ -34,6 +34,7 @@ export async function createGuestContact(input: CreateGuestContactInput): Promis
       ownerUserId: input.ownerUserId,
       name,
       phone: phoneInput,
+      ...(input.socioNumber !== undefined && { socioNumber: input.socioNumber }),
     },
   });
 
@@ -54,6 +55,7 @@ export async function createGuestContact(input: CreateGuestContactInput): Promis
       ownerUserId: guestContact.ownerUserId,
       name: guestContact.name,
       phone: guestContact.phone,
+      ...(guestContact.socioNumber !== null && guestContact.socioNumber !== undefined && { socioNumber: guestContact.socioNumber }),
       createdAt: guestContact.createdAt.toISOString(),
     },
     user: { id: user.id, name: user.name },
@@ -88,6 +90,31 @@ export async function listGuestContactsByOwner(ownerUserId: string): Promise<Gue
     ownerUserId: c.ownerUserId,
     name: c.name,
     phone: c.phone,
+    ...(c.socioNumber !== null && c.socioNumber !== undefined && { socioNumber: c.socioNumber }),
     createdAt: c.createdAt.toISOString(),
   }));
+}
+
+export async function updateGuestContactSocioNumber(
+  id: string,
+  ownerUserId: string,
+  socioNumber: string,
+): Promise<GuestContactDTO> {
+  const contact = await prisma.guestContact.findUnique({ where: { id } });
+  if (!contact) throw new AppError('Guest contact not found', 404);
+  if (contact.ownerUserId !== ownerUserId) throw new AppError('Forbidden', 403);
+
+  const updated = await prisma.guestContact.update({
+    where: { id },
+    data: { socioNumber },
+  });
+
+  return {
+    id: updated.id,
+    ownerUserId: updated.ownerUserId,
+    name: updated.name,
+    phone: updated.phone,
+    ...(updated.socioNumber !== null && updated.socioNumber !== undefined && { socioNumber: updated.socioNumber }),
+    createdAt: updated.createdAt.toISOString(),
+  };
 }

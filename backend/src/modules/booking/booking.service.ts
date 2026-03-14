@@ -1,0 +1,369 @@
+// booking.service.ts
+// Manages ClubMembership (user credentials per club) and BookingAttempt lifecycle.
+// Triggered automatically after a match is confirmed.
+
+import { prisma } from '../../prisma'
+import { AppError } from '../../shared/errors/AppError'
+import { encrypt, decrypt } from '../../shared/utils/crypto.utils'
+import { getAdapter } from './adapters/adapter.registry'
+import { logger } from '../../config/logger'
+import type {
+  UpsertClubMembershipInput,
+  ClubMembershipDTO,
+  BookingAttemptDTO,
+} from './booking.types'
+
+// ─── ClubMembership ───────────────────────────────────────────────
+
+export async function upsertClubMembership(
+  input: UpsertClubMembershipInput,
+): Promise<ClubMembershipDTO> {
+  const encryptedPassword = input.password ? encrypt(input.password) : undefined
+
+  const membership = await prisma.clubMembership.upsert({
+    where: { userId_clubSlug: { userId: input.userId, clubSlug: input.clubSlug } },
+    create: {
+      userId: input.userId,
+      clubSlug: input.clubSlug,
+      adapterType: input.adapterType,
+      socioNumber: input.socioNumber,
+      encryptedPassword: encryptedPassword ?? null,
+      status: 'unverified',
+    },
+    update: {
+      socioNumber: input.socioNumber,
+      adapterType: input.adapterType,
+      ...(encryptedPassword !== undefined && { encryptedPassword }),
+      status: 'unverified',
+      lastVerifiedAt: null,
+    },
+  })
+
+  return toMembershipDTO(membership)
+}
+
+export async function getClubMembership(
+  userId: string,
+  clubSlug: string,
+): Promise<ClubMembershipDTO | null> {
+  const membership = await prisma.clubMembership.findUnique({
+    where: { userId_clubSlug: { userId, clubSlug } },
+  })
+  return membership ? toMembershipDTO(membership) : null
+}
+
+export async function listClubMemberships(userId: string): Promise<ClubMembershipDTO[]> {
+  const memberships = await prisma.clubMembership.findMany({ where: { userId } })
+  return memberships.map(toMembershipDTO)
+}
+
+export async function deleteClubMembership(userId: string, clubSlug: string): Promise<void> {
+  await prisma.clubMembership.delete({
+    where: { userId_clubSlug: { userId, clubSlug } },
+  })
+}
+
+export async function testClubConnection(userId: string, clubSlug: string): Promise<boolean> {
+  const membership = await prisma.clubMembership.findUnique({
+    where: { userId_clubSlug: { userId, clubSlug } },
+  })
+  if (!membership) throw new AppError('Club membership not found', 404)
+  if (!membership.encryptedPassword) throw new AppError('No password stored for this membership', 400)
+
+  const adapter = getAdapter(membership.adapterType)
+  const creds = {
+    socioNumber: membership.socioNumber,
+    password: decrypt(membership.encryptedPassword),
+  }
+
+  const ok = await adapter.testConnection(creds)
+
+  await prisma.clubMembership.update({
+    where: { id: membership.id },
+    data: {
+      status: ok ? 'active' : 'invalid_credentials',
+      lastVerifiedAt: new Date(),
+    },
+  })
+
+  return ok
+}
+
+// ─── BookingAttempt ───────────────────────────────────────────────
+
+/**
+ * Triggered after a match is confirmed.
+ * Finds the host's ClubMembership, collects socio numbers from all other participants,
+ * and attempts to book a court via the appropriate adapter.
+ *
+ * If any participant is missing a socio number, the attempt fails immediately.
+ */
+export async function triggerBookingForMatch(matchId: string): Promise<void> {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: {
+      participants: { include: { user: true } },
+      availability: true,
+    },
+  })
+  if (!match) throw new AppError('Match not found', 404)
+
+  // Check for existing booking attempt via separate query (avoids relying on include before Prisma client is regenerated)
+  const existingAttempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
+  if (existingAttempt) {
+    logger.warn(`[booking] Match ${matchId} already has a booking attempt, skipping`)
+    return
+  }
+
+  // Find host: participant who owns the availability
+  const hostUserId = match.availability?.userId
+  if (!hostUserId) {
+    logger.warn(`[booking] No host userId for match ${matchId}, skipping booking`)
+    return
+  }
+
+  // Find host ClubMembership — for now use the first active one with a password
+  // In the future this could be club-specific based on match venue/location
+  const hostMembership = await prisma.clubMembership.findFirst({
+    where: {
+      userId: hostUserId,
+      encryptedPassword: { not: null },
+      status: 'active',
+    },
+  })
+  if (!hostMembership) {
+    logger.info(`[booking] Host ${hostUserId} has no active club membership, skipping booking`)
+    return
+  }
+
+  // Create pending BookingAttempt
+  const attempt = await prisma.bookingAttempt.create({
+    data: {
+      matchId,
+      clubMembershipId: hostMembership.id,
+      status: 'pending',
+    },
+  })
+
+  // Log booking_pending event to SchedulingRequest history
+  logBookingEvent(matchId, 'booking_pending').catch(() => {})
+
+  // Run booking async — don't await so it doesn't block confirmInvite
+  runBookingJob(attempt.id, matchId, hostMembership.id).catch((err) => {
+    logger.error(`[booking] Unhandled error in booking job for match ${matchId}:`, err)
+  })
+}
+
+/**
+ * Log a booking event to the SchedulingInviteEvent table for the request linked to this match.
+ * If the match has no linked SchedulingRequest, the event is silently skipped.
+ */
+async function logBookingEvent(
+  matchId: string,
+  action: 'booking_pending' | 'booking_success' | 'booking_failed',
+  metadata?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const request = await prisma.schedulingRequest.findUnique({ where: { matchId } })
+    if (!request) return
+    await prisma.schedulingInviteEvent.create({
+      data: {
+        schedulingRequestId: request.id,
+        action,
+        ...(metadata !== undefined && { metadata: metadata as object }),
+      },
+    })
+  } catch (err) {
+    logger.warn(`[booking] Failed to log ${action} event for match ${matchId}:`, err)
+  }
+}
+
+/** Detect network-level errors that indicate the booking system is offline/unreachable */
+function isOfflineError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  const offlinePatterns = ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ERR_NAME_NOT_RESOLVED', 'net::ERR']
+  return offlinePatterns.some((p) => msg.includes(p))
+}
+
+async function runBookingJob(
+  attemptId: string,
+  matchId: string,
+  hostMembershipId: string,
+): Promise<void> {
+  try {
+    const [attempt, match] = await Promise.all([
+      prisma.bookingAttempt.findUnique({ where: { id: attemptId } }),
+      prisma.match.findUnique({
+        where: { id: matchId },
+        include: {
+          participants: { include: { user: true } },
+          availability: true,
+        },
+      }),
+    ])
+    if (!attempt || !match) return
+
+    const membership = await prisma.clubMembership.findUnique({
+      where: { id: hostMembershipId },
+    })
+    if (!membership || !membership.encryptedPassword) {
+      await failAttempt(attemptId, 'Host membership missing or has no password')
+      return
+    }
+
+    const hostUserId = match.availability?.userId
+    const otherParticipants = match.participants.filter((p) => p.userId !== hostUserId)
+
+    // Collect socio numbers for other participants
+    const participantSocioNumbers: string[] = []
+    for (const participant of otherParticipants) {
+      // Check ClubMembership for registered users
+      const participantMembership = await prisma.clubMembership.findFirst({
+        where: { userId: participant.userId, clubSlug: membership.clubSlug },
+      })
+      if (participantMembership?.socioNumber) {
+        participantSocioNumbers.push(participantMembership.socioNumber)
+        continue
+      }
+
+      // Check GuestContact for guest users
+      const guestContact = await prisma.guestContact.findFirst({
+        where: {
+          phone: participant.user?.phone ?? '',
+          ownerUserId: hostUserId ?? '',
+        },
+      })
+      if (guestContact?.socioNumber) {
+        participantSocioNumbers.push(guestContact.socioNumber)
+        continue
+      }
+
+      await failAttempt(
+        attemptId,
+        `Missing socio number for participant ${participant.user?.name ?? participant.userId}`,
+      )
+      return
+    }
+
+    const adapter = getAdapter(membership.adapterType)
+    const creds = {
+      socioNumber: membership.socioNumber,
+      password: decrypt(membership.encryptedPassword),
+    }
+
+    const date = match.availability?.date
+      ? new Date(match.availability.date).toISOString().slice(0, 10)
+      : new Date(match.scheduledAt).toISOString().slice(0, 10)
+    const time = match.availability?.startTime
+      ? new Date(match.availability.startTime).toTimeString().slice(0, 5)
+      : new Date(match.scheduledAt).toTimeString().slice(0, 5)
+
+    const sport = (match as { sport?: string | null }).sport ?? 'tennis'
+    const sportOptions = { sport }
+
+    // Check availability and pick first available court
+    const slots = await adapter.checkAvailability(creds, date, time, sportOptions)
+    const slot = slots.find((s) => s.available)
+    if (!slot) {
+      await failAttempt(attemptId, `No available courts at ${date} ${time}`)
+      return
+    }
+
+    const result = await adapter.book(creds, date, time, slot.courtId, participantSocioNumbers, sportOptions)
+
+    await prisma.bookingAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: 'success',
+        externalBookingId: result.externalId,
+        courtName: result.courtName,
+        completedAt: new Date(),
+      },
+    })
+
+    logBookingEvent(matchId, 'booking_success', { courtName: result.courtName, externalId: result.externalId }).catch(() => {})
+    logger.info(`[booking] Court booked for match ${matchId}: ${result.courtName} (${result.externalId})`)
+  } catch (err) {
+    const offline = isOfflineError(err)
+    const message = offline
+      ? 'Club booking system is offline or unreachable'
+      : (err instanceof Error ? err.message : String(err))
+    await failAttempt(attemptId, message)
+    logBookingEvent(matchId, 'booking_failed', { errorMessage: message }).catch(() => {})
+    logger.error(`[booking] Booking failed for match ${matchId}: ${message}`)
+  }
+}
+
+async function failAttempt(attemptId: string, errorMessage: string): Promise<void> {
+  await prisma.bookingAttempt.update({
+    where: { id: attemptId },
+    data: { status: 'failed', errorMessage, completedAt: new Date() },
+  }).catch(() => {}) // don't throw if update fails
+}
+
+/**
+ * Retry a failed booking. Resets the existing attempt and re-runs the booking job.
+ * Only allowed when the current attempt status is 'failed'.
+ */
+export async function retryBookingForMatch(matchId: string): Promise<void> {
+  const existing = await prisma.bookingAttempt.findUnique({ where: { matchId } })
+  if (!existing) throw new AppError('No booking attempt found for this match', 404)
+  if (existing.status !== 'failed') {
+    throw new AppError(`Cannot retry — booking status is "${existing.status}"`, 409)
+  }
+
+  // Reset attempt to pending
+  await prisma.bookingAttempt.update({
+    where: { id: existing.id },
+    data: { status: 'pending', errorMessage: null, completedAt: null },
+  })
+
+  logBookingEvent(matchId, 'booking_pending', { retry: true }).catch(() => {})
+
+  runBookingJob(existing.id, matchId, existing.clubMembershipId).catch((err) => {
+    logger.error(`[booking] Unhandled error in retry booking job for match ${matchId}:`, err)
+  })
+}
+
+export async function getBookingAttemptByMatch(matchId: string): Promise<BookingAttemptDTO | null> {
+  const attempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
+  return attempt ? toAttemptDTO(attempt) : null
+}
+
+// ─── Mappers ──────────────────────────────────────────────────────
+
+function toMembershipDTO(m: {
+  id: string; userId: string; clubSlug: string; adapterType: string
+  socioNumber: string; encryptedPassword: string | null; status: string
+  lastVerifiedAt: Date | null; createdAt: Date
+}): ClubMembershipDTO {
+  return {
+    id: m.id,
+    userId: m.userId,
+    clubSlug: m.clubSlug,
+    adapterType: m.adapterType,
+    socioNumber: m.socioNumber,
+    hasPassword: !!m.encryptedPassword,
+    status: m.status,
+    lastVerifiedAt: m.lastVerifiedAt?.toISOString() ?? null,
+    createdAt: m.createdAt.toISOString(),
+  }
+}
+
+function toAttemptDTO(a: {
+  id: string; matchId: string; clubMembershipId: string; status: string
+  externalBookingId: string | null; courtName: string | null
+  errorMessage: string | null; attemptedAt: Date; completedAt: Date | null
+}): BookingAttemptDTO {
+  return {
+    id: a.id,
+    matchId: a.matchId,
+    clubMembershipId: a.clubMembershipId,
+    status: a.status,
+    externalBookingId: a.externalBookingId,
+    courtName: a.courtName,
+    errorMessage: a.errorMessage,
+    attemptedAt: a.attemptedAt.toISOString(),
+    completedAt: a.completedAt?.toISOString() ?? null,
+  }
+}

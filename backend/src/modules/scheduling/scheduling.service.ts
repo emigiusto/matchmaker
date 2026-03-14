@@ -8,6 +8,7 @@ import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
+import { triggerBookingForMatch } from '../booking/booking.service';
 import { createNotification } from '../notifications/notifications.service';
 import type {
   CreateSchedulingRequestInput,
@@ -404,6 +405,7 @@ export const schedulingService = {
           radiusKm: input.radiusKm ?? null,
           responseWindowMinutes: responseWindow,
           maxParallelCandidates: maxParallel,
+          bookingEnabled: input.bookingEnabled ?? false,
           inviteToken,
           status: 'active',
         },
@@ -772,6 +774,13 @@ export const schedulingService = {
     });
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
+
+    // Trigger court booking if the scheduling request opted in
+    if ((request as { bookingEnabled?: boolean }).bookingEnabled) {
+      triggerBookingForMatch(match.id).catch((err) => {
+        logger.error('Failed to trigger booking for scheduling match', { matchId: match.id, requestId, error: err instanceof Error ? err.message : err });
+      });
+    }
 
     // Notify all match participants
     await notifyMatchParticipantsOnCreate(match);

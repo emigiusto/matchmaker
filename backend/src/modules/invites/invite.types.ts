@@ -52,6 +52,8 @@ export interface InviteDTO {
   radiusKm?: number | null;
   /** Match type: competitive or practice */
   matchType: MatchType;
+  /** Whether to auto-book a court when the invite is accepted */
+  bookingEnabled: boolean;
   /** Location from availability (when included) */
   location?: string;
   /** Date from availability YYYY-MM-DD (when included) */
@@ -73,5 +75,5 @@ export interface CreateInviteInput {
   availabilityId: string;
   inviterUserId: string;
   matchType?: MatchType;
-  // Additional fields (e.g., invitee info) can be added as needed
+  bookingEnabled?: boolean;
 }

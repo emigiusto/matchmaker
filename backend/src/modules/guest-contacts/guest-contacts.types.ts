@@ -6,6 +6,7 @@ export interface GuestContactDTO {
   ownerUserId: string;
   name: string;
   phone: string;
+  socioNumber?: string;
   createdAt: string;
 }
 
@@ -30,4 +31,5 @@ export interface CreateGuestContactInput {
   ownerUserId: string;
   name: string;
   phone: string;
+  socioNumber?: string;
 }

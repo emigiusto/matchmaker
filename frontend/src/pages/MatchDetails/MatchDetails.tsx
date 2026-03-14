@@ -14,6 +14,8 @@ import {
   Check,
   XCircle,
   Trash2,
+  Building2,
+  RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,6 +38,7 @@ import { toast } from "sonner"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
+import { bookingService, type BookingAttemptDTO } from "@/lib/services/booking.service"
 import type { Match } from "@/lib/types"
 import { Loader2 } from "lucide-react"
 
@@ -49,6 +52,8 @@ export default function MatchDetailPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [resultSubmitted, _setResultSubmitted] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
+  const [bookingAttempt, setBookingAttempt] = useState<BookingAttemptDTO | null>(null)
+  const [retryingBooking, setRetryingBooking] = useState(false)
 
   function fetchReminders() {
     if (!currentUserId) return
@@ -83,6 +88,25 @@ export default function MatchDetailPage() {
   useEffect(() => {
     if (id && currentUserId) fetchReminders()
   }, [id, currentUserId])
+
+  useEffect(() => {
+    if (!id) return
+    bookingService.getAttempt(id).then(setBookingAttempt).catch(() => {})
+  }, [id])
+
+  async function handleRetryBooking() {
+    if (!id) return
+    setRetryingBooking(true)
+    try {
+      await bookingService.retryBooking(id)
+      setBookingAttempt((prev) => prev ? { ...prev, status: "pending" } : prev)
+      toast.success("Booking retry queued")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to retry booking")
+    } finally {
+      setRetryingBooking(false)
+    }
+  }
 
   async function handleDeleteReminder(reminderId: string) {
     setDeletingId(reminderId)
@@ -313,6 +337,74 @@ export default function MatchDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Court Booking Status */}
+        {bookingAttempt && (
+          <Card className={`border-border/50 ${
+            bookingAttempt.status === "success" ? "border-green-500/30 bg-green-500/5" :
+            bookingAttempt.status === "failed" ? "border-destructive/30 bg-destructive/5" : ""
+          }`}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight">
+                <Building2 className="h-4 w-4" />
+                Court Booking
+                <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  bookingAttempt.status === "success"
+                    ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                    : bookingAttempt.status === "failed"
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                }`}>
+                  {bookingAttempt.status === "pending" ? "In progress…" :
+                   bookingAttempt.status === "success" ? "Booked" :
+                   bookingAttempt.status === "failed" ? "Failed" : bookingAttempt.status}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {bookingAttempt.status === "success" && bookingAttempt.courtName && (
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span>Court <strong>{bookingAttempt.courtName}</strong> reserved</span>
+                  {bookingAttempt.externalBookingId && (
+                    <span className="text-xs text-muted-foreground">
+                      · Ref: {bookingAttempt.externalBookingId}
+                    </span>
+                  )}
+                </div>
+              )}
+              {bookingAttempt.status === "failed" && (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 text-sm">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <span className="text-destructive">
+                      {bookingAttempt.errorMessage ?? "Booking failed"}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleRetryBooking}
+                    disabled={retryingBooking}
+                  >
+                    {retryingBooking
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <RefreshCw className="h-3.5 w-3.5" />
+                    }
+                    Retry booking
+                  </Button>
+                </div>
+              )}
+              {bookingAttempt.status === "pending" && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Attempting to reserve a court…
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Reminders */}
         <Card className="border-border/50">

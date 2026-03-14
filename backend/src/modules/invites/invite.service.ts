@@ -59,8 +59,10 @@ import { getMatchById, notifyMatchParticipantsOnCreate } from '../matches/matche
 import { logger } from '../../config/logger';
 import { AvailabilityService } from '../availabilities/availability.service';
 import { MatchType } from '../matches/matches.types';
+import { triggerBookingForMatch } from '../booking/booking.service';
 
 export class InviteService {
+
   /**
    * Get invite by ID
    */
@@ -166,6 +168,7 @@ export class InviteService {
         availabilityId: createInviteInput.availabilityId,
         inviterUserId: createInviteInput.inviterUserId,
         matchType,
+        bookingEnabled: createInviteInput.bookingEnabled ?? false,
       },
     });
     return InviteService.toDTO(invite);
@@ -332,6 +335,16 @@ export class InviteService {
       }
     }
 
+    // Trigger court booking asynchronously — only if the invite has booking enabled
+    if (updatedInviteDTO.matchId && updatedInviteDTO.bookingEnabled) {
+      triggerBookingForMatch(updatedInviteDTO.matchId).catch((err) => {
+        logger.error('Failed to trigger booking for match', {
+          matchId: updatedInviteDTO.matchId,
+          error: err instanceof Error ? err.message : err
+        });
+      });
+    }
+
     return updatedInviteDTO;
   }
 
@@ -445,6 +458,7 @@ export class InviteService {
       maxLevel: typeof invite.maxLevel === 'number' ? invite.maxLevel : null,
       radiusKm: typeof invite.radiusKm === 'number' ? invite.radiusKm : null,
       matchType: invite.matchType as 'competitive' | 'practice',
+      bookingEnabled: (invite as Invite & { bookingEnabled?: boolean }).bookingEnabled ?? false,
     };
   }
 

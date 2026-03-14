@@ -20,6 +20,7 @@ import conversationsRoutes from './modules/conversations/conversations.routes';
 import schedulingRoutes from './modules/scheduling/scheduling.routes';
 import whatsappRoutes from './modules/whatsapp/whatsapp.routes';
 import remindersRoutes from './modules/reminders/reminders.routes';
+import bookingRoutes from './modules/booking/booking.routes';
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use('/matchmaking', matchmakingRoutes);
 router.use('/scheduling', schedulingRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/reminders', remindersRoutes);
+router.use('/booking', bookingRoutes);
 
 export default router;

@@ -24,6 +24,7 @@ export class SchedulingController {
         maxParallelCandidates: body.maxParallelCandidates != null ? Number(body.maxParallelCandidates) : undefined,
         hostPartnerUserId: body.hostPartnerUserId ?? null,
         candidateUserIds: body.candidateUserIds || [],
+        bookingEnabled: body.bookingEnabled === true,
       };
       const request = await schedulingService.createSchedulingRequest(input);
       res.status(201).json(request);
