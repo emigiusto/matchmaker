@@ -46,6 +46,7 @@ import {
 import { toast } from "sonner"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { PageHeader } from "@/components/page-header"
+import { useTranslation } from "@/lib/i18n"
 
 export interface InviteRequest {
   id: string
@@ -103,6 +104,7 @@ function TimeLeftBadge({
   contactedAt: string
   responseWindowMinutes: number
 }) {
+  const { t } = useTranslation()
   const [, tick] = useState(0)
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 30_000)
@@ -116,7 +118,7 @@ function TimeLeftBadge({
         isExpired ? "text-muted-foreground" : "text-blue-600"
       }`}
     >
-      {text}
+      {isExpired ? t("invites.status.expired") : text}
     </span>
   )
 }
@@ -132,7 +134,8 @@ function formatTimeRange(startIso: string, endIso: string): string {
 }
 
 function mapSchedulingToInviteRequest(
-  r: import("@/lib/services/scheduling.service").SchedulingRequestDTO
+  r: import("@/lib/services/scheduling.service").SchedulingRequestDTO,
+  t: (key: string) => string = (key) => key
 ): InviteRequest | null {
   const statusMap = {
     active: "scheduling" as const,
@@ -156,7 +159,7 @@ function mapSchedulingToInviteRequest(
   const contacts = candidates.map((c) => ({
     id: c.id,
     contactUserId: c.contactUserId,
-    name: c.contactUserName ?? "Unknown",
+    name: c.contactUserName ?? t("common.unknown"),
     status: contactStatusMap[c.status] ?? "pending",
     contactedAt: c.contactedAt ?? null,
   }))
@@ -206,6 +209,7 @@ export function InviteRequestsSection({
   pageTitle = "Invites",
   pageDescription,
 }: InviteRequestsSectionProps) {
+  const { t } = useTranslation()
   const [inviteRequests, setInviteRequests] = useState<InviteRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedRequestId, setCopiedRequestId] = useState<string | null>(null)
@@ -226,7 +230,7 @@ export function InviteRequestsSection({
     try {
       const requestsRes = await schedulingService.listByHost(currentUserId)
       const mapped = requestsRes
-        .map(mapSchedulingToInviteRequest)
+        .map((r) => mapSchedulingToInviteRequest(r, t))
         .filter((r): r is InviteRequest => r !== null)
       setInviteRequests(mapped)
       // Refresh history for any card that has already been expanded
@@ -316,70 +320,70 @@ export function InviteRequestsSection({
     setCancelConfirm(null)
     try {
       const updated = await schedulingService.cancel(id, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
+      const mapped = mapSchedulingToInviteRequest(updated, t)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === id ? mapped : r)))
         switchToFilterForStatus(mapped.status, mapped, true)
       }
-      toast.success("Invite request cancelled")
+      toast.success(t("invites.toast.requestCancelled"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to cancel request")
+      toast.error(e instanceof Error ? e.message : t("invites.toast.cancelRequestFailed"))
     }
   }
 
   async function handleCancelContact(requestId: string, candidateId: string) {
     try {
       const updated = await schedulingService.cancelContacted(requestId, candidateId, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
+      const mapped = mapSchedulingToInviteRequest(updated, t)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
         switchToFilterForStatus(mapped.status, mapped)
-        toast.success("Cancelled invite")
+        toast.success(t("invites.toast.inviteCancelled"))
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to cancel")
+      toast.error(e instanceof Error ? e.message : t("invites.toast.cancelFailed"))
     }
   }
 
   async function handleRemoveContact(requestId: string, candidateId: string) {
     try {
       const updated = await schedulingService.removeCandidate(requestId, candidateId, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
+      const mapped = mapSchedulingToInviteRequest(updated, t)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
         switchToFilterForStatus(mapped.status, mapped)
-        toast.success("Removed from queue")
+        toast.success(t("invites.toast.removedFromQueue"))
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to remove")
+      toast.error(e instanceof Error ? e.message : t("invites.toast.removeFailed"))
     }
   }
 
   async function handleCancelAccepted(requestId: string, candidateId: string) {
     try {
       const updated = await schedulingService.cancelAccepted(requestId, candidateId, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
+      const mapped = mapSchedulingToInviteRequest(updated, t)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
         switchToFilterForStatus(mapped.status, mapped)
-        toast.success("Acceptance cancelled")
+        toast.success(t("invites.toast.acceptanceCancelled"))
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to cancel")
+      toast.error(e instanceof Error ? e.message : t("invites.toast.cancelFailed"))
     }
   }
 
   async function handleManualAccept(requestId: string, candidateId: string) {
     try {
       const updated = await schedulingService.manualAccept(requestId, candidateId, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
+      const mapped = mapSchedulingToInviteRequest(updated, t)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
         switchToFilterForStatus(mapped.status, mapped)
-        toast.success("Match confirmed!")
+        toast.success(t("invites.toast.matchConfirmed"))
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to accept")
+      toast.error(e instanceof Error ? e.message : t("invites.toast.acceptFailed"))
     } finally {
       setAcceptConfirm(null)
     }
@@ -388,20 +392,20 @@ export function InviteRequestsSection({
   async function handleRetryContact(requestId: string, candidateId: string) {
     try {
       const updated = await schedulingService.retry(requestId, candidateId, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated)
+      const mapped = mapSchedulingToInviteRequest(updated, t)
       if (mapped) {
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
         switchToFilterForStatus(mapped.status, mapped)
-        toast.success("Invite will be retried")
+        toast.success(t("invites.toast.retryQueued"))
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to retry invite")
+      toast.error(e instanceof Error ? e.message : t("invites.toast.retryFailed"))
     }
   }
 
   function handleShareWhatsApp(request: InviteRequest) {
     const message = encodeURIComponent(
-      `Want to play ${request.sport} on ${format(new Date(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || "TBD"}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
+      `Want to play ${request.sport} on ${format(new Date(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || t("common.tbd")}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
     )
     window.open(`https://wa.me/?text=${message}`, "_blank")
   }
@@ -412,19 +416,19 @@ export function InviteRequestsSection({
       const fullUrl = link.startsWith("http") ? link : `${window.location.origin}${link}`
       await navigator.clipboard.writeText(fullUrl)
       setCopiedRequestId(request.id)
-      toast.success("Invite link copied")
+      toast.success(t("invites.toast.linkCopied"))
       setTimeout(() => setCopiedRequestId(null), 2000)
     } catch {
       const fallback = `${window.location.origin}/play?invite=${request.inviteToken}`
       await navigator.clipboard.writeText(fallback)
       setCopiedRequestId(request.id)
-      toast.success("Invite link copied")
+      toast.success(t("invites.toast.linkCopied"))
       setTimeout(() => setCopiedRequestId(null), 2000)
     }
   }
 
   function getEventLabel(event: SchedulingInviteEventDTO): string {
-    const name = event.candidateUserName ?? "Unknown"
+    const name = event.candidateUserName ?? t("common.unknown")
     switch (event.action) {
       case "invite_sent": return `Invite sent to ${name}`
       case "invite_accepted": return `${name} accepted`
@@ -437,14 +441,14 @@ export function InviteRequestsSection({
         const count = (event.metadata?.count as number) ?? 1
         return `${count} contact${count === 1 ? "" : "s"} added`
       }
-      case "request_started": return "Scheduling started"
-      case "request_cancelled": return "Request cancelled"
-      case "request_completed": return "Match confirmed"
-      case "request_expired": return "No match found"
-      case "booking_pending": return "Court booking in progress"
+      case "request_started": return t("invites.events.schedulingStarted")
+      case "request_cancelled": return t("invites.events.requestCancelled")
+      case "request_completed": return t("invites.events.matchConfirmed")
+      case "request_expired": return t("invites.events.noMatchFound")
+      case "booking_pending": return t("invites.events.bookingInProgress")
       case "booking_success": return `Court booked${event.metadata?.courtName ? `: ${event.metadata.courtName}` : ""}`
       case "booking_failed": return `Booking failed${event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : ""}`
-      case "booking_cancelled": return "Court booking cancelled"
+      case "booking_cancelled": return t("invites.events.bookingCancelled")
       default: return event.action
     }
   }
@@ -501,10 +505,10 @@ export function InviteRequestsSection({
               size="sm"
               onClick={() => setInviteFilter(f)}
             >
-              {f === "all" && "Active"}
-              {f === "past" && "Expired"}
-              {f === "completed" && "Confirmed"}
-              {f === "cancelled" && "Cancelled"}
+              {f === "all" && t("invites.filter.active")}
+              {f === "past" && t("invites.filter.expired")}
+              {f === "completed" && t("invites.filter.confirmed")}
+              {f === "cancelled" && t("invites.filter.cancelled")}
             </Button>
           ))}
         </div>
@@ -532,19 +536,19 @@ export function InviteRequestsSection({
                   </div>
                   <p className="mt-4 text-lg font-medium text-foreground">
                     {inviteRequests.length === 0
-                      ? "No invites yet"
+                      ? t("invites.empty.noInvitesYet")
                       : inviteFilter === "all"
-                        ? "No active invites"
+                        ? t("invites.empty.noActiveInvites")
                         : inviteFilter === "past"
-                          ? "No expired invites"
+                          ? t("invites.empty.noExpiredInvites")
                           : inviteFilter === "cancelled"
-                              ? "No cancelled invites"
-                              : "No confirmed matches"}
+                              ? t("invites.empty.noCancelledInvites")
+                              : t("invites.empty.noConfirmedMatches")}
                   </p>
                   <p className="mt-1 text-base text-muted-foreground">
                     {inviteRequests.length === 0
-                      ? 'Tap "I Want to Play" to create your first invite'
-                      : "Try another filter"}
+                      ? t("invites.empty.tapToCreate")
+                      : t("invites.empty.tryAnotherFilter")}
                   </p>
                   <Button size="lg" className="mt-6 gap-2" onClick={() => setWizardOpen(true)}>
                     <Zap className="h-5 w-5" />
@@ -609,7 +613,7 @@ export function InviteRequestsSection({
                         </span>
                         <span className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-primary" />
-                          {request.location?.trim() || "TBD"}
+                          {request.location?.trim() || t("common.tbd")}
                         </span>
                         {displayStatus === "scheduling" && (
                           <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
@@ -700,7 +704,7 @@ export function InviteRequestsSection({
                                         contactName: contact.name,
                                       })
                                     }
-                                    title="Accept"
+                                    title={t("invites.actions.accept")}
                                     className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-700"
                                   >
                                     <UserCheck className="h-3 w-3" />
@@ -711,7 +715,7 @@ export function InviteRequestsSection({
                                 contact.status === "pending" && (
                                   <button
                                     onClick={() => handleRemoveContact(request.id, contact.id)}
-                                    title="Remove from queue"
+                                    title={t("invites.actions.removeFromQueue")}
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
                                   >
                                     <Trash2 className="h-3 w-3" />
@@ -722,7 +726,7 @@ export function InviteRequestsSection({
                                 (contact.status === "no_response" || contact.status === "cancelled" || contact.status === "send_failed") && (
                                   <button
                                     onClick={() => handleRetryContact(request.id, contact.id)}
-                                    title="Retry invite"
+                                    title={t("invites.actions.retryInvite")}
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                   >
                                     <RotateCcw className="h-3 w-3" />
@@ -733,7 +737,7 @@ export function InviteRequestsSection({
                                 contact.status === "contacted" && (
                                   <button
                                     onClick={() => handleCancelContact(request.id, contact.id)}
-                                    title="Cancel"
+                                    title={t("invites.actions.cancel")}
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                   >
                                     <XCircle className="h-3 w-3" />
@@ -745,7 +749,7 @@ export function InviteRequestsSection({
                                     onClick={() =>
                                       handleCancelAccepted(request.id, contact.id)
                                     }
-                                    title="Cancel acceptance"
+                                    title={t("invites.actions.cancelAcceptance")}
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
                                   >
                                     <XCircle className="h-3 w-3" />
@@ -799,8 +803,8 @@ export function InviteRequestsSection({
                         <div className="mt-4 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 px-4 py-3">
                           <p className="text-sm text-muted-foreground">
                             {request.matchFormat === "doubles"
-                              ? "Not enough contacts responded in time. Add more contacts or start a new request."
-                              : "No one responded in time. Add more contacts or start a new request."}
+                              ? t("invites.expiredNotEnough")
+                              : t("invites.expiredNoOne")}
                           </p>
                           <div className="mt-3 flex flex-wrap gap-2">
                             <AddContactsToInvite
@@ -811,7 +815,7 @@ export function InviteRequestsSection({
                             />
                             <Button size="sm" onClick={() => setWizardOpen(true)}>
                               <Zap className="mr-1.5 h-3.5 w-3.5" />
-                              New request
+                              {t("invites.newRequest")}
                             </Button>
                             <Button
                               variant="ghost"
@@ -820,7 +824,7 @@ export function InviteRequestsSection({
                               onClick={() => setCancelConfirm(request.id)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
-                              Cancel request
+                              {t("invites.actions.cancelRequest")}
                             </Button>
                           </div>
                         </div>
@@ -845,12 +849,12 @@ export function InviteRequestsSection({
                                 {copiedRequestId === request.id ? (
                                   <>
                                     <Check className="h-3.5 w-3.5" />
-                                    Copied
+                                    {t("invites.actions.copied")}
                                   </>
                                 ) : (
                                   <>
                                     <Copy className="h-3.5 w-3.5" />
-                                    Copy Link
+                                    {t("invites.actions.copyLink")}
                                   </>
                                 )}
                               </Button>
@@ -861,7 +865,7 @@ export function InviteRequestsSection({
                                 onClick={() => handleShareWhatsApp(request)}
                               >
                                 <Link2 className="h-3.5 w-3.5" />
-                                WhatsApp
+                                {t("invites.actions.whatsapp")}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -870,7 +874,7 @@ export function InviteRequestsSection({
                                 onClick={() => setCancelConfirm(request.id)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
-                                Cancel request
+                                {t("invites.actions.cancelRequest")}
                               </Button>
                             </div>
                           </div>
@@ -882,7 +886,7 @@ export function InviteRequestsSection({
                             <Button size="sm" className="gap-1.5" asChild>
                               <Link to={`/matches/${request.matchId}`}>
                                 <ExternalLink className="h-3.5 w-3.5" />
-                                Go to match
+                                {t("invites.actions.goToMatch")}
                               </Link>
                             </Button>
                           )}
@@ -898,7 +902,7 @@ export function InviteRequestsSection({
                                 rel="noopener noreferrer"
                               >
                                 <CheckCircle className="h-3.5 w-3.5" />
-                                Open WhatsApp Group
+                                {t("invites.actions.openWhatsApp")}
                               </a>
                             </Button>
                           ) : (
@@ -906,10 +910,10 @@ export function InviteRequestsSection({
                               size="sm"
                               className="gap-1.5 bg-[#25D366] text-white hover:bg-[#25D366]/90"
                               disabled
-                              title="WhatsApp group link not available"
+                              title={t("invites.whatsappNotAvailable")}
                             >
                               <CheckCircle className="h-3.5 w-3.5" />
-                              Open WhatsApp Group
+                              {t("invites.actions.openWhatsApp")}
                             </Button>
                           )}
                         </div>
@@ -977,7 +981,7 @@ export function InviteRequestsSection({
               .listByHost(currentUserId)
               .then((requestsRes) => {
                 const mapped = requestsRes
-                  .map(mapSchedulingToInviteRequest)
+                  .map((r) => mapSchedulingToInviteRequest(r, t))
                   .filter((r): r is InviteRequest => r !== null)
                 setInviteRequests(mapped)
               })

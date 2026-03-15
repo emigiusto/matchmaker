@@ -6,7 +6,7 @@ export function useTranslation() {
   const { language } = useLanguage()
   const translations = language === "es" ? es : en
 
-  const t = (key: string, defaultValue = key): string => {
+  const t = (key: string, paramsOrDefault?: Record<string, string | number> | string): string => {
     const keys = key.split(".")
     let value: any = translations
 
@@ -14,11 +14,21 @@ export function useTranslation() {
       if (typeof value === "object" && value !== null && k in value) {
         value = value[k]
       } else {
-        return defaultValue
+        return typeof paramsOrDefault === "string" ? paramsOrDefault : key
       }
     }
 
-    return typeof value === "string" ? value : defaultValue
+    if (typeof value !== "string") {
+      return typeof paramsOrDefault === "string" ? paramsOrDefault : key
+    }
+
+    if (paramsOrDefault && typeof paramsOrDefault === "object") {
+      return value.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
+        k in paramsOrDefault ? String(paramsOrDefault[k]) : `{{${k}}}`
+      )
+    }
+
+    return value
   }
 
   return { t, language }

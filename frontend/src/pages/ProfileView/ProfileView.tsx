@@ -16,6 +16,7 @@ import { toast } from "sonner"
 import { playersService } from "@/lib/services/players.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import type { Player } from "@/lib/types"
+import { useTranslation } from "@/lib/i18n"
 
 // Map backend PlayerDTO to frontend Player shape
 function adaptPlayer(dto: Record<string, unknown>): Player {
@@ -39,6 +40,7 @@ function adaptPlayer(dto: Record<string, unknown>): Player {
 export default function PlayerProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const currentUserId = getCurrentUserId()
+  const { t } = useTranslation()
   const [player, setPlayer] = useState<Player | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -57,7 +59,7 @@ export default function PlayerProfilePage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Player Profile" />
+        <PageHeader title={t("profileView.title")} />
         <div className="flex flex-1 items-center justify-center p-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -68,9 +70,9 @@ export default function PlayerProfilePage() {
   if (!player) {
     return (
       <>
-        <PageHeader title="Player Profile" />
+        <PageHeader title={t("profileView.title")} />
         <div className="flex flex-1 items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">Player not found</p>
+          <p className="text-sm text-muted-foreground">{t("profileView.notFound")}</p>
         </div>
       </>
     )
@@ -83,10 +85,10 @@ export default function PlayerProfilePage() {
 
   return (
     <>
-      <PageHeader title="Player Profile">
+      <PageHeader title={t("profileView.title")}>
         <Button variant="ghost" size="sm" asChild>
           <Link to="/dashboard">
-            <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> {t("common.back")}
           </Link>
         </Button>
       </PageHeader>
@@ -119,7 +121,7 @@ export default function PlayerProfilePage() {
                     <span className="font-mono text-2xl font-bold text-primary">
                       {player.levelValue.toFixed(1)}
                     </span>
-                    <span className="text-sm text-muted-foreground">Level</span>
+                    <span className="text-sm text-muted-foreground">{t("common.level")}</span>
                   </div>
                 </div>
               </div>
@@ -130,7 +132,7 @@ export default function PlayerProfilePage() {
                   onClick={() => toast.success(`Friend request sent to ${player.name}`)}
                 >
                   <UserPlus className="mr-1.5 h-4 w-4" />
-                  Add Friend
+                  {t("profileView.addFriend")}
                 </Button>
               )}
             </div>
@@ -146,7 +148,7 @@ export default function PlayerProfilePage() {
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Matches
+                  {t("profileView.matches")}
                 </p>
                 <p className="font-mono text-xl font-bold text-foreground">
                   {player.matchesPlayed}
@@ -161,7 +163,7 @@ export default function PlayerProfilePage() {
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Win Rate
+                  {t("profileView.winRate")}
                 </p>
                 <p className="font-mono text-xl font-bold text-foreground">{winRate}%</p>
               </div>
@@ -174,7 +176,7 @@ export default function PlayerProfilePage() {
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Record
+                  {t("profileView.record")}
                 </p>
                 <p className="font-mono text-xl font-bold text-foreground">
                   {player.wins}W - {player.losses}L

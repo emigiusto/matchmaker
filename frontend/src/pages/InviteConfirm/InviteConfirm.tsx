@@ -29,6 +29,7 @@ import { invitesService } from "@/lib/services/invites.service"
 import { adaptInvite } from "@/lib/api/adapters"
 import { getCurrentUserId } from "@/lib/current-user"
 import type { Invite } from "@/lib/types"
+import { useTranslation } from "@/lib/i18n"
 
 const mockInviteData: Invite & { message?: string; fromPlayerLevel?: number; fromPlayerCity?: string; fromPlayerMatches?: number; fromPlayerWins?: number } = {
   id: "invite-ext-001",
@@ -75,6 +76,7 @@ type FlowState = "invite" | "responding" | "accepted" | "declined"
 export default function InviteLandingPage() {
   const { token } = useParams<{ token: string }>()
   const currentUserId = getCurrentUserId()
+  const { t } = useTranslation()
   const [invite, setInvite] = useState<(Invite & { message?: string; fromPlayerLevel?: number; fromPlayerCity?: string; fromPlayerMatches?: number; fromPlayerWins?: number }) | null>(null)
   const [loading, setLoading] = useState(true)
   const [flowState, setFlowState] = useState<FlowState>("invite")
@@ -118,13 +120,13 @@ export default function InviteLandingPage() {
       try {
         await invitesService.decline(token)
         setFlowState("declined")
-        toast("Invite declined. You can always join later.")
+        toast(t("inviteConfirm.toast.declined"))
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to decline")
       }
     } else {
       setFlowState("declined")
-      toast("Invite declined. You can always join later.")
+      toast(t("inviteConfirm.toast.declined"))
     }
   }
 
@@ -142,13 +144,13 @@ export default function InviteLandingPage() {
       try {
         await invitesService.accept(token, currentUserId)
         setFlowState("accepted")
-        toast.success("Logged in and invite accepted!")
+        toast.success(t("inviteConfirm.toast.loggedIn"))
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to accept")
       }
     } else {
       setFlowState("accepted")
-      toast.success("Logged in and invite accepted!")
+      toast.success(t("inviteConfirm.toast.loggedIn"))
     }
   }
 
@@ -158,20 +160,20 @@ export default function InviteLandingPage() {
       try {
         await invitesService.accept(token, currentUserId)
         setFlowState("accepted")
-        toast.success("Account created and invite accepted! Welcome to MatchMaker.")
+        toast.success(t("inviteConfirm.toast.signedUp"))
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to accept")
       }
     } else {
       setFlowState("accepted")
-      toast.success("Account created and invite accepted! Welcome to MatchMaker.")
+      toast.success(t("inviteConfirm.toast.signedUp"))
     }
   }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading invite...</p>
+        <p className="text-muted-foreground">{t("inviteConfirm.loading")}</p>
       </div>
     )
   }
@@ -186,13 +188,13 @@ export default function InviteLandingPage() {
               <TennisBallIcon className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold tracking-tight text-foreground">
-              MatchMaker
+              {t("common.appName")}
             </span>
           </div>
           <Button variant="outline" size="sm" className="hidden gap-1.5 sm:flex" asChild>
             <Link to="/dashboard">
               <LogIn className="h-4 w-4" />
-              Log in
+              {t("inviteConfirm.login")}
             </Link>
           </Button>
         </div>
@@ -206,13 +208,13 @@ export default function InviteLandingPage() {
             className="mb-4 gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium"
           >
             <TennisBallIcon className="h-3.5 w-3.5" />
-            Match Invite
+            {t("inviteConfirm.badge")}
           </Badge>
           <h1 className="mx-auto max-w-xl text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-            {"You've been invited to play"}
+            {t("inviteConfirm.title")}
           </h1>
           <p className="mx-auto mt-3 max-w-md text-pretty text-base text-muted-foreground lg:text-lg">
-            {displayInvite.fromPlayerName} wants to play a match with you
+            {displayInvite.fromPlayerName} {t("inviteConfirm.wantsToPlay")}
           </p>
         </div>
 
@@ -265,7 +267,7 @@ export default function InviteLandingPage() {
                   <div className="rounded-xl bg-muted/40 p-4 text-center">
                     <Calendar className="mx-auto mb-2 h-5 w-5 text-primary" />
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Date
+                      {t("matches.date")}
                     </p>
                     <p className="mt-1 text-base font-bold text-foreground">
                       {format(new Date(displayInvite.date), "MMM d")}
@@ -274,14 +276,14 @@ export default function InviteLandingPage() {
                   <div className="rounded-xl bg-muted/40 p-4 text-center">
                     <Clock className="mx-auto mb-2 h-5 w-5 text-primary" />
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Time
+                      {t("matches.time")}
                     </p>
                     <p className="mt-1 text-base font-bold text-foreground">{displayInvite.time}</p>
                   </div>
                   <div className="rounded-xl bg-muted/40 p-4 text-center">
                     <MapPin className="mx-auto mb-2 h-5 w-5 text-primary" />
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Location
+                      {t("matches.location")}
                     </p>
                     <p className="mt-1 text-sm font-bold text-foreground">{displayInvite.location}</p>
                   </div>
@@ -296,7 +298,7 @@ export default function InviteLandingPage() {
                       onClick={handleAcceptClick}
                     >
                       <CheckCircle className="h-5 w-5" />
-                      Accept Invite
+                      {t("inviteConfirm.acceptInvite")}
                     </Button>
                     <Button
                       size="xl"
@@ -305,7 +307,7 @@ export default function InviteLandingPage() {
                       onClick={handleDecline}
                     >
                       <XCircle className="h-5 w-5" />
-                      Decline
+                      {t("inviteConfirm.decline")}
                     </Button>
                   </div>
                 )}
@@ -315,10 +317,10 @@ export default function InviteLandingPage() {
                   <div className="mt-6">
                     <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/[0.04] p-4 text-center">
                       <p className="text-base font-semibold text-foreground">
-                        Great! How would you like to accept?
+                        {t("inviteConfirm.choicePrompt")}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Choose one of the options below to confirm your attendance
+                        {t("inviteConfirm.choiceDesc")}
                       </p>
                     </div>
 
@@ -326,15 +328,15 @@ export default function InviteLandingPage() {
                       <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="guest" className="gap-1.5 text-xs sm:text-sm">
                           <User className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline">Play as</span> Guest
+                          {t("inviteConfirm.tabs.guest")}
                         </TabsTrigger>
                         <TabsTrigger value="login" className="gap-1.5 text-xs sm:text-sm">
                           <LogIn className="h-3.5 w-3.5" />
-                          Log in
+                          {t("inviteConfirm.tabs.login")}
                         </TabsTrigger>
                         <TabsTrigger value="signup" className="gap-1.5 text-xs sm:text-sm">
                           <UserPlus className="h-3.5 w-3.5" />
-                          Sign up
+                          {t("inviteConfirm.tabs.signup")}
                         </TabsTrigger>
                       </TabsList>
 
@@ -342,17 +344,16 @@ export default function InviteLandingPage() {
                       <TabsContent value="guest" className="mt-4">
                         <div className="flex flex-col gap-4">
                           <p className="text-sm leading-relaxed text-muted-foreground">
-                            No account needed. Just tell us your name so {displayInvite.fromPlayerName}{" "}
-                            knows who accepted.
+                            {t("inviteConfirm.guest.desc", { name: displayInvite.fromPlayerName })}
                           </p>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <Label htmlFor="guest-first" className="text-sm font-medium">
-                                First name <span className="text-destructive">*</span>
+                                {t("inviteConfirm.guest.firstName")} <span className="text-destructive">*</span>
                               </Label>
                               <Input
                                 id="guest-first"
-                                placeholder="First name"
+                                placeholder={t("inviteConfirm.guest.firstNamePlaceholder")}
                                 className="mt-1.5"
                                 value={guestFirstName}
                                 onChange={(e) => setGuestFirstName(e.target.value)}
@@ -360,11 +361,11 @@ export default function InviteLandingPage() {
                             </div>
                             <div>
                               <Label htmlFor="guest-last" className="text-sm font-medium">
-                                Last name <span className="text-destructive">*</span>
+                                {t("inviteConfirm.guest.lastName")} <span className="text-destructive">*</span>
                               </Label>
                               <Input
                                 id="guest-last"
-                                placeholder="Last name"
+                                placeholder={t("inviteConfirm.guest.lastNamePlaceholder")}
                                 className="mt-1.5"
                                 value={guestLastName}
                                 onChange={(e) => setGuestLastName(e.target.value)}
@@ -373,15 +374,15 @@ export default function InviteLandingPage() {
                           </div>
                           <div>
                             <Label htmlFor="guest-email" className="text-sm font-medium">
-                              Email{" "}
+                              {t("inviteConfirm.guest.email")}{" "}
                               <span className="text-xs font-normal text-muted-foreground">
-                                (optional, for match updates)
+                                {t("inviteConfirm.guest.emailOptional")}
                               </span>
                             </Label>
                             <Input
                               id="guest-email"
                               type="email"
-                              placeholder="you@example.com"
+                              placeholder={t("inviteConfirm.guest.emailPlaceholder")}
                               className="mt-1.5"
                               value={guestEmail}
                               onChange={(e) => setGuestEmail(e.target.value)}
@@ -394,10 +395,10 @@ export default function InviteLandingPage() {
                             onClick={handleGuestAccept}
                           >
                             <CheckCircle className="h-5 w-5" />
-                            Accept as Guest
+                            {t("inviteConfirm.guest.submit")}
                           </Button>
                           <p className="text-center text-xs text-muted-foreground">
-                            You can create an account later to track your matches and level
+                            {t("inviteConfirm.guest.hint")}
                           </p>
                         </div>
                       </TabsContent>
@@ -406,16 +407,16 @@ export default function InviteLandingPage() {
                       <TabsContent value="login" className="mt-4">
                         <form onSubmit={handleLoginAccept} className="flex flex-col gap-4">
                           <p className="text-sm leading-relaxed text-muted-foreground">
-                            Already a MatchMaker player? Log in to accept with your profile.
+                            {t("inviteConfirm.loginTab.desc")}
                           </p>
                           <div>
                             <Label htmlFor="login-email" className="text-sm font-medium">
-                              Email
+                              {t("inviteConfirm.loginTab.email")}
                             </Label>
                             <Input
                               id="login-email"
                               type="email"
-                              placeholder="you@example.com"
+                              placeholder={t("inviteConfirm.loginTab.emailPlaceholder")}
                               className="mt-1.5"
                               required
                               value={loginEmail}
@@ -424,12 +425,12 @@ export default function InviteLandingPage() {
                           </div>
                           <div>
                             <Label htmlFor="login-password" className="text-sm font-medium">
-                              Password
+                              {t("inviteConfirm.loginTab.password")}
                             </Label>
                             <Input
                               id="login-password"
                               type="password"
-                              placeholder="Your password"
+                              placeholder={t("inviteConfirm.loginTab.passwordPlaceholder")}
                               className="mt-1.5"
                               required
                               value={loginPassword}
@@ -442,11 +443,11 @@ export default function InviteLandingPage() {
                             className="w-full gap-2 text-base font-semibold"
                           >
                             <LogIn className="h-5 w-5" />
-                            Log in & Accept
+                            {t("inviteConfirm.loginTab.submit")}
                           </Button>
                           <p className="text-center text-xs text-muted-foreground">
                             <a href="#" className="font-medium text-primary hover:underline">
-                              Forgot your password?
+                              {t("inviteConfirm.loginTab.forgotPassword")}
                             </a>
                           </p>
                         </form>
@@ -456,16 +457,15 @@ export default function InviteLandingPage() {
                       <TabsContent value="signup" className="mt-4">
                         <form onSubmit={handleSignupAccept} className="flex flex-col gap-4">
                           <p className="text-sm leading-relaxed text-muted-foreground">
-                            Create your free account to accept this invite and start tracking your
-                            tennis journey.
+                            {t("inviteConfirm.signupTab.desc")}
                           </p>
                           <div>
                             <Label htmlFor="signup-name" className="text-sm font-medium">
-                              Full name
+                              {t("inviteConfirm.signupTab.fullName")}
                             </Label>
                             <Input
                               id="signup-name"
-                              placeholder="Your full name"
+                              placeholder={t("inviteConfirm.signupTab.fullNamePlaceholder")}
                               className="mt-1.5"
                               required
                               value={signupName}
@@ -474,12 +474,12 @@ export default function InviteLandingPage() {
                           </div>
                           <div>
                             <Label htmlFor="signup-email" className="text-sm font-medium">
-                              Email
+                              {t("inviteConfirm.signupTab.email")}
                             </Label>
                             <Input
                               id="signup-email"
                               type="email"
-                              placeholder="you@example.com"
+                              placeholder={t("inviteConfirm.signupTab.emailPlaceholder")}
                               className="mt-1.5"
                               required
                               value={signupEmail}
@@ -488,12 +488,12 @@ export default function InviteLandingPage() {
                           </div>
                           <div>
                             <Label htmlFor="signup-password" className="text-sm font-medium">
-                              Password
+                              {t("inviteConfirm.signupTab.password")}
                             </Label>
                             <Input
                               id="signup-password"
                               type="password"
-                              placeholder="Create a password"
+                              placeholder={t("inviteConfirm.signupTab.passwordPlaceholder")}
                               className="mt-1.5"
                               required
                               value={signupPassword}
@@ -506,12 +506,12 @@ export default function InviteLandingPage() {
                             className="w-full gap-2 text-base font-semibold"
                           >
                             <UserPlus className="h-5 w-5" />
-                            Create Account & Accept
+                            {t("inviteConfirm.signupTab.submit")}
                           </Button>
                           <p className="text-center text-xs text-muted-foreground">
-                            By creating an account you agree to our{" "}
+                            {t("inviteConfirm.signupTab.terms")}{" "}
                             <a href="#" className="font-medium text-primary hover:underline">
-                              Terms of Service
+                              {t("inviteConfirm.signupTab.termsLink")}
                             </a>
                           </p>
                         </form>
@@ -523,7 +523,7 @@ export default function InviteLandingPage() {
                       onClick={handleDecline}
                       className="mt-4 w-full text-center text-sm text-muted-foreground transition-colors hover:text-destructive"
                     >
-                      {"I can't make it -- decline invite"}
+                      {t("inviteConfirm.signupTab.declineLink")}
                     </button>
                   </div>
                 )}
@@ -532,30 +532,28 @@ export default function InviteLandingPage() {
                 {flowState === "accepted" && (
                   <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/[0.04] p-6 text-center">
                     <CheckCircle className="mx-auto mb-3 h-10 w-10 text-primary" />
-                    <p className="text-xl font-bold text-foreground">{"You're in!"}</p>
+                    <p className="text-xl font-bold text-foreground">{t("inviteConfirm.accepted.title")}</p>
                     <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                      {displayInvite.fromPlayerName} will be notified that you accepted. See you on{" "}
-                      <span className="font-medium text-foreground">
-                        {format(new Date(displayInvite.date), "EEEE, MMM d")}
-                      </span>{" "}
-                      at{" "}
-                      <span className="font-medium text-foreground">{displayInvite.time}</span> at{" "}
-                      <span className="font-medium text-foreground">{displayInvite.location}</span>.
+                      {t("inviteConfirm.accepted.message", {
+                        date: format(new Date(displayInvite.date), "EEEE, MMM d"),
+                        time: displayInvite.time,
+                        location: displayInvite.location,
+                      })}
                     </p>
                     {guestFirstName && (
                       <div className="mt-5 rounded-xl border border-border/40 bg-card p-4">
                         <p className="text-sm font-medium text-muted-foreground">
-                          Want to track your matches and find more opponents?
+                          {t("inviteConfirm.accepted.upsell")}
                         </p>
                         <Button
                           size="lg"
                           className="mt-3 gap-2 text-base font-semibold"
                           onClick={() =>
-                            toast.success("Redirecting to sign up...")
+                            toast.success(t("inviteConfirm.toast.redirecting"))
                           }
                         >
                           <Sparkles className="h-4 w-4" />
-                          Create a Free Account
+                          {t("inviteConfirm.accepted.cta")}
                           <ArrowRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -567,21 +565,20 @@ export default function InviteLandingPage() {
                 {flowState === "declined" && (
                   <div className="mt-6 rounded-2xl border border-border/40 bg-muted/20 p-6 text-center">
                     <XCircle className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                    <p className="text-xl font-bold text-foreground">No worries</p>
+                    <p className="text-xl font-bold text-foreground">{t("inviteConfirm.declined.title")}</p>
                     <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                      {displayInvite.fromPlayerName} will be notified. Maybe next time! You can still
-                      create an account to find other players near you.
+                      {displayInvite.fromPlayerName} {t("inviteConfirm.declined.message")}
                     </p>
                     <Button
                       variant="outline"
                       size="lg"
                       className="mt-4 gap-2"
                       onClick={() =>
-                        toast.success("Redirecting to sign up...")
+                        toast.success(t("inviteConfirm.toast.redirecting"))
                       }
                     >
                       <Sparkles className="h-4 w-4" />
-                      Explore MatchMaker
+                      {t("inviteConfirm.declined.cta")}
                     </Button>
                   </div>
                 )}
@@ -594,39 +591,34 @@ export default function InviteLandingPage() {
             <Card className="border-border/40">
               <CardContent className="p-6">
                 <h3 className="mb-5 text-lg font-bold text-foreground">
-                  Why players love MatchMaker
+                  {t("inviteConfirm.features.title")}
                 </h3>
                 <div className="flex flex-col gap-5">
                   {[
                     {
                       icon: Users,
-                      title: "Smart Matchmaking",
-                      description:
-                        "Find opponents at your level, near you, and available when you are. No more endless WhatsApp group messages.",
+                      title: t("inviteConfirm.features.smartMatchmaking"),
+                      description: t("inviteConfirm.features.smartMatchmakingDesc"),
                     },
                     {
                       icon: BarChart3,
-                      title: "Track Your Progress",
-                      description:
-                        "See your level evolve over time, review match history, and understand your game with real stats.",
+                      title: t("inviteConfirm.features.trackProgress"),
+                      description: t("inviteConfirm.features.trackProgressDesc"),
                     },
                     {
                       icon: Zap,
-                      title: "One-Tap Scheduling",
-                      description:
-                        "Say when and where you want to play. We suggest opponents, send invites, and set reminders automatically.",
+                      title: t("inviteConfirm.features.oneTapScheduling"),
+                      description: t("inviteConfirm.features.oneTapSchedulingDesc"),
                     },
                     {
                       icon: Shield,
-                      title: "Fair & Transparent",
-                      description:
-                        "Every result is confirmed by both players. Your level reflects real performance, not self-reported skill.",
+                      title: t("inviteConfirm.features.fairTransparent"),
+                      description: t("inviteConfirm.features.fairTransparentDesc"),
                     },
                     {
                       icon: TrendingUp,
-                      title: "Community Rankings",
-                      description:
-                        "Compete on local leaderboards, discover rising players in your area, and find your next great rival.",
+                      title: t("inviteConfirm.features.communityRankings"),
+                      description: t("inviteConfirm.features.communityRankingsDesc"),
                     },
                   ].map((item) => (
                     <div key={item.title} className="flex gap-3.5">
@@ -651,19 +643,19 @@ export default function InviteLandingPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
                     <p className="font-mono text-2xl font-bold text-primary">2,400+</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Active players</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t("inviteConfirm.stats.activePlayers")}</p>
                   </div>
                   <div className="text-center">
                     <p className="font-mono text-2xl font-bold text-primary">8,500+</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Matches played</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t("inviteConfirm.stats.matchesPlayed")}</p>
                   </div>
                   <div className="text-center">
                     <p className="font-mono text-2xl font-bold text-primary">15</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Cities</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t("inviteConfirm.stats.cities")}</p>
                   </div>
                   <div className="text-center">
                     <p className="font-mono text-2xl font-bold text-primary">4.8</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">App rating</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t("inviteConfirm.stats.appRating")}</p>
                   </div>
                 </div>
               </CardContent>
@@ -679,10 +671,10 @@ export default function InviteLandingPage() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
               <TennisBallIcon className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-sm font-semibold text-foreground">MatchMaker</span>
+            <span className="text-sm font-semibold text-foreground">{t("common.appName")}</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            The simplest way to organize your tennis matches.
+            {t("footer.tagline")}
           </p>
         </div>
       </footer>

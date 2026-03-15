@@ -1,9 +1,11 @@
 import { useState } from "react"
 import { InviteRequestsSection } from "@/components/invite-requests-section"
 import { getCurrentUserId } from "@/lib/current-user"
+import { useTranslation } from "@/lib/i18n"
 
 export default function PlayPage() {
   const currentUserId = getCurrentUserId()
+  const { t } = useTranslation()
   const [wizardOpen, setWizardOpen] = useState(false)
 
   return (
@@ -12,8 +14,8 @@ export default function PlayPage() {
       wizardOpen={wizardOpen}
       setWizardOpen={setWizardOpen}
       variant="standalone"
-      pageTitle="My Invites"
-      pageDescription="Create matches and browse open invites"
+      pageTitle={t("play.pageTitle")}
+      pageDescription={t("play.pageDescription")}
     />
   )
 }

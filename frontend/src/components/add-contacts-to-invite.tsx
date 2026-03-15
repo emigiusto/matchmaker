@@ -13,6 +13,7 @@ import { groupsService } from "@/lib/services/groups.service"
 import { friendshipsService } from "@/lib/services/friendships.service"
 import { usersService } from "@/lib/services/users.service"
 import { schedulingService } from "@/lib/services/scheduling.service"
+import { useTranslation } from "@/lib/i18n"
 
 type AvailableContact =
   | { id: string; name: string; type: "user" }
@@ -33,6 +34,7 @@ export function AddContactsToInvite({
   onSuccess,
   disabled,
 }: AddContactsToInviteProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [groups, setGroups] = useState<import("@/lib/services/groups.service").GroupWithMembersDTO[]>([])
   const [friends, setFriends] = useState<import("@/lib/services/friendships.service").Friend[]>([])
@@ -60,7 +62,7 @@ export function AddContactsToInvite({
         setFriends(f.filter((x) => x.type === "user"))
         const userContacts: AvailableContact[] = withPhone.map((u) => ({
           id: u.id,
-          name: u.name || u.email || "Unknown",
+          name: u.name || u.email || t("common.unknown"),
           type: "user" as const,
         }))
         setAvailableContacts(userContacts)
@@ -69,7 +71,7 @@ export function AddContactsToInvite({
         setGroups([])
         setFriends([])
         setAvailableContacts([])
-        toast.error("Could not load contacts")
+        toast.error(t("wizard.toast.loadContactsFailed"))
       })
       .finally(() => setLoading(false))
   }, [open, hostUserId])
@@ -88,7 +90,7 @@ export function AddContactsToInvite({
   async function handleAdd() {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) {
-      toast.info("Select at least one contact")
+      toast.info(t("invites.selectAtLeastOne"))
       return
     }
     setAdding(true)
@@ -98,7 +100,7 @@ export function AddContactsToInvite({
       setOpen(false)
       onSuccess()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to add contacts")
+      toast.error(e instanceof Error ? e.message : t("invites.failedToAddContacts"))
     } finally {
       setAdding(false)
     }
@@ -109,7 +111,7 @@ export function AddContactsToInvite({
       .filter((m) => m.id !== hostUserId && m.phone && !existingContactIds.includes(m.id))
       .map((m) => m.id)
     if (toAdd.length === 0) {
-      toast.info("All members from this list are already added")
+      toast.info(t("invites.allMembersAdded"))
       return
     }
     setSelectedIds((prev) => {
@@ -133,11 +135,11 @@ export function AddContactsToInvite({
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5" disabled={disabled}>
           <UserPlus className="h-3.5 w-3.5" />
-          Add contacts
+          {t("invites.addContacts")}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3" align="start">
-        <p className="mb-3 text-sm font-medium">Add contacts to this invite</p>
+        <p className="mb-3 text-sm font-medium">{t("invites.addContactsToInvite")}</p>
         {loading ? (
           <div className="flex justify-center py-6">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -146,7 +148,7 @@ export function AddContactsToInvite({
           <>
             {groups.length > 0 && (
               <div className="mb-3">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">From list</p>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">{t("invites.fromList")}</p>
                 <div className="flex flex-wrap gap-1">
                   {groups.map((g) => (
                     <Button
@@ -166,7 +168,7 @@ export function AddContactsToInvite({
             <div className="relative mb-2">
               <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search..."
+                placeholder={t("invites.search")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 pl-8"
@@ -191,7 +193,7 @@ export function AddContactsToInvite({
               ))}
               {filtered.length === 0 && (
                 <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-                  No contacts to add
+                  {t("invites.noContactsToAdd")}
                 </p>
               )}
             </div>

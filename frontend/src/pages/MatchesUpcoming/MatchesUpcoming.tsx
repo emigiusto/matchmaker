@@ -13,6 +13,7 @@ import { ResultUploadDialog } from "@/components/result-upload-dialog"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import type { Match } from "@/lib/types"
+import { useTranslation } from "@/lib/i18n"
 
 /** Safely format a date string; returns fallback if invalid */
 function safeFormatDate(
@@ -26,6 +27,7 @@ function safeFormatDate(
 }
 
 export default function MatchesPage() {
+  const { t } = useTranslation()
   const currentUserId = getCurrentUserId()
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([])
   const [pastMatches, setPastMatches] = useState<Match[]>([])
@@ -88,8 +90,8 @@ export default function MatchesPage() {
   return (
     <>
       <PageHeader
-        title="Matches"
-        description="Your upcoming and past matches"
+        title={t("matchesUpcoming.title")}
+        description={t("matchesUpcoming.description")}
       />
       <div className="flex flex-1 flex-col gap-6 p-4 lg:p-8">
         {loading ? (
@@ -104,14 +106,14 @@ export default function MatchesPage() {
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
                 <Swords className="h-8 w-8 text-muted-foreground" />
               </div>
-              <p className="mt-4 text-lg font-medium text-foreground">No matches are scheduled</p>
+              <p className="mt-4 text-lg font-medium text-foreground">{t("matchesUpcoming.noMatches")}</p>
               <p className="mt-1 text-base text-muted-foreground">
-                Create invites to schedule your next match
+                {t("matchesUpcoming.noMatchesDesc")}
               </p>
               <Button size="lg" className="mt-6 gap-2" asChild>
                 <Link to="/play">
                   <Calendar className="h-5 w-5" />
-                  I Want to Play
+                  {t("common.iWantToPlay")}
                 </Link>
               </Button>
             </CardContent>
@@ -122,16 +124,16 @@ export default function MatchesPage() {
             <section>
               <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
                 <Calendar className="h-5 w-5 text-primary" />
-                Upcoming matches
+                {t("matchesUpcoming.upcoming")}
               </h2>
               {!hasUpcoming ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
-                    <p className="text-muted-foreground">No matches are scheduled</p>
+                    <p className="text-muted-foreground">{t("matchesUpcoming.noMatches")}</p>
                     <Button size="sm" className="mt-4 gap-2" asChild>
                       <Link to="/play">
                         <Calendar className="h-4 w-4" />
-                        I Want to Play
+                        {t("common.iWantToPlay")}
                       </Link>
                     </Button>
                   </CardContent>
@@ -141,7 +143,7 @@ export default function MatchesPage() {
                   {matchesToday.length > 0 && (
                     <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-lg font-bold tracking-tight">Today</CardTitle>
+                        <CardTitle className="text-lg font-bold tracking-tight">{t("matchesUpcoming.today")}</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3 pt-0">
                         {matchesToday.map((match) => {
@@ -163,7 +165,7 @@ export default function MatchesPage() {
                                     size="sm"
                                   />
                                   <p className="text-base font-semibold text-foreground">
-                                    vs {opponent.name}
+                                    {t("common.vs")} {opponent.name}
                                   </p>
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -222,7 +224,7 @@ export default function MatchesPage() {
                   {matchesLater.length > 0 && (
                     <Card>
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-lg font-bold tracking-tight">Coming up</CardTitle>
+                        <CardTitle className="text-lg font-bold tracking-tight">{t("matchesUpcoming.comingUp")}</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3 pt-0">
                         {matchesLater.map((match) => {
@@ -244,7 +246,7 @@ export default function MatchesPage() {
                                     size="sm"
                                   />
                                   <p className="text-base font-semibold text-foreground">
-                                    vs {opponent.name}
+                                    {t("common.vs")} {opponent.name}
                                   </p>
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -310,12 +312,12 @@ export default function MatchesPage() {
             <section>
               <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
                 <History className="h-5 w-5 text-muted-foreground" />
-                Past matches
+                {t("matchesUpcoming.past")}
               </h2>
               {pastMatches.length === 0 ? (
                 <Card>
                   <CardContent className="flex items-center justify-center py-12">
-                    <p className="text-muted-foreground">No past matches yet</p>
+                    <p className="text-muted-foreground">{t("matchesUpcoming.noPast")}</p>
                   </CardContent>
                 </Card>
               ) : (
@@ -339,7 +341,7 @@ export default function MatchesPage() {
                               size="sm"
                             />
                             <p className="text-base font-semibold text-foreground">
-                              vs {opponent.name}
+                              {t("common.vs")} {opponent.name}
                             </p>
                             <span
                               className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -351,9 +353,9 @@ export default function MatchesPage() {
                               }`}
                             >
                               {match.status === "completed"
-                                ? "Completed"
+                                ? t("common.confirmed")
                                 : match.status === "cancelled"
-                                  ? "Cancelled"
+                                  ? t("common.cancelled")
                                   : match.status === "disputed"
                                     ? "Disputed"
                                     : match.status === "awaiting_confirmation"

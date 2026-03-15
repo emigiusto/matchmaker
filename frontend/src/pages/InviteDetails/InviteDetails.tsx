@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { getCurrentUserId } from "@/lib/current-user"
+import { useTranslation } from "@/lib/i18n"
 import {
   schedulingService,
   type SchedulingRequestDTO,
@@ -99,8 +100,8 @@ function getDisplayStatus(r: SchedulingRequestDTO) {
   return r.status
 }
 
-function getEventLabel(event: SchedulingInviteEventDTO): string {
-  const name = event.candidateUserName ?? "Unknown"
+function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string) => string): string {
+  const name = event.candidateUserName ?? t("common.unknown")
   switch (event.action) {
     case "invite_sent": return `Invite sent to ${name}`
     case "invite_accepted": return `${name} accepted`
@@ -112,10 +113,10 @@ function getEventLabel(event: SchedulingInviteEventDTO): string {
       const count = (event.metadata?.count as number) ?? 1
       return `${count} contact${count === 1 ? "" : "s"} added`
     }
-    case "request_started": return "Scheduling started"
-    case "request_cancelled": return "Request cancelled"
-    case "request_completed": return "Match confirmed"
-    case "request_expired": return "No match found"
+    case "request_started": return t("invites.events.schedulingStarted")
+    case "request_cancelled": return t("invites.events.requestCancelled")
+    case "request_completed": return t("invites.events.matchConfirmed")
+    case "request_expired": return t("invites.events.noMatchFound")
     default: return event.action
   }
 }
@@ -138,6 +139,7 @@ function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
 }
 
 export default function InviteDetailsPage() {
+  const { t } = useTranslation()
   const { requestId } = useParams<{ requestId: string }>()
   const currentUserId = getCurrentUserId()
 
@@ -203,9 +205,9 @@ export default function InviteDetailsPage() {
     try {
       const updated = await schedulingService.cancel(requestId, currentUserId)
       setRequest(updated)
-      toast.success("Request cancelled")
+      toast.success(t("inviteDetails.toast.requestCancelled"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to cancel")
+      toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.cancelFailed"))
     }
   }
 
@@ -215,9 +217,9 @@ export default function InviteDetailsPage() {
       const updated = await schedulingService.cancelContacted(requestId, candidateId, currentUserId)
       setRequest(updated)
       await fetchEvents()
-      toast.success("Cancelled invite")
+      toast.success(t("inviteDetails.toast.inviteCancelled"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to cancel")
+      toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.cancelFailed"))
     }
   }
 
@@ -227,9 +229,9 @@ export default function InviteDetailsPage() {
       const updated = await schedulingService.cancelAccepted(requestId, candidateId, currentUserId)
       setRequest(updated)
       await fetchEvents()
-      toast.success("Acceptance cancelled")
+      toast.success(t("inviteDetails.toast.acceptanceCancelled"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to cancel acceptance")
+      toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.cancelAcceptanceFailed"))
     }
   }
 
@@ -240,9 +242,9 @@ export default function InviteDetailsPage() {
       setRequest(updated)
       await fetchEvents()
       setAcceptConfirm(null)
-      toast.success("Candidate accepted")
+      toast.success(t("inviteDetails.toast.candidateAccepted"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to accept")
+      toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.acceptFailed"))
     }
   }
 
@@ -252,9 +254,9 @@ export default function InviteDetailsPage() {
       const updated = await schedulingService.retry(requestId, candidateId, currentUserId)
       setRequest(updated)
       await fetchEvents()
-      toast.success("Retry queued")
+      toast.success(t("inviteDetails.toast.retryQueued"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to retry")
+      toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.retryFailed"))
     }
   }
 
@@ -270,7 +272,7 @@ export default function InviteDetailsPage() {
       )
     }
     setCopiedLink(true)
-    toast.success("Invite link copied")
+    toast.success(t("inviteDetails.toast.linkCopied"))
     setTimeout(() => setCopiedLink(false), 2000)
   }
 
@@ -284,7 +286,7 @@ export default function InviteDetailsPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Invite Details" />
+        <PageHeader title={t("inviteDetails.title")} />
         <div className="flex flex-1 items-center justify-center p-8">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -295,11 +297,11 @@ export default function InviteDetailsPage() {
   if (!request) {
     return (
       <>
-        <PageHeader title="Invite Details" />
+        <PageHeader title={t("inviteDetails.title")} />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <p className="text-muted-foreground">Invite not found</p>
+          <p className="text-muted-foreground">{t("inviteDetails.notFound")}</p>
           <Button variant="outline" asChild>
-            <Link to="/play">Back to invites</Link>
+            <Link to="/play">{t("invites.actions.backToInvites")}</Link>
           </Button>
         </div>
       </>
@@ -313,13 +315,13 @@ export default function InviteDetailsPage() {
   return (
     <>
       <PageHeader
-        title="Invite Details"
+        title={t("inviteDetails.title")}
         description={`${request.sportType} · ${request.format}`}
       >
         <Button variant="ghost" size="sm" className="gap-1.5" asChild>
           <Link to="/play">
             <ArrowLeft className="h-4 w-4" />
-            Back
+            {t("common.back")}
           </Link>
         </Button>
       </PageHeader>
@@ -367,12 +369,12 @@ export default function InviteDetailsPage() {
             </div>
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
-              <span>{request.locationText?.trim() || "TBD"}</span>
+              <span>{request.locationText?.trim() || t("common.tbd")}</span>
             </div>
             {displayStatus === "scheduling" && (
               <div className="flex items-center gap-2 text-sm">
                 <Hourglass className="h-4 w-4 shrink-0 text-primary" />
-                <span>Reply window: {formatResponseWindow(request.responseWindowMinutes)}</span>
+                <span>{t("inviteDetails.replyWindow")} {formatResponseWindow(request.responseWindowMinutes)}</span>
               </div>
             )}
           </CardContent>
@@ -385,7 +387,7 @@ export default function InviteDetailsPage() {
               <Button className="gap-1.5" asChild>
                 <Link to={`/matches/${request.matchId}`}>
                   <ExternalLink className="h-4 w-4" />
-                  Go to match
+                  {t("invites.actions.goToMatch")}
                 </Link>
               </Button>
             )}
@@ -400,7 +402,7 @@ export default function InviteDetailsPage() {
                   rel="noopener noreferrer"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  Open WhatsApp Group
+                  {t("invites.actions.openWhatsApp")}
                 </a>
               </Button>
             ) : (
@@ -409,7 +411,7 @@ export default function InviteDetailsPage() {
                 disabled
               >
                 <CheckCircle className="h-4 w-4" />
-                Open WhatsApp Group
+                {t("invites.actions.openWhatsApp")}
               </Button>
             )}
           </div>
@@ -425,7 +427,7 @@ export default function InviteDetailsPage() {
               onSuccess={() => { fetchRequest(); fetchEvents() }}
             />
             <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyLink}>
-              {copiedLink ? <><Check className="h-3.5 w-3.5" /> Copied</> : <><Copy className="h-3.5 w-3.5" /> Copy Link</>}
+              {copiedLink ? <><Check className="h-3.5 w-3.5" /> {t("invites.actions.copied")}</> : <><Copy className="h-3.5 w-3.5" /> {t("invites.actions.copyLink")}</>}
             </Button>
             <Button
               variant="outline"
@@ -434,7 +436,7 @@ export default function InviteDetailsPage() {
               onClick={handleShareWhatsApp}
             >
               <Link2 className="h-3.5 w-3.5" />
-              WhatsApp
+              {t("invites.actions.whatsapp")}
             </Button>
             {displayStatus === "scheduling" && (
               <Button
@@ -444,7 +446,7 @@ export default function InviteDetailsPage() {
                 onClick={handleCancelRequest}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Cancel request
+                {t("invites.actions.cancelRequest")}
               </Button>
             )}
           </div>
@@ -453,15 +455,15 @@ export default function InviteDetailsPage() {
         {/* Candidates */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Invite Progress</CardTitle>
+            <CardTitle className="text-base">{t("inviteDetails.progress")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 pt-0">
             {candidates.length === 0 && (
-              <p className="text-sm text-muted-foreground">No candidates yet</p>
+              <p className="text-sm text-muted-foreground">{t("inviteDetails.noCandidates")}</p>
             )}
             {candidates.map((candidate, idx) => {
               const uiStatus = mapCandidateStatus(candidate.status)
-              const contactName = candidate.contactUserName ?? "Unknown"
+              const contactName = candidate.contactUserName ?? t("common.unknown")
               return (
                 <div
                   key={candidate.id}
@@ -510,7 +512,7 @@ export default function InviteDetailsPage() {
                       (uiStatus === "pending" || uiStatus === "contacted" || uiStatus === "no_response" || uiStatus === "cancelled") && (
                         <button
                           onClick={() => setAcceptConfirm({ candidateId: candidate.id, contactName })}
-                          title="Accept"
+                          title={t("invites.actions.accept")}
                           className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10"
                         >
                           <UserCheck className="h-3.5 w-3.5" />
@@ -521,7 +523,7 @@ export default function InviteDetailsPage() {
                       uiStatus === "contacted" && (
                         <button
                           onClick={() => handleCancelContact(candidate.id)}
-                          title="Cancel invite"
+                          title={t("invites.actions.cancelInvite")}
                           className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
                         >
                           <XCircle className="h-3.5 w-3.5" />
@@ -532,7 +534,7 @@ export default function InviteDetailsPage() {
                       (uiStatus === "no_response" || uiStatus === "cancelled" || uiStatus === "send_failed") && (
                         <button
                           onClick={() => handleRetry(candidate.id)}
-                          title="Retry invite"
+                          title={t("invites.actions.retryInvite")}
                           className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
@@ -542,7 +544,7 @@ export default function InviteDetailsPage() {
                       uiStatus === "accepted" && (
                         <button
                           onClick={() => handleCancelAccepted(candidate.id)}
-                          title="Cancel acceptance"
+                          title={t("invites.actions.cancelAcceptance")}
                           className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
                         >
                           <XCircle className="h-3.5 w-3.5" />
@@ -560,7 +562,7 @@ export default function InviteDetailsPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <History className="h-4 w-4" />
-              History
+              {t("inviteDetails.history")}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -569,7 +571,7 @@ export default function InviteDetailsPage() {
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : events.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">No events recorded yet</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">{t("inviteDetails.noEvents")}</p>
             ) : (
               <div className="relative">
                 {/* Timeline line */}
@@ -582,7 +584,7 @@ export default function InviteDetailsPage() {
                         {getEventIcon(event.action)}
                       </span>
                       <div className="flex flex-1 items-baseline justify-between gap-2">
-                        <span className="text-sm text-foreground">{getEventLabel(event)}</span>
+                        <span className="text-sm text-foreground">{getEventLabel(event, t)}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">
                           {format(new Date(event.createdAt), "MMM d, HH:mm")}
                         </span>
@@ -600,17 +602,17 @@ export default function InviteDetailsPage() {
       <AlertDialog open={!!acceptConfirm} onOpenChange={(open) => !open && setAcceptConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Accept candidate</AlertDialogTitle>
+            <AlertDialogTitle>{t("inviteDetails.confirmDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Accept {acceptConfirm?.contactName ?? "this person"} for this match?
+              {t("inviteDetails.confirmDialog.description", { name: acceptConfirm?.contactName ?? t("common.unknown") })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("inviteDetails.confirmDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => acceptConfirm && handleManualAccept(acceptConfirm.candidateId)}
             >
-              Accept
+              {t("inviteDetails.confirmDialog.accept")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -18,6 +18,7 @@ import { notificationsService } from "@/lib/services/notifications.service"
 import type { Notification } from "@/lib/types"
 import { getCurrentUserId } from "@/lib/current-user"
 import { formatDistanceToNow } from "date-fns"
+import { useTranslation } from "@/lib/i18n"
 
 const iconMap: Record<string, typeof Bell> = {
   invite_received: Mail,
@@ -31,6 +32,7 @@ const iconMap: Record<string, typeof Bell> = {
 
 export default function NotificationsPage() {
   const currentUserId = getCurrentUserId()
+  const { t } = useTranslation()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const unreadCount = notifications.filter((n) => !n.read).length
@@ -77,7 +79,7 @@ export default function NotificationsPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Notifications" description="" />
+        <PageHeader title={t("notifications.title")} description="" />
         <div className="flex flex-1 items-center justify-center p-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -87,11 +89,11 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <PageHeader title="Notifications" description={`${unreadCount} unread`}>
+      <PageHeader title={t("notifications.title")} description={`${unreadCount} unread`}>
         {unreadCount > 0 && (
           <Button variant="ghost" onClick={handleMarkAllRead}>
             <Check className="mr-1.5 h-5 w-5" />
-            Mark all read
+            {t("notifications.markAllRead")}
           </Button>
         )}
       </PageHeader>
@@ -102,7 +104,7 @@ export default function NotificationsPage() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
                 <Bell className="h-7 w-7 text-muted-foreground" />
               </div>
-              <p className="text-lg font-medium text-foreground">No notifications</p>
+              <p className="text-lg font-medium text-foreground">{t("notifications.noNotifications")}</p>
             </CardContent>
           </Card>
         ) : (
@@ -153,7 +155,7 @@ export default function NotificationsPage() {
                           className="shrink-0 text-sm"
                           onClick={() => handleMarkRead(notification.id)}
                         >
-                          Mark read
+                          {t("notifications.markRead")}
                         </Button>
                       )}
                     </div>
@@ -167,7 +169,7 @@ export default function NotificationsPage() {
                         to={`/matches/${notification.metadata.matchId}`}
                         className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                       >
-                        View match
+                        {t("notifications.viewMatch")}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     )}
@@ -176,7 +178,7 @@ export default function NotificationsPage() {
                         to={`/play/${notification.metadata.requestId}`}
                         className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                       >
-                        View invite
+                        {t("notifications.viewInvite")}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     )}
@@ -185,7 +187,7 @@ export default function NotificationsPage() {
                         to="/play"
                         className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                       >
-                        View invites
+                        {t("notifications.viewInvites")}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     )}

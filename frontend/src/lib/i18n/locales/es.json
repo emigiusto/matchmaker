@@ -5,7 +5,16 @@
     "logout": "Cerrar sesión",
     "language": "Idioma",
     "english": "English",
-    "spanish": "Español"
+    "spanish": "Español",
+    "vs": "vs",
+    "tbd": "Por definir",
+    "back": "Atrás",
+    "retry": "Reintentar",
+    "unknown": "Desconocido",
+    "cancelled": "Cancelado",
+    "confirmed": "Confirmado",
+    "level": "Nivel",
+    "court": "Pista"
   },
   "navigation": {
     "dashboard": "Panel Principal",
@@ -169,5 +178,402 @@
     "created": "Creado correctamente",
     "updated": "Actualizado correctamente",
     "invited": "Invitación enviada correctamente"
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "subtitle": "Introduce tu correo y contraseña para acceder a tu cuenta",
+    "emailPlaceholder": "tu@correo.com",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Iniciar sesión",
+    "noAccount": "¿No tienes cuenta?",
+    "signUp": "Regístrate",
+    "failed": "Error al iniciar sesión"
+  },
+  "play": {
+    "pageTitle": "Mis Invitaciones",
+    "pageDescription": "Crea partidos y consulta invitaciones abiertas"
+  },
+  "sportFormat": {
+    "tennisSingles": "Tenis Individual",
+    "tennisDoubles": "Tenis Dobles",
+    "padel": "Pádel",
+    "tennis": "Tenis"
+  },
+  "wizard": {
+    "steps": {
+      "whenWhere": "Cuándo y Dónde",
+      "formatSport": "Formato y Deporte",
+      "whoToInvite": "A Quién Invitar",
+      "startScheduling": "Iniciar Planificación"
+    },
+    "stepDesc": {
+      "whenWhere": "Establece la fecha, hora y lugar de tu partido",
+      "formatSport": "Elige deporte y formato",
+      "whoToInvite": "Selecciona y prioriza los contactos a invitar",
+      "startScheduling": "Revisa e inicia la secuencia automática de invitaciones"
+    },
+    "pickDate": "Elige una fecha",
+    "courtPlaceholder": "Pista, club o instalación (ej. Club Tennis Barcelona)",
+    "cityPlaceholder": "Ciudad (ej. Barcelona)",
+    "toBeDecided": "Por definir",
+    "autoBook": "Reservar pista automáticamente",
+    "membershipActive": "Activo",
+    "membershipError": "Error",
+    "membershipUnverified": "No verificado",
+    "singles": "Individual (1c1)",
+    "doubles": "Dobles (2c2)",
+    "searchLists": "Buscar listas...",
+    "searchFriends": "Buscar amigos...",
+    "searchContacts": "Buscar contactos...",
+    "allAdded": "Todos añadidos",
+    "noMatches": "Sin coincidencias",
+    "namePlaceholder": "Nombre",
+    "socioPlaceholder": "Nº socio",
+    "doublesMinContacts": "Añade al menos 3 contactos para un partido de dobles",
+    "addContactsLabel": "Añadir contactos",
+    "addFromList": "Añade desde una lista o individualmente arriba",
+    "dragToReorder": "Arrastra para reordenar",
+    "durationFixed": "La duración está fijada en 1 hora.",
+    "toast": {
+      "loadContactsFailed": "No se pudieron cargar los contactos",
+      "allMembersAdded": "Todos los miembros de esta lista ya están añadidos o no tienen número de teléfono",
+      "socioSaved": "Número de socio guardado",
+      "saveFailed": "Error al guardar",
+      "enterNamePhone": "Introduce nombre y teléfono",
+      "contactSaved": "Contacto guardado y añadido a la lista de invitaciones",
+      "contactFailed": "Error al añadir contacto",
+      "linkCopied": "Enlace de invitación copiado al portapapeles",
+      "schedulingStarted": "¡Planificación iniciada! Se enviarán invitaciones por WhatsApp.",
+      "schedulingFailed": "Error al iniciar la planificación"
+    }
+  },
+  "invites": {
+    "status": {
+      "scheduling": "Planificando",
+      "matched": "Emparejado",
+      "expired": "Expirado",
+      "cancelled": "Cancelado",
+      "active": "Activo",
+      "confirmed": "Confirmado"
+    },
+    "events": {
+      "schedulingStarted": "Planificación iniciada",
+      "requestCancelled": "Solicitud cancelada",
+      "matchConfirmed": "Partido confirmado",
+      "noMatchFound": "No se encontró partido",
+      "bookingInProgress": "Reserva de pista en curso",
+      "bookingCancelled": "Reserva de pista cancelada"
+    },
+    "actions": {
+      "accept": "Aceptar",
+      "removeFromQueue": "Eliminar de la cola",
+      "retryInvite": "Reintentar invitación",
+      "cancel": "Cancelar",
+      "cancelAcceptance": "Cancelar aceptación",
+      "goToMatch": "Ir al partido",
+      "openWhatsApp": "Abrir grupo de WhatsApp",
+      "copyLink": "Copiar enlace",
+      "copied": "Copiado",
+      "whatsapp": "WhatsApp",
+      "cancelRequest": "Cancelar solicitud",
+      "backToInvites": "Volver a invitaciones",
+      "cancelInvite": "Cancelar invitación"
+    },
+    "filter": {
+      "active": "Activo",
+      "expired": "Expirado",
+      "confirmed": "Confirmado",
+      "cancelled": "Cancelado"
+    },
+    "empty": {
+      "noInvitesYet": "Sin invitaciones todavía",
+      "noActiveInvites": "Sin invitaciones activas",
+      "noExpiredInvites": "Sin invitaciones expiradas",
+      "noCancelledInvites": "Sin invitaciones canceladas",
+      "noConfirmedMatches": "Sin partidos confirmados",
+      "tapToCreate": "Pulsa \"Quiero Jugar\" para crear tu primera invitación",
+      "tryAnotherFilter": "Prueba otro filtro"
+    },
+    "newRequest": "Nueva solicitud",
+    "addContacts": "Añadir contactos",
+    "addContactsToInvite": "Añadir contactos a esta invitación",
+    "noContactsToAdd": "Sin contactos para añadir",
+    "fromList": "Desde lista",
+    "search": "Buscar...",
+    "selectAtLeastOne": "Selecciona al menos un contacto",
+    "failedToAddContacts": "Error al añadir contactos",
+    "allMembersAdded": "Todos los miembros de esta lista ya están añadidos",
+    "expiredNotEnough": "No hubo suficientes respuestas a tiempo. Añade más contactos o inicia una nueva solicitud.",
+    "expiredNoOne": "Nadie respondió a tiempo. Añade más contactos o inicia una nueva solicitud.",
+    "whatsappNotAvailable": "Enlace al grupo de WhatsApp no disponible",
+    "toast": {
+      "requestCancelled": "Solicitud de invitación cancelada",
+      "cancelRequestFailed": "Error al cancelar la solicitud",
+      "inviteCancelled": "Invitación cancelada",
+      "cancelFailed": "Error al cancelar",
+      "removedFromQueue": "Eliminado de la cola",
+      "removeFailed": "Error al eliminar",
+      "acceptanceCancelled": "Aceptación cancelada",
+      "matchConfirmed": "¡Partido confirmado!",
+      "acceptFailed": "Error al aceptar",
+      "retryQueued": "Se reintentará la invitación",
+      "retryFailed": "Error al reintentar la invitación",
+      "linkCopied": "Enlace de invitación copiado"
+    }
+  },
+  "inviteDetails": {
+    "title": "Detalles de Invitación",
+    "progress": "Progreso de Invitación",
+    "history": "Historial",
+    "noCandidates": "Sin candidatos todavía",
+    "noEvents": "Sin eventos registrados todavía",
+    "replyWindow": "Ventana de respuesta:",
+    "confirmDialog": {
+      "title": "Aceptar candidato",
+      "description": "¿Aceptar a {{name}} para este partido?",
+      "cancel": "Cancelar",
+      "accept": "Aceptar"
+    },
+    "toast": {
+      "requestCancelled": "Solicitud cancelada",
+      "cancelFailed": "Error al cancelar",
+      "inviteCancelled": "Invitación cancelada",
+      "acceptanceCancelled": "Aceptación cancelada",
+      "cancelAcceptanceFailed": "Error al cancelar la aceptación",
+      "candidateAccepted": "Candidato aceptado",
+      "acceptFailed": "Error al aceptar",
+      "retryQueued": "Reintento en cola",
+      "retryFailed": "Error al reintentar",
+      "linkCopied": "Enlace de invitación copiado"
+    },
+    "notFound": "Invitación no encontrada"
+  },
+  "inviteConfirm": {
+    "loading": "Cargando invitación...",
+    "badge": "Invitación de Partido",
+    "title": "Te han invitado a jugar",
+    "wantsToPlay": "quiere jugar un partido contigo",
+    "acceptInvite": "Aceptar Invitación",
+    "decline": "Rechazar",
+    "login": "Iniciar sesión",
+    "choicePrompt": "¡Genial! ¿Cómo quieres aceptar?",
+    "choiceDesc": "Elige una de las opciones para confirmar tu asistencia",
+    "tabs": {
+      "guest": "Jugar como Invitado",
+      "login": "Iniciar sesión",
+      "signup": "Registrarse"
+    },
+    "guest": {
+      "desc": "Sin cuenta necesaria. Solo dinos tu nombre para que {{name}} sepa quién aceptó.",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo",
+      "emailOptional": "(opcional, para actualizaciones del partido)",
+      "emailPlaceholder": "tu@correo.com",
+      "firstNamePlaceholder": "Nombre",
+      "lastNamePlaceholder": "Apellido",
+      "submit": "Aceptar como Invitado",
+      "hint": "Puedes crear una cuenta después para seguir tus partidos y nivel"
+    },
+    "loginTab": {
+      "desc": "¿Ya eres jugador de MatchMaker? Inicia sesión para aceptar con tu perfil.",
+      "email": "Correo",
+      "emailPlaceholder": "tu@correo.com",
+      "password": "Contraseña",
+      "passwordPlaceholder": "Tu contraseña",
+      "submit": "Iniciar sesión y Aceptar",
+      "forgotPassword": "¿Olvidaste tu contraseña?"
+    },
+    "signupTab": {
+      "desc": "Crea tu cuenta gratuita para aceptar esta invitación y comenzar a seguir tu trayectoria tenística.",
+      "fullName": "Nombre completo",
+      "fullNamePlaceholder": "Tu nombre completo",
+      "email": "Correo",
+      "emailPlaceholder": "tu@correo.com",
+      "password": "Contraseña",
+      "passwordPlaceholder": "Crea una contraseña",
+      "submit": "Crear Cuenta y Aceptar",
+      "terms": "Al crear una cuenta aceptas nuestros",
+      "termsLink": "Términos de Servicio",
+      "declineLink": "No puedo asistir — rechazar invitación"
+    },
+    "accepted": {
+      "title": "¡Estás dentro!",
+      "message": "Nos vemos el {{date}} a las {{time}} en {{location}}.",
+      "upsell": "¿Quieres seguir tus partidos y encontrar más rivales?",
+      "cta": "Crear una Cuenta Gratis"
+    },
+    "declined": {
+      "title": "Sin problema",
+      "message": "será notificado. ¡Quizás la próxima! Aún puedes crear una cuenta para encontrar otros jugadores cerca.",
+      "cta": "Explorar MatchMaker"
+    },
+    "features": {
+      "title": "Por qué los jugadores aman MatchMaker",
+      "smartMatchmaking": "Emparejamiento Inteligente",
+      "smartMatchmakingDesc": "Encuentra rivales de tu nivel, cerca de ti y disponibles cuando tú lo estés. Sin más mensajes interminables de grupo de WhatsApp.",
+      "trackProgress": "Sigue Tu Progreso",
+      "trackProgressDesc": "Ve cómo evoluciona tu nivel, revisa el historial de partidos y comprende tu juego con estadísticas reales.",
+      "oneTapScheduling": "Planificación en Un Toque",
+      "oneTapSchedulingDesc": "Di cuándo y dónde quieres jugar. Sugerimos rivales, enviamos invitaciones y programamos recordatorios automáticamente.",
+      "fairTransparent": "Justo y Transparente",
+      "fairTransparentDesc": "Cada resultado es confirmado por ambos jugadores. Tu nivel refleja el rendimiento real, no la habilidad autodeclarada.",
+      "communityRankings": "Rankings Comunitarios",
+      "communityRankingsDesc": "Compite en clasificaciones locales, descubre jugadores emergentes en tu zona y encuentra tu próximo gran rival."
+    },
+    "stats": {
+      "activePlayers": "Jugadores activos",
+      "matchesPlayed": "Partidos jugados",
+      "cities": "Ciudades",
+      "appRating": "Valoración de la app"
+    },
+    "toast": {
+      "declined": "Invitación rechazada. Siempre puedes unirte después.",
+      "loggedIn": "¡Sesión iniciada e invitación aceptada!",
+      "signedUp": "¡Cuenta creada e invitación aceptada! Bienvenido a MatchMaker.",
+      "redirecting": "Redirigiendo al registro..."
+    }
+  },
+  "matchDetails": {
+    "title": "Partido",
+    "players": "Jugadores",
+    "teamA": "Equipo A",
+    "teamB": "Equipo B",
+    "doublesNote": "Dobles — equipos asignados al enviar el resultado",
+    "booking": {
+      "title": "Reserva de Pista",
+      "inProgress": "En progreso…",
+      "booked": "Reservado",
+      "failed": "Fallido",
+      "cancelled": "Cancelado",
+      "reserved": "reservada",
+      "ref": "Ref:",
+      "cancellingBooking": "Cancelando reserva…",
+      "cancelBooking": "Cancelar reserva",
+      "bookingFailed": "Reserva fallida",
+      "retryBooking": "Reintentar reserva",
+      "attempting": "Intentando reservar una pista…"
+    },
+    "reminders": {
+      "title": "Recordatorios",
+      "matchCancelled": "Este partido fue cancelado. No se enviarán recordatorios.",
+      "description": "Recibe un recordatorio por WhatsApp antes del partido.",
+      "addReminder": "Añadir Recordatorio",
+      "yourReminders": "Tus recordatorios",
+      "loading": "Cargando recordatorios…",
+      "noReminders": "Sin recordatorios. Añade uno arriba para recibir un aviso por WhatsApp antes del partido.",
+      "noRemindersSet": "No se configuraron recordatorios para este partido.",
+      "removeReminder": "Eliminar recordatorio"
+    },
+    "result": {
+      "title": "Resultado del Partido",
+      "ratingChange": "Cambio de clasificación:",
+      "set": "Set {{number}}",
+      "status": "Estado",
+      "awaitingConfirmation": "Esperando Confirmación",
+      "confirmed": "Confirmado",
+      "confirmResult": "Confirmar Resultado",
+      "dispute": "Impugnar",
+      "disputeTitle": "Impugnar Resultado",
+      "disputeReason": "Razón",
+      "disputePlaceholder": "Explica por qué estás impugnando este resultado...",
+      "submitDispute": "Enviar Impugnación"
+    },
+    "submit": {
+      "title": "Enviar Resultado",
+      "disabled": "El envío de resultados está temporalmente desactivado.",
+      "button": "Cargar Resultado",
+      "submitted": "Resultado enviado, esperando confirmación"
+    },
+    "notFound": "Partido no encontrado"
+  },
+  "matchesUpcoming": {
+    "title": "Partidos",
+    "description": "Tus próximos y pasados partidos",
+    "noMatches": "No hay partidos programados",
+    "noMatchesDesc": "Crea invitaciones para programar tu próximo partido",
+    "upcoming": "Próximos partidos",
+    "today": "Hoy",
+    "comingUp": "Próximamente",
+    "past": "Partidos pasados",
+    "noPast": "Aún no hay partidos pasados"
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "markAllRead": "Marcar todo como leído",
+    "noNotifications": "Sin notificaciones",
+    "markRead": "Marcar como leído",
+    "viewMatch": "Ver partido",
+    "viewInvite": "Ver invitación",
+    "viewInvites": "Ver invitaciones"
+  },
+  "profilePage": {
+    "loadError": "No se pudo cargar tu perfil.",
+    "you": "Tú",
+    "settings": {
+      "title": "Configuración Personal",
+      "description": "Estos datos se usan para la planificación, invitaciones de WhatsApp y recordatorios.",
+      "displayName": "Nombre visible",
+      "namePlaceholder": "Tu nombre",
+      "phone": "Número de teléfono",
+      "phoneHint": "Necesario para invitaciones de WhatsApp y recordatorios. Incluye el código de país (ej. +34).",
+      "email": "Correo electrónico",
+      "preferredLanguage": "Idioma preferido",
+      "saveChanges": "Guardar cambios"
+    },
+    "location": {
+      "title": "Preferencias de ubicación",
+      "description": "Ubicación por defecto para «Quiero Jugar» — tu club y ciudad preferidos.",
+      "preferredClub": "Club / pista preferida",
+      "clubPlaceholder": "ej. Club Tennis Barcelona",
+      "defaultCity": "Ciudad por defecto",
+      "cityPlaceholder": "ej. Barcelona",
+      "save": "Guardar ubicación"
+    },
+    "clubConnections": {
+      "title": "Conexiones de Club",
+      "description": "Conecta tu membresía de club para habilitar la reserva automática de pista cuando se confirme un partido.",
+      "socio": "Socio #{{number}}",
+      "verified": "Verificado",
+      "invalidCredentials": "Credenciales inválidas — actualiza tu contraseña",
+      "notVerified": "Aún no verificado",
+      "notConnected": "No conectado",
+      "test": "Probar",
+      "connect": "Conectar",
+      "socioNumber": "Número de socio",
+      "socioPlaceholder": "ej. 12345",
+      "password": "Contraseña",
+      "passwordNote": "(necesario para la reserva automática)",
+      "passwordKeepBlank": "Deja en blanco para mantener la actual",
+      "passwordPlaceholder": "Tu contraseña del portal del club",
+      "securityNote": "Almacenado cifrado. Solo se usa para iniciar sesión en el portal del club en tu nombre.",
+      "update": "Actualizar",
+      "saveConnection": "Guardar conexión"
+    },
+    "contacts": {
+      "title": "Contactos",
+      "description": "Establece un número de socio para cada contacto para que puedan añadirse a las reservas de pista.",
+      "socioPlaceholder": "Nº socio",
+      "noSocio": "Sin nº socio"
+    },
+    "toast": {
+      "socioSaved": "Número de socio guardado",
+      "saveFailed": "Error al guardar",
+      "connectionSaved": "Conexión de club guardada",
+      "connectionFailed": "Error al guardar la conexión de club",
+      "connectionVerified": "Conexión verificada correctamente",
+      "invalidCredentials": "Credenciales inválidas — verifica tu número de socio y contraseña",
+      "connectionTestFailed": "Error en la prueba de conexión",
+      "connectionRemoved": "Conexión de club eliminada",
+      "removeFailed": "Error al eliminar la conexión"
+    }
+  },
+  "profileView": {
+    "title": "Perfil de Jugador",
+    "addFriend": "Añadir Amigo",
+    "matches": "Partidos",
+    "winRate": "Porcentaje de Victorias",
+    "record": "Récord",
+    "notFound": "Jugador no encontrado"
   }
 }

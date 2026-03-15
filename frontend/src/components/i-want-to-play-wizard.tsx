@@ -77,6 +77,7 @@ import { friendshipsService } from "@/lib/services/friendships.service"
 import { guestContactsService } from "@/lib/services/guest-contacts.service"
 import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO } from "@/lib/services/booking.service"
 import { getCurrentUserId } from "@/lib/current-user"
+import { useTranslation } from "@/lib/i18n"
 
 interface WizardProps {
   open: boolean
@@ -116,10 +117,12 @@ function SortableContactItem({
   contact,
   index,
   onRemove,
+  dragLabel = "Drag to reorder",
 }: {
   contact: Contact
   index: number
   onRemove: (id: string) => void
+  dragLabel?: string
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: contact.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
@@ -136,7 +139,7 @@ function SortableContactItem({
         {...attributes}
         {...listeners}
         className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
-        aria-label="Drag to reorder"
+        aria-label={dragLabel}
       >
         <GripVertical className="h-4 w-4 shrink-0" />
       </button>
@@ -160,6 +163,7 @@ function SortableContactItem({
 export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdProp, onSuccess }: WizardProps) {
   const hostUserId = hostUserIdProp ?? getCurrentUserId()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [step, setStep] = useState<Step>(1)
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [datePickerOpen, setDatePickerOpen] = useState(false)
@@ -297,7 +301,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         setAvailableContacts([])
         setGroupsWithMembers([])
         setFriends([])
-        toast.error("Could not load contacts")
+        toast.error(t("wizard.toast.loadContactsFailed"))
       })
       .finally(() => setContactsLoading(false))
   }, [open, hostUserId])
@@ -317,7 +321,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
   const locationText = locationType === "place" ? specificPlace : cityValue
-  const displayLocation = locationText.trim() || "To be decided"
+  const displayLocation = locationText.trim() || t("wizard.toBeDecided")
 
 
   function addContact(contact: Contact) {
@@ -336,7 +340,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: ac.id, socioNumber: ac.socioNumber ?? "" } }))
       setSocioEdits((prev) => ({ ...prev, [user.id]: ac.socioNumber ?? "" }))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to add contact")
+      toast.error(e instanceof Error ? e.message : t("wizard.toast.contactFailed"))
     }
   }
 
@@ -345,7 +349,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       (m) => m.id !== hostUserId && m.phone && !priorityList.some((c) => c.id === m.id)
     )
     if (toAdd.length === 0) {
-      toast.info("All members from this list are already added or don't have a phone number")
+      toast.info(t("wizard.toast.allMembersAdded"))
       return
     }
     setPriorityList((prev) => [
@@ -363,9 +367,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     try {
       await guestContactsService.updateSocioNumber(meta.gcId, hostUserId, value)
       setGcMeta((prev) => ({ ...prev, [userId]: { ...prev[userId], socioNumber: value } }))
-      toast.success("Socio number saved")
+      toast.success(t("wizard.toast.socioSaved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save")
+      toast.error(err instanceof Error ? err.message : t("wizard.toast.saveFailed"))
     } finally {
       setSavingSocio(null)
     }
@@ -380,7 +384,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     const name = manualName.trim()
     const phone = manualPhone.trim()
     if (!name || !phone) {
-      toast.error("Enter name and phone")
+      toast.error(t("wizard.toast.enterNamePhone"))
       return
     }
     const phoneValidation = validatePhoneE164(phone)
@@ -397,9 +401,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       addContact({ id: user.id, name: user.name || name })
       setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: guestContact.id, socioNumber: socio } }))
       setSocioEdits((prev) => ({ ...prev, [user.id]: socio }))
-      toast.success("Contact saved and added to invite list")
+      toast.success(t("wizard.toast.contactSaved"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to add contact")
+      toast.error(e instanceof Error ? e.message : t("wizard.toast.contactFailed"))
     }
   }
 
@@ -431,7 +435,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     const url = typeof window !== "undefined" ? `${window.location.origin}/invite/tok-${Date.now()}` : ""
     navigator.clipboard.writeText(url)
     setLinkCopied(true)
-    toast.success("Invite link copied to clipboard")
+    toast.success(t("wizard.toast.linkCopied"))
     setTimeout(() => setLinkCopied(false), 2000)
   }
 
@@ -459,16 +463,17 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         hostPartnerUserId: null,
         candidateUserIds: priorityList.map((c) => c.id),
         bookingEnabled,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
       await schedulingService.start(req.id)
-      toast.success("Scheduling started! Invites will be sent via WhatsApp.", {
+      toast.success(t("wizard.toast.schedulingStarted"), {
         description: `First contacting ${priorityList[0]?.name}...`
       })
       onSuccess?.()
       handleClose(false)
       navigate(`/play/${req.id}`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to start scheduling")
+      toast.error(e instanceof Error ? e.message : t("wizard.toast.schedulingFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -479,16 +484,16 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold tracking-tight">
-            {step === 1 && "When & Where"}
-            {step === 2 && "Format & Sport"}
-            {step === 3 && "Who to Invite"}
-            {step === 4 && "Start Scheduling"}
+            {step === 1 && t("wizard.steps.whenWhere")}
+            {step === 2 && t("wizard.steps.formatSport")}
+            {step === 3 && t("wizard.steps.whoToInvite")}
+            {step === 4 && t("wizard.steps.startScheduling")}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {step === 1 && "Set the date, time, and location for your match"}
-            {step === 2 && "Choose sport and format"}
-            {step === 3 && "Select and prioritize contacts to invite"}
-            {step === 4 && "Review and start the automated invite sequence"}
+            {step === 1 && t("wizard.stepDesc.whenWhere")}
+            {step === 2 && t("wizard.stepDesc.formatSport")}
+            {step === 3 && t("wizard.stepDesc.whoToInvite")}
+            {step === 4 && t("wizard.stepDesc.startScheduling")}
           </DialogDescription>
           {/* Step indicator */}
           <div className="flex items-center gap-2 pt-2">
@@ -520,7 +525,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     )}
                   >
                     <CalendarIcon className="mr-2 h-5 w-5" />
-                    {date ? format(date, "EEEE, MMMM d, yyyy") : "Pick a date"}
+                    {date ? format(date, "EEEE, MMMM d, yyyy") : t("wizard.pickDate")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -560,7 +565,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <span className="text-sm font-semibold">{endTime || "--:--"}</span>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Duration is fixed at 1 hour.</p>
+              <p className="text-xs text-muted-foreground">{t("wizard.durationFixed")}</p>
             </div>
 
             {/* Location — optional: Place (court/club) or City, defaults to user's preferred club */}
@@ -603,14 +608,14 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <Input
                     value={specificPlace}
                     onChange={(e) => setSpecificPlace(e.target.value)}
-                    placeholder="Court, club, or venue (e.g. Club Tennis Barcelona)"
+                    placeholder={t("wizard.courtPlaceholder")}
                     className="pl-11 text-base"
                   />
                 ) : (
                   <Input
                     value={cityValue}
                     onChange={(e) => setCityValue(e.target.value)}
-                    placeholder="City (e.g. Barcelona)"
+                    placeholder={t("wizard.cityPlaceholder")}
                     className="pl-11 text-base"
                   />
                 )}
@@ -625,7 +630,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               <div className="rounded-xl border border-border/40 bg-card px-4 py-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">Auto-book a court</p>
+                    <p className="text-sm font-medium">{t("wizard.autoBook")}</p>
                     <p className="text-xs text-muted-foreground">
                       Reserve a court automatically when someone accepts.
                     </p>
@@ -633,7 +638,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <Switch
                     checked={bookingEnabled}
                     onCheckedChange={setBookingEnabled}
-                    aria-label="Auto-book a court"
+                    aria-label={t("wizard.autoBook")}
                   />
                 </div>
                 {bookingEnabled && clubMemberships.length > 1 && (
@@ -670,7 +675,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                                 ? "bg-red-500/10 text-red-500"
                                 : "bg-muted text-muted-foreground"
                             )}>
-                              {m.status === "active" ? "Active" : m.status === "invalid_credentials" ? "Error" : "Unverified"}
+                              {m.status === "active" ? t("wizard.membershipActive") : m.status === "invalid_credentials" ? t("wizard.membershipError") : t("wizard.membershipUnverified")}
                             </span>
                           </button>
                         )
@@ -696,7 +701,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                           ? "bg-red-500/10 text-red-500"
                           : "bg-muted text-muted-foreground"
                       )}>
-                        {m.status === "active" ? "Active" : m.status === "invalid_credentials" ? "Error" : "Unverified"}
+                        {m.status === "active" ? t("wizard.membershipActive") : m.status === "invalid_credentials" ? t("wizard.membershipError") : t("wizard.membershipUnverified")}
                       </span>
                     </div>
                   )
@@ -706,7 +711,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               <div className="rounded-xl border border-border/40 bg-card px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Auto-book a court</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t("wizard.autoBook")}</p>
                     <p className="text-xs text-muted-foreground">
                       Add a club connection in your{" "}
                       <Link
@@ -719,7 +724,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       to enable automatic court booking.
                     </p>
                   </div>
-                  <Switch disabled aria-label="Auto-book a court" />
+                  <Switch disabled aria-label={t("wizard.autoBook")} />
                 </div>
               </div>
             )}
@@ -754,7 +759,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       : "border-border/50 text-foreground hover:border-primary/30"
                   )}
                 >
-                  Tennis
+                  {t("sportFormat.tennis")}
                 </button>
                 <button
                   type="button"
@@ -770,7 +775,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       : "border-border/50 text-foreground hover:border-primary/30"
                   )}
                 >
-                  Padel
+                  {t("sportFormat.padel")}
                 </button>
               </div>
               {sport === "padel" && (
@@ -803,7 +808,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     )}
                   >
                     <Users className={cn("h-4 w-4", matchFormat === fmt && !(sport === "padel" && fmt === "singles") ? "text-primary" : "text-muted-foreground")} />
-                    {fmt === "singles" ? "Singles (1v1)" : "Doubles (2v2)"}
+                    {fmt === "singles" ? t("wizard.singles") : t("wizard.doubles")}
                   </button>
                 ))}
               </div>
@@ -851,7 +856,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(1)}>
                 <ChevronLeft className="mr-1 h-5 w-5" />
-                Back
+                {t("form.back")}
               </Button>
               <Button size="lg" className="flex-1" onClick={() => setStep(3)}>
                 Continue
@@ -866,7 +871,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
           <div className="space-y-4 pt-2">
 
             <div className="space-y-3">
-              <Label className="text-base font-medium">Add contacts</Label>
+              <Label className="text-base font-medium">{t("wizard.addContactsLabel")}</Label>
               {contactsLoading ? (
                 <div className="flex items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-6">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -886,7 +891,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         <div className="relative mb-2">
                           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
-                            placeholder="Search lists..."
+                            placeholder={t("wizard.searchLists")}
                             value={searchFromList}
                             onChange={(e) => setSearchFromList(e.target.value)}
                             className="h-8 pl-8"
@@ -922,7 +927,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         <div className="relative mb-2">
                           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
-                            placeholder="Search friends..."
+                            placeholder={t("wizard.searchFriends")}
                             value={searchFriends}
                             onChange={(e) => setSearchFriends(e.target.value)}
                             className="h-8 pl-8"
@@ -960,7 +965,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       <div className="relative mb-2">
                         <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                          placeholder="Search contacts..."
+                          placeholder={t("wizard.searchContacts")}
                           value={searchAllContacts}
                           onChange={(e) => setSearchAllContacts(e.target.value)}
                           className="h-8 pl-8"
@@ -985,7 +990,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       </div>
                       {availableContacts.filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true).filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase())).length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                          {availableContacts.filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true).length === 0 ? "All added" : "No matches"}
+                          {availableContacts.filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true).length === 0 ? t("wizard.allAdded") : t("wizard.noMatches")}
                         </p>
                       )}
                     </PopoverContent>
@@ -1012,7 +1017,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 <p className="text-xs text-muted-foreground">Saved to your contacts. Use country code (e.g. +34 for Spain).</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(120px,1fr)_minmax(200px,2fr)_90px_auto] sm:items-end">
                   <Input
-                    placeholder="Name"
+                    placeholder={t("wizard.namePlaceholder")}
                     value={manualName}
                     onChange={(e) => setManualName(e.target.value)}
                     className="w-full"
@@ -1025,7 +1030,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     />
                   </div>
                   <Input
-                    placeholder="Socio #"
+                    placeholder={t("wizard.socioPlaceholder")}
                     value={manualSocio}
                     onChange={(e) => setManualSocio(e.target.value)}
                     className="w-full"
@@ -1059,7 +1064,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   )}
                 </Label>
                 {priorityList.length > 0 && (
-                  <span className="text-xs text-muted-foreground">Drag to reorder</span>
+                  <span className="text-xs text-muted-foreground">{t("wizard.dragToReorder")}</span>
                 )}
               </div>
 
@@ -1069,8 +1074,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <p className="mt-2 text-sm text-muted-foreground">No contacts added yet</p>
                   <p className="text-xs text-muted-foreground/70">
                     {matchFormat === "doubles"
-                      ? "Add at least 3 contacts for a doubles match"
-                      : "Add from a list or individually above"}
+                      ? t("wizard.doublesMinContacts")
+                      : t("wizard.addFromList")}
                   </p>
                 </div>
               ) : (
@@ -1083,6 +1088,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                           contact={contact}
                           index={index}
                           onRemove={removeContact}
+                          dragLabel={t("wizard.dragToReorder")}
                         />
                       ))}
                     </div>
@@ -1105,7 +1111,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       <span className="min-w-0 flex-1 text-sm font-medium truncate">{c.name}</span>
                       <Input
                         className="h-8 w-28 text-sm"
-                        placeholder="Socio #"
+                        placeholder={t("wizard.socioPlaceholder")}
                         value={socioEdits[c.id] ?? gcMeta[c.id]?.socioNumber ?? ""}
                         onChange={(e) => setSocioEdits((p) => ({ ...p, [c.id]: e.target.value }))}
                         onBlur={() => { if (gcMeta[c.id]) handleSaveSocio(c.id) }}
@@ -1199,7 +1205,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(2)}>
                 <ChevronLeft className="mr-1 h-5 w-5" />
-                Back
+                {t("form.back")}
               </Button>
               <Button
                 size="lg"
@@ -1341,7 +1347,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 onClick={() => setStep(3)}
               >
                 <ChevronLeft className="mr-1 h-5 w-5" />
-                Back
+                {t("form.back")}
               </Button>
               <Button
                 size="lg"

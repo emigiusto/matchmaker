@@ -36,6 +36,7 @@ import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
 import { toast } from "sonner"
+import { useTranslation } from "@/lib/i18n"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
@@ -45,6 +46,7 @@ import { Loader2 } from "lucide-react"
 
 export default function MatchDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { t } = useTranslation()
   const currentUserId = getCurrentUserId()
   const [match, setMatch] = useState<Match | null>(null)
   const [loading, setLoading] = useState(true)
@@ -170,7 +172,7 @@ export default function MatchDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Match" />
+        <PageHeader title={t("matchDetails.title")} />
         <div className="flex flex-1 items-center justify-center p-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -181,12 +183,12 @@ export default function MatchDetailPage() {
   if (!match) {
     return (
       <>
-        <PageHeader title="Match" />
+        <PageHeader title={t("matchDetails.title")} />
         <div className="flex flex-1 items-center justify-center p-8">
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">Match not found</p>
+            <p className="text-sm text-muted-foreground">{t("matchDetails.notFound")}</p>
             <Button variant="ghost" className="mt-4" asChild>
-              <Link to="/dashboard">Back to Dashboard</Link>
+              <Link to="/dashboard">{t("common.back")}</Link>
             </Button>
           </div>
         </div>
@@ -210,10 +212,10 @@ export default function MatchDetailPage() {
 
   return (
     <>
-      <PageHeader title="Match Detail">
+      <PageHeader title={t("matchDetails.title")}>
         <Button variant="ghost" size="sm" asChild>
           <Link to="/dashboard">
-            <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> {t("common.back")}
           </Link>
         </Button>
       </PageHeader>
@@ -248,7 +250,7 @@ export default function MatchDetailPage() {
                 /* Doubles with teams: Team A vs Team B — all 4 players */
                 <div className="flex items-center justify-center gap-8">
                   <div className="flex flex-col items-center gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team A</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("matchDetails.teamA")}</span>
                     <div className="flex flex-wrap justify-center gap-3">
                       {(match.participants ?? [])
                         .filter((p) => p.team === "A")
@@ -257,13 +259,13 @@ export default function MatchDetailPage() {
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
                               {(p.userName ?? "?").split(" ").map((n) => n[0]).join("")}
                             </div>
-                            <span className="text-sm font-medium">{p.userName ?? "Participant"}</span>
+                            <span className="text-sm font-medium">{p.userName ?? t("common.unknown")}</span>
                           </div>
                         ))}
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-2xl font-bold text-muted-foreground/40">vs</span>
+                    <span className="text-2xl font-bold text-muted-foreground/40">{t("common.vs")}</span>
                     {match.result && (
                       <p className="font-mono text-lg font-bold text-foreground">
                         {match.result.sets.map((s) => `${s.player1Score}-${s.player2Score}`).join(" ")}
@@ -271,7 +273,7 @@ export default function MatchDetailPage() {
                     )}
                   </div>
                   <div className="flex flex-col items-center gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team B</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("matchDetails.teamB")}</span>
                     <div className="flex flex-wrap justify-center gap-3">
                       {(match.participants ?? [])
                         .filter((p) => p.team === "B")
@@ -280,7 +282,7 @@ export default function MatchDetailPage() {
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted-foreground/20 text-xs font-bold text-muted-foreground">
                               {(p.userName ?? "?").split(" ").map((n) => n[0]).join("")}
                             </div>
-                            <span className="text-sm font-medium">{p.userName ?? "Participant"}</span>
+                            <span className="text-sm font-medium">{p.userName ?? t("common.unknown")}</span>
                           </div>
                         ))}
                     </div>
@@ -295,11 +297,11 @@ export default function MatchDetailPage() {
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-semibold text-foreground">{currentPlayer.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">Level {currentPlayer.levelValue.toFixed(1)}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {currentPlayer.levelValue.toFixed(1)}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-2xl font-bold text-muted-foreground/40">vs</span>
+                    <span className="text-2xl font-bold text-muted-foreground/40">{t("common.vs")}</span>
                     {match.result && (
                       <p className="font-mono text-lg font-bold text-foreground">
                         {match.result.sets.map((s) => `${s.player1Score}-${s.player2Score}`).join(" ")}
@@ -312,7 +314,7 @@ export default function MatchDetailPage() {
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-semibold text-foreground">{opponent.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">Level {opponent.levelValue.toFixed(1)}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {opponent.levelValue.toFixed(1)}</p>
                     </div>
                   </div>
                 </div>
@@ -320,14 +322,14 @@ export default function MatchDetailPage() {
             ) : (
               /* Doubles before result: teams unknown, list all participants */
               <div className="flex flex-col items-center gap-4">
-                <p className="text-sm text-muted-foreground">Doubles — teams assigned when result is submitted</p>
+                <p className="text-sm text-muted-foreground">{t("matchDetails.doublesNote")}</p>
                 <div className="flex flex-wrap justify-center gap-4">
                   {(match.participants ?? []).map((p) => (
                     <div key={p.userId} className="flex items-center gap-2 rounded-full bg-muted/50 px-4 py-2">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
                         {(p.userName ?? "?").split(" ").map((n) => n[0]).join("")}
                       </div>
-                      <span className="text-sm font-medium">{p.userName ?? "Participant"}</span>
+                      <span className="text-sm font-medium">{p.userName ?? t("common.unknown")}</span>
                     </div>
                   ))}
                 </div>
@@ -394,7 +396,7 @@ export default function MatchDetailPage() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight">
                 <Building2 className="h-4 w-4" />
-                Court Booking
+                {t("matchDetails.booking.title")}
                 <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   bookingAttempt.status === "success"
                     ? "bg-green-500/10 text-green-700 dark:text-green-400"
@@ -402,10 +404,10 @@ export default function MatchDetailPage() {
                     ? "bg-destructive/10 text-destructive"
                     : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
                 }`}>
-                  {bookingAttempt.status === "pending" ? "In progress…" :
-                   bookingAttempt.status === "success" ? "Booked" :
-                   bookingAttempt.status === "failed" ? "Failed" :
-                   bookingAttempt.status === "cancelled" ? "Cancelled" : bookingAttempt.status}
+                  {bookingAttempt.status === "pending" ? t("matchDetails.booking.inProgress") :
+                   bookingAttempt.status === "success" ? t("matchDetails.booking.booked") :
+                   bookingAttempt.status === "failed" ? t("matchDetails.booking.failed") :
+                   bookingAttempt.status === "cancelled" ? t("matchDetails.booking.cancelled") : bookingAttempt.status}
                 </span>
               </CardTitle>
             </CardHeader>
@@ -415,10 +417,10 @@ export default function MatchDetailPage() {
                   {bookingAttempt.courtName && (
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Court <strong>{bookingAttempt.courtName}</strong> reserved</span>
+                      <span><strong>{bookingAttempt.courtName}</strong> {t("matchDetails.booking.reserved")}</span>
                       {bookingAttempt.externalBookingId && (
                         <span className="text-xs text-muted-foreground">
-                          · Ref: {bookingAttempt.externalBookingId}
+                          · {t("matchDetails.booking.ref")} {bookingAttempt.externalBookingId}
                         </span>
                       )}
                     </div>
@@ -434,7 +436,7 @@ export default function MatchDetailPage() {
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       : <Ban className="h-3.5 w-3.5" />
                     }
-                    {cancellingBooking ? "Cancelling booking…" : "Cancel booking"}
+                    {cancellingBooking ? t("matchDetails.booking.cancellingBooking") : t("matchDetails.booking.cancelBooking")}
                   </Button>
                   {cancelBookingError && (
                     <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-sm text-destructive">
@@ -449,7 +451,7 @@ export default function MatchDetailPage() {
                   <div className="flex items-start gap-2 text-sm">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                     <span className="text-destructive">
-                      {bookingAttempt.errorMessage ?? "Booking failed"}
+                      {bookingAttempt.errorMessage ?? t("matchDetails.booking.bookingFailed")}
                     </span>
                   </div>
                   <Button
@@ -463,14 +465,14 @@ export default function MatchDetailPage() {
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       : <RefreshCw className="h-3.5 w-3.5" />
                     }
-                    Retry booking
+                    {t("matchDetails.booking.retryBooking")}
                   </Button>
                 </div>
               )}
               {bookingAttempt.status === "pending" && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Attempting to reserve a court…
+                  {t("matchDetails.booking.attempting")}
                 </div>
               )}
             </CardContent>
@@ -482,12 +484,12 @@ export default function MatchDetailPage() {
           <CardHeader>
             <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
               <Bell className="h-4 w-4" />
-              Reminders
+              {t("matchDetails.reminders.title")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               {match.status === "cancelled"
-                ? "This match was cancelled. No reminders will be sent."
-                : "Get a WhatsApp reminder before the match."}
+                ? t("matchDetails.reminders.matchCancelled")
+                : t("matchDetails.reminders.description")}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -504,24 +506,24 @@ export default function MatchDetailPage() {
                   trigger={
                     <Button variant="outline" size="lg" className="gap-2">
                       <Bell className="h-5 w-5" />
-                      Add Reminder
+                      {t("matchDetails.reminders.addReminder")}
                     </Button>
                   }
                 />
               </div>
             )}
             <div>
-              <h4 className="text-sm font-medium text-foreground mb-2">Your reminders</h4>
+              <h4 className="text-sm font-medium text-foreground mb-2">{t("matchDetails.reminders.yourReminders")}</h4>
               {remindersLoading ? (
                 <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading reminders…
+                  {t("matchDetails.reminders.loading")}
                 </div>
               ) : reminders.length === 0 ? (
                 <p className="py-4 text-sm text-muted-foreground">
                   {(match.status === "scheduled" || match.status === "awaiting_confirmation")
-                    ? "No reminders set. Add one above to get a WhatsApp reminder before the match."
-                    : "No reminders were set for this match."}
+                    ? t("matchDetails.reminders.noReminders")
+                    : t("matchDetails.reminders.noRemindersSet")}
                 </p>
               ) : (
                 <ul className="space-y-2">
@@ -573,7 +575,7 @@ export default function MatchDetailPage() {
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                             onClick={() => handleDeleteReminder(r.id)}
                             disabled={deletingId === r.id}
-                            title="Remove reminder"
+                            title={t("matchDetails.reminders.removeReminder")}
                           >
                             {deletingId === r.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -598,7 +600,7 @@ export default function MatchDetailPage() {
               <Card className="border-border/50">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold tracking-tight">
-                    Match Result
+                    {t("matchDetails.result.title")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -609,7 +611,7 @@ export default function MatchDetailPage() {
                         className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-2.5"
                       >
                         <span className="text-xs font-medium text-muted-foreground">
-                          Set {set.setNumber}
+                          {t("matchDetails.result.set", { number: set.setNumber })}
                         </span>
                         <span className="font-mono text-sm font-semibold text-foreground">
                           {set.player1Score} - {set.player2Score}
@@ -626,7 +628,7 @@ export default function MatchDetailPage() {
                         ) : (
                           <TrendingDown className="h-4 w-4 text-destructive" />
                         )}
-                        <span className="text-xs text-muted-foreground">Rating change:</span>
+                        <span className="text-xs text-muted-foreground">{t("matchDetails.result.ratingChange")}</span>
                         <span
                           className={`font-mono text-sm font-semibold ${
                             match.result.player1RatingChange > 0
@@ -643,11 +645,11 @@ export default function MatchDetailPage() {
 
                   {match.matchType === "competitive" && (
                     <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                      <p className="text-xs font-medium text-muted-foreground">Status</p>
+                      <p className="text-xs font-medium text-muted-foreground">{t("matchDetails.result.status")}</p>
                       <p className="mt-1 text-sm font-semibold text-foreground">
                         {match.status === "awaiting_confirmation"
-                          ? "Awaiting Confirmation"
-                          : "Confirmed"}
+                          ? t("matchDetails.result.awaitingConfirmation")
+                          : t("matchDetails.result.confirmed")}
                       </p>
                     </div>
                   )}
@@ -656,29 +658,29 @@ export default function MatchDetailPage() {
                     <div className="flex gap-2">
                       <Button size="sm" onClick={handleConfirmResult}>
                         <CheckCircle className="mr-1.5 h-4 w-4" />
-                        Confirm Result
+                        {t("matchDetails.result.confirmResult")}
                       </Button>
                       <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
                         <DialogTrigger asChild>
                           <Button size="sm" variant="outline">
                             <AlertTriangle className="mr-1.5 h-4 w-4" />
-                            Dispute
+                            {t("matchDetails.result.dispute")}
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Dispute Result</DialogTitle>
+                            <DialogTitle>{t("matchDetails.result.disputeTitle")}</DialogTitle>
                           </DialogHeader>
                           <form onSubmit={handleDisputeResult} className="space-y-4">
                             <div className="space-y-2">
-                              <Label className="text-xs font-medium">Reason</Label>
+                              <Label className="text-xs font-medium">{t("matchDetails.result.disputeReason")}</Label>
                               <Textarea
-                                placeholder="Explain why you're disputing this result..."
+                                placeholder={t("matchDetails.result.disputePlaceholder")}
                                 required
                               />
                             </div>
                             <Button type="submit" variant="destructive" className="w-full">
-                              Submit Dispute
+                              {t("matchDetails.result.submitDispute")}
                             </Button>
                           </form>
                         </DialogContent>
@@ -822,15 +824,15 @@ export default function MatchDetailPage() {
             <Card className="border-border/50">
               <CardHeader>
                 <CardTitle className="text-base font-semibold tracking-tight">
-                  Submit Result
+                  {t("matchDetails.submit.title")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center justify-center py-8">
                 <p className="mb-4 text-center text-sm text-muted-foreground">
-                  Submit result is temporarily disabled.
+                  {t("matchDetails.submit.disabled")}
                 </p>
                 <Button size="lg" className="gap-2" disabled>
-                  Upload Result
+                  {t("matchDetails.submit.button")}
                 </Button>
               </CardContent>
             </Card>
@@ -841,7 +843,7 @@ export default function MatchDetailPage() {
                   <CheckCircle className="h-5 w-5 text-primary" />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Result submitted, awaiting confirmation
+                  {t("matchDetails.submit.submitted")}
                 </p>
               </CardContent>
             </Card>
@@ -850,14 +852,14 @@ export default function MatchDetailPage() {
           {/* Players Card */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-base font-semibold tracking-tight">Players</CardTitle>
+              <CardTitle className="text-base font-semibold tracking-tight">{t("matchDetails.players")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {((match.participants ?? []).length >= 4
                 ? (match.participants ?? []).map((p) => ({
                     id: p.userId,
                     userId: p.userId,
-                    name: p.userName ?? "Participant",
+                    name: p.userName ?? t("common.unknown"),
                     city: "",
                     levelValue: 0,
                   }))
@@ -880,7 +882,7 @@ export default function MatchDetailPage() {
                         <p className="font-mono text-sm font-semibold text-foreground">
                           {player.levelValue.toFixed(1)}
                         </p>
-                        <p className="text-xs text-muted-foreground">Level</p>
+                        <p className="text-xs text-muted-foreground">{t("common.level")}</p>
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground">—</p>

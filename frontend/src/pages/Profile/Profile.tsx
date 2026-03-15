@@ -88,9 +88,9 @@ export default function ProfilePage() {
       const updated = await guestContactsService.updateSocioNumber(contactId, currentUserId, value)
       setContacts((prev) => prev.map((c) => c.id === contactId ? updated : c))
       setEditingSocio(null)
-      toast.success("Socio number saved")
+      toast.success(t("profilePage.toast.socioSaved"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save")
+      toast.error(err instanceof Error ? err.message : t("profilePage.toast.saveFailed"))
     } finally {
       setSavingSocio(null)
     }
@@ -185,7 +185,7 @@ export default function ProfilePage() {
       toast.success(t("success.saved"))
       await refetchProfile()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save"
+      const msg = err instanceof Error ? err.message : t("profilePage.toast.saveFailed")
       toast.error(msg)
     } finally {
       setSavingLocation(false)
@@ -214,7 +214,7 @@ export default function ProfilePage() {
       toast.success(t("success.saved"))
       await refetchProfile()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save"
+      const msg = err instanceof Error ? err.message : t("profilePage.toast.saveFailed")
       setSaveError(msg)
     } finally {
       setSaving(false)
@@ -233,12 +233,12 @@ export default function ProfilePage() {
         socioNumber: clubForm.socioNumber.trim(),
         password: clubForm.password.trim() || undefined,
       })
-      toast.success("Club connection saved")
+      toast.success(t("profilePage.toast.connectionSaved"))
       setClubForm((p) => ({ ...p, socioNumber: "", password: "" }))
       setEditingClub(null)
       await fetchMemberships()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save club connection")
+      toast.error(err instanceof Error ? err.message : t("profilePage.toast.connectionFailed"))
     } finally {
       setSavingClub(false)
     }
@@ -249,13 +249,13 @@ export default function ProfilePage() {
     try {
       const ok = await bookingService.testConnection(currentUserId, clubSlug)
       if (ok) {
-        toast.success("Connection verified successfully")
+        toast.success(t("profilePage.toast.connectionVerified"))
       } else {
-        toast.error("Invalid credentials — check your socio number and password")
+        toast.error(t("profilePage.toast.invalidCredentials"))
       }
       await fetchMemberships()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Connection test failed")
+      toast.error(err instanceof Error ? err.message : t("profilePage.toast.connectionTestFailed"))
     } finally {
       setTestingClub(null)
     }
@@ -264,10 +264,10 @@ export default function ProfilePage() {
   async function handleDeleteMembership(clubSlug: string) {
     try {
       await bookingService.deleteMembership(currentUserId, clubSlug)
-      toast.success("Club connection removed")
+      toast.success(t("profilePage.toast.connectionRemoved"))
       await fetchMemberships()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to remove connection")
+      toast.error(err instanceof Error ? err.message : t("profilePage.toast.removeFailed"))
     }
   }
 
@@ -292,22 +292,22 @@ export default function ProfilePage() {
       <>
         <PageHeader title={t("profile.myProfile")} description="" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12">
-          <p className="text-muted-foreground">Could not load your profile.</p>
+          <p className="text-muted-foreground">{t("profilePage.loadError")}</p>
           <Button variant="outline" onClick={() => window.location.reload()}>
-            Retry
+            {t("common.retry")}
           </Button>
         </div>
       </>
     )
   }
 
-  const displayName = user?.name || form.name || "You"
+  const displayName = user?.name || form.name || t("profilePage.you")
 
   return (
     <>
       <PageHeader
         title={t("profile.myProfile")}
-        description="Your personal settings and preferences for scheduling"
+        description={t("profilePage.settings.description")}
       />
       <div className="flex flex-1 flex-col gap-6 p-5 lg:p-8">
         {/* Profile header - minimal */}
@@ -334,10 +334,10 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
               <Settings className="h-5 w-5 text-primary" />
-              Personal Settings
+              {t("profilePage.settings.title")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              These details are used for scheduling, WhatsApp invites, and reminders.
+              {t("profilePage.settings.description")}
             </p>
           </CardHeader>
           <CardContent>
@@ -345,13 +345,13 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-2">
                   <UserIcon className="h-4 w-4" />
-                  Display name
+                  {t("profilePage.settings.displayName")}
                 </Label>
                 <Input
                   id="name"
                   value={form.name}
                   onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Your name"
+                  placeholder={t("profilePage.settings.namePlaceholder")}
                   className="max-w-md"
                 />
               </div>
@@ -359,7 +359,7 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label htmlFor="phone" className="flex items-center gap-2">
                   <Phone className="h-4 w-4" />
-                  Phone number
+                  {t("profilePage.settings.phone")}
                 </Label>
                 <PhoneInput
                   id="phone"
@@ -369,14 +369,14 @@ export default function ProfilePage() {
                   className="max-w-md"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Required for WhatsApp invites and match reminders. Include country code (e.g. +34).
+                  {t("profilePage.settings.phoneHint")}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  Email
+                  {t("profilePage.settings.email")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   {user?.email || "—"}
@@ -386,7 +386,7 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
-                  Preferred language
+                  {t("profilePage.settings.preferredLanguage")}
                 </Label>
                 <Select value={language} onValueChange={(v) => setLanguage(v as "en" | "es")}>
                   <SelectTrigger className="max-w-[200px]">
@@ -404,7 +404,7 @@ export default function ProfilePage() {
               )}
               <Button type="submit" disabled={saving} className="gap-2">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save changes
+                {t("profilePage.settings.saveChanges")}
               </Button>
             </form>
           </CardContent>
@@ -415,34 +415,34 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
               <MapPin className="h-5 w-5 text-primary" />
-              Location preferences
+              {t("profilePage.location.title")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Default location for &quot;I Want to Play&quot; — your preferred club and city.
+              {t("profilePage.location.description")}
             </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSaveLocation} className="space-y-4 max-w-md">
               <div className="space-y-2">
-                <Label htmlFor="preferredClub">Preferred club / court</Label>
+                <Label htmlFor="preferredClub">{t("profilePage.location.preferredClub")}</Label>
                 <Input
                   id="preferredClub"
                   value={locationForm.preferredClub}
                   onChange={(e) =>
                     setLocationForm((p) => ({ ...p, preferredClub: e.target.value }))
                   }
-                  placeholder="e.g. Club Tennis Barcelona"
+                  placeholder={t("profilePage.location.clubPlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="defaultCity">Default city</Label>
+                <Label htmlFor="defaultCity">{t("profilePage.location.defaultCity")}</Label>
                 <Input
                   id="defaultCity"
                   value={locationForm.defaultCity}
                   onChange={(e) =>
                     setLocationForm((p) => ({ ...p, defaultCity: e.target.value }))
                   }
-                  placeholder="e.g. Barcelona"
+                  placeholder={t("profilePage.location.cityPlaceholder")}
                 />
               </div>
               <Button type="submit" disabled={savingLocation} className="gap-2">
@@ -451,7 +451,7 @@ export default function ProfilePage() {
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Save location
+                {t("profilePage.location.save")}
               </Button>
             </form>
           </CardContent>
@@ -462,10 +462,10 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
               <Building2 className="h-5 w-5 text-primary" />
-              Club Connections
+              {t("profilePage.clubConnections.title")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Connect your club membership to enable automatic court booking when a match is confirmed.
+              {t("profilePage.clubConnections.description")}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -481,22 +481,22 @@ export default function ProfilePage() {
                       <p className="font-semibold text-foreground">{club.label}</p>
                       {membership && !isEditing && (
                         <>
-                          <p className="mt-0.5 text-sm text-muted-foreground">Socio #{membership.socioNumber}</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">{t("profilePage.clubConnections.socio", { number: membership.socioNumber })}</p>
                           <div className="mt-1.5 flex items-center gap-1.5">
                             {membership.status === "active" ? (
                               <>
                                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                                <span className="text-xs text-green-600 dark:text-green-400">Verified</span>
+                                <span className="text-xs text-green-600 dark:text-green-400">{t("profilePage.clubConnections.verified")}</span>
                               </>
                             ) : membership.status === "invalid_credentials" ? (
                               <>
                                 <XCircle className="h-3.5 w-3.5 text-destructive" />
-                                <span className="text-xs text-destructive">Invalid credentials — update your password</span>
+                                <span className="text-xs text-destructive">{t("profilePage.clubConnections.invalidCredentials")}</span>
                               </>
                             ) : (
                               <>
                                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">Not verified yet</span>
+                                <span className="text-xs text-muted-foreground">{t("profilePage.clubConnections.notVerified")}</span>
                               </>
                             )}
                             {membership.lastVerifiedAt && (
@@ -508,7 +508,7 @@ export default function ProfilePage() {
                         </>
                       )}
                       {!membership && !isEditing && (
-                        <p className="mt-0.5 text-sm text-muted-foreground">Not connected</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{t("profilePage.clubConnections.notConnected")}</p>
                       )}
                     </div>
                     {membership && !isEditing && (
@@ -525,7 +525,7 @@ export default function ProfilePage() {
                           ) : (
                             <Wifi className="h-3.5 w-3.5" />
                           )}
-                          Test
+                          {t("profilePage.clubConnections.test")}
                         </Button>
                         <Button
                           variant="outline"
@@ -534,7 +534,7 @@ export default function ProfilePage() {
                           onClick={() => handleEditMembership(membership)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
-                          Edit
+                          {t("form.edit")}
                         </Button>
                         <Button
                           variant="ghost"
@@ -555,7 +555,7 @@ export default function ProfilePage() {
                           setClubForm({ clubSlug: club.clubSlug, socioNumber: "", password: "" })
                         }}
                       >
-                        Connect
+                        {t("profilePage.clubConnections.connect")}
                       </Button>
                     )}
                   </div>
@@ -567,19 +567,19 @@ export default function ProfilePage() {
                       className="space-y-3 border-t border-border/40 pt-4"
                     >
                       <div className="space-y-1.5">
-                        <Label htmlFor={`socioNumber-${club.clubSlug}`}>Socio number</Label>
+                        <Label htmlFor={`socioNumber-${club.clubSlug}`}>{t("profilePage.clubConnections.socioNumber")}</Label>
                         <Input
                           id={`socioNumber-${club.clubSlug}`}
                           value={clubForm.socioNumber}
                           onChange={(e) => setClubForm((p) => ({ ...p, socioNumber: e.target.value }))}
-                          placeholder="e.g. 12345"
+                          placeholder={t("profilePage.clubConnections.socioPlaceholder")}
                           required
                         />
                       </div>
                       <div className="space-y-1.5">
                         <Label htmlFor={`clubPassword-${club.clubSlug}`}>
-                          Password{" "}
-                          <span className="font-normal text-muted-foreground">(required for automatic booking)</span>
+                          {t("profilePage.clubConnections.password")}{" "}
+                          <span className="font-normal text-muted-foreground">{t("profilePage.clubConnections.passwordNote")}</span>
                         </Label>
                         <div className="relative">
                           <Input
@@ -587,7 +587,7 @@ export default function ProfilePage() {
                             type={showPassword ? "text" : "password"}
                             value={clubForm.password}
                             onChange={(e) => setClubForm((p) => ({ ...p, password: e.target.value }))}
-                            placeholder={membership ? "Leave blank to keep existing" : "Your club portal password"}
+                            placeholder={membership ? t("profilePage.clubConnections.passwordKeepBlank") : t("profilePage.clubConnections.passwordPlaceholder")}
                             className="pr-10"
                           />
                           <button
@@ -600,13 +600,13 @@ export default function ProfilePage() {
                           </button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Stored encrypted. Only used to log in to the club portal on your behalf.
+                          {t("profilePage.clubConnections.securityNote")}
                         </p>
                       </div>
                       <div className="flex gap-2">
                         <Button type="submit" disabled={savingClub} className="gap-2">
                           {savingClub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                          {membership ? "Update" : "Save connection"}
+                          {membership ? t("profilePage.clubConnections.update") : t("profilePage.clubConnections.saveConnection")}
                         </Button>
                         <Button
                           type="button"
@@ -616,7 +616,7 @@ export default function ProfilePage() {
                             setClubForm({ clubSlug: SUPPORTED_CLUBS[0].clubSlug, socioNumber: "", password: "" })
                           }}
                         >
-                          Cancel
+                          {t("form.cancel")}
                         </Button>
                       </div>
                     </form>
@@ -631,9 +631,9 @@ export default function ProfilePage() {
         {contacts.length > 0 && (
           <Card className="border-border/50">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold tracking-tight">Contacts</CardTitle>
+              <CardTitle className="text-base font-semibold tracking-tight">{t("profilePage.contacts.title")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Set a socio number for each contact so they can be added to court bookings.
+                {t("profilePage.contacts.description")}
               </p>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -647,7 +647,7 @@ export default function ProfilePage() {
                     <div className="flex items-center gap-2">
                       <Input
                         className="h-8 w-28 text-sm"
-                        placeholder="Socio #"
+                        placeholder={t("profilePage.contacts.socioPlaceholder")}
                         value={socioInputs[c.id] ?? ""}
                         onChange={(e) => setSocioInputs((p) => ({ ...p, [c.id]: e.target.value }))}
                         onKeyDown={(e) => {
@@ -662,10 +662,10 @@ export default function ProfilePage() {
                         onClick={() => handleSaveSocio(c.id)}
                         disabled={savingSocio === c.id}
                       >
-                        {savingSocio === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+                        {savingSocio === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("form.save")}
                       </Button>
                       <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingSocio(null)}>
-                        Cancel
+                        {t("form.cancel")}
                       </Button>
                     </div>
                   ) : (
@@ -675,7 +675,7 @@ export default function ProfilePage() {
                           #{c.socioNumber}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground italic">No socio #</span>
+                        <span className="text-xs text-muted-foreground italic">{t("profilePage.contacts.noSocio")}</span>
                       )}
                       <Button
                         size="sm"

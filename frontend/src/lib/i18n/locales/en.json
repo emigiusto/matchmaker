@@ -5,7 +5,16 @@
     "logout": "Logout",
     "language": "Language",
     "english": "English",
-    "spanish": "Español"
+    "spanish": "Español",
+    "vs": "vs",
+    "tbd": "TBD",
+    "back": "Back",
+    "retry": "Retry",
+    "unknown": "Unknown",
+    "cancelled": "Cancelled",
+    "confirmed": "Confirmed",
+    "level": "Level",
+    "court": "Court"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -169,5 +178,402 @@
     "created": "Created successfully",
     "updated": "Updated successfully",
     "invited": "Invite sent successfully"
+  },
+  "login": {
+    "title": "Log in",
+    "subtitle": "Enter your email and password to access your account",
+    "emailPlaceholder": "you@example.com",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Log in",
+    "noAccount": "Don't have an account?",
+    "signUp": "Sign up",
+    "failed": "Login failed"
+  },
+  "play": {
+    "pageTitle": "My Invites",
+    "pageDescription": "Create matches and browse open invites"
+  },
+  "sportFormat": {
+    "tennisSingles": "Tennis Singles",
+    "tennisDoubles": "Tennis Doubles",
+    "padel": "Padel",
+    "tennis": "Tennis"
+  },
+  "wizard": {
+    "steps": {
+      "whenWhere": "When & Where",
+      "formatSport": "Format & Sport",
+      "whoToInvite": "Who to Invite",
+      "startScheduling": "Start Scheduling"
+    },
+    "stepDesc": {
+      "whenWhere": "Set the date, time, and location for your match",
+      "formatSport": "Choose sport and format",
+      "whoToInvite": "Select and prioritize contacts to invite",
+      "startScheduling": "Review and start the automated invite sequence"
+    },
+    "pickDate": "Pick a date",
+    "courtPlaceholder": "Court, club, or venue (e.g. Club Tennis Barcelona)",
+    "cityPlaceholder": "City (e.g. Barcelona)",
+    "toBeDecided": "To be decided",
+    "autoBook": "Auto-book a court",
+    "membershipActive": "Active",
+    "membershipError": "Error",
+    "membershipUnverified": "Unverified",
+    "singles": "Singles (1v1)",
+    "doubles": "Doubles (2v2)",
+    "searchLists": "Search lists...",
+    "searchFriends": "Search friends...",
+    "searchContacts": "Search contacts...",
+    "allAdded": "All added",
+    "noMatches": "No matches",
+    "namePlaceholder": "Name",
+    "socioPlaceholder": "Socio #",
+    "doublesMinContacts": "Add at least 3 contacts for a doubles match",
+    "addContactsLabel": "Add contacts",
+    "addFromList": "Add from a list or individually above",
+    "dragToReorder": "Drag to reorder",
+    "durationFixed": "Duration is fixed at 1 hour.",
+    "toast": {
+      "loadContactsFailed": "Could not load contacts",
+      "allMembersAdded": "All members from this list are already added or don't have a phone number",
+      "socioSaved": "Socio number saved",
+      "saveFailed": "Failed to save",
+      "enterNamePhone": "Enter name and phone",
+      "contactSaved": "Contact saved and added to invite list",
+      "contactFailed": "Failed to add contact",
+      "linkCopied": "Invite link copied to clipboard",
+      "schedulingStarted": "Scheduling started! Invites will be sent via WhatsApp.",
+      "schedulingFailed": "Failed to start scheduling"
+    }
+  },
+  "invites": {
+    "status": {
+      "scheduling": "Scheduling",
+      "matched": "Matched",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "active": "Active",
+      "confirmed": "Confirmed"
+    },
+    "events": {
+      "schedulingStarted": "Scheduling started",
+      "requestCancelled": "Request cancelled",
+      "matchConfirmed": "Match confirmed",
+      "noMatchFound": "No match found",
+      "bookingInProgress": "Court booking in progress",
+      "bookingCancelled": "Court booking cancelled"
+    },
+    "actions": {
+      "accept": "Accept",
+      "removeFromQueue": "Remove from queue",
+      "retryInvite": "Retry invite",
+      "cancel": "Cancel",
+      "cancelAcceptance": "Cancel acceptance",
+      "goToMatch": "Go to match",
+      "openWhatsApp": "Open WhatsApp Group",
+      "copyLink": "Copy Link",
+      "copied": "Copied",
+      "whatsapp": "WhatsApp",
+      "cancelRequest": "Cancel request",
+      "backToInvites": "Back to invites",
+      "cancelInvite": "Cancel invite"
+    },
+    "filter": {
+      "active": "Active",
+      "expired": "Expired",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled"
+    },
+    "empty": {
+      "noInvitesYet": "No invites yet",
+      "noActiveInvites": "No active invites",
+      "noExpiredInvites": "No expired invites",
+      "noCancelledInvites": "No cancelled invites",
+      "noConfirmedMatches": "No confirmed matches",
+      "tapToCreate": "Tap \"I Want to Play\" to create your first invite",
+      "tryAnotherFilter": "Try another filter"
+    },
+    "newRequest": "New request",
+    "addContacts": "Add contacts",
+    "addContactsToInvite": "Add contacts to this invite",
+    "noContactsToAdd": "No contacts to add",
+    "fromList": "From list",
+    "search": "Search...",
+    "selectAtLeastOne": "Select at least one contact",
+    "failedToAddContacts": "Failed to add contacts",
+    "allMembersAdded": "All members from this list are already added",
+    "expiredNotEnough": "Not enough contacts responded in time. Add more contacts or start a new request.",
+    "expiredNoOne": "No one responded in time. Add more contacts or start a new request.",
+    "whatsappNotAvailable": "WhatsApp group link not available",
+    "toast": {
+      "requestCancelled": "Invite request cancelled",
+      "cancelRequestFailed": "Failed to cancel request",
+      "inviteCancelled": "Cancelled invite",
+      "cancelFailed": "Failed to cancel",
+      "removedFromQueue": "Removed from queue",
+      "removeFailed": "Failed to remove",
+      "acceptanceCancelled": "Acceptance cancelled",
+      "matchConfirmed": "Match confirmed!",
+      "acceptFailed": "Failed to accept",
+      "retryQueued": "Invite will be retried",
+      "retryFailed": "Failed to retry invite",
+      "linkCopied": "Invite link copied"
+    }
+  },
+  "inviteDetails": {
+    "title": "Invite Details",
+    "progress": "Invite Progress",
+    "history": "History",
+    "noCandidates": "No candidates yet",
+    "noEvents": "No events recorded yet",
+    "replyWindow": "Reply window:",
+    "confirmDialog": {
+      "title": "Accept candidate",
+      "description": "Accept {{name}} for this match?",
+      "cancel": "Cancel",
+      "accept": "Accept"
+    },
+    "toast": {
+      "requestCancelled": "Request cancelled",
+      "cancelFailed": "Failed to cancel",
+      "inviteCancelled": "Cancelled invite",
+      "acceptanceCancelled": "Acceptance cancelled",
+      "cancelAcceptanceFailed": "Failed to cancel acceptance",
+      "candidateAccepted": "Candidate accepted",
+      "acceptFailed": "Failed to accept",
+      "retryQueued": "Retry queued",
+      "retryFailed": "Failed to retry",
+      "linkCopied": "Invite link copied"
+    },
+    "notFound": "Invite not found"
+  },
+  "inviteConfirm": {
+    "loading": "Loading invite...",
+    "badge": "Match Invite",
+    "title": "You've been invited to play",
+    "wantsToPlay": "wants to play a match with you",
+    "acceptInvite": "Accept Invite",
+    "decline": "Decline",
+    "login": "Log in",
+    "choicePrompt": "Great! How would you like to accept?",
+    "choiceDesc": "Choose one of the options below to confirm your attendance",
+    "tabs": {
+      "guest": "Play as Guest",
+      "login": "Log in",
+      "signup": "Sign up"
+    },
+    "guest": {
+      "desc": "No account needed. Just tell us your name so {{name}} knows who accepted.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "emailOptional": "(optional, for match updates)",
+      "emailPlaceholder": "you@example.com",
+      "firstNamePlaceholder": "First name",
+      "lastNamePlaceholder": "Last name",
+      "submit": "Accept as Guest",
+      "hint": "You can create an account later to track your matches and level"
+    },
+    "loginTab": {
+      "desc": "Already a MatchMaker player? Log in to accept with your profile.",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "Your password",
+      "submit": "Log in & Accept",
+      "forgotPassword": "Forgot your password?"
+    },
+    "signupTab": {
+      "desc": "Create your free account to accept this invite and start tracking your tennis journey.",
+      "fullName": "Full name",
+      "fullNamePlaceholder": "Your full name",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "Create a password",
+      "submit": "Create Account & Accept",
+      "terms": "By creating an account you agree to our",
+      "termsLink": "Terms of Service",
+      "declineLink": "I can't make it -- decline invite"
+    },
+    "accepted": {
+      "title": "You're in!",
+      "message": "See you on {{date}} at {{time}} at {{location}}.",
+      "upsell": "Want to track your matches and find more opponents?",
+      "cta": "Create a Free Account"
+    },
+    "declined": {
+      "title": "No worries",
+      "message": "will be notified. Maybe next time! You can still create an account to find other players near you.",
+      "cta": "Explore MatchMaker"
+    },
+    "features": {
+      "title": "Why players love MatchMaker",
+      "smartMatchmaking": "Smart Matchmaking",
+      "smartMatchmakingDesc": "Find opponents at your level, near you, and available when you are. No more endless WhatsApp group messages.",
+      "trackProgress": "Track Your Progress",
+      "trackProgressDesc": "See your level evolve over time, review match history, and understand your game with real stats.",
+      "oneTapScheduling": "One-Tap Scheduling",
+      "oneTapSchedulingDesc": "Say when and where you want to play. We suggest opponents, send invites, and set reminders automatically.",
+      "fairTransparent": "Fair & Transparent",
+      "fairTransparentDesc": "Every result is confirmed by both players. Your level reflects real performance, not self-reported skill.",
+      "communityRankings": "Community Rankings",
+      "communityRankingsDesc": "Compete on local leaderboards, discover rising players in your area, and find your next great rival."
+    },
+    "stats": {
+      "activePlayers": "Active players",
+      "matchesPlayed": "Matches played",
+      "cities": "Cities",
+      "appRating": "App rating"
+    },
+    "toast": {
+      "declined": "Invite declined. You can always join later.",
+      "loggedIn": "Logged in and invite accepted!",
+      "signedUp": "Account created and invite accepted! Welcome to MatchMaker.",
+      "redirecting": "Redirecting to sign up..."
+    }
+  },
+  "matchDetails": {
+    "title": "Match",
+    "players": "Players",
+    "teamA": "Team A",
+    "teamB": "Team B",
+    "doublesNote": "Doubles — teams assigned when result is submitted",
+    "booking": {
+      "title": "Court Booking",
+      "inProgress": "In progress…",
+      "booked": "Booked",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "reserved": "reserved",
+      "ref": "Ref:",
+      "cancellingBooking": "Cancelling booking…",
+      "cancelBooking": "Cancel booking",
+      "bookingFailed": "Booking failed",
+      "retryBooking": "Retry booking",
+      "attempting": "Attempting to reserve a court…"
+    },
+    "reminders": {
+      "title": "Reminders",
+      "matchCancelled": "This match was cancelled. No reminders will be sent.",
+      "description": "Get a WhatsApp reminder before the match.",
+      "addReminder": "Add Reminder",
+      "yourReminders": "Your reminders",
+      "loading": "Loading reminders…",
+      "noReminders": "No reminders set. Add one above to get a WhatsApp reminder before the match.",
+      "noRemindersSet": "No reminders were set for this match.",
+      "removeReminder": "Remove reminder"
+    },
+    "result": {
+      "title": "Match Result",
+      "ratingChange": "Rating change:",
+      "set": "Set {{number}}",
+      "status": "Status",
+      "awaitingConfirmation": "Awaiting Confirmation",
+      "confirmed": "Confirmed",
+      "confirmResult": "Confirm Result",
+      "dispute": "Dispute",
+      "disputeTitle": "Dispute Result",
+      "disputeReason": "Reason",
+      "disputePlaceholder": "Explain why you're disputing this result...",
+      "submitDispute": "Submit Dispute"
+    },
+    "submit": {
+      "title": "Submit Result",
+      "disabled": "Submit result is temporarily disabled.",
+      "button": "Upload Result",
+      "submitted": "Result submitted, awaiting confirmation"
+    },
+    "notFound": "Match not found"
+  },
+  "matchesUpcoming": {
+    "title": "Matches",
+    "description": "Your upcoming and past matches",
+    "noMatches": "No matches are scheduled",
+    "noMatchesDesc": "Create invites to schedule your next match",
+    "upcoming": "Upcoming matches",
+    "today": "Today",
+    "comingUp": "Coming up",
+    "past": "Past matches",
+    "noPast": "No past matches yet"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "noNotifications": "No notifications",
+    "markRead": "Mark read",
+    "viewMatch": "View match",
+    "viewInvite": "View invite",
+    "viewInvites": "View invites"
+  },
+  "profilePage": {
+    "loadError": "Could not load your profile.",
+    "you": "You",
+    "settings": {
+      "title": "Personal Settings",
+      "description": "These details are used for scheduling, WhatsApp invites, and reminders.",
+      "displayName": "Display name",
+      "namePlaceholder": "Your name",
+      "phone": "Phone number",
+      "phoneHint": "Required for WhatsApp invites and match reminders. Include country code (e.g. +34).",
+      "email": "Email",
+      "preferredLanguage": "Preferred language",
+      "saveChanges": "Save changes"
+    },
+    "location": {
+      "title": "Location preferences",
+      "description": "Default location for \"I Want to Play\" — your preferred club and city.",
+      "preferredClub": "Preferred club / court",
+      "clubPlaceholder": "e.g. Club Tennis Barcelona",
+      "defaultCity": "Default city",
+      "cityPlaceholder": "e.g. Barcelona",
+      "save": "Save location"
+    },
+    "clubConnections": {
+      "title": "Club Connections",
+      "description": "Connect your club membership to enable automatic court booking when a match is confirmed.",
+      "socio": "Socio #{{number}}",
+      "verified": "Verified",
+      "invalidCredentials": "Invalid credentials — update your password",
+      "notVerified": "Not verified yet",
+      "notConnected": "Not connected",
+      "test": "Test",
+      "connect": "Connect",
+      "socioNumber": "Socio number",
+      "socioPlaceholder": "e.g. 12345",
+      "password": "Password",
+      "passwordNote": "(required for automatic booking)",
+      "passwordKeepBlank": "Leave blank to keep existing",
+      "passwordPlaceholder": "Your club portal password",
+      "securityNote": "Stored encrypted. Only used to log in to the club portal on your behalf.",
+      "update": "Update",
+      "saveConnection": "Save connection"
+    },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Set a socio number for each contact so they can be added to court bookings.",
+      "socioPlaceholder": "Socio #",
+      "noSocio": "No socio #"
+    },
+    "toast": {
+      "socioSaved": "Socio number saved",
+      "saveFailed": "Failed to save",
+      "connectionSaved": "Club connection saved",
+      "connectionFailed": "Failed to save club connection",
+      "connectionVerified": "Connection verified successfully",
+      "invalidCredentials": "Invalid credentials — check your socio number and password",
+      "connectionTestFailed": "Connection test failed",
+      "connectionRemoved": "Club connection removed",
+      "removeFailed": "Failed to remove connection"
+    }
+  },
+  "profileView": {
+    "title": "Player Profile",
+    "addFriend": "Add Friend",
+    "matches": "Matches",
+    "winRate": "Win Rate",
+    "record": "Record",
+    "notFound": "Player not found"
   }
 }

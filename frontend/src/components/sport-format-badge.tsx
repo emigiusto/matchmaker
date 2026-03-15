@@ -1,5 +1,6 @@
 import { User, Users, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useTranslation } from "@/lib/i18n"
 
 export type SportFormat =
   | "tennis_singles"
@@ -8,22 +9,22 @@ export type SportFormat =
 
 const config: Record<
   SportFormat,
-  { label: string; icon: typeof User; className: string }
+  { labelKey: string; icon: typeof User; className: string }
 > = {
   tennis_singles: {
-    label: "Tennis Singles",
+    labelKey: "sportFormat.tennisSingles",
     icon: User,
     className:
       "border-emerald-200/60 bg-emerald-500/8 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-500/10 dark:text-emerald-400",
   },
   tennis_doubles: {
-    label: "Tennis Doubles",
+    labelKey: "sportFormat.tennisDoubles",
     icon: Users,
     className:
       "border-emerald-200/60 bg-emerald-500/10 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-500/12 dark:text-emerald-400",
   },
   padel: {
-    label: "Padel",
+    labelKey: "sportFormat.padel",
     icon: Square,
     className:
       "border-sky-200/60 bg-sky-500/8 text-sky-700 dark:border-sky-800/40 dark:bg-sky-500/10 dark:text-sky-400",
@@ -51,8 +52,10 @@ export function SportFormatBadge({
   className,
   size = "default",
 }: SportFormatBadgeProps) {
+  const { t } = useTranslation()
   const key = toSportFormat(sport, format)
-  const { label, icon: Icon, className: styleClass } = config[key]
+  const { labelKey, icon: Icon, className: styleClass } = config[key]
+  const label = t(labelKey)
   const sizeClass = size === "sm" ? "gap-1 px-1.5 py-0 text-[10px]" : "gap-1.5 px-2.5 py-1 text-xs"
   return (
     <span
