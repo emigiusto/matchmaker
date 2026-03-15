@@ -62,6 +62,7 @@ export interface CreateSchedulingRequestInput {
   hostPartnerUserId?: string | null
   candidateUserIds: string[]
   bookingEnabled?: boolean
+  timezone?: string
 }
 
 export type SchedulingInviteEventAction =

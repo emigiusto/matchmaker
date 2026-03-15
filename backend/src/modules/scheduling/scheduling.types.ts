@@ -38,6 +38,7 @@ export interface CreateSchedulingRequestInput {
   hostPartnerUserId?: string | null;
   candidateUserIds: string[];
   bookingEnabled?: boolean;
+  timezone?: string;
 }
 
 export interface SchedulingRequestDTO {
@@ -59,6 +60,7 @@ export interface SchedulingRequestDTO {
   currentCandidateIndex: number;
   matchId: string | null;
   whatsappGroupId: string | null;
+  timezone: string;
   createdAt: string;
   updatedAt: string;
   candidates?: SchedulingCandidateDTO[];

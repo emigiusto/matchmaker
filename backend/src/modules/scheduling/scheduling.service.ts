@@ -50,9 +50,19 @@ type RequestRow = {
   currentCandidateIndex: number;
   matchId: string | null;
   match?: { whatsappGroupId: string | null } | null;
+  timezone?: string;
   createdAt: Date;
   updatedAt: Date;
 };
+
+/** Format a Date in a given IANA timezone, e.g. "Europe/Madrid". Falls back to UTC on invalid tz. */
+function formatInTz(date: Date, locale: string, options: Intl.DateTimeFormatOptions, timezone: string): string {
+  try {
+    return date.toLocaleString(locale, { ...options, timeZone: timezone });
+  } catch {
+    return date.toLocaleString(locale, { ...options, timeZone: 'UTC' });
+  }
+}
 
 function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
   return {
@@ -74,6 +84,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     currentCandidateIndex: r.currentCandidateIndex,
     matchId: r.matchId,
     whatsappGroupId: r.match?.whatsappGroupId ?? null,
+    timezone: r.timezone ?? 'UTC',
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -301,8 +312,9 @@ async function notifyHostSchedulingNoMatch(
   },
   reason: SchedulingExpiredReason
 ): Promise<void> {
-  const dateStr = request.date.toLocaleDateString('es-ES', { weekday: 'short', month: 'short', day: 'numeric' });
-  const timeStr = `${request.startTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} - ${request.endTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+  const tz = (request as RequestRow).timezone ?? 'UTC';
+  const dateStr = formatInTz(request.date, 'es-ES', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+  const timeStr = `${formatInTz(request.startTime, 'es-ES', { hour: '2-digit', minute: '2-digit' }, tz)} - ${formatInTz(request.endTime, 'es-ES', { hour: '2-digit', minute: '2-digit' }, tz)}`;
   const payload = {
     requestId: request.id,
     reason,
@@ -406,6 +418,7 @@ export const schedulingService = {
           responseWindowMinutes: responseWindow,
           maxParallelCandidates: maxParallel,
           bookingEnabled: input.bookingEnabled ?? false,
+          timezone: input.timezone ?? 'UTC',
           inviteToken,
           status: 'active',
         },
@@ -478,8 +491,9 @@ export const schedulingService = {
     }
 
     const hostName = request.hostUser?.name || 'Someone';
-    const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'long' });
-    const timeStr = `${request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${request.endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    const tz = (request as RequestRow).timezone ?? 'UTC';
+    const dateStr = formatInTz(request.date, 'en-US', { weekday: 'long' }, tz);
+    const timeStr = `${formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz)} - ${formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz)}`;
     const format = (request as RequestRow).format || 'singles';
     const message = formatInviteMessage(
         hostName,
@@ -652,8 +666,9 @@ export const schedulingService = {
     if (phone) {
       const req = candidate.schedulingRequest;
       const hostName = req.hostUser?.name ?? 'Someone';
-      const dateStr = req.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      const timeStr = req.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const tz = (req as RequestRow).timezone ?? 'UTC';
+      const dateStr = formatInTz(req.date, 'en-US', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+      const timeStr = formatInTz(req.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
       const format = (req as RequestRow).format || 'singles';
       const msg = formatInviteNoLongerAvailableMessage(hostName, req.sportType, format, dateStr, timeStr, req.locationText);
       const result = await whatsappService.sendInviteMessage(phone, msg);
@@ -800,12 +815,9 @@ export const schedulingService = {
       process.env.WHAPI_ACCOUNT_NUMBER;
 
     if (participantPhones.length >= 1) {
-      const dateStr = request.date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      });
-      const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const tz = (request as RequestRow).timezone ?? 'UTC';
+      const dateStr = formatInTz(request.date, 'en-US', { weekday: 'long', month: 'long', day: 'numeric' }, tz);
+      const timeStr = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
       const groupName = `${dateStr} ${timeStr}`;
       const whenStr = `${dateStr} · ${timeStr}`;
 
@@ -1004,8 +1016,9 @@ export const schedulingService = {
     const phone = candidate.contactUser?.phone;
     if (phone) {
       const hostName = request.hostUser?.name ?? 'Someone';
-      const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const tz = (request as RequestRow).timezone ?? 'UTC';
+      const dateStr = formatInTz(request.date, 'en-US', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+      const timeStr = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
       const format = (request as RequestRow).format || 'singles';
       const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText);
       const result = await whatsappService.sendInviteMessage(phone, msg);
@@ -1092,8 +1105,9 @@ export const schedulingService = {
     if (request.status === 'completed') throw new AppError('Cannot cancel a completed match', 400);
 
     const hostName = request.hostUser?.name ?? 'Someone';
-    const dateStr = request.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const timeStr = request.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const tz = (request as RequestRow).timezone ?? 'UTC';
+    const dateStr = formatInTz(request.date, 'en-US', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+    const timeStr = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
     const format = (request as RequestRow).format || 'singles';
     const msg = formatInviteNoLongerAvailableMessage(
       hostName,
