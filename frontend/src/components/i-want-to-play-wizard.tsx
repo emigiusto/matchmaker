@@ -319,9 +319,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const locationText = locationType === "place" ? specificPlace : cityValue
   const displayLocation = locationText.trim() || "To be decided"
 
-  const endTimeSlots = startTime
-    ? TIME_SLOTS.filter((t) => t > startTime)
-    : TIME_SLOTS
 
   function addContact(contact: Contact) {
     if (priorityList.some((c) => c.id === contact.id)) return
