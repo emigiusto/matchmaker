@@ -80,6 +80,7 @@ export type SchedulingInviteEventAction =
   | 'booking_pending'
   | 'booking_success'
   | 'booking_failed'
+  | 'booking_cancelled'
 
 export interface SchedulingInviteEventDTO {
   id: string

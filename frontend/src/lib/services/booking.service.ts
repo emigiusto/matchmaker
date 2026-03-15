@@ -66,4 +66,8 @@ export const bookingService = {
   async retryBooking(matchId: string): Promise<void> {
     await apiClient.post(`/booking/attempts/${matchId}/retry`, {})
   },
+
+  async cancelBooking(matchId: string): Promise<void> {
+    await apiClient.post(`/booking/attempts/${matchId}/cancel`, {})
+  },
 }

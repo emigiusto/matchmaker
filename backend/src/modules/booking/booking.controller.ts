@@ -9,6 +9,7 @@ import {
   testClubConnection,
   getBookingAttemptByMatch,
   retryBookingForMatch,
+  cancelBookingForMatch,
 } from './booking.service'
 import { AppError } from '../../shared/errors/AppError'
 
@@ -79,6 +80,15 @@ export class BookingController {
       const matchId = String(req.params.matchId)
       await retryBookingForMatch(matchId)
       res.json({ queued: true })
+    } catch (err) { next(err) }
+  }
+
+  // POST /booking/attempts/:matchId/cancel
+  static async cancelAttempt(req: Request, res: Response, next: NextFunction) {
+    try {
+      const matchId = String(req.params.matchId)
+      await cancelBookingForMatch(matchId)
+      res.json({ cancelled: true })
     } catch (err) { next(err) }
   }
 }

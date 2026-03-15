@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/lib/i18n/language-context'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { DashboardLayout } from '@/layouts/DashboardLayout'
+import { WifiOff } from 'lucide-react'
 import Dashboard from '@/pages/Dashboard/Dashboard'
 import Play from '@/pages/Play/Play'
 import Profile from '@/pages/Profile/Profile'
@@ -24,7 +26,32 @@ import ProfileView from '@/pages/ProfileView/ProfileView'
 // import AiCoachCompanion from '@/pages/AiCoachCompanion/AiCoachCompanion'
 // import AiCoachInsights from '@/pages/AiCoachInsights/AiCoachInsights'
 
+function ServiceUnavailable() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <WifiOff className="h-12 w-12 text-muted-foreground" />
+      <h1 className="text-xl font-semibold">Service Unavailable</h1>
+      <p className="text-sm text-muted-foreground max-w-xs">
+        We're having trouble connecting to the server. Please try again in a few minutes.
+      </p>
+    </div>
+  )
+}
+
 function App() {
+  const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const available = (e as CustomEvent<{ available: boolean }>).detail.available
+      setApiAvailable(available)
+    }
+    window.addEventListener('api:status', handler)
+    return () => window.removeEventListener('api:status', handler)
+  }, [])
+
+  if (apiAvailable === false) return <ServiceUnavailable />
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="matchmaker-theme">
       <LanguageProvider>

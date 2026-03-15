@@ -93,7 +93,8 @@ export type SchedulingInviteEventAction =
   | 'request_expired'
   | 'booking_pending'
   | 'booking_success'
-  | 'booking_failed';
+  | 'booking_failed'
+  | 'booking_cancelled';
 
 export interface SchedulingInviteEventDTO {
   id: string;

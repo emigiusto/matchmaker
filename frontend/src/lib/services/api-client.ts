@@ -16,7 +16,12 @@ export class ApiError extends Error {
   }
 }
 
+function emitApiStatus(available: boolean) {
+  window.dispatchEvent(new CustomEvent("api:status", { detail: { available } }))
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
+  emitApiStatus(true)
   if (!response.ok) {
     const errorBody = await response.text().catch(() => "Unknown error")
     let message = "Unknown error"
@@ -28,7 +33,19 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
     throw new ApiError(response.status, typeof message === "string" ? message : "Request failed")
   }
+  if (response.status === 204 || response.headers.get("content-length") === "0") {
+    return undefined as T
+  }
   return response.json() as Promise<T>
+}
+
+async function fetchWithAvailability(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch (err) {
+    emitApiStatus(false)
+    throw err
+  }
 }
 
 export const apiClient = {
@@ -39,7 +56,7 @@ export const apiClient = {
         url.searchParams.append(key, value)
       })
     }
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithAvailability(url.toString(), {
       headers: getAuthHeaders(),
       cache: "no-store",
     })
@@ -47,7 +64,7 @@ export const apiClient = {
   },
 
   async post<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetchWithAvailability(`${API_BASE_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: body ? JSON.stringify(body) : undefined,
@@ -56,7 +73,7 @@ export const apiClient = {
   },
 
   async put<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetchWithAvailability(`${API_BASE_URL}${path}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: body ? JSON.stringify(body) : undefined,
@@ -65,7 +82,7 @@ export const apiClient = {
   },
 
   async patch<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetchWithAvailability(`${API_BASE_URL}${path}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: body ? JSON.stringify(body) : undefined,
@@ -74,7 +91,7 @@ export const apiClient = {
   },
 
   async delete<T>(path: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetchWithAvailability(`${API_BASE_URL}${path}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
     })

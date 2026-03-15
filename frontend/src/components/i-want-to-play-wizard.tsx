@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react"
+import { useNavigate, Link } from "react-router-dom"
 import {
   DndContext,
   closestCenter,
@@ -28,6 +29,9 @@ import {
   Clock,
   Users,
   CircleDot,
+  Swords,
+  Target,
+  Building2,
   Copy,
   Check,
   Loader2,
@@ -71,6 +75,7 @@ import { playersService } from "@/lib/services/players.service"
 import { groupsService } from "@/lib/services/groups.service"
 import { friendshipsService } from "@/lib/services/friendships.service"
 import { guestContactsService } from "@/lib/services/guest-contacts.service"
+import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO } from "@/lib/services/booking.service"
 import { getCurrentUserId } from "@/lib/current-user"
 
 interface WizardProps {
@@ -82,22 +87,17 @@ interface WizardProps {
 
 type Step = 1 | 2 | 3 | 4
 
-// Generate time slots at :00 and :30 only (06:00 – 22:30)
+// Generate time slots at :00 only (06:00 – 22:00)
 const TIME_SLOTS: string[] = []
 for (let h = 6; h <= 22; h++) {
   TIME_SLOTS.push(`${String(h).padStart(2, "0")}:00`)
-  if (h < 22) TIME_SLOTS.push(`${String(h).padStart(2, "0")}:30`)
 }
-TIME_SLOTS.push("22:30")
 
 function addOneHour(time: string): string {
   if (!time) return ""
-  const [h, m] = time.split(":").map(Number)
-  const totalMinutes = h * 60 + m + 60
-  const newH = Math.floor(totalMinutes / 60)
-  const newM = totalMinutes % 60
-  if (newH > 22 || (newH === 22 && newM > 30)) return "22:30"
-  return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`
+  const [h] = time.split(":").map(Number)
+  const newH = Math.min(h + 1, 22)
+  return `${String(newH).padStart(2, "0")}:00`
 }
 
 type LocationType = "place" | "city"
@@ -159,6 +159,7 @@ function SortableContactItem({
 
 export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdProp, onSuccess }: WizardProps) {
   const hostUserId = hostUserIdProp ?? getCurrentUserId()
+  const navigate = useNavigate()
   const [step, setStep] = useState<Step>(1)
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [datePickerOpen, setDatePickerOpen] = useState(false)
@@ -186,6 +187,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [friends, setFriends] = useState<import("@/lib/services/friendships.service").Friend[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [bookingEnabled, setBookingEnabled] = useState(false)
+  const [clubMemberships, setClubMemberships] = useState<ClubMembershipDTO[]>([])
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
   // Maps userId → { gcId, socioNumber } for guest contacts in the priority list
   const [gcMeta, setGcMeta] = useState<Record<string, { gcId: string; socioNumber: string }>>({})
   const [socioEdits, setSocioEdits] = useState<Record<string, string>>({})
@@ -213,6 +216,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setResponseWindow(defaultResponseWindow)
     setMaxParallelCandidates(1)
     setPriorityList([])
+    setBookingEnabled(false)
+    setSelectedMembershipId(null)
     setShowManualAdd(false)
   }
 
@@ -226,6 +231,15 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         setCityValue((prev) => prev || (p.defaultCity ?? ""))
       }
     })
+  }, [open, hostUserId])
+
+  // Fetch club memberships to determine if booking is available
+  useEffect(() => {
+    if (!open || !hostUserId) return
+    bookingService.listMemberships(hostUserId).then((memberships) => {
+      setClubMemberships(memberships)
+      if (memberships.length > 0) setSelectedMembershipId(memberships[0].id)
+    }).catch(() => setClubMemberships([]))
   }, [open, hostUserId])
 
   // Fetch contacts for step 3: users, groups, friends, guest contacts
@@ -298,7 +312,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setEndTime(addOneHour(val))
   }
 
-  const canProceedStep1 = date && startTime && endTime && startTime < endTime
+  const canProceedStep1 = date && startTime
   const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
@@ -455,6 +469,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       })
       onSuccess?.()
       handleClose(false)
+      navigate(`/play/${req.id}`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to start scheduling")
     } finally {
@@ -543,26 +558,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   </Select>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm">
+                <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm opacity-60">
                   <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">End</span>
-                  <Select
-                    value={endTime}
-                    onValueChange={setEndTime}
-                    disabled={!startTime}
-                  >
-                    <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
-                      <SelectValue placeholder="--:--" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {endTimeSlots.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <span className="text-sm font-semibold">{endTime || "--:--"}</span>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">Duration is fixed at 1 hour.</p>
             </div>
 
             {/* Location — optional: Place (court/club) or City, defaults to user's preferred club */}
@@ -621,6 +622,110 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 Leave blank to decide later. Place defaults to your preferred club from profile.
               </p>
             </div>
+
+            {/* Court booking */}
+            {clubMemberships.length > 0 ? (
+              <div className="rounded-xl border border-border/40 bg-card px-4 py-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Auto-book a court</p>
+                    <p className="text-xs text-muted-foreground">
+                      Reserve a court automatically when someone accepts.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={bookingEnabled}
+                    onCheckedChange={setBookingEnabled}
+                    aria-label="Auto-book a court"
+                  />
+                </div>
+                {bookingEnabled && clubMemberships.length > 1 && (
+                  <div className="space-y-1.5 border-t border-border/40 pt-3">
+                    <p className="text-xs font-medium text-muted-foreground">Club connection</p>
+                    <div className="space-y-2">
+                      {clubMemberships.map((m) => {
+                        const clubLabel = SUPPORTED_CLUBS.find((c) => c.clubSlug === m.clubSlug)?.label ?? m.clubSlug
+                        const isSelected = selectedMembershipId === m.id
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setSelectedMembershipId(m.id)}
+                            className={cn(
+                              "w-full flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-all",
+                              isSelected
+                                ? "border-primary bg-primary/5"
+                                : "border-border/50 hover:border-primary/30"
+                            )}
+                          >
+                            <Building2 className={cn("h-5 w-5 shrink-0", isSelected ? "text-primary" : "text-muted-foreground")} />
+                            <div className="flex-1 min-w-0">
+                              <p className={cn("text-sm font-medium leading-tight", isSelected ? "text-primary" : "text-foreground")}>
+                                {clubLabel}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Socio {m.socioNumber}</p>
+                            </div>
+                            <span className={cn(
+                              "shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full",
+                              m.status === "active"
+                                ? "bg-green-500/10 text-green-600"
+                                : m.status === "invalid_credentials"
+                                ? "bg-red-500/10 text-red-500"
+                                : "bg-muted text-muted-foreground"
+                            )}>
+                              {m.status === "active" ? "Active" : m.status === "invalid_credentials" ? "Error" : "Unverified"}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {bookingEnabled && clubMemberships.length === 1 && (() => {
+                  const m = clubMemberships[0]
+                  const clubLabel = SUPPORTED_CLUBS.find((c) => c.clubSlug === m.clubSlug)?.label ?? m.clubSlug
+                  return (
+                    <div className="flex items-center gap-3 border-t border-border/40 pt-3">
+                      <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium leading-tight">{clubLabel}</p>
+                        <p className="text-xs text-muted-foreground">Socio {m.socioNumber}</p>
+                      </div>
+                      <span className={cn(
+                        "shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full",
+                        m.status === "active"
+                          ? "bg-green-500/10 text-green-600"
+                          : m.status === "invalid_credentials"
+                          ? "bg-red-500/10 text-red-500"
+                          : "bg-muted text-muted-foreground"
+                      )}>
+                        {m.status === "active" ? "Active" : m.status === "invalid_credentials" ? "Error" : "Unverified"}
+                      </span>
+                    </div>
+                  )
+                })()}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border/40 bg-card px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Auto-book a court</p>
+                    <p className="text-xs text-muted-foreground">
+                      Add a club connection in your{" "}
+                      <Link
+                        to="/profile"
+                        className="underline underline-offset-2 hover:text-foreground"
+                        onClick={() => handleClose(false)}
+                      >
+                        profile
+                      </Link>{" "}
+                      to enable automatic court booking.
+                    </p>
+                  </div>
+                  <Switch disabled aria-label="Auto-book a court" />
+                </div>
+              </div>
+            )}
 
             <Button
               size="xl"
@@ -712,7 +817,40 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               )}
             </div>
 
-            {/* Competitive / Practice — hidden in v1, default to practice */}
+            {/* Match type: Practice / Competitive */}
+            <div className="space-y-2">
+              <Label className="text-base font-medium">Mode</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMatchType("practice")}
+                  className={cn(
+                    "flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
+                    matchType === "practice"
+                      ? "border-[#22c55e] bg-[#22c55e]/5"
+                      : "border-border/50 hover:border-[#22c55e]/30"
+                  )}
+                >
+                  <Target className={cn("h-6 w-6", matchType === "practice" ? "text-[#22c55e]" : "text-muted-foreground")} />
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Practice</p>
+                    <p className="text-xs text-muted-foreground">Casual, no tracking</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all cursor-not-allowed border-border/30 opacity-40"
+                >
+                  <Swords className="h-6 w-6 text-muted-foreground" />
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Competitive</p>
+                    <p className="text-xs text-muted-foreground">Coming soon</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(1)}>
                 <ChevronLeft className="mr-1 h-5 w-5" />
@@ -1172,24 +1310,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   Once accepted, a match is created and a WhatsApp group is set up
                 </li>
               </ul>
-            </div>
-
-            {/* Court booking option */}
-            <div className="rounded-xl border border-border/40 bg-card px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">Auto-book a court</p>
-                  <p className="text-xs text-muted-foreground">
-                    Automatically reserve a court when someone accepts.
-                    Requires a club connection in your profile.
-                  </p>
-                </div>
-                <Switch
-                  checked={bookingEnabled}
-                  onCheckedChange={setBookingEnabled}
-                  aria-label="Auto-book a court"
-                />
-              </div>
             </div>
 
             {/* Copy invite link */}

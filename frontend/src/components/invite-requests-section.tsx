@@ -24,6 +24,8 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Building2,
+  Ban,
 } from "lucide-react"
 import type { SchedulingInviteEventDTO } from "@/lib/services/scheduling.service"
 import { SportFormatBadge } from "@/components/sport-format-badge"
@@ -439,6 +441,10 @@ export function InviteRequestsSection({
       case "request_cancelled": return "Request cancelled"
       case "request_completed": return "Match confirmed"
       case "request_expired": return "No match found"
+      case "booking_pending": return "Court booking in progress"
+      case "booking_success": return `Court booked${event.metadata?.courtName ? `: ${event.metadata.courtName}` : ""}`
+      case "booking_failed": return `Booking failed${event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : ""}`
+      case "booking_cancelled": return "Court booking cancelled"
       default: return event.action
     }
   }
@@ -457,6 +463,10 @@ export function InviteRequestsSection({
       case "request_cancelled": return <XCircle className="h-3 w-3 text-muted-foreground" />
       case "request_completed": return <CheckCircle className="h-3 w-3 text-green-600" />
       case "request_expired": return <XCircle className="h-3 w-3 text-muted-foreground" />
+      case "booking_pending": return <Building2 className="h-3 w-3 text-amber-500" />
+      case "booking_success": return <Building2 className="h-3 w-3 text-green-600" />
+      case "booking_failed": return <Building2 className="h-3 w-3 text-destructive" />
+      case "booking_cancelled": return <Ban className="h-3 w-3 text-muted-foreground" />
       default: return <Clock className="h-3 w-3 text-muted-foreground" />
     }
   }

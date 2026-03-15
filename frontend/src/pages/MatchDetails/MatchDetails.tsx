@@ -16,6 +16,7 @@ import {
   Trash2,
   Building2,
   RefreshCw,
+  Ban,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -54,6 +55,8 @@ export default function MatchDetailPage() {
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [bookingAttempt, setBookingAttempt] = useState<BookingAttemptDTO | null>(null)
   const [retryingBooking, setRetryingBooking] = useState(false)
+  const [cancellingBooking, setCancellingBooking] = useState(false)
+  const [cancelBookingError, setCancelBookingError] = useState<string | null>(null)
   const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function fetchReminders() {
@@ -133,6 +136,21 @@ export default function MatchDetailPage() {
       toast.error(err instanceof Error ? err.message : "Failed to retry booking")
     } finally {
       setRetryingBooking(false)
+    }
+  }
+
+  async function handleCancelBooking() {
+    if (!id) return
+    setCancellingBooking(true)
+    setCancelBookingError(null)
+    try {
+      await bookingService.cancelBooking(id)
+      setBookingAttempt((prev) => prev ? { ...prev, status: "cancelled" } : prev)
+      toast.success("Booking cancelled")
+    } catch (err) {
+      setCancelBookingError(err instanceof Error ? err.message : "Failed to cancel booking")
+    } finally {
+      setCancellingBooking(false)
     }
   }
 
@@ -370,7 +388,8 @@ export default function MatchDetailPage() {
         {bookingAttempt && (
           <Card className={`border-border/50 ${
             bookingAttempt.status === "success" ? "border-green-500/30 bg-green-500/5" :
-            bookingAttempt.status === "failed" ? "border-destructive/30 bg-destructive/5" : ""
+            bookingAttempt.status === "failed" ? "border-destructive/30 bg-destructive/5" :
+            bookingAttempt.status === "cancelled" ? "border-muted bg-muted/20" : ""
           }`}>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight">
@@ -385,19 +404,43 @@ export default function MatchDetailPage() {
                 }`}>
                   {bookingAttempt.status === "pending" ? "In progress…" :
                    bookingAttempt.status === "success" ? "Booked" :
-                   bookingAttempt.status === "failed" ? "Failed" : bookingAttempt.status}
+                   bookingAttempt.status === "failed" ? "Failed" :
+                   bookingAttempt.status === "cancelled" ? "Cancelled" : bookingAttempt.status}
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {bookingAttempt.status === "success" && bookingAttempt.courtName && (
-                <div className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Court <strong>{bookingAttempt.courtName}</strong> reserved</span>
-                  {bookingAttempt.externalBookingId && (
-                    <span className="text-xs text-muted-foreground">
-                      · Ref: {bookingAttempt.externalBookingId}
-                    </span>
+              {bookingAttempt.status === "success" && (
+                <div className="space-y-3">
+                  {bookingAttempt.courtName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span>Court <strong>{bookingAttempt.courtName}</strong> reserved</span>
+                      {bookingAttempt.externalBookingId && (
+                        <span className="text-xs text-muted-foreground">
+                          · Ref: {bookingAttempt.externalBookingId}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-destructive hover:text-destructive"
+                    onClick={handleCancelBooking}
+                    disabled={cancellingBooking}
+                  >
+                    {cancellingBooking
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Ban className="h-3.5 w-3.5" />
+                    }
+                    {cancellingBooking ? "Cancelling booking…" : "Cancel booking"}
+                  </Button>
+                  {cancelBookingError && (
+                    <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-sm text-destructive">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{cancelBookingError}</span>
+                    </div>
                   )}
                 </div>
               )}

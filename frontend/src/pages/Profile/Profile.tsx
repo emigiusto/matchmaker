@@ -461,179 +461,165 @@ export default function ProfilePage() {
               Club Connections
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Connect your club membership to enable automatic court booking when matches are confirmed.
+              Connect your club membership to enable automatic court booking when a match is confirmed.
             </p>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Existing memberships */}
-            {memberships.length > 0 && (
-              <div className="space-y-3">
-                {memberships.map((m) => {
-                  const club = SUPPORTED_CLUBS.find((c) => c.clubSlug === m.clubSlug)
-                  return (
-                    <div key={m.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-foreground">{club?.label ?? m.clubSlug}</p>
-                          <p className="mt-0.5 text-sm text-muted-foreground">Socio #{m.socioNumber}</p>
+          <CardContent className="space-y-4">
+            {SUPPORTED_CLUBS.map((club) => {
+              const membership = memberships.find((m) => m.clubSlug === club.clubSlug)
+              const isEditing = editingClub === club.clubSlug
+
+              return (
+                <div key={club.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-4">
+                  {/* Club header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-foreground">{club.label}</p>
+                      {membership && !isEditing && (
+                        <>
+                          <p className="mt-0.5 text-sm text-muted-foreground">Socio #{membership.socioNumber}</p>
                           <div className="mt-1.5 flex items-center gap-1.5">
-                            {m.status === "active" ? (
+                            {membership.status === "active" ? (
                               <>
                                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                 <span className="text-xs text-green-600 dark:text-green-400">Verified</span>
                               </>
-                            ) : m.status === "invalid_credentials" ? (
+                            ) : membership.status === "invalid_credentials" ? (
                               <>
                                 <XCircle className="h-3.5 w-3.5 text-destructive" />
-                                <span className="text-xs text-destructive">Invalid credentials</span>
+                                <span className="text-xs text-destructive">Invalid credentials — update your password</span>
                               </>
                             ) : (
                               <>
                                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">Not verified</span>
+                                <span className="text-xs text-muted-foreground">Not verified yet</span>
                               </>
                             )}
-                            {m.lastVerifiedAt && (
+                            {membership.lastVerifiedAt && (
                               <span className="text-xs text-muted-foreground/60">
-                                · {new Date(m.lastVerifiedAt).toLocaleDateString()}
+                                · {new Date(membership.lastVerifiedAt).toLocaleDateString()}
                               </span>
                             )}
                           </div>
-                        </div>
-                        <div className="flex shrink-0 gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5"
-                            disabled={testingClub === m.clubSlug}
-                            onClick={() => handleTestConnection(m.clubSlug)}
-                          >
-                            {testingClub === m.clubSlug ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Wifi className="h-3.5 w-3.5" />
-                            )}
-                            Test
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditMembership(m)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteMembership(m.clubSlug)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
+                        </>
+                      )}
+                      {!membership && !isEditing && (
+                        <p className="mt-0.5 text-sm text-muted-foreground">Not connected</p>
+                      )}
                     </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Add / Edit form */}
-            {(memberships.length === 0 || editingClub !== null) && (
-              <form onSubmit={handleSaveClub} className="space-y-4 max-w-md">
-                {editingClub !== null && (
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Editing connection
-                  </p>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="clubSlug">Club</Label>
-                  <Select
-                    value={clubForm.clubSlug}
-                    onValueChange={(v) => setClubForm((p) => ({ ...p, clubSlug: v }))}
-                    disabled={editingClub !== null}
-                  >
-                    <SelectTrigger id="clubSlug">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUPPORTED_CLUBS.map((c) => (
-                        <SelectItem key={c.clubSlug} value={c.clubSlug}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="socioNumber">Socio number</Label>
-                  <Input
-                    id="socioNumber"
-                    value={clubForm.socioNumber}
-                    onChange={(e) => setClubForm((p) => ({ ...p, socioNumber: e.target.value }))}
-                    placeholder="e.g. 12345"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clubPassword">
-                    Password{" "}
-                    <span className="font-normal text-muted-foreground">(required for automatic booking)</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="clubPassword"
-                      type={showPassword ? "text" : "password"}
-                      value={clubForm.password}
-                      onChange={(e) => setClubForm((p) => ({ ...p, password: e.target.value }))}
-                      placeholder={editingClub ? "Leave blank to keep existing" : "Your club portal password"}
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowPassword((v) => !v)}
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                    {membership && !isEditing && (
+                      <div className="flex shrink-0 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          disabled={testingClub === club.clubSlug}
+                          onClick={() => handleTestConnection(club.clubSlug)}
+                        >
+                          {testingClub === club.clubSlug ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Wifi className="h-3.5 w-3.5" />
+                          )}
+                          Test
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => handleEditMembership(membership)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteMembership(club.clubSlug)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                    {!membership && !isEditing && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingClub(club.clubSlug)
+                          setClubForm({ clubSlug: club.clubSlug, socioNumber: "", password: "" })
+                        }}
+                      >
+                        Connect
+                      </Button>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Stored encrypted. Only used to log in to the club portal on your behalf.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={savingClub} className="gap-2">
-                    {savingClub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    {editingClub ? "Update connection" : "Save connection"}
-                  </Button>
-                  {editingClub && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingClub(null)
-                        setClubForm({ clubSlug: SUPPORTED_CLUBS[0].clubSlug, socioNumber: "", password: "" })
-                      }}
+
+                  {/* Inline form — shown when adding or editing */}
+                  {isEditing && (
+                    <form
+                      onSubmit={handleSaveClub}
+                      className="space-y-3 border-t border-border/40 pt-4"
                     >
-                      Cancel
-                    </Button>
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`socioNumber-${club.clubSlug}`}>Socio number</Label>
+                        <Input
+                          id={`socioNumber-${club.clubSlug}`}
+                          value={clubForm.socioNumber}
+                          onChange={(e) => setClubForm((p) => ({ ...p, socioNumber: e.target.value }))}
+                          placeholder="e.g. 12345"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`clubPassword-${club.clubSlug}`}>
+                          Password{" "}
+                          <span className="font-normal text-muted-foreground">(required for automatic booking)</span>
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id={`clubPassword-${club.clubSlug}`}
+                            type={showPassword ? "text" : "password"}
+                            value={clubForm.password}
+                            onChange={(e) => setClubForm((p) => ({ ...p, password: e.target.value }))}
+                            placeholder={membership ? "Leave blank to keep existing" : "Your club portal password"}
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowPassword((v) => !v)}
+                            tabIndex={-1}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Stored encrypted. Only used to log in to the club portal on your behalf.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={savingClub} className="gap-2">
+                          {savingClub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          {membership ? "Update" : "Save connection"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingClub(null)
+                            setClubForm({ clubSlug: SUPPORTED_CLUBS[0].clubSlug, socioNumber: "", password: "" })
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
                   )}
                 </div>
-              </form>
-            )}
-
-            {/* Add new button when memberships exist and not editing */}
-            {memberships.length > 0 && editingClub === null && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => setEditingClub("")}
-              >
-                + Add another club
-              </Button>
-            )}
+              )
+            })}
           </CardContent>
         </Card>
 

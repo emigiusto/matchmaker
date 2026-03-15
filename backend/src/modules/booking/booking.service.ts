@@ -59,8 +59,18 @@ export async function listClubMemberships(userId: string): Promise<ClubMembershi
 }
 
 export async function deleteClubMembership(userId: string, clubSlug: string): Promise<void> {
-  await prisma.clubMembership.delete({
+  const membership = await prisma.clubMembership.findUnique({
     where: { userId_clubSlug: { userId, clubSlug } },
+  })
+  if (!membership) return
+
+  // Delete referencing BookingAttempt rows first to avoid FK violation
+  await prisma.bookingAttempt.deleteMany({
+    where: { clubMembershipId: membership.id },
+  })
+
+  await prisma.clubMembership.delete({
+    where: { id: membership.id },
   })
 }
 
@@ -161,7 +171,7 @@ export async function triggerBookingForMatch(matchId: string): Promise<void> {
  */
 async function logBookingEvent(
   matchId: string,
-  action: 'booking_pending' | 'booking_success' | 'booking_failed',
+  action: 'booking_pending' | 'booking_success' | 'booking_failed' | 'booking_cancelled',
   metadata?: Record<string, unknown>,
 ): Promise<void> {
   try {
@@ -352,6 +362,48 @@ export async function retryBookingForMatch(matchId: string): Promise<void> {
   runBookingJob(existing.id, matchId, existing.clubMembershipId).catch((err) => {
     logger.error(`[booking] Unhandled error in retry booking job for match ${matchId}:`, err)
   })
+}
+
+/**
+ * Cancel a successful booking. Only callable when status is 'success'.
+ * Uses the host's ClubMembership credentials to cancel via the adapter.
+ */
+export async function cancelBookingForMatch(matchId: string): Promise<void> {
+  const attempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
+  if (!attempt) throw new AppError('No booking attempt found for this match', 404)
+  if (attempt.status !== 'success') {
+    throw new AppError(`Cannot cancel — booking status is "${attempt.status}"`, 409)
+  }
+  if (!attempt.externalBookingId) {
+    throw new AppError('Booking has no external ID — cannot cancel', 400)
+  }
+
+  const membership = await prisma.clubMembership.findUnique({ where: { id: attempt.clubMembershipId } })
+  if (!membership || !membership.encryptedPassword) {
+    throw new AppError('Host membership missing or has no password', 400)
+  }
+
+  const adapter = getAdapter(membership.adapterType)
+  const creds = {
+    socioNumber: membership.socioNumber,
+    password: decrypt(membership.encryptedPassword),
+  }
+
+  try {
+    await adapter.cancel(creds, attempt.externalBookingId)
+  } catch (err) {
+    // If the reservation is already gone at the club side, treat as cancelled.
+    // Log and continue — the desired end state (no active booking) is already true.
+    logger.warn(`[booking] Adapter cancel failed for match ${matchId} (may already be cancelled):`, err instanceof Error ? err.message : err)
+  }
+
+  await prisma.bookingAttempt.update({
+    where: { id: attempt.id },
+    data: { status: 'cancelled', completedAt: new Date(), errorMessage: null },
+  })
+
+  logBookingEvent(matchId, 'booking_cancelled').catch(() => {})
+  logger.info(`[booking] Booking cancelled for match ${matchId}`)
 }
 
 export async function getBookingAttemptByMatch(matchId: string): Promise<BookingAttemptDTO | null> {

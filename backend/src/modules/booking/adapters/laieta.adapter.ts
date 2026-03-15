@@ -358,12 +358,79 @@ export class LaietaAdapter implements BookingAdapter {
     }
   }
 
-  async cancel(_creds: ClubCredentials, _externalBookingId: string): Promise<void> {
-    // TODO: Implement once the "My reservations" page selectors are known.
-    throw new AppError(
-      'Court cancellation not yet implemented for LaietaAdapter',
-      501,
-      'NOT_IMPLEMENTED',
-    )
+  async cancel(creds: ClubCredentials, externalBookingId: string): Promise<void> {
+    // externalBookingId format: "courtId::YYYY-MM-DD::HH" (possibly prefixed with "[TEST-MODE]::")
+    const cleanId = externalBookingId.replace(/^\[TEST-MODE\]::/, '')
+    const parts = cleanId.split('::')
+    if (parts.length < 3) {
+      throw new AppError(`Cannot parse externalBookingId for cancellation: ${externalBookingId}`, 400, 'INVALID_BOOKING_ID')
+    }
+    const [courtId, date, hour] = parts
+
+    // Convert YYYY-MM-DD → DD-MM-YYYY (format shown on the reservas page)
+    const [year, month, day] = date.split('-')
+    const pageDate = `${day}-${month}-${year}`
+    const pageHour = `${hour}:00`
+
+    // Normalize court name for comparison (collapse multiple spaces)
+    const normalizeCourt = (s: string) => s.replace(/\s+/g, ' ').trim().toUpperCase()
+    const targetCourt = normalizeCourt(courtId)
+
+    let browser: Browser | null = null
+    try {
+      browser = await this.launchBrowser()
+      const sessionValue = await this.login(browser, creds)
+      const page = await this.openWithSession(browser, `${BASE_URL}/reservas`, sessionValue)
+
+      // Scrape all booking fieldsets to find the matching one
+      const cancelButtonName = await page.evaluate(
+        (targetDate: string, targetHour: string, targetCourt: string) => {
+          const normalizeCourt = (s: string) => s.replace(/\s+/g, ' ').trim().toUpperCase()
+          const fieldsets = document.querySelectorAll('fieldset.panel.panel-default')
+          for (const fieldset of fieldsets) {
+            // Read date, hour, court from the booking card
+            const dateEl = fieldset.querySelector('[id^="edit-date--"]')
+            const hourEl = fieldset.querySelector('[id^="edit-hour--"]')
+            const placeEl = fieldset.querySelector('[id^="edit-place--"]')
+            if (!dateEl || !hourEl || !placeEl) continue
+
+            const bookingDate = dateEl.textContent?.trim() ?? ''
+            const bookingHour = hourEl.textContent?.trim() ?? ''
+            const bookingCourt = normalizeCourt(placeEl.textContent?.trim() ?? '')
+
+            if (bookingDate === targetDate && bookingHour === targetHour && bookingCourt === targetCourt) {
+              const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
+              return cancelBtn?.name ?? null
+            }
+          }
+          return null
+        },
+        pageDate, pageHour, targetCourt,
+      )
+
+      if (!cancelButtonName) {
+        throw new AppError(
+          `No reservation was found at the club for ${courtId} on ${pageDate} at ${pageHour}. It may have already been cancelled or the booking details don't match.`,
+          404,
+          'BOOKING_NOT_FOUND',
+        )
+      }
+
+      logger.info(`[laieta] Cancelling booking: name=${cancelButtonName}, court=${courtId}, date=${date}, time=${pageHour}`)
+
+      // Override confirmDialog to auto-confirm, then click the cancel button
+      const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
+      await page.evaluate((btnName: string) => {
+        ;(window as unknown as Record<string, unknown>)['confirmDialog'] = () => true
+        const btn = document.querySelector(`button[name="${btnName}"]`) as HTMLButtonElement | null
+        btn?.click()
+      }, cancelButtonName)
+      await navigationPromise
+
+      await this.checkForPageError(page)
+      logger.info(`[laieta] Booking cancelled: court=${courtId}, date=${date}, time=${pageHour}`)
+    } finally {
+      if (browser) await browser.close()
+    }
   }
 }
