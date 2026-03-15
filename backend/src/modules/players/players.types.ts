@@ -25,8 +25,8 @@ export interface PlayerDTO {
   id: string;
   /** User ID for this player */
   userId: string;
-  /** Display name for tennis persona */
-  displayName: string;
+  /** Name from the linked User */
+  name: string;
   /** Player's skill level (may be unset) */
   levelValue?: number;
   /** Confidence in level assessment */
@@ -52,7 +52,6 @@ export interface PlayerDTO {
  */
 export interface CreatePlayerInput {
   userId: string;
-  displayName: string;
   levelValue?: number;
   levelConfidence?: number;
   preferredSurfaces?: string[];
@@ -67,7 +66,6 @@ export interface CreatePlayerInput {
  * All fields optional to allow partial updates
  */
 export interface UpdatePlayerInput {
-  displayName?: string;
   levelValue?: number;
   levelConfidence?: number;
   preferredSurfaces?: string[];

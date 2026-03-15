@@ -27,7 +27,7 @@ export const playersService = {
 
   async create(
     userId: string,
-    data: { displayName?: string; preferredClub?: string; defaultCity?: string }
+    data: { preferredClub?: string; defaultCity?: string }
   ): Promise<PlayerPreferences> {
     return apiClient.post<PlayerPreferences>("/players", { userId, ...data })
   },

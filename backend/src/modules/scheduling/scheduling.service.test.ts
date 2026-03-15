@@ -7,8 +7,9 @@ import { AppError } from '../../shared/errors/AppError';
 
 const { mockTx, mockRepo } = vi.hoisted(() => {
   const mockTx = {
-    user: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn(), findMany: vi.fn() },
     schedulingRequest: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
+    schedulingInviteEvent: { findMany: vi.fn(), create: vi.fn() },
     schedulingCandidate: {
       create: vi.fn(),
       update: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock('../../prisma', () => {
     user: mockTx.user,
     schedulingRequest: mockTx.schedulingRequest,
     schedulingCandidate: mockTx.schedulingCandidate,
+    schedulingInviteEvent: mockTx.schedulingInviteEvent,
     availability: mockTx.availability,
     match: mockTx.match,
     $transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => fn(mockTx)),
@@ -1073,6 +1075,7 @@ describe('SchedulingService', () => {
   describe('listSchedulingRequestsByHost', () => {
     it('returns requests for host', async () => {
       mockTx.schedulingRequest.findMany.mockResolvedValue([baseRequest]);
+      mockRepo.findActivePastScheduledTime.mockResolvedValue([]); // called by expireRequestsPastScheduledTime
 
       const result = await schedulingService.listSchedulingRequestsByHost('host1');
 
@@ -1100,6 +1103,240 @@ describe('SchedulingService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('req1');
+    });
+  });
+
+  describe('getEventHistory', () => {
+    it('returns empty array when no events exist', async () => {
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([]);
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      const result = await schedulingService.getEventHistory('req1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('maps events to DTOs and resolves actor names', async () => {
+      const eventDate = new Date('2025-04-15T10:00:00Z');
+      const events = [
+        {
+          id: 'evt1',
+          schedulingRequestId: 'req1',
+          candidateId: 'cand1',
+          actorUserId: 'host1',
+          action: 'invite_sent',
+          metadata: null,
+          createdAt: eventDate,
+          candidate: { contactUser: { name: 'Candidate' } },
+        },
+      ];
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue(events);
+      mockTx.user.findMany.mockResolvedValue([{ id: 'host1', name: 'Host User' }]);
+
+      const result = await schedulingService.getEventHistory('req1');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('evt1');
+      expect(result[0].action).toBe('invite_sent');
+      expect(result[0].actorUserName).toBe('Host User');
+      expect(result[0].candidateUserName).toBe('Candidate');
+      expect(result[0].createdAt).toBe(eventDate.toISOString());
+    });
+
+    it('sets actorUserName to null when actorUserId is null', async () => {
+      const eventDate = new Date('2025-04-15T10:00:00Z');
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        {
+          id: 'evt2',
+          schedulingRequestId: 'req1',
+          candidateId: null,
+          actorUserId: null,
+          action: 'booking_pending',
+          metadata: { courtName: 'Court 3' },
+          createdAt: eventDate,
+          candidate: null,
+        },
+      ]);
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      const result = await schedulingService.getEventHistory('req1');
+
+      expect(result[0].actorUserName).toBeNull();
+      expect(result[0].candidateUserName).toBeNull();
+      expect(result[0].metadata).toEqual({ courtName: 'Court 3' });
+    });
+  });
+
+  describe('handleCandidateResponse emoji patterns', () => {
+    it('accepts with 👍 emoji in message', async () => {
+      const candidate = {
+        ...baseRequest.candidates![0],
+        status: 'waiting_reply',
+        schedulingRequest: { ...baseRequest, status: 'active' },
+      };
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      const mockTxForUpdate = {
+        schedulingCandidate: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findMany: vi.fn().mockResolvedValue([{ status: 'pending' }]),
+        },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(mockTxForUpdate));
+      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
+      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
+      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
+      mockRepo.countPendingCandidates.mockResolvedValue(0);
+
+      const result = await schedulingService.handleCandidateResponse('+456', '👍');
+
+      expect(result).toEqual({ processed: true });
+      expect(mockTxForUpdate.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'accepted' }) }),
+      );
+    });
+
+    it('accepts when message contains 👍 alongside other text', async () => {
+      const candidate = {
+        ...baseRequest.candidates![0],
+        status: 'waiting_reply',
+        schedulingRequest: { ...baseRequest, status: 'active' },
+      };
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      const mockTxForUpdate = {
+        schedulingCandidate: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findMany: vi.fn().mockResolvedValue([{ status: 'pending' }]),
+        },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(mockTxForUpdate));
+      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
+      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
+      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
+      mockRepo.countPendingCandidates.mockResolvedValue(0);
+
+      const result = await schedulingService.handleCandidateResponse('+456', 'Sure 👍 sounds good');
+
+      expect(result).toEqual({ processed: true });
+    });
+
+    it('does not accept with unrelated emoji', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...baseRequest.candidates![0],
+        status: 'waiting_reply',
+        schedulingRequest: { ...baseRequest, status: 'active' },
+      });
+
+      const result = await schedulingService.handleCandidateResponse('+456', '😊');
+
+      expect(result).toEqual({ processed: false });
+    });
+  });
+
+  describe('addCandidates to active request', () => {
+    it('adds new candidates to an active request without reactivating', async () => {
+      const activeReq = { ...baseRequest, status: 'active' };
+      const updatedReq = {
+        ...activeReq,
+        candidates: [...activeReq.candidates!, { id: 'cand3', contactUser: { name: 'New' }, createdAt: new Date(), updatedAt: new Date() }],
+      };
+      mockRepo.findRequestById
+        .mockResolvedValueOnce(activeReq)
+        .mockResolvedValue(updatedReq);
+      mockRepo.addCandidates.mockResolvedValue([{ id: 'cand3' }]);
+      mockRepo.findActiveRequestById.mockResolvedValue(activeReq);
+      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
+      mockRepo.countWaitingReplyCandidates.mockResolvedValue(1);
+
+      const result = await schedulingService.addCandidates('req1', ['cand3'], 'host1');
+
+      expect(mockRepo.addCandidates).toHaveBeenCalledWith('req1', ['cand3']);
+      // Active request should NOT trigger another updateRequestStatus to 'active'
+      expect(mockRepo.updateRequestStatus).not.toHaveBeenCalledWith('req1', 'active');
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('createSchedulingRequest bookingEnabled flag', () => {
+    it('passes bookingEnabled: true through to the created request', async () => {
+      mockRepo.countActiveByHostUserId.mockResolvedValue(0);
+      mockTx.user.findUnique.mockResolvedValue({ id: 'host1', name: 'Host' });
+      const now = new Date();
+      const createdReq = {
+        id: 'req-booking',
+        hostUserId: 'host1',
+        hostPartnerUserId: null,
+        sportType: 'tennis',
+        format: 'singles',
+        matchType: 'practice',
+        date: new Date(baseInput.date),
+        startTime: new Date(baseInput.startTime),
+        endTime: new Date(baseInput.endTime),
+        locationText: 'Court 1',
+        radiusKm: null,
+        responseWindowMinutes: 240,
+        inviteToken: 'tok-book',
+        status: 'active',
+        currentCandidateIndex: 0,
+        matchId: null,
+        maxParallelCandidates: 1,
+        bookingEnabled: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockTx.schedulingRequest.create.mockResolvedValue(createdReq);
+      mockTx.schedulingCandidate.create.mockResolvedValue({
+        id: 'c-new', schedulingRequestId: 'req-booking', contactUserId: 'cand1', priorityOrder: 0, status: 'pending',
+      });
+      mockRepo.findRequestById.mockResolvedValue({
+        ...createdReq,
+        hostUser: { id: 'host1', name: 'Host' },
+        hostPartner: null,
+        candidates: [{ id: 'c-new', contactUser: { name: 'Cand' }, createdAt: now, updatedAt: now }],
+        match: null,
+      });
+
+      await schedulingService.createSchedulingRequest({ ...baseInput, bookingEnabled: true });
+
+      expect(mockTx.schedulingRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ bookingEnabled: true }),
+        }),
+      );
+    });
+
+    it('defaults bookingEnabled to false when not provided', async () => {
+      mockRepo.countActiveByHostUserId.mockResolvedValue(0);
+      mockTx.user.findUnique.mockResolvedValue({ id: 'host1', name: 'Host' });
+      const now = new Date();
+      const createdReq = {
+        id: 'req-no-booking', hostUserId: 'host1', hostPartnerUserId: null,
+        sportType: 'tennis', format: 'singles', matchType: 'practice',
+        date: new Date(baseInput.date), startTime: new Date(baseInput.startTime), endTime: new Date(baseInput.endTime),
+        locationText: 'Court 1', radiusKm: null, responseWindowMinutes: 240,
+        inviteToken: 'tok-x', status: 'active', currentCandidateIndex: 0,
+        matchId: null, maxParallelCandidates: 1, bookingEnabled: false, createdAt: now, updatedAt: now,
+      };
+      mockTx.schedulingRequest.create.mockResolvedValue(createdReq);
+      mockTx.schedulingCandidate.create.mockResolvedValue({
+        id: 'c-new', schedulingRequestId: 'req-no-booking', contactUserId: 'cand1', priorityOrder: 0, status: 'pending',
+      });
+      mockRepo.findRequestById.mockResolvedValue({
+        ...createdReq,
+        hostUser: { id: 'host1', name: 'Host' },
+        hostPartner: null,
+        candidates: [{ id: 'c-new', contactUser: { name: 'Cand' }, createdAt: now, updatedAt: now }],
+        match: null,
+      });
+
+      await schedulingService.createSchedulingRequest(baseInput);
+
+      expect(mockTx.schedulingRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ bookingEnabled: false }),
+        }),
+      );
     });
   });
 });

@@ -48,6 +48,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [form, setForm] = useState({ name: "", phone: "" })
   const [player, setPlayer] = useState<{ id: string; preferredClub?: string; defaultCity?: string } | null>(null)
   const [locationForm, setLocationForm] = useState({ preferredClub: "", defaultCity: "" })
@@ -176,7 +177,6 @@ export default function ProfilePage() {
         await playersService.update(player.id, { preferredClub, defaultCity })
       } else {
         const created = await playersService.create(currentUserId, {
-          displayName: user?.name ?? "Player",
           preferredClub,
           defaultCity,
         })
@@ -205,6 +205,7 @@ export default function ProfilePage() {
       phoneToSave = normalized
     }
     setSaving(true)
+    setSaveError(null)
     try {
       await usersService.update(currentUserId, {
         name: form.name || undefined,
@@ -214,7 +215,7 @@ export default function ProfilePage() {
       await refetchProfile()
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save"
-      toast.error(msg)
+      setSaveError(msg)
     } finally {
       setSaving(false)
     }
@@ -363,7 +364,7 @@ export default function ProfilePage() {
                 <PhoneInput
                   id="phone"
                   value={form.phone}
-                  onChange={(phone) => setForm((p) => ({ ...p, phone }))}
+                  onChange={(phone) => { setForm((p) => ({ ...p, phone })); setSaveError(null) }}
                   defaultCountryCode="34"
                   className="max-w-md"
                 />
@@ -398,6 +399,9 @@ export default function ProfilePage() {
                 </Select>
               </div>
 
+              {saveError && (
+                <p className="text-sm text-destructive">{saveError}</p>
+              )}
               <Button type="submit" disabled={saving} className="gap-2">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save changes

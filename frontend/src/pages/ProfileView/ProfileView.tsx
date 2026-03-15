@@ -17,12 +17,12 @@ import { playersService } from "@/lib/services/players.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import type { Player } from "@/lib/types"
 
-// Backend returns displayName/defaultCity; map to frontend Player shape
+// Map backend PlayerDTO to frontend Player shape
 function adaptPlayer(dto: Record<string, unknown>): Player {
   return {
     id: dto.id as string,
     userId: dto.userId as string,
-    name: (dto.displayName ?? dto.name ?? "Player") as string,
+    name: (dto.name ?? "Player") as string,
     city: (dto.defaultCity ?? dto.city ?? "") as string,
     latitude: (dto.latitude as number) ?? 0,
     longitude: (dto.longitude as number) ?? 0,

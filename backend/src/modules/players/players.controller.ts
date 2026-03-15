@@ -79,12 +79,8 @@ export class PlayersController {
   static async createPlayer(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = createPlayerSchema.parse(req.body);
-      // Ensure displayName is not undefined, or omit it if undefined
-      const { userId, displayName, ...rest } = parsed;
-      const playerInput = displayName !== undefined
-        ? { displayName, ...rest }
-        : { ...rest };
-      const player = await PlayersService.createPlayerForUser(userId, playerInput as any);
+      const { userId, ...rest } = parsed;
+      const player = await PlayersService.createPlayerForUser(userId, { userId, ...rest });
       res.status(201).json(player);
     } catch (error) {
       next(error);

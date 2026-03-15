@@ -17,11 +17,9 @@ export const playerIdParamSchema = z.object({
 
 /**
  * Schema for creating a Player
- * TODO: Add stricter validation for displayName, preferredSurfaces, etc.
  */
 export const createPlayerSchema = z.object({
   userId: z.string().uuid(),
-  displayName: z.string().min(1).optional(), // Optional, but if present, must not be empty
   levelValue: z.number().min(LEVEL_MIN).max(LEVEL_MAX).optional(),
   levelConfidence: z.number().min(0).max(1).optional(),
   preferredSurfaces: z.array(z.string()).optional(),
@@ -33,10 +31,8 @@ export const createPlayerSchema = z.object({
 
 /**
  * Schema for updating a Player (all fields optional)
- * TODO: Add stricter validation for displayName, preferredSurfaces, etc.
  */
 export const updatePlayerSchema = z.object({
-  displayName: z.string().min(1).optional(),
   levelValue: z.number().min(LEVEL_MIN).max(LEVEL_MAX).optional(),
   levelConfidence: z.number().min(0).max(1).optional(),
   preferredSurfaces: z.array(z.string()).optional(),

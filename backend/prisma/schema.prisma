@@ -62,7 +62,6 @@ model User {
 model Player {
   id              String   @id @default(uuid())
   userId          String   @unique
-  displayName     String?
   levelValue      Float?
   levelConfidence Float?
   defaultCity     String?

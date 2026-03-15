@@ -40,10 +40,10 @@ export class PlayersService {
     } catch (err) {
       // Ignore cache errors
     }
-    const player = await prisma.player.findUnique({ where: { userId } });
+    const player = await prisma.player.findUnique({ where: { userId }, include: { user: { select: { name: true } } } });
     if (!player) throw new AppError('Player not found', 404);
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-    const dto = PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+    const dto = PlayersService.toDTO(player, player.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
     try {
       await cacheSet(cacheKey, JSON.stringify(dto), 60 * 60 * 24); // cache for 24 hours
     } catch (err) {
@@ -87,10 +87,10 @@ export class PlayersService {
       }
     }
     if (uncachedIds.length > 0) {
-      const players = await prisma.player.findMany({ where: { userId: { in: uncachedIds } } });
+      const players = await prisma.player.findMany({ where: { userId: { in: uncachedIds } }, include: { user: { select: { name: true } } } });
       for (const player of players) {
         const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-        const dto = PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+        const dto = PlayersService.toDTO(player, player.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
         if (cache) {
           cache.set(player.userId, dto);
         }
@@ -103,10 +103,10 @@ export class PlayersService {
    * List all players (for admin or UI)
    */
   static async listPlayers(): Promise<PlayerDTO[]> {
-    const players = await prisma.player.findMany();
-    return Promise.all(players.map(async (player: Player) => {
+    const players = await prisma.player.findMany({ include: { user: { select: { name: true } } } });
+    return Promise.all(players.map(async (player) => {
       const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-      return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+      return PlayersService.toDTO(player, player.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
     }));
   }
 
@@ -114,10 +114,10 @@ export class PlayersService {
    * List players by city
    */
   static async listPlayersByCity(city: string): Promise<PlayerDTO[]> {
-    const players = await prisma.player.findMany({ where: { defaultCity: city } });
-    return Promise.all(players.map(async (player: Player) => {
+    const players = await prisma.player.findMany({ where: { defaultCity: city }, include: { user: { select: { name: true } } } });
+    return Promise.all(players.map(async (player) => {
       const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-      return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+      return PlayersService.toDTO(player, player.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
     }));
   }
 
@@ -178,7 +178,6 @@ export class PlayersService {
     const player = await prisma.player.create({
       data: {
         userId,
-        displayName: data.displayName ?? user.name ?? undefined,
         levelValue: data.levelValue,
         levelConfidence: data.levelConfidence,
         defaultCity: data.defaultCity,
@@ -194,27 +193,27 @@ export class PlayersService {
     // Fetch actual surfaces
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
     // Return PlayerDTO
-    return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+    return PlayersService.toDTO(player, user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**
    * Get Player by Player ID
    */
   static async getPlayerById(playerId: string): Promise<PlayerDTO> {
-    const player = await prisma.player.findUnique({ where: { id: playerId } });
+    const player = await prisma.player.findUnique({ where: { id: playerId }, include: { user: { select: { name: true } } } });
     if (!player) throw new AppError('Player not found', 404);
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId } });
-    return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+    return PlayersService.toDTO(player, player.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**
    * Get Player by User ID
    */
   static async getPlayerByUserId(userId: string): Promise<PlayerDTO> {
-    const player = await prisma.player.findUnique({ where: { userId } });
+    const player = await prisma.player.findUnique({ where: { userId }, include: { user: { select: { name: true } } } });
     if (!player) throw new AppError('Player not found', 404);
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId: player.id } });
-    return PlayersService.toDTO(player, surfaces.map((s: { surface: string }) => s.surface));
+    return PlayersService.toDTO(player, player.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**
@@ -230,12 +229,12 @@ export class PlayersService {
     const updatedPlayer = await prisma.player.update({
       where: { id: playerId },
       data: {
-        displayName: data.displayName,
         levelValue: data.levelValue,
         levelConfidence: data.levelConfidence,
         defaultCity: data.defaultCity,
         preferredClub: data.preferredClub,
       },
+      include: { user: { select: { name: true } } },
     });
     // Replace all PlayerSurface entries (no duplicates) if provided
     if (data.preferredSurfaces) {
@@ -243,14 +242,14 @@ export class PlayersService {
     }
     // Fetch current surfaces
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId } });
-    return PlayersService.toDTO(updatedPlayer, surfaces.map((s: { surface: string }) => s.surface));
+    return PlayersService.toDTO(updatedPlayer, updatedPlayer.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
   }
 
   /**
    * Convert Player + surfaces to PlayerDTO (API shape)
    * Never exposes internal PlayerSurface model.
    */
-  private static toDTO(player: Player, preferredSurfaces?: string[]): PlayerDTO {
+  private static toDTO(player: Player, userName: string, preferredSurfaces?: string[]): PlayerDTO {
     // Elo config for decay (should match runtime config)
     const eloConfig = new EloRatingAlgorithm();
     const storedConfidence = player.levelConfidence ?? undefined;
@@ -269,7 +268,7 @@ export class PlayersService {
     return {
       id: player.id,
       userId: player.userId,
-      displayName: player.displayName ?? '',
+      name: userName,
       levelValue: player.levelValue ?? undefined,
       levelConfidence: storedConfidence,
       effectiveConfidence,
