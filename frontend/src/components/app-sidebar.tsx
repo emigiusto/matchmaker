@@ -185,7 +185,7 @@ export function AppSidebar() {
               }}
             >
               <LogOut className="h-4 w-4" />
-              Log out
+              {t("common.logout")}
             </Button>
           </div>
         </SidebarFooter>

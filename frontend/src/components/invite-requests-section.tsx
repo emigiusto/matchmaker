@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
+import { es as esLocale } from "date-fns/locale"
 import { Link } from "react-router-dom"
 import {
   Calendar,
@@ -209,7 +210,8 @@ export function InviteRequestsSection({
   pageTitle = "Invites",
   pageDescription,
 }: InviteRequestsSectionProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "es" ? esLocale : undefined
   const [inviteRequests, setInviteRequests] = useState<InviteRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedRequestId, setCopiedRequestId] = useState<string | null>(null)
@@ -430,24 +432,24 @@ export function InviteRequestsSection({
   function getEventLabel(event: SchedulingInviteEventDTO): string {
     const name = event.candidateUserName ?? t("common.unknown")
     switch (event.action) {
-      case "invite_sent": return `Invite sent to ${name}`
-      case "invite_accepted": return `${name} accepted`
-      case "invite_manually_accepted": return `${name} manually accepted by host`
-      case "invite_declined": return `${name} declined`
-      case "invite_expired": return `No response from ${name}`
-      case "candidate_cancelled": return `${name} cancelled`
-      case "candidate_retried": return `${name} queued for retry`
+      case "invite_sent": return t("invites.events.inviteSent", { name })
+      case "invite_accepted": return t("invites.events.inviteAccepted", { name })
+      case "invite_manually_accepted": return t("invites.events.inviteManuallyAccepted", { name })
+      case "invite_declined": return t("invites.events.inviteDeclined", { name })
+      case "invite_expired": return t("invites.events.inviteExpired", { name })
+      case "candidate_cancelled": return t("invites.events.candidateCancelled", { name })
+      case "candidate_retried": return t("invites.events.candidateRetried", { name })
       case "candidates_added": {
         const count = (event.metadata?.count as number) ?? 1
-        return `${count} contact${count === 1 ? "" : "s"} added`
+        return t("invites.events.candidatesAdded", { count })
       }
       case "request_started": return t("invites.events.schedulingStarted")
       case "request_cancelled": return t("invites.events.requestCancelled")
       case "request_completed": return t("invites.events.matchConfirmed")
       case "request_expired": return t("invites.events.noMatchFound")
       case "booking_pending": return t("invites.events.bookingInProgress")
-      case "booking_success": return `Court booked${event.metadata?.courtName ? `: ${event.metadata.courtName}` : ""}`
-      case "booking_failed": return `Booking failed${event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : ""}`
+      case "booking_success": return t("invites.events.bookingSuccess", { court: event.metadata?.courtName ? `: ${event.metadata.courtName}` : "" })
+      case "booking_failed": return t("invites.events.bookingFailed", { error: event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : "" })
       case "booking_cancelled": return t("invites.events.bookingCancelled")
       default: return event.action
     }
@@ -524,8 +526,7 @@ export function InviteRequestsSection({
             {atCapacity && (
               <div className="mb-4 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
                 <XCircle className="h-4 w-4 shrink-0" />
-                You have reached the limit of {MAX_ACTIVE_REQUESTS} active scheduling requests. Cancel
-                or finish one to start a new one.
+                {t("invites.atCapacityBanner", { max: MAX_ACTIVE_REQUESTS })}
               </div>
             )}
             {filteredRequests.length === 0 ? (
@@ -572,25 +573,25 @@ export function InviteRequestsSection({
                           {displayStatus === "scheduling" && (
                             <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-200/60 bg-blue-500/8 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-400">
                               <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                              Scheduling
+                              {t("invites.status.scheduling")}
                             </span>
                           )}
                           {displayStatus === "matched" && (
                             <span className="inline-flex items-center gap-1.5 rounded-md border border-green-200/60 bg-green-500/8 px-2.5 py-1 text-xs font-medium text-green-700 dark:border-green-800/40 dark:bg-green-500/10 dark:text-green-400">
                               <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-                              Matched
+                              {t("invites.status.matched")}
                             </span>
                           )}
                           {request.status === "expired" && (
                             <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
                               <XCircle className="h-3.5 w-3.5 shrink-0" />
-                              No match
+                              {t("invites.status.expired")}
                             </span>
                           )}
                           {displayStatus === "cancelled" && (
                             <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
                               <XCircle className="h-3.5 w-3.5 shrink-0" />
-                              Cancelled
+                              {t("invites.status.cancelled")}
                             </span>
                           )}
                         </div>
@@ -605,7 +606,7 @@ export function InviteRequestsSection({
                       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-foreground">
                         <span className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-primary" />
-                          {format(new Date(request.date), "EEE, MMM d")}
+                          {format(new Date(request.date), "EEE, MMM d", { locale: dateLocale })}
                         </span>
                         <span className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-primary" />
@@ -618,14 +619,14 @@ export function InviteRequestsSection({
                         {displayStatus === "scheduling" && (
                           <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
                             <Hourglass className="h-3.5 w-3.5" />
-                            Reply within {formatResponseWindow(request.responseWindowMinutes)}
+                            {t("inviteDetails.replyWithin", { window: formatResponseWindow(request.responseWindowMinutes) })}
                           </span>
                         )}
                       </div>
 
                       <div className="mt-4 border-t border-border/30 pt-4">
                         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Invite Progress
+                          {t("inviteDetails.progress")}
                         </p>
                         <div className="max-h-48 space-y-1.5 overflow-y-auto pr-2">
                           {request.contacts.map((contact, idx) => (
@@ -766,7 +767,7 @@ export function InviteRequestsSection({
                           onClick={() => toggleHistory(request.id)}
                         >
                           <History className="h-3.5 w-3.5 shrink-0" />
-                          <span className="font-medium">History</span>
+                          <span className="font-medium">{t("inviteDetails.history")}</span>
                           {expandedHistoryId === request.id ? (
                             <ChevronUp className="ml-auto h-3.5 w-3.5" />
                           ) : (
@@ -790,7 +791,7 @@ export function InviteRequestsSection({
                                   <span className="mt-0.5 shrink-0">{getEventIcon(event.action)}</span>
                                   <span className="flex-1 text-foreground">{getEventLabel(event)}</span>
                                   <span className="shrink-0 text-muted-foreground">
-                                    {format(new Date(event.createdAt), "MMM d, HH:mm")}
+                                    {format(new Date(event.createdAt), "MMM d, HH:mm", { locale: dateLocale })}
                                   </span>
                                 </div>
                               ))
@@ -939,7 +940,7 @@ export function InviteRequestsSection({
         >
           {activeRequestCount}
         </span>
-        <span> / {MAX_ACTIVE_REQUESTS} active</span>
+        <span> {t("invites.activeSuffix", { max: MAX_ACTIVE_REQUESTS })}</span>
       </span>
       <Button
         size="lg"
@@ -948,12 +949,12 @@ export function InviteRequestsSection({
         disabled={atCapacity}
         title={
           atCapacity
-            ? `You have reached the limit of ${MAX_ACTIVE_REQUESTS} active scheduling requests`
+            ? t("invites.atCapacityTooltip", { max: MAX_ACTIVE_REQUESTS })
             : undefined
         }
       >
         <Zap className="h-5 w-5" />
-        I Want to Play
+        {t("common.iWantToPlay")}
       </Button>
     </div>
   )

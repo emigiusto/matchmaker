@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Link, useParams } from "react-router-dom"
 import { format } from "date-fns"
+import { es as esLocale, enUS } from "date-fns/locale"
 import {
   ArrowLeft,
   Bell,
@@ -46,7 +47,8 @@ import { Loader2 } from "lucide-react"
 
 export default function MatchDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "es" ? esLocale : enUS
   const currentUserId = getCurrentUserId()
   const [match, setMatch] = useState<Match | null>(null)
   const [loading, setLoading] = useState(true)
@@ -227,7 +229,7 @@ export default function MatchDetailPage() {
           {match.status === "cancelled" && (
             <div className="border-b border-destructive/20 bg-destructive/10 px-6 py-3">
               <p className="text-center text-sm font-semibold text-destructive">
-                This match has been cancelled and will not take place
+                {t("common.matchCancelledBanner")}
               </p>
             </div>
           )}
@@ -239,7 +241,7 @@ export default function MatchDetailPage() {
               />
               <StatusBadge status={match.status} />
               <span className="text-xs text-muted-foreground">
-                {format(new Date(match.date), "EEEE, MMMM d, yyyy")}
+                {format(new Date(match.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}
               </span>
             </div>
           </div>
@@ -345,7 +347,7 @@ export default function MatchDetailPage() {
             <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {format(new Date(match.date), "MMM d, yyyy")}
+                {format(new Date(match.date), "MMM d, yyyy", { locale: dateLocale })}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" />
@@ -544,11 +546,11 @@ export default function MatchDetailPage() {
                         )}
                         <div>
                           <p className="text-sm font-medium text-foreground">
-                            {format(new Date(r.scheduledAt), "EEE, MMM d 'at' HH:mm")}
+                            {format(new Date(r.scheduledAt), "EEE, MMM d, HH:mm", { locale: dateLocale })}
                           </p>
                           {r.status === "sent" && r.sentAt && (
                             <p className="text-xs text-muted-foreground">
-                              Sent {format(new Date(r.sentAt), "MMM d, HH:mm")}
+                              {t("common.reminderSent")} {format(new Date(r.sentAt), "MMM d, HH:mm", { locale: dateLocale })}
                             </p>
                           )}
                           {r.status === "failed" && r.error && (
@@ -566,7 +568,7 @@ export default function MatchDetailPage() {
                               : "bg-destructive/10 text-destructive"
                           }`}
                         >
-                          {r.status}
+                          {r.status === "sent" ? t("common.reminderSent") : r.status === "failed" ? t("common.reminderFailed") : t("common.reminderPending")}
                         </span>
                         {r.status === "pending" && (
                           <Button

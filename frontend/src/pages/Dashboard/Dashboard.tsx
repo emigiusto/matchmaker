@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { format } from "date-fns"
+import { es as esLocale, enUS } from "date-fns/locale"
 import { ArrowRight, Calendar, MapPin, Clock, Zap, Loader2, CirclePlay, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,11 +23,12 @@ import type { Match } from "@/lib/types"
 function safeFormatDate(
   value: string | undefined | null,
   formatStr: string,
+  locale: Locale,
   fallback = "-"
 ): string {
   if (!value) return fallback
   const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? fallback : format(d, formatStr)
+  return Number.isNaN(d.getTime()) ? fallback : format(d, formatStr, { locale })
 }
 
 export default function Dashboard() {
@@ -35,7 +37,8 @@ export default function Dashboard() {
   const [invitesRefreshTrigger, setInvitesRefreshTrigger] = useState(0)
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([])
   const [matchesLoading, setMatchesLoading] = useState(true)
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "es" ? esLocale : enUS
   const today = format(new Date(), "yyyy-MM-dd")
 
   async function refreshMatches() {
@@ -120,22 +123,22 @@ export default function Dashboard() {
             <TabsList className="h-11 w-full rounded-xl bg-muted/60 px-1.5 py-1 sm:w-auto">
               <TabsTrigger value="invites" className="flex-1 gap-2 rounded-lg px-4 data-[state=active]:shadow-md sm:flex-none">
                 <CirclePlay className="h-4 w-4" />
-                Invites
+                {t("dashboard.invitesTab")}
               </TabsTrigger>
               <TabsTrigger value="matches" className="flex-1 gap-2 rounded-lg px-4 data-[state=active]:shadow-md sm:flex-none">
                 <Swords className="h-4 w-4" />
-                Upcoming Matches
+                {t("dashboard.upcomingMatches")}
               </TabsTrigger>
             </TabsList>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" className="gap-1 text-sm text-primary" asChild>
                 <Link to="/play">
-                  View all invites <ArrowRight className="h-4 w-4" />
+                  {t("dashboard.viewAllInvites")} <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button variant="ghost" size="sm" className="gap-1 text-sm text-primary" asChild>
                 <Link to="/matches">
-                  View all matches <ArrowRight className="h-4 w-4" />
+                  {t("dashboard.viewAllMatches")} <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
             </div>
@@ -163,14 +166,14 @@ export default function Dashboard() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <p className="text-center text-base text-muted-foreground">
-                  No upcoming matches
+                  {t("dashboard.noUpcomingMatches")}
                 </p>
                 <p className="mt-1 text-center text-sm text-muted-foreground">
-                  Create invites to schedule your next match
+                  {t("dashboard.noUpcomingMatchesDesc")}
                 </p>
                 <Button size="lg" className="mt-6 gap-2" onClick={() => setWizardOpen(true)}>
                   <Zap className="h-5 w-5" />
-                  I Want to Play
+                  {t("common.iWantToPlay")}
                 </Button>
               </CardContent>
             </Card>
@@ -180,7 +183,7 @@ export default function Dashboard() {
                 <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-semibold">
-                      Today
+                      {t("matchesUpcoming.today")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
@@ -202,7 +205,7 @@ export default function Dashboard() {
                                 size="sm"
                               />
                               <p className="text-base font-semibold text-foreground">
-                                vs {opponent.name}
+                                {t("common.vs")} {opponent.name}
                               </p>
                             </div>
                             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -261,7 +264,7 @@ export default function Dashboard() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-semibold">
-                      Coming up
+                      {t("matchesUpcoming.comingUp")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
@@ -283,13 +286,13 @@ export default function Dashboard() {
                                 size="sm"
                               />
                               <p className="text-base font-semibold text-foreground">
-                                vs {opponent.name}
+                                {t("common.vs")} {opponent.name}
                               </p>
                             </div>
                             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1.5">
                                 <Calendar className="h-4 w-4 shrink-0" />
-                                {safeFormatDate(match.date, "EEE, MMM d")}
+                                {safeFormatDate(match.date, "EEE, MMM d", dateLocale)}
                               </span>
                               <span className="flex items-center gap-1.5">
                                 <Clock className="h-4 w-4 shrink-0" />

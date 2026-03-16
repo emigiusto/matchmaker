@@ -17,6 +17,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { format, startOfDay, isBefore } from "date-fns"
+import { es as esLocale } from "date-fns/locale"
 import {
   Calendar as CalendarIcon,
   MapPin,
@@ -163,7 +164,8 @@ function SortableContactItem({
 export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdProp, onSuccess }: WizardProps) {
   const hostUserId = hostUserIdProp ?? getCurrentUserId()
   const navigate = useNavigate()
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "es" ? esLocale : undefined
   const [step, setStep] = useState<Step>(1)
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [datePickerOpen, setDatePickerOpen] = useState(false)
@@ -514,7 +516,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
           <div className="space-y-5 pt-2">
             {/* Date */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Date</Label>
+              <Label className="text-base font-medium">{t("wizard.date")}</Label>
               <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -525,7 +527,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     )}
                   >
                     <CalendarIcon className="mr-2 h-5 w-5" />
-                    {date ? format(date, "EEEE, MMMM d, yyyy") : t("wizard.pickDate")}
+                    {date ? format(date, "EEEE, MMMM d, yyyy", { locale: dateLocale }) : t("wizard.pickDate")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -542,10 +544,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
             {/* Time */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Time</Label>
+              <Label className="text-base font-medium">{t("wizard.time")}</Label>
               <div className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
                 <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Start</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeStart")}</span>
                   <Select value={startTime} onValueChange={handleStartTimeChange}>
                     <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
                       <SelectValue placeholder="--:--" />
@@ -561,7 +563,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm opacity-60">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">End</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeEnd")}</span>
                   <span className="text-sm font-semibold">{endTime || "--:--"}</span>
                 </div>
               </div>
@@ -572,7 +574,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-medium">
-                  Location <span className="text-muted-foreground font-normal">(optional)</span>
+                  {t("wizard.location")} <span className="text-muted-foreground font-normal">{t("wizard.locationOptional")}</span>
                 </Label>
                 <div className="flex rounded-lg border border-border/60 bg-muted/30 p-0.5 text-xs">
                   <button
@@ -585,7 +587,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    Place
+                    {t("wizard.locationPlace")}
                   </button>
                   <button
                     type="button"
@@ -597,7 +599,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    City
+                    {t("wizard.locationCity")}
                   </button>
                 </div>
               </div>
@@ -620,9 +622,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   />
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Leave blank to decide later. Place defaults to your preferred club from profile.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("wizard.locationHint")}</p>
             </div>
 
             {/* Court booking */}
@@ -631,9 +631,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium">{t("wizard.autoBook")}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Reserve a court automatically when someone accepts.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("wizard.autoBookHint")}</p>
                   </div>
                   <Switch
                     checked={bookingEnabled}
@@ -643,7 +641,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 </div>
                 {bookingEnabled && clubMemberships.length > 1 && (
                   <div className="space-y-1.5 border-t border-border/40 pt-3">
-                    <p className="text-xs font-medium text-muted-foreground">Club connection</p>
+                    <p className="text-xs font-medium text-muted-foreground">{t("wizard.clubConnection")}</p>
                     <div className="space-y-2">
                       {clubMemberships.map((m) => {
                         const clubLabel = SUPPORTED_CLUBS.find((c) => c.clubSlug === m.clubSlug)?.label ?? m.clubSlug
@@ -713,15 +711,15 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">{t("wizard.autoBook")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Add a club connection in your{" "}
+                      {t("wizard.autoBookProfileLinkBefore")}{" "}
                       <Link
                         to="/profile"
                         className="underline underline-offset-2 hover:text-foreground"
                         onClick={() => handleClose(false)}
                       >
-                        profile
+                        {t("wizard.autoBookProfileLinkText")}
                       </Link>{" "}
-                      to enable automatic court booking.
+                      {t("wizard.autoBookProfileLinkAfter")}
                     </p>
                   </div>
                   <Switch disabled aria-label={t("wizard.autoBook")} />
@@ -735,7 +733,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               disabled={!canProceedStep1}
               onClick={() => setStep(2)}
             >
-              Continue
+              {t("wizard.continue")}
               <ChevronRight className="ml-1 h-5 w-5" />
             </Button>
           </div>
@@ -747,7 +745,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
             {/* Sport first */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Sport</Label>
+              <Label className="text-base font-medium">{t("wizard.sport")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -779,15 +777,13 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 </button>
               </div>
               {sport === "padel" && (
-                <p className="text-xs text-muted-foreground">
-                  Padel is always doubles — format is set automatically.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("wizard.padelAlwaysDoubles")}</p>
               )}
             </div>
 
             {/* Format: Singles / Doubles — padel locks to doubles */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Format</Label>
+              <Label className="text-base font-medium">{t("wizard.format")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 {(["singles", "doubles"] as const).map((fmt) => (
                   <button
@@ -813,15 +809,13 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 ))}
               </div>
               {matchFormat === "doubles" && sport === "tennis" && (
-                <p className="text-xs text-muted-foreground">
-                  4 players total — you + 3 others.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("wizard.doublesNote4")}</p>
               )}
             </div>
 
             {/* Match type: Practice / Competitive */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Mode</Label>
+              <Label className="text-base font-medium">{t("wizard.mode")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -835,8 +829,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 >
                   <Target className={cn("h-6 w-6", matchType === "practice" ? "text-[#22c55e]" : "text-muted-foreground")} />
                   <div className="text-center">
-                    <p className="text-sm font-semibold">Practice</p>
-                    <p className="text-xs text-muted-foreground">Casual, no tracking</p>
+                    <p className="text-sm font-semibold">{t("wizard.practice")}</p>
+                    <p className="text-xs text-muted-foreground">{t("wizard.practiceDesc")}</p>
                   </div>
                 </button>
                 <button
@@ -846,8 +840,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 >
                   <Swords className="h-6 w-6 text-muted-foreground" />
                   <div className="text-center">
-                    <p className="text-sm font-semibold">Competitive</p>
-                    <p className="text-xs text-muted-foreground">Coming soon</p>
+                    <p className="text-sm font-semibold">{t("wizard.competitive")}</p>
+                    <p className="text-xs text-muted-foreground">{t("wizard.competitiveDesc")}</p>
                   </div>
                 </button>
               </div>
@@ -859,7 +853,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 {t("form.back")}
               </Button>
               <Button size="lg" className="flex-1" onClick={() => setStep(3)}>
-                Continue
+                {t("wizard.continue")}
                 <ChevronRight className="ml-1 h-5 w-5" />
               </Button>
             </div>
@@ -884,7 +878,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1.5">
                           <List className="h-4 w-4" />
-                          From list
+                          {t("wizard.fromList")}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-64 p-2" align="start">
@@ -920,7 +914,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1.5">
                           <UserPlus className="h-4 w-4" />
-                          Friends
+                          {t("wizard.friends")}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-64 p-2" align="start">
@@ -958,7 +952,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1.5" disabled={availableContacts.length === 0}>
                         <UserCircle className="h-4 w-4" />
-                        All contacts
+                        {t("wizard.allContacts")}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-64 p-2" align="start">
@@ -1003,7 +997,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {showManualAdd ? (
               <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Add manually (name + phone)</Label>
+                  <Label className="text-sm font-medium">{t("wizard.addManuallyLabel")}</Label>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1011,10 +1005,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     onClick={() => setShowManualAdd(false)}
                   >
                     <ChevronUp className="h-3.5 w-3.5" />
-                    Hide
+                    {t("wizard.hide")}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Saved to your contacts. Use country code (e.g. +34 for Spain).</p>
+                <p className="text-xs text-muted-foreground">{t("wizard.addManuallyHint")}</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(120px,1fr)_minmax(200px,2fr)_90px_auto] sm:items-end">
                   <Input
                     placeholder={t("wizard.namePlaceholder")}
@@ -1036,7 +1030,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     className="w-full"
                   />
                   <Button variant="secondary" size="sm" className="shrink-0 sm:self-end" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
-                    Add
+                    {t("wizard.addButton")}
                   </Button>
                 </div>
               </div>
@@ -1048,7 +1042,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 onClick={() => setShowManualAdd(true)}
               >
                 <UserPlus className="h-4 w-4" />
-                Add manual contacts
+                {t("wizard.addManualContactsButton")}
               </Button>
             )}
 
@@ -1056,7 +1050,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-medium">
-                  Priority order
+                  {t("wizard.priorityOrder")}
                   {priorityList.length > 0 && (
                     <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
                       {priorityList.length}
@@ -1071,7 +1065,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               {priorityList.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-8 text-center">
                   <Users className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">No contacts added yet</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{t("wizard.noContactsYet")}</p>
                   <p className="text-xs text-muted-foreground/70">
                     {matchFormat === "doubles"
                       ? t("wizard.doublesMinContacts")
@@ -1100,8 +1094,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {/* Socio numbers — shown for all contacts when booking is enabled */}
             {priorityList.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-base font-medium">Socio numbers</Label>
-                <p className="text-xs text-muted-foreground">Required for automatic court booking.</p>
+                <Label className="text-base font-medium">{t("wizard.socioNumbers")}</Label>
+                <p className="text-xs text-muted-foreground">{t("wizard.socioNumbersHint")}</p>
                 <div className="space-y-2">
                   {priorityList.map((c) => (
                     <div key={c.id} className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
@@ -1127,20 +1121,18 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {/* Response window */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-medium">Response window</Label>
+                <Label className="text-base font-medium">{t("wizard.responseWindowLabel")}</Label>
                 <span className="text-sm font-semibold text-primary">
                   {responseWindow < 1
-                    ? `${Math.round(responseWindow * 60)} sec`
+                    ? t("wizard.responseWindowSec", { n: Math.round(responseWindow * 60) })
                     : responseWindow < 60
-                    ? `${responseWindow} min`
+                    ? t("wizard.responseWindowMinutes", { n: responseWindow })
                     : responseWindow === 60
-                    ? "1 hour"
-                    : `${responseWindow / 60} hours`}
+                    ? t("wizard.responseWindowOneHour")
+                    : t("wizard.responseWindowHours", { n: responseWindow / 60 })}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                How long to wait before contacting the next person in line
-              </p>
+              <p className="text-xs text-muted-foreground">{t("wizard.responseWindowHint")}</p>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   ...(typeof import.meta !== "undefined" && import.meta.env?.DEV
@@ -1175,14 +1167,14 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {/* Parallel candidates */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-medium">Contact at once</Label>
+                <Label className="text-base font-medium">{t("wizard.contactAtOnceLabel")}</Label>
                 <span className="text-sm font-semibold text-primary">
-                  {maxParallelCandidates} {maxParallelCandidates === 1 ? "person" : "people"}
+                  {maxParallelCandidates === 1
+                    ? t("wizard.contactAtOncePerson", { n: maxParallelCandidates })
+                    : t("wizard.contactAtOncePeople", { n: maxParallelCandidates })}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                How many candidates to reach out to simultaneously (1–3)
-              </p>
+              <p className="text-xs text-muted-foreground">{t("wizard.contactAtOnceHint")}</p>
               <div className="flex gap-1.5">
                 {[1, 2, 3].map((n) => (
                   <button
@@ -1212,9 +1204,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 className="flex-1"
                 disabled={!canProceedStep3}
                 onClick={() => setStep(4)}
-                title={!canProceedStep3 ? `Add at least ${spotsNeeded} contact${spotsNeeded > 1 ? "s" : ""}` : undefined}
+                title={!canProceedStep3 ? t("wizard.addAtLeastContacts", { n: spotsNeeded }) : undefined}
               >
-                Continue
+                {t("wizard.continue")}
                 <ChevronRight className="ml-1 h-5 w-5" />
               </Button>
             </div>
@@ -1227,12 +1219,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {/* Match summary */}
             <div className="rounded-xl border border-border/40 bg-muted/30 px-4 py-3">
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Match Details
+                {t("wizard.matchDetailsSummary")}
               </h3>
               <div className="space-y-2">
                 <div className="flex items-center gap-3 text-sm">
                   <CalendarIcon className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="font-medium">{date ? format(date, "EEEE, MMMM d") : ""}</span>
+                  <span className="font-medium">{date ? format(date, "EEEE, MMMM d", { locale: dateLocale }) : ""}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <Clock className="h-4 w-4 shrink-0 text-primary" />
@@ -1251,7 +1243,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {/* Invite sequence preview */}
             <div className="rounded-xl border border-border/40 bg-muted/30 px-4 py-3">
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Invite Sequence
+                {t("wizard.inviteSequenceLabel")}
               </h3>
               <div className="space-y-2">
                 {priorityList.slice(0, 5).map((contact, index) => (
@@ -1265,14 +1257,14 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     <span className="flex-1 text-sm">{contact.name}</span>
                     {index === 0 && (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        First
+                        {t("wizard.inviteSequenceFirst")}
                       </span>
                     )}
                   </div>
                 ))}
                 {priorityList.length > 5 && (
                   <p className="pl-8 text-xs text-muted-foreground">
-                    +{priorityList.length - 5} more contacts
+                    {t("wizard.inviteSequenceMore", { n: priorityList.length - 5 })}
                   </p>
                 )}
               </div>
@@ -1282,35 +1274,32 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
                 <Zap className="h-4 w-4" />
-                How it works
+                {t("wizard.howItWorksTitle")}
               </h3>
               <ul className="space-y-1.5 text-xs text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  Invites are sent via WhatsApp — up to{" "}
-                  <strong>{maxParallelCandidates} contact{maxParallelCandidates > 1 ? "s" : ""}</strong> at a time
+                  {t("wizard.howItWorks1", { n: maxParallelCandidates })}
                 </li>
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  You can run up to <strong>5 scheduling requests</strong> simultaneously
+                  {t("wizard.howItWorks2")}
                 </li>
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  If someone declines or doesn&apos;t respond within{" "}
-                  <strong>
-                    {responseWindow < 1
-                      ? `${Math.round(responseWindow * 60)} seconds`
+                  {t("wizard.howItWorks3", {
+                    window: responseWindow < 1
+                      ? t("wizard.responseWindowSec", { n: Math.round(responseWindow * 60) })
                       : responseWindow < 60
-                      ? `${responseWindow} min`
+                      ? t("wizard.responseWindowMinutes", { n: responseWindow })
                       : responseWindow === 60
-                      ? "1 hour"
-                      : `${responseWindow / 60} hours`}
-                  </strong>
-                  , the next person is contacted
+                      ? t("wizard.responseWindowOneHour")
+                      : t("wizard.responseWindowHours", { n: responseWindow / 60 })
+                  })}
                 </li>
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  Once accepted, a match is created and a WhatsApp group is set up
+                  {t("wizard.howItWorks4")}
                 </li>
               </ul>
             </div>
@@ -1319,10 +1308,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             <div className="rounded-xl border border-border/40 bg-card px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Share invite link</p>
-                  <p className="text-xs text-muted-foreground">
-                    Anyone who accepts this link will override the ongoing scheduling
-                  </p>
+                  <p className="text-sm font-medium">{t("wizard.shareInviteLink")}</p>
+                  <p className="text-xs text-muted-foreground">{t("wizard.shareInviteLinkHint")}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -1331,9 +1318,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   onClick={handleCopyInviteLink}
                 >
                   {linkCopied ? (
-                    <><Check className="h-3.5 w-3.5" />Copied</>
+                    <><Check className="h-3.5 w-3.5" />{t("wizard.copied")}</>
                   ) : (
-                    <><Copy className="h-3.5 w-3.5" />Copy Link</>
+                    <><Copy className="h-3.5 w-3.5" />{t("wizard.copyLink")}</>
                   )}
                 </Button>
               </div>
@@ -1360,7 +1347,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 ) : (
                   <Zap className="mr-2 h-5 w-5" />
                 )}
-                Start Scheduling
+                {t("wizard.startSchedulingButton")}
               </Button>
             </div>
           </div>

@@ -1,28 +1,44 @@
 import { Badge } from "@/components/ui/badge"
+import { useTranslation } from "@/lib/i18n/use-translation"
 
-const statusConfig = {
-  scheduled: { label: "Scheduled", className: "border-0 bg-primary/10 text-primary text-sm" },
-  awaiting_confirmation: { label: "Awaiting", className: "border-0 bg-chart-4/15 text-chart-4 text-sm" },
-  completed: { label: "Completed", className: "border-0 bg-primary/10 text-primary text-sm" },
-  cancelled: { label: "Cancelled", className: "border-0 bg-destructive/10 text-destructive text-sm font-semibold" },
-  disputed: { label: "Disputed", className: "border-0 bg-destructive/10 text-destructive text-sm" },
-  pending: { label: "Pending", className: "border-0 bg-chart-4/15 text-chart-4 text-sm" },
-  confirmed: { label: "Confirmed", className: "border-0 bg-primary/10 text-primary text-sm" },
-  accepted: { label: "Accepted", className: "border-0 bg-primary/10 text-primary text-sm" },
-  declined: { label: "Declined", className: "border-0 bg-muted text-muted-foreground text-sm" },
-  expired: { label: "Expired", className: "border-0 bg-muted text-muted-foreground text-sm" },
+const statusClassNames: Record<string, string> = {
+  scheduled:             "border-0 bg-primary/10 text-primary text-sm",
+  awaiting_confirmation: "border-0 bg-chart-4/15 text-chart-4 text-sm",
+  completed:             "border-0 bg-primary/10 text-primary text-sm",
+  cancelled:             "border-0 bg-destructive/10 text-destructive text-sm font-semibold",
+  disputed:              "border-0 bg-destructive/10 text-destructive text-sm",
+  pending:               "border-0 bg-chart-4/15 text-chart-4 text-sm",
+  confirmed:             "border-0 bg-primary/10 text-primary text-sm",
+  accepted:              "border-0 bg-primary/10 text-primary text-sm",
+  declined:              "border-0 bg-muted text-muted-foreground text-sm",
+  expired:               "border-0 bg-muted text-muted-foreground text-sm",
+}
+
+const statusI18nKeys: Record<string, string> = {
+  scheduled:             "common.statusScheduled",
+  awaiting_confirmation: "common.statusAwaiting",
+  completed:             "common.statusCompleted",
+  cancelled:             "common.cancelled",
+  disputed:              "common.statusDisputedLabel",
+  pending:               "common.statusPending",
+  confirmed:             "common.confirmed",
+  accepted:              "common.statusAccepted",
+  declined:              "common.statusDeclined",
+  expired:               "common.statusExpired",
 }
 
 interface StatusBadgeProps {
-  status: keyof typeof statusConfig
+  status: keyof typeof statusClassNames
   className?: string
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config = statusConfig[status]
+  const { t } = useTranslation()
+  const cls = statusClassNames[status] ?? "border-0 bg-muted text-muted-foreground text-sm"
+  const label = statusI18nKeys[status] ? t(statusI18nKeys[status]) : status
   return (
-    <Badge className={`${config.className} ${className || ""}`}>
-      {config.label}
+    <Badge className={`${cls} ${className || ""}`}>
+      {label}
     </Badge>
   )
 }

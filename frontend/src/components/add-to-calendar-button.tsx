@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useTranslation } from "@/lib/i18n/use-translation"
 
 interface AddToCalendarButtonProps {
   date: string // "2026-02-19"
@@ -20,33 +21,51 @@ interface AddToCalendarButtonProps {
   compact?: boolean
 }
 
-function buildCalendarParts(props: AddToCalendarButtonProps) {
+type TFn = (key: string, params?: Record<string, string | number>) => string
+
+function buildCalendarParts(props: AddToCalendarButtonProps, t: TFn) {
   const { participants, location, matchType, opponentName } = props
   const participantNames = participants.filter(Boolean)
   const isDoubles = participantNames.length >= 4
 
   let title: string
-  const locationSuffix = location ? ` - ${location}` : ""
   if (isDoubles) {
     const teamA = participantNames.slice(0, 2).join(" & ")
     const teamB = participantNames.slice(2, 4).join(" & ")
-    title = `Doubles match: ${teamA} vs ${teamB}${locationSuffix}`
+    const key = location
+      ? "matchDetails.addToCalendar.eventTitleDoubles"
+      : "matchDetails.addToCalendar.eventTitleDoublesNoLocation"
+    title = t(key, { teamA, teamB, location })
   } else {
     const opponent =
       opponentName ||
-      (participantNames.length >= 2 ? participantNames[1] : participantNames[0] ?? "Opponent")
-    const prefix = matchType === "practice" ? "Practice match" : "Match"
-    title = `${prefix} vs ${opponent}${locationSuffix}`
+      (participantNames.length >= 2
+        ? participantNames[1]
+        : participantNames[0] ?? t("matchDetails.addToCalendar.eventOpponentFallback"))
+    const isPractice = matchType === "practice"
+    const key = isPractice
+      ? location
+        ? "matchDetails.addToCalendar.eventTitlePractice"
+        : "matchDetails.addToCalendar.eventTitlePracticeNoLocation"
+      : location
+        ? "matchDetails.addToCalendar.eventTitleMatch"
+        : "matchDetails.addToCalendar.eventTitleMatchNoLocation"
+    title = t(key, { opponent, location })
   }
 
+  const typeLabel = matchType === "practice"
+    ? t("matchDetails.addToCalendar.eventDescTypePractice")
+    : t("matchDetails.addToCalendar.eventDescTypeCompetitive")
+
   const descriptionLines = [
-    `Type: ${matchType === "practice" ? "Practice" : "Competitive"}`,
-    participantNames.length > 0 ? `Players: ${participantNames.join(", ")}` : null,
-    `Location: ${location}`,
+    t("matchDetails.addToCalendar.eventDescType", { type: typeLabel }),
+    participantNames.length > 0
+      ? t("matchDetails.addToCalendar.eventDescPlayers", { names: participantNames.join(", ") })
+      : null,
+    t("matchDetails.addToCalendar.eventDescLocation", { location }),
   ].filter(Boolean) as string[]
 
-  const description = descriptionLines.join("\n")
-  return { title, description }
+  return { title, description: descriptionLines.join("\n") }
 }
 
 const EUROPE_MADRID_TZ = "Europe/Madrid"
@@ -75,11 +94,11 @@ function buildDateTimeRange(props: AddToCalendarButtonProps) {
   }
 }
 
-function formatGoogleCalendarUrl(props: AddToCalendarButtonProps): string {
+function formatGoogleCalendarUrl(props: AddToCalendarButtonProps, t: TFn): string {
   const { location } = props
   const { start, end } = buildDateTimeRange(props)
 
-  const { title, description } = buildCalendarParts(props)
+  const { title, description } = buildCalendarParts(props, t)
   const base = "https://calendar.google.com/calendar/event?action=TEMPLATE"
   const params = new URLSearchParams({
     text: title,
@@ -92,11 +111,11 @@ function formatGoogleCalendarUrl(props: AddToCalendarButtonProps): string {
   return `${base}&${params.toString()}`
 }
 
-function formatIcsContent(props: AddToCalendarButtonProps): string {
+function formatIcsContent(props: AddToCalendarButtonProps, t: TFn): string {
   const { location } = props
   const { start, end } = buildDateTimeRange(props)
 
-  const { title, description } = buildCalendarParts(props)
+  const { title, description } = buildCalendarParts(props, t)
 
   return [
     "BEGIN:VCALENDAR",
@@ -112,8 +131,8 @@ function formatIcsContent(props: AddToCalendarButtonProps): string {
   ].join("\n")
 }
 
-function downloadIcs(props: AddToCalendarButtonProps) {
-  const content = formatIcsContent(props)
+function downloadIcs(props: AddToCalendarButtonProps, t: TFn) {
+  const content = formatIcsContent(props, t)
   const blob = new Blob([content], { type: "text/calendar" })
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
@@ -128,7 +147,8 @@ function downloadIcs(props: AddToCalendarButtonProps) {
 
 export function AddToCalendarButton(props: AddToCalendarButtonProps) {
   const { compact = false } = props
-  const googleUrl = formatGoogleCalendarUrl(props)
+  const { t } = useTranslation()
+  const googleUrl = formatGoogleCalendarUrl(props, t)
 
   return (
     <DropdownMenu>
@@ -140,23 +160,23 @@ export function AddToCalendarButton(props: AddToCalendarButtonProps) {
             className="gap-1.5 text-muted-foreground hover:text-primary"
           >
             <CalendarPlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Calendar</span>
+            <span className="hidden sm:inline">{t("matchDetails.addToCalendar.calendar")}</span>
           </Button>
         ) : (
           <Button variant="outline" size="sm" className="gap-1.5">
             <CalendarPlus className="h-4 w-4" />
-            Add to Calendar
+            {t("matchDetails.addToCalendar.addToCalendar")}
           </Button>
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem asChild>
           <a href={googleUrl} target="_blank" rel="noopener noreferrer">
-            Google Calendar
+            {t("matchDetails.addToCalendar.googleCalendar")}
           </a>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => downloadIcs(props)}>
-          Apple / Outlook (.ics)
+        <DropdownMenuItem onClick={() => downloadIcs(props, t)}>
+          {t("matchDetails.addToCalendar.appleOutlook")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

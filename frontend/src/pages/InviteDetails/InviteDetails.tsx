@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Link, useParams } from "react-router-dom"
 import { format } from "date-fns"
+import { es as esLocale } from "date-fns/locale"
 import {
   ArrowLeft,
   Calendar,
@@ -65,12 +66,12 @@ function mapCandidateStatus(s: SchedulingCandidateDTO["status"]): ContactStatus 
   return map[s] ?? "pending"
 }
 
-function formatResponseWindow(minutes: number): string {
-  if (minutes < 60) return `${Math.round(minutes)} min`
+function formatResponseWindow(minutes: number, t: (key: string, params?: Record<string, string | number>) => string): string {
+  if (minutes < 60) return t("inviteDetails.responseWindowMin", { n: Math.round(minutes) })
   const hours = minutes / 60
-  if (hours < 24) return `${Math.round(hours)}h`
-  const days = hours / 24
-  return `${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"}`
+  if (hours < 24) return t("inviteDetails.responseWindowH", { n: Math.round(hours) })
+  const days = Math.round(hours / 24)
+  return t(days === 1 ? "inviteDetails.responseWindowDay" : "inviteDetails.responseWindowDays", { n: days })
 }
 
 function formatTimeRange(startIso: string, endIso: string): string {
@@ -100,18 +101,18 @@ function getDisplayStatus(r: SchedulingRequestDTO) {
   return r.status
 }
 
-function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string) => string): string {
+function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?: Record<string, string | number>) => string): string {
   const name = event.candidateUserName ?? t("common.unknown")
   switch (event.action) {
-    case "invite_sent": return `Invite sent to ${name}`
-    case "invite_accepted": return `${name} accepted`
-    case "invite_declined": return `${name} declined`
-    case "invite_expired": return `No response from ${name}`
-    case "candidate_cancelled": return `${name} cancelled`
-    case "candidate_retried": return `${name} queued for retry`
+    case "invite_sent": return t("invites.events.inviteSent", { name })
+    case "invite_accepted": return t("invites.events.inviteAccepted", { name })
+    case "invite_declined": return t("invites.events.inviteDeclined", { name })
+    case "invite_expired": return t("invites.events.inviteExpired", { name })
+    case "candidate_cancelled": return t("invites.events.candidateCancelled", { name })
+    case "candidate_retried": return t("invites.events.candidateRetried", { name })
     case "candidates_added": {
       const count = (event.metadata?.count as number) ?? 1
-      return `${count} contact${count === 1 ? "" : "s"} added`
+      return t("invites.events.candidatesAdded", { count })
     }
     case "request_started": return t("invites.events.schedulingStarted")
     case "request_cancelled": return t("invites.events.requestCancelled")
@@ -139,7 +140,8 @@ function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
 }
 
 export default function InviteDetailsPage() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "es" ? esLocale : undefined
   const { requestId } = useParams<{ requestId: string }>()
   const currentUserId = getCurrentUserId()
 
@@ -316,7 +318,13 @@ export default function InviteDetailsPage() {
     <>
       <PageHeader
         title={t("inviteDetails.title")}
-        description={`${request.sportType} · ${request.format}`}
+        description={
+          request.sportType === "padel"
+            ? t("sportFormat.padel")
+            : request.format === "doubles"
+              ? t("sportFormat.tennisDoubles")
+              : t("sportFormat.tennisSingles")
+        }
       >
         <Button variant="ghost" size="sm" className="gap-1.5" asChild>
           <Link to="/play">
@@ -333,25 +341,25 @@ export default function InviteDetailsPage() {
           {displayStatus === "scheduling" && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-200/60 bg-blue-500/8 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-400">
               <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-              Scheduling
+              {t("invites.status.scheduling")}
             </span>
           )}
           {displayStatus === "matched" && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-green-200/60 bg-green-500/8 px-2.5 py-1 text-xs font-medium text-green-700 dark:border-green-800/40 dark:bg-green-500/10 dark:text-green-400">
               <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-              Matched
+              {t("invites.status.matched")}
             </span>
           )}
           {displayStatus === "expired" && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
               <XCircle className="h-3.5 w-3.5 shrink-0" />
-              No match
+              {t("invites.status.expired")}
             </span>
           )}
           {displayStatus === "cancelled" && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
               <XCircle className="h-3.5 w-3.5 shrink-0" />
-              Cancelled
+              {t("invites.status.cancelled")}
             </span>
           )}
         </div>
@@ -361,7 +369,7 @@ export default function InviteDetailsPage() {
           <CardContent className="grid gap-3 p-5 sm:grid-cols-2">
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 shrink-0 text-primary" />
-              <span>{format(new Date(request.date), "EEEE, MMMM d, yyyy")}</span>
+              <span>{format(new Date(request.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 shrink-0 text-primary" />
@@ -374,7 +382,7 @@ export default function InviteDetailsPage() {
             {displayStatus === "scheduling" && (
               <div className="flex items-center gap-2 text-sm">
                 <Hourglass className="h-4 w-4 shrink-0 text-primary" />
-                <span>{t("inviteDetails.replyWindow")} {formatResponseWindow(request.responseWindowMinutes)}</span>
+                <span>{t("inviteDetails.replyWindow")} {formatResponseWindow(request.responseWindowMinutes, t)}</span>
               </div>
             )}
           </CardContent>
@@ -504,7 +512,7 @@ export default function InviteDetailsPage() {
                   >
                     {contactName}
                   </span>
-                  <span className="text-xs text-muted-foreground capitalize">{uiStatus.replace("_", " ")}</span>
+                  <span className="text-xs text-muted-foreground">{t(`invites.candidateStatus.${uiStatus}`)}</span>
                   {/* Actions */}
                   <div className="flex items-center gap-1">
                     {displayStatus !== "matched" &&
@@ -586,7 +594,7 @@ export default function InviteDetailsPage() {
                       <div className="flex flex-1 items-baseline justify-between gap-2">
                         <span className="text-sm text-foreground">{getEventLabel(event, t)}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {format(new Date(event.createdAt), "MMM d, HH:mm")}
+                          {format(new Date(event.createdAt), "MMM d, HH:mm", { locale: dateLocale })}
                         </span>
                       </div>
                     </div>

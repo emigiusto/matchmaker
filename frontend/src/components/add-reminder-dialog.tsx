@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { format } from "date-fns"
+import { es as esLocale } from "date-fns/locale"
 import { Bell, Calendar as CalendarIcon, Clock, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +21,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { remindersService } from "@/lib/services/reminders.service"
+import { useTranslation } from "@/lib/i18n/use-translation"
 
 interface AddReminderDialogProps {
   matchId: string
@@ -37,16 +39,19 @@ interface AddReminderDialogProps {
 
 type ReminderMode = "preset" | "relative" | "exact"
 
-const presets = [
-  { label: "30 minutes before", value: "30m" },
-  { label: "1 hour before", value: "1h" },
-  { label: "2 hours before", value: "2h" },
-  { label: "6 hours before", value: "6h" },
-  { label: "12 hours before", value: "12h" },
-  { label: "24 hours before", value: "24h" },
-  { label: "2 days before", value: "2d" },
-  { label: "1 week before", value: "1w" },
-] as const
+const presetValues = ["30m", "1h", "2h", "6h", "12h", "24h", "2d", "1w"] as const
+type PresetValue = (typeof presetValues)[number]
+
+const presetI18nKeys: Record<PresetValue, string> = {
+  "30m": "matchDetails.reminders.preset30m",
+  "1h":  "matchDetails.reminders.preset1h",
+  "2h":  "matchDetails.reminders.preset2h",
+  "6h":  "matchDetails.reminders.preset6h",
+  "12h": "matchDetails.reminders.preset12h",
+  "24h": "matchDetails.reminders.preset24h",
+  "2d":  "matchDetails.reminders.preset2d",
+  "1w":  "matchDetails.reminders.preset1w",
+}
 
 const presetToMs: Record<string, number> = {
   "30m": 30 * 60 * 1000,
@@ -69,10 +74,12 @@ export function AddReminderDialog({
   trigger,
   onSuccess,
 }: AddReminderDialogProps) {
+  const { t, language } = useTranslation()
+  const dateLocale = language === "es" ? esLocale : undefined
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<ReminderMode>("preset")
-  const [selectedPreset, setSelectedPreset] = useState<string>("24h")
+  const [selectedPreset, setSelectedPreset] = useState<PresetValue>("24h")
 
   // Relative custom
   const [relativeAmount, setRelativeAmount] = useState<string>("3")
@@ -93,16 +100,16 @@ export function AddReminderDialog({
 
   function getReminderLabel(): string {
     if (mode === "preset") {
-      return presets.find((p) => p.value === selectedPreset)?.label ?? selectedPreset
+      return t(presetI18nKeys[selectedPreset], selectedPreset)
     }
     if (mode === "relative") {
       const amount = parseInt(relativeAmount) || 0
-      return `${amount} ${relativeUnit} before`
+      return `${amount} ${relativeUnit} ${t("matchDetails.reminders.before")}`
     }
     if (mode === "exact" && exactDate && exactTime) {
-      return `${format(exactDate, "MMM d")} at ${exactTime}`
+      return `${format(exactDate, "MMM d", { locale: dateLocale })} at ${exactTime}`
     }
-    return "Custom"
+    return t("matchDetails.reminders.custom")
   }
 
   function getMatchDateTime(): Date {
@@ -138,12 +145,12 @@ export function AddReminderDialog({
     try {
       const scheduledAt = computeScheduledAt()
       await remindersService.create({ userId, matchId, scheduledAt })
-      toast.success(`Reminder set: ${label} your match vs ${opponent}. We'll WhatsApp you.`)
+      toast.success(t("matchDetails.reminders.successToast", { label, opponent }))
       setOpen(false)
       resetForm()
       onSuccess?.()
     } catch (err) {
-      let msg = "Failed to set reminder"
+      let msg = t("matchDetails.reminders.failedToSet")
       if (err instanceof Error) {
         try {
           const parsed = JSON.parse(err.message) as { error?: string }
@@ -185,14 +192,14 @@ export function AddReminderDialog({
             className="gap-1.5 text-muted-foreground hover:text-primary"
           >
             <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">Remind me</span>
+            <span className="hidden sm:inline">{t("matchDetails.reminders.remindMe")}</span>
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold tracking-tight">
-            Add Reminder
+            {t("matchDetails.reminders.addReminder")}
           </DialogTitle>
         </DialogHeader>
 
@@ -202,16 +209,16 @@ export function AddReminderDialog({
             vs {opponent}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {format(new Date(matchDate), "EEEE, MMM d")} at {matchTime} &middot; {location}
+            {format(new Date(matchDate), "EEEE, MMM d", { locale: dateLocale })} at {matchTime} &middot; {location}
           </p>
         </div>
 
         {/* Mode selector */}
         <div className="flex gap-2">
           {([
-            { key: "preset", label: "Quick" },
-            { key: "relative", label: "Custom" },
-            { key: "exact", label: "Exact" },
+            { key: "preset", label: t("matchDetails.reminders.quick") },
+            { key: "relative", label: t("matchDetails.reminders.custom") },
+            { key: "exact", label: t("matchDetails.reminders.exact") },
           ] as const).map((m) => (
             <button
               key={m.key}
@@ -233,21 +240,21 @@ export function AddReminderDialog({
           {/* Preset mode */}
           {mode === "preset" && (
             <div className="space-y-2">
-              <Label className="text-base font-medium">When to remind</Label>
+              <Label className="text-base font-medium">{t("matchDetails.reminders.whenToRemind")}</Label>
               <div className="grid grid-cols-2 gap-2">
-                {presets.map((preset) => (
+                {presetValues.map((value) => (
                   <button
-                    key={preset.value}
+                    key={value}
                     type="button"
-                    onClick={() => setSelectedPreset(preset.value)}
+                    onClick={() => setSelectedPreset(value)}
                     className={cn(
                       "rounded-xl border px-3 py-2.5 text-sm transition-all",
-                      selectedPreset === preset.value
+                      selectedPreset === value
                         ? "border-primary bg-primary/10 font-medium text-primary"
                         : "border-border/50 text-foreground hover:border-primary/30"
                     )}
                   >
-                    {preset.label}
+                    {t(presetI18nKeys[value])}
                   </button>
                 ))}
               </div>
@@ -257,7 +264,7 @@ export function AddReminderDialog({
           {/* Relative mode */}
           {mode === "relative" && (
             <div className="space-y-3">
-              <Label className="text-base font-medium">Remind me</Label>
+              <Label className="text-base font-medium">{t("matchDetails.reminders.remindMeLabel")}</Label>
               <div className="flex items-center gap-3">
                 <Input
                   type="number"
@@ -278,7 +285,7 @@ export function AddReminderDialog({
                         : "border-border/50 text-foreground hover:border-primary/30"
                     )}
                   >
-                    Hours
+                    {t("matchDetails.reminders.hours")}
                   </button>
                   <button
                     type="button"
@@ -290,10 +297,10 @@ export function AddReminderDialog({
                         : "border-border/50 text-foreground hover:border-primary/30"
                     )}
                   >
-                    Days
+                    {t("matchDetails.reminders.days")}
                   </button>
                 </div>
-                <span className="text-sm text-muted-foreground">before</span>
+                <span className="text-sm text-muted-foreground">{t("matchDetails.reminders.before")}</span>
               </div>
             </div>
           )}
@@ -302,7 +309,7 @@ export function AddReminderDialog({
           {mode === "exact" && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-base font-medium">Date</Label>
+                <Label className="text-base font-medium">{t("matchDetails.reminders.date")}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -313,7 +320,7 @@ export function AddReminderDialog({
                       )}
                     >
                       <CalendarIcon className="mr-2 h-5 w-5" />
-                      {exactDate ? format(exactDate, "EEEE, MMMM d, yyyy") : "Pick a date"}
+                      {exactDate ? format(exactDate, "EEEE, MMMM d, yyyy", { locale: dateLocale }) : t("matchDetails.reminders.pickADate")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -332,7 +339,7 @@ export function AddReminderDialog({
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label className="text-base font-medium">Time</Label>
+                <Label className="text-base font-medium">{t("matchDetails.reminders.time")}</Label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -348,7 +355,7 @@ export function AddReminderDialog({
 
           {isScheduledInPast && (
             <p className="text-sm text-destructive">
-              The reminder date must be in the future.
+              {t("matchDetails.reminders.pastError")}
             </p>
           )}
 
@@ -358,7 +365,7 @@ export function AddReminderDialog({
             ) : (
               <Bell className="h-5 w-5" />
             )}
-            Set Reminder
+            {t("matchDetails.reminders.setReminder")}
           </Button>
         </form>
       </DialogContent>

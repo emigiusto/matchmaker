@@ -218,9 +218,12 @@ export function adaptNotification(dto: BackendNotificationDTO): Notification {
     message: deriveNotificationMessage(dto.type, payload),
     read: !!dto.readAt,
     createdAt: dto.createdAt,
-    metadata: Object.fromEntries(
-      Object.entries(payload).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
-    ),
+    metadata: {
+      _type: dto.type,
+      ...Object.fromEntries(
+        Object.entries(payload).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
+      ),
+    },
   }
 }
 

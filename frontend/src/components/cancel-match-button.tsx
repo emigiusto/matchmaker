@@ -15,6 +15,7 @@ import {
 import { matchesService } from "@/lib/services/matches.service"
 import { toast } from "sonner"
 import type { Match } from "@/lib/types"
+import { useTranslation } from "@/lib/i18n/use-translation"
 
 interface CancelMatchButtonProps {
   matchId: string
@@ -33,6 +34,7 @@ export function CancelMatchButton({
   size = "default",
   compact = false,
 }: CancelMatchButtonProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -41,10 +43,10 @@ export function CancelMatchButton({
     try {
       const match = await matchesService.cancel(matchId, userId)
       setOpen(false)
-      toast.success("Match cancelled")
+      toast.success(t("matchDetails.cancelMatch.successToast"))
       onSuccess?.(match)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to cancel match"
+      const msg = err instanceof Error ? err.message : t("matchDetails.cancelMatch.failedToCancel")
       toast.error(msg)
     } finally {
       setLoading(false)
@@ -56,19 +58,18 @@ export function CancelMatchButton({
       <AlertDialogTrigger asChild>
         <Button variant={variant} size={size} className="gap-2">
           <XCircle className={compact ? "h-4 w-4" : "h-5 w-5"} />
-          {compact ? "Cancel" : "Cancel Match"}
+          {compact ? t("matchDetails.cancelMatch.button") : t("matchDetails.cancelMatch.buttonFull")}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Cancel match?</AlertDialogTitle>
+          <AlertDialogTitle>{t("matchDetails.cancelMatch.title")}</AlertDialogTitle>
           <AlertDialogDescription>
-            This will cancel the match. Participants will no longer see it as scheduled. This action
-            cannot be undone.
+            {t("matchDetails.cancelMatch.description")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Keep</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{t("matchDetails.cancelMatch.keep")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault()
@@ -77,7 +78,7 @@ export function CancelMatchButton({
             disabled={loading}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {loading ? "Cancelling…" : "Cancel match"}
+            {loading ? t("matchDetails.cancelMatch.cancelling") : t("matchDetails.cancelMatch.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

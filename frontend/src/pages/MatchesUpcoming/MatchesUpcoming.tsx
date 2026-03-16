@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
 import { format } from "date-fns"
+import { es as esLocale, enUS } from "date-fns/locale"
 import { Calendar, Clock, History, MapPin, Loader2, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,15 +20,17 @@ import { useTranslation } from "@/lib/i18n"
 function safeFormatDate(
   value: string | undefined | null,
   formatStr: string,
+  locale: Locale,
   fallback = "-"
 ): string {
   if (!value) return fallback
   const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? fallback : format(d, formatStr)
+  return Number.isNaN(d.getTime()) ? fallback : format(d, formatStr, { locale })
 }
 
 export default function MatchesPage() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const dateLocale = language === "es" ? esLocale : enUS
   const currentUserId = getCurrentUserId()
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([])
   const [pastMatches, setPastMatches] = useState<Match[]>([])
@@ -122,10 +125,6 @@ export default function MatchesPage() {
           <div className="space-y-8">
             {/* Upcoming matches */}
             <section>
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
-                <Calendar className="h-5 w-5 text-primary" />
-                {t("matchesUpcoming.upcoming")}
-              </h2>
               {!hasUpcoming ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
@@ -252,7 +251,7 @@ export default function MatchesPage() {
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1.5">
                                     <Calendar className="h-4 w-4 shrink-0" />
-                                    {safeFormatDate(match.date, "EEE, MMM d")}
+                                    {safeFormatDate(match.date, "EEE, MMM d", dateLocale)}
                                   </span>
                                   <span className="flex items-center gap-1.5">
                                     <Clock className="h-4 w-4 shrink-0" />
@@ -357,16 +356,16 @@ export default function MatchesPage() {
                                 : match.status === "cancelled"
                                   ? t("common.cancelled")
                                   : match.status === "disputed"
-                                    ? "Disputed"
+                                    ? t("matchesUpcoming.disputed")
                                     : match.status === "awaiting_confirmation"
-                                      ? "Awaiting"
-                                      : "Past"}
+                                      ? t("matchesUpcoming.awaiting")
+                                      : t("matchesUpcoming.pastStatus")}
                             </span>
                           </div>
                           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1.5">
                               <Calendar className="h-4 w-4 shrink-0" />
-                              {safeFormatDate(match.date, "MMM d")}
+                              {safeFormatDate(match.date, "MMM d", dateLocale)}
                             </span>
                             <span className="flex items-center gap-1.5">
                               <MapPin className="h-4 w-4 shrink-0" />

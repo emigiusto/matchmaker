@@ -14,10 +14,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en")
 
   useEffect(() => {
-    // Get language from localStorage on mount
     const savedLanguage = localStorage.getItem("language") as Language | null
     if (savedLanguage && (savedLanguage === "en" || savedLanguage === "es")) {
       setLanguageState(savedLanguage)
+    } else {
+      // Detect browser language; default to "es"
+      const browserLang = navigator.language?.toLowerCase() ?? ""
+      setLanguageState(browserLang.startsWith("en") ? "en" : "es")
     }
   }, [])
 
