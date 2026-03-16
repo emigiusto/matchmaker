@@ -11,7 +11,7 @@ interface MessageTemplates {
   inviteReply(): string;
   noLongerAvailable(hostName: string, sport: string, format: string, date: string, time: string, loc: string): string;
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
-  noMatch(sport: string, format: string, when: string, loc: string, reason: string): string;
+  noMatch(sport: string, format: string, when: string, loc: string, reason: string, url: string): string;
   noMatchReason: Record<NoMatchReasonKey, string>;
   matchCancelled(sport: string, format: string, when: string, loc: string): string;
   reminder(opponentName: string, sport: string, format: string, when: string, loc: string, url?: string): string;
@@ -93,7 +93,7 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
-    noMatch(sport, format, when, loc, reason) {
+    noMatch(sport, format, when, loc, reason, url) {
       return [
         '❌ *Tu solicitud de partido no tuvo match*',
         '',
@@ -102,6 +102,8 @@ const templates: Record<Locale, MessageTemplates> = {
         `*Dónde:* ${loc || 'TBD'}`,
         '',
         reason,
+        '',
+        `🔗 *Ver solicitud:* ${url}`,
         '',
         'Puedes añadir más contactos o crear una nueva solicitud desde Matchmaker.',
       ].join('\n');
@@ -192,7 +194,7 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
-    noMatch(sport, format, when, loc, reason) {
+    noMatch(sport, format, when, loc, reason, url) {
       return [
         '❌ *No match found for your request*',
         '',
@@ -201,6 +203,8 @@ const templates: Record<Locale, MessageTemplates> = {
         `*Where:* ${loc || 'TBD'}`,
         '',
         reason,
+        '',
+        `🔗 *View request:* ${url}`,
         '',
         'You can add more contacts or create a new request in Matchmaker.',
       ].join('\n');

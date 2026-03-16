@@ -203,6 +203,7 @@ function formatNoMatchWhatsAppMessage(
   timeStr: string,
   location: string,
   reason: SchedulingExpiredReason,
+  requestId: string,
   locale?: string | null
 ): string {
   const msgs = getMessages(locale);
@@ -210,7 +211,8 @@ function formatNoMatchWhatsAppMessage(
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
   const whenStr = `${dateStr} · ${timeStr}`;
   const reasonText = msgs.noMatchReason[reason];
-  return msgs.noMatch(sport, formatLabel, whenStr, location, reasonText);
+  const requestUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/play/${requestId}`;
+  return msgs.noMatch(sport, formatLabel, whenStr, location, reasonText, requestUrl);
 }
 
 async function recordEvent(data: {
@@ -280,6 +282,7 @@ async function notifyHostSchedulingNoMatch(
       timeStr,
       request.locationText,
       reason,
+      request.id,
       hostLocale
     );
     const result = await whatsappService.sendInviteMessage(hostPhone, msg);

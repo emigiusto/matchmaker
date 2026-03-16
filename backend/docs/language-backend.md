@@ -142,10 +142,10 @@ to phone numbers? some of them might not be users
   string, url: string) =>
         `✅ *¡Partido confirmado!*\n\n${sport} · ${fmt}\n*Cuándo:*
   ${when}\n*Dónde:* ${loc}\n\n🔗 *Ver partido:* ${url}`,
-      noMatch: (sport: string, fmt: string, when: string, loc: string,      
-  reason: string) =>
+      noMatch: (sport: string, fmt: string, when: string, loc: string,
+  reason: string, url: string) =>
         `❌ *Tu solicitud de partido no tuvo match*\n\n${sport} ·
-  ${fmt}\n*Cuándo:* ${when}\n*Dónde:* ${loc}\n\n${reason}\n\nPuedes añadir  
+  ${fmt}\n*Cuándo:* ${when}\n*Dónde:* ${loc}\n\n${reason}\n\n🔗 *Ver solicitud:* ${url}\n\nPuedes añadir
   más contactos o crear una nueva solicitud.`,
       noMatchReason: {
         no_more_candidates: 'No quedaban más candidatos disponibles.',      
