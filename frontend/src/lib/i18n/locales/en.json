@@ -750,7 +750,9 @@
     "renameList": "Rename list",
     "addToList": "Add to list",
     "removeFromList": "Remove from list",
-    "editName": "Edit name",
+    "editContact": "Edit Contact",
+    "phoneImmutable": "Phone number cannot be changed",
+    "clubSocioNumbers": "Socio numbers",
     "newContactTitle": "New Contact",
     "newListTitle": "New List",
     "listNamePlaceholder": "List name",
@@ -772,6 +774,7 @@
       "listRenamed": "List renamed",
       "memberAdded": "Added to list",
       "memberRemoved": "Removed from list",
+      "contactUpdated": "Contact saved",
       "socioSaved": "Socio number saved",
       "saveFailed": "Could not save"
     }

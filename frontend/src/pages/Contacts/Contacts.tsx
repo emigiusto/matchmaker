@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
-  Plus, Pencil, Trash2, List, UserPlus, Search, Loader2, X, Check, BookUser, ChevronDown, ChevronRight,
+  Plus, Pencil, Trash2, Search, Loader2, BookUser, ChevronDown, ChevronRight, X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/page-header"
 import { PhoneInput } from "@/components/phone-input"
+import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -26,11 +27,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { getCurrentUserId } from "@/lib/current-user"
 import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
+import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO } from "@/lib/services/booking.service"
 import { validatePhoneE164 } from "@/lib/phone.utils"
+import { apiClient } from "@/lib/services/api-client"
+
+function clubLabel(clubSlug: string): string {
+  return SUPPORTED_CLUBS.find((c) => c.clubSlug === clubSlug)?.label ?? clubSlug
+}
 
 export default function Contacts() {
   const { t } = useTranslation()
@@ -38,6 +47,7 @@ export default function Contacts() {
 
   const [contacts, setContacts] = useState<ContactDTO[]>([])
   const [lists, setLists] = useState<ContactListDTO[]>([])
+  const [memberships, setMemberships] = useState<ClubMembershipDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [expandedListId, setExpandedListId] = useState<string | null>(null)
@@ -62,31 +72,111 @@ export default function Contacts() {
   const [deletingContact, setDeletingContact] = useState<ContactDTO | null>(null)
   const [deletingList, setDeletingList] = useState<ContactListDTO | null>(null)
 
-  // Inline name edit
-  const [editingNameId, setEditingNameId] = useState<string | null>(null)
-  const [editingNameValue, setEditingNameValue] = useState("")
-  const [savingName, setSavingName] = useState(false)
+  // Edit contact dialog
+  const [editingContact, setEditingContact] = useState<ContactDTO | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editSocioInputs, setEditSocioInputs] = useState<Record<string, string>>({})
+  const [editListIds, setEditListIds] = useState<Set<string>>(new Set())
+  const [savingEdit, setSavingEdit] = useState(false)
 
-  // Add to list
-  const [addingToList, setAddingToList] = useState<ContactDTO | null>(null)
+  // ─── Data fetching ────────────────────────────────────────
 
   const refresh = useCallback(async () => {
-    try {
-      const [cs, ls] = await Promise.all([
-        contactsService.list(currentUserId),
-        contactsService.listLists(currentUserId),
-      ])
-      setContacts(cs)
-      setLists(ls)
-    } catch {
-      toast.error(t("wizard.toast.loadContactsFailed"))
-    }
+    const [cs, ls] = await Promise.all([
+      contactsService.list(currentUserId),
+      contactsService.listLists(currentUserId),
+    ])
+    setContacts(cs)
+    setLists(ls)
   }, [currentUserId])
 
   useEffect(() => {
     setLoading(true)
-    refresh().finally(() => setLoading(false))
-  }, [refresh])
+    Promise.all([
+      refresh(),
+      bookingService.listMemberships(currentUserId).then(setMemberships).catch(() => {}),
+    ]).finally(() => setLoading(false))
+  }, [refresh, currentUserId])
+
+  // ─── Derived: contactId → list names ─────────────────────
+
+  const contactListMap = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const l of lists) {
+      for (const m of l.members) {
+        if (!map[m.id]) map[m.id] = []
+        map[m.id].push(l.name)
+      }
+    }
+    return map
+  }, [lists])
+
+  // ─── Edit dialog ──────────────────────────────────────────
+
+  function openEdit(c: ContactDTO) {
+    setEditingContact(c)
+    setEditName(c.name)
+    setEditSocioInputs({ ...c.socioNumbers })
+    setEditListIds(
+      new Set(lists.filter((l) => l.members.some((m) => m.id === c.id)).map((l) => l.id))
+    )
+  }
+
+  async function handleSaveEdit() {
+    if (!editingContact) return
+    setSavingEdit(true)
+    try {
+      const nameChanged = editName.trim() !== editingContact.name
+
+      // Build merged socioNumbers from inputs
+      const newSocioNumbers: Record<string, string> = { ...editingContact.socioNumbers }
+      for (const ms of memberships) {
+        const val = (editSocioInputs[ms.clubSlug] ?? "").trim()
+        if (val) {
+          newSocioNumbers[ms.clubSlug] = val
+        } else {
+          delete newSocioNumbers[ms.clubSlug]
+        }
+      }
+      const socioChanged =
+        JSON.stringify(newSocioNumbers) !== JSON.stringify(editingContact.socioNumbers)
+
+      // Single PATCH if name or socio changed
+      if (nameChanged || socioChanged) {
+        const patch: Record<string, unknown> = { ownerUserId: currentUserId }
+        if (nameChanged) patch.name = editName.trim()
+        if (socioChanged) patch.socioNumbers = newSocioNumbers
+        await apiClient.patch(`/contacts/${editingContact.id}`, patch)
+      }
+
+      // Diff list memberships
+      const originalListIds = new Set(
+        lists.filter((l) => l.members.some((m) => m.id === editingContact.id)).map((l) => l.id)
+      )
+      const listOps: Promise<unknown>[] = []
+      for (const listId of editListIds) {
+        if (!originalListIds.has(listId)) {
+          listOps.push(contactsService.addMemberToList(listId, editingContact.id, currentUserId))
+        }
+      }
+      for (const listId of originalListIds) {
+        if (!editListIds.has(listId)) {
+          listOps.push(
+            contactsService.removeMemberFromList(listId, editingContact.id, currentUserId)
+          )
+        }
+      }
+      await Promise.all(listOps)
+
+      toast.success(t("contactsPage.toast.contactUpdated"))
+      setEditingContact(null)
+      await refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
+    } finally {
+      setSavingEdit(false)
+    }
+  }
 
   // ─── Create contact ───────────────────────────────────────
 
@@ -121,24 +211,6 @@ export default function Contacts() {
       await refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
-    }
-  }
-
-  // ─── Inline name edit ─────────────────────────────────────
-
-  async function handleSaveName() {
-    if (!editingNameId) return
-    const name = editingNameValue.trim()
-    if (!name) { setEditingNameId(null); return }
-    setSavingName(true)
-    try {
-      await contactsService.updateName(editingNameId, currentUserId, name)
-      setEditingNameId(null)
-      await refresh()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
-    } finally {
-      setSavingName(false)
     }
   }
 
@@ -193,18 +265,7 @@ export default function Contacts() {
     }
   }
 
-  // ─── Add / remove from list ───────────────────────────────
-
-  async function handleAddToList(listId: string, contactId: string) {
-    try {
-      await contactsService.addMemberToList(listId, contactId, currentUserId)
-      toast.success(t("contactsPage.toast.memberAdded"))
-      setAddingToList(null)
-      await refresh()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
-    }
-  }
+  // ─── Remove from list (inline in lists panel) ─────────────
 
   async function handleRemoveFromList(listId: string, contactId: string) {
     try {
@@ -219,7 +280,10 @@ export default function Contacts() {
   // ─── Filtered contacts ────────────────────────────────────
 
   const filteredContacts = contacts.filter(
-    (c) => !search.trim() || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)
+    (c) =>
+      !search.trim() ||
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone.includes(search)
   )
 
   // ─── Render ───────────────────────────────────────────────
@@ -235,7 +299,7 @@ export default function Contacts() {
         {/* Action bar */}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" className="gap-1.5" onClick={() => setNewContactOpen(true)}>
-            <UserPlus className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
             {t("contactsPage.newContact")}
           </Button>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setNewListOpen(true)}>
@@ -255,10 +319,11 @@ export default function Contacts() {
               <div className="flex items-center gap-2">
                 <BookUser className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold">{t("contactsPage.allContacts")}</h2>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{contacts.length}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {contacts.length}
+                </span>
               </div>
 
-              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -273,7 +338,9 @@ export default function Contacts() {
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-16">
                     <p className="text-center text-base text-muted-foreground">
-                      {contacts.length === 0 ? t("contactsPage.noContacts") : t("common.noResults")}
+                      {contacts.length === 0
+                        ? t("contactsPage.noContacts")
+                        : t("common.noResults")}
                     </p>
                     {contacts.length === 0 && (
                       <p className="mt-1 text-center text-sm text-muted-foreground">
@@ -285,74 +352,66 @@ export default function Contacts() {
               ) : (
                 <Card>
                   <CardContent className="divide-y divide-border/40 p-0">
-                    {filteredContacts.map((c) => (
-                      <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                          {c.name[0]?.toUpperCase()}
-                        </div>
+                    {filteredContacts.map((c) => {
+                      const memberOfLists = contactListMap[c.id] ?? []
+                      const socioEntries = Object.entries(c.socioNumbers)
+                      return (
+                        <div key={c.id} className="flex items-start gap-3 px-4 py-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                            {c.name[0]?.toUpperCase()}
+                          </div>
 
-                        <div className="min-w-0 flex-1">
-                          {editingNameId === c.id ? (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                className="h-7 py-1 text-sm"
-                                value={editingNameValue}
-                                onChange={(e) => setEditingNameValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveName()
-                                  if (e.key === "Escape") setEditingNameId(null)
-                                }}
-                                autoFocus
-                              />
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleSaveName} disabled={savingName}>
-                                {savingName ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                              </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingNameId(null)}>
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ) : (
+                          <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{c.name}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground">{c.phone}</p>
-                          {c.linkedUserId && (
-                            <span className="inline-block rounded-full bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">
-                              {t("contactsPage.linkedUser")}
-                            </span>
-                          )}
-                        </div>
+                            <p className="text-xs text-muted-foreground">{c.phone}</p>
 
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                            title={t("contactsPage.editName")}
-                            onClick={() => { setEditingNameId(c.id); setEditingNameValue(c.name) }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                            title={t("contactsPage.addToList")}
-                            onClick={() => setAddingToList(c)}
-                          >
-                            <List className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                            title={t("contactsPage.deleteContact")}
-                            onClick={() => setDeletingContact(c)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                            {(c.linkedUserId || socioEntries.length > 0 || memberOfLists.length > 0) && (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {c.linkedUserId && (
+                                  <Badge
+                                    variant="outline"
+                                    className="h-5 px-1.5 py-0 text-[10px] font-medium border-green-300 text-green-700 dark:border-green-800 dark:text-green-400"
+                                  >
+                                    {t("contactsPage.linkedUser")}
+                                  </Badge>
+                                )}
+                                {socioEntries.map(([slug, num]) => (
+                                  <Badge key={slug} variant="secondary" className="h-5 px-1.5 py-0 text-[10px]">
+                                    {clubLabel(slug)} · {num}
+                                  </Badge>
+                                ))}
+                                {memberOfLists.map((name) => (
+                                  <Badge key={name} variant="outline" className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground">
+                                    {name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-0.5 flex shrink-0 items-center gap-0.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                              title={t("contactsPage.editContact")}
+                              onClick={() => openEdit(c)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                              title={t("contactsPage.deleteContact")}
+                              onClick={() => setDeletingContact(c)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </CardContent>
                 </Card>
               )}
@@ -361,40 +420,54 @@ export default function Contacts() {
             {/* Right: lists */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <List className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold">{t("contactsPage.lists")}</h2>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{lists.length}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {lists.length}
+                </span>
               </div>
 
               {lists.length === 0 ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-10">
-                    <p className="text-center text-sm text-muted-foreground">{t("contactsPage.noLists")}</p>
-                    <p className="mt-1 text-center text-xs text-muted-foreground">{t("contactsPage.noListsDesc")}</p>
+                    <p className="text-center text-sm text-muted-foreground">
+                      {t("contactsPage.noLists")}
+                    </p>
+                    <p className="mt-1 text-center text-xs text-muted-foreground">
+                      {t("contactsPage.noListsDesc")}
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="space-y-2">
                   {lists.map((l) => (
                     <Card key={l.id} className="border-border/50">
-                      <CardHeader className="py-3 px-4">
+                      <CardHeader className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <button
                             className="flex flex-1 items-center gap-2 text-left"
-                            onClick={() => setExpandedListId(expandedListId === l.id ? null : l.id)}
+                            onClick={() =>
+                              setExpandedListId(expandedListId === l.id ? null : l.id)
+                            }
                           >
-                            {expandedListId === l.id
-                              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                            {expandedListId === l.id ? (
+                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
                             <CardTitle className="text-sm font-medium">{l.name}</CardTitle>
-                            <span className="text-xs text-muted-foreground">({l.members.length})</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({l.members.length})
+                            </span>
                           </button>
                           <Button
                             size="sm"
                             variant="ghost"
                             className="h-6 w-6 p-0 text-muted-foreground"
                             title={t("contactsPage.renameList")}
-                            onClick={() => { setRenamingList(l); setRenameValue(l.name) }}
+                            onClick={() => {
+                              setRenamingList(l)
+                              setRenameValue(l.name)
+                            }}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
@@ -413,7 +486,9 @@ export default function Contacts() {
                       {expandedListId === l.id && (
                         <CardContent className="px-4 pb-3 pt-0">
                           {l.members.length === 0 ? (
-                            <p className="text-xs text-muted-foreground italic">{t("contactsPage.noContacts")}</p>
+                            <p className="text-xs italic text-muted-foreground">
+                              {t("contactsPage.noContacts")}
+                            </p>
                           ) : (
                             <div className="space-y-1">
                               {l.members.map((m) => (
@@ -444,6 +519,103 @@ export default function Contacts() {
         )}
       </div>
 
+      {/* ── Edit contact dialog ────────────────────────────── */}
+      <Dialog open={!!editingContact} onOpenChange={(o) => !o && setEditingContact(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("contactsPage.editContact")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Name */}
+            <div className="space-y-1.5">
+              <Label>{t("contactsPage.namePlaceholder")}</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveEdit()}
+                autoFocus
+              />
+            </div>
+
+            {/* Phone — read-only */}
+            <div className="space-y-1.5">
+              <Label>{t("contactsPage.phonePlaceholder")}</Label>
+              <Input
+                value={editingContact?.phone ?? ""}
+                readOnly
+                className="text-muted-foreground"
+              />
+              <p className="text-xs text-muted-foreground">{t("contactsPage.phoneImmutable")}</p>
+            </div>
+
+            {/* Socio numbers — one row per club membership */}
+            {memberships.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <Label>{t("contactsPage.clubSocioNumbers")}</Label>
+                  {memberships.map((ms) => (
+                    <div key={ms.clubSlug} className="flex items-center gap-3">
+                      <span className="w-36 shrink-0 truncate text-sm text-muted-foreground">
+                        {clubLabel(ms.clubSlug)}
+                      </span>
+                      <Input
+                        className="h-8 text-sm"
+                        placeholder={t("contactsPage.socioPlaceholder")}
+                        value={editSocioInputs[ms.clubSlug] ?? ""}
+                        onChange={(e) =>
+                          setEditSocioInputs((prev) => ({
+                            ...prev,
+                            [ms.clubSlug]: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* List memberships */}
+            {lists.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>{t("contactsPage.lists")}</Label>
+                  {lists.map((l) => (
+                    <div key={l.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`list-${l.id}`}
+                        checked={editListIds.has(l.id)}
+                        onCheckedChange={(checked) =>
+                          setEditListIds((prev) => {
+                            const next = new Set(prev)
+                            checked ? next.add(l.id) : next.delete(l.id)
+                            return next
+                          })
+                        }
+                      />
+                      <label htmlFor={`list-${l.id}`} className="cursor-pointer text-sm">
+                        {l.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">{t("form.cancel")}</Button>
+            </DialogClose>
+            <Button onClick={handleSaveEdit} disabled={!editName.trim() || savingEdit}>
+              {savingEdit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("form.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── New contact dialog ─────────────────────────────── */}
       <Dialog open={newContactOpen} onOpenChange={setNewContactOpen}>
         <DialogContent>
@@ -469,7 +641,10 @@ export default function Contacts() {
             <DialogClose asChild>
               <Button variant="outline">{t("form.cancel")}</Button>
             </DialogClose>
-            <Button onClick={handleCreateContact} disabled={!newName.trim() || !newPhone.trim() || creatingContact}>
+            <Button
+              onClick={handleCreateContact}
+              disabled={!newName.trim() || !newPhone.trim() || creatingContact}
+            >
               {creatingContact ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {t("wizard.addButton")}
             </Button>
@@ -529,36 +704,11 @@ export default function Contacts() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Add to list dialog ─────────────────────────────── */}
-      <Dialog open={!!addingToList} onOpenChange={(o) => !o && setAddingToList(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("contactsPage.addToList")}: {addingToList?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-1 py-2 max-h-60 overflow-y-auto">
-            {lists.length === 0 && (
-              <p className="text-sm text-muted-foreground">{t("contactsPage.noLists")}</p>
-            )}
-            {lists.map((l) => {
-              const alreadyIn = l.members.some((m) => m.id === addingToList?.id)
-              return (
-                <button
-                  key={l.id}
-                  disabled={alreadyIn}
-                  onClick={() => addingToList && handleAddToList(l.id, addingToList.id)}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
-                >
-                  <span>{l.name}</span>
-                  {alreadyIn && <Check className="h-3.5 w-3.5 text-muted-foreground" />}
-                </button>
-              )
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* ── Delete contact alert ───────────────────────────── */}
-      <AlertDialog open={!!deletingContact} onOpenChange={(o) => !o && setDeletingContact(null)}>
+      <AlertDialog
+        open={!!deletingContact}
+        onOpenChange={(o) => !o && setDeletingContact(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
