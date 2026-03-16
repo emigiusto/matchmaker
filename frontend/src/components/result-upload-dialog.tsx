@@ -13,8 +13,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import type { Match, PostMatchQuestionnaire } from "@/lib/types"
+import { useTranslation } from "@/lib/i18n/use-translation"
 
 interface ResultUploadDialogProps {
   match: Match
@@ -185,6 +187,7 @@ const ALL_QUESTIONS: QuestionDefinition[] = [
 ]
 
 export function ResultUploadDialog({ match, onResultSubmitted, trigger }: ResultUploadDialogProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [sets, setSets] = useState<SetInput[]>([
     { id: "set-1", player1Score: "", player2Score: "" },
@@ -320,13 +323,22 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button size="sm" className="gap-2">
-            Upload Result
-          </Button>
-        )}
-      </DialogTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              {trigger || (
+                <Button size="sm" variant="outline" className="gap-2" disabled>
+                  {t("matchDetails.submit.button")}
+                </Button>
+              )}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{t("matchDetails.submit.disabled")}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Upload Match Result</DialogTitle>
