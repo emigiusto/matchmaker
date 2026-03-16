@@ -1,5 +1,19 @@
 import { apiClient } from "./api-client"
 
+export interface PublicSchedulingInviteDTO {
+  id: string
+  hostName: string
+  sportType: 'tennis' | 'padel'
+  format: 'singles' | 'doubles'
+  matchType: 'competitive' | 'practice'
+  date: string
+  startTime: string
+  locationText: string
+  status: string
+  bookingEnabled: boolean
+  matchId: string | null
+}
+
 export type SchedulingRequestStatus = "active" | "completed" | "expired" | "cancelled"
 export type SchedulingCandidateStatus =
   | "pending"
@@ -71,6 +85,7 @@ export type SchedulingInviteEventAction =
   | 'invite_manually_accepted'
   | 'invite_declined'
   | 'invite_expired'
+  | 'invite_link_accepted'
   | 'candidate_cancelled'
   | 'candidate_retried'
   | 'candidates_added'
@@ -197,5 +212,23 @@ export const schedulingService = {
       params
     )
     return res.inviteLink
+  },
+
+  async getForJoin(token: string): Promise<PublicSchedulingInviteDTO | null> {
+    try {
+      return await apiClient.get<PublicSchedulingInviteDTO>(`/scheduling/join/${token}`)
+    } catch {
+      return null
+    }
+  },
+
+  async acceptViaLink(
+    token: string,
+    data: { name: string; phone: string; email?: string; socioNumber?: string }
+  ): Promise<{ status: 'accepted' | 'already_filled'; matchId: string | null; candidateId: string | null }> {
+    return apiClient.post<{ status: 'accepted' | 'already_filled'; matchId: string | null; candidateId: string | null }>(
+      `/scheduling/join/${token}/accept`,
+      data
+    )
   },
 }

@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import type { SignupInput, LoginInput, AuthResponse } from './auth.types';
+import { resolveLocale } from '../../lib/whatsapp-messages';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const SALT_ROUNDS = 10;
@@ -14,7 +15,7 @@ const SALT_ROUNDS = 10;
  * Creates a non-guest user with hashed password.
  */
 export async function signup(input: SignupInput): Promise<AuthResponse> {
-  const { name, email, password } = input;
+  const { name, email, password, locale } = input;
   const trimmedEmail = email.trim().toLowerCase();
   const trimmedPassword = password.trim();
   if (!trimmedEmail || !trimmedPassword || trimmedPassword.length < 6) {
@@ -31,6 +32,7 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
       email: trimmedEmail,
       passwordHash,
       isGuest: false,
+      locale: resolveLocale(locale),
     },
   });
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });

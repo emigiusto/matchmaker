@@ -18,12 +18,12 @@ model User {
   phone        String?  @unique
   passwordHash String?
   isGuest      Boolean  @default(true)
+  locale       String   @default("es")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   player         Player?
   availabilities Availability[]
-  invitesSent    Invite[]       @relation("InvitesSent")
   notifications  Notification[]
 
   // Social graph
@@ -159,7 +159,6 @@ model Availability {
   createdAt       DateTime @default(now())
 
   user    User     @relation(fields: [userId], references: [id])
-  invites Invite[]
   matches Match[]
 
   @@index([userId])
@@ -175,49 +174,6 @@ enum AvailabilityStatus {
 }
 
 ////////////////////////////////////////////////////////////
-// INVITE
-////////////////////////////////////////////////////////////
-model Invite {
-  id             String           @id @default(uuid())
-  token          String           @unique
-  inviterUserId  String
-  availabilityId String
-  status         InviteStatus     @default(pending)
-  visibility     InviteVisibility @default(private)
-  minLevel       Float?
-  maxLevel       Float?
-  radiusKm       Float?
-  expiresAt      DateTime
-  createdAt      DateTime         @default(now())
-  bookingEnabled Boolean          @default(false)
-
-  inviter      User         @relation("InvitesSent", fields: [inviterUserId], references: [id])
-  availability Availability @relation(fields: [availabilityId], references: [id])
-  match        Match?
-
-  matchType    MatchType    @default(competitive)
-
-  @@index([inviterUserId])
-  @@index([availabilityId])
-  @@index([visibility, status])
-  @@index([status, expiresAt])
-  @@index([createdAt])
-  @@index([matchType])
-}
-
-enum InviteStatus {
-  pending
-  accepted
-  cancelled
-  expired
-}
-
-enum InviteVisibility {
-  private
-  community
-}
-
-////////////////////////////////////////////////////////////
 // MATCH
 ////////////////////////////////////////////////////////////
 /// Participants are stored in MatchParticipant. Teams (A/B) are assigned when result is loaded.
@@ -225,7 +181,6 @@ enum InviteVisibility {
 ///
 model Match {
   id               String   @id @default(uuid())
-  inviteId         String?  @unique
   availabilityId   String
   venueId          String?
   playerAId        String?
@@ -242,7 +197,6 @@ model Match {
   /// Match lifecycle status
   status           MatchStatus @default(scheduled)
 
-  invite         Invite?        @relation(fields: [inviteId], references: [id])
   availability   Availability   @relation(fields: [availabilityId], references: [id])
   venue          Venue?         @relation(fields: [venueId], references: [id])
   playerA        Player?        @relation("PlayerA", fields: [playerAId], references: [id])

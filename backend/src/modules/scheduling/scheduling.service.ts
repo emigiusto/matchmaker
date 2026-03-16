@@ -16,10 +16,14 @@ import type {
   SchedulingCandidateDTO,
   SchedulingInviteEventAction,
   SchedulingInviteEventDTO,
+  PublicSchedulingInviteDTO,
 } from './scheduling.types';
+import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
+import { findUserByNormalizedPhone, createGuestUser } from '../users/users.service';
 import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './scheduling.types';
+import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/whatsapp-messages';
 
-const ACCEPT_PATTERNS = /^(yes|y|accept|👍)$|👍/i;
+const ACCEPT_PATTERNS = /^(yes|y|accept|sí|si|s|👍)$|👍/i;
 const DECLINE_PATTERNS = /^(no|n|decline)$/i;
 
 /** Minimum accepted candidates required before marking request completed. Singles: 1. Doubles: 3 (host + 3 = 4 players). */
@@ -119,57 +123,12 @@ function toCandidateDTO(c: { id: string; schedulingRequestId: string; contactUse
 }
 
 /** Quick-reply buttons for invite (Whapi supports; Wasender/Mock fall back to plain text) */
-const INVITE_BUTTONS = [
-  { id: 'invite_yes', title: 'YES' },
-  { id: 'invite_no', title: 'NO' },
-] as const;
-
-function formatResponseWindow(minutes: number): string {
-  if (minutes < 60) return `${Math.round(minutes)} minute${Math.round(minutes) === 1 ? '' : 's'}`;
-  const hours = minutes / 60;
-  if (hours < 24) return `${Math.round(hours)} hour${Math.round(hours) === 1 ? '' : 's'}`;
-  const days = hours / 24;
-  return `${Math.round(days)} day${Math.round(days) === 1 ? '' : 's'}`;
-}
-
-function formatInviteMessage(
-  hostName: string,
-  sportType: string,
-  format: string,
-  dateStr: string,
-  timeStr: string,
-  location: string,
-  withButtons: boolean,
-  responseWindowMinutes: number
-): string {
-  const sportEmoji = sportType === 'padel' ? '🏓' : '🎾';
-  const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
-  const sportLabel = `${sportType.charAt(0).toUpperCase()}${sportType.slice(1)} ${formatLabel}`;
-  const timeLeft = formatResponseWindow(responseWindowMinutes);
-  const loc = (location && location.trim()) || 'TBD';
-
-  const lines = [
-    `${sportEmoji} *${hostName} wants to play with you!*`,
-    '',
-    `📅  ${dateStr}  ·  ${timeStr}`,
-    `📍  ${loc}`,
-    `🏅  ${sportLabel}`,
-    '',
-    `⏳ You have *${timeLeft}* to respond`,
-  ];
-
-  const base = lines.join('\n');
-
-  if (withButtons) {
-    return base;
-  }
-
-  const footer = [
-    '',
-    'Reply *YES* ✅ to accept or *NO* ❌ to decline',
-  ].join('\n');
-
-  return `${base}\n${footer}`;
+function getInviteButtons(locale?: string | null) {
+  const loc = resolveLocale(locale);
+  return [
+    { id: 'invite_yes', title: loc === 'es' ? 'SÍ' : 'YES' },
+    { id: 'invite_no', title: 'NO' },
+  ] as const;
 }
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
@@ -181,23 +140,29 @@ function formatGroupInviteFallbackMessage(input: {
   location: string;
   rivalOrPlayersStr?: string;
   matchId?: string;
+  locale?: string | null;
 }): string {
   const sportEmoji = input.sportType === 'padel' ? '🏓' : '🎾';
   const sport = input.sportType.charAt(0).toUpperCase() + input.sportType.slice(1).toLowerCase();
   const formatLabel = input.format === 'doubles' ? 'Doubles' : 'Singles';
   const loc = (input.location && input.location.trim()) || 'TBD';
   const matchUrl = input.matchId ? `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${input.matchId}` : null;
+  const isEs = resolveLocale(input.locale) === 'es';
   return [
-    `${sportEmoji} *Your match is confirmed!*`,
+    `${sportEmoji} *${isEs ? '¡Tu partido está confirmado!' : 'Your match is confirmed!'}*`,
     '',
     `📅  ${input.whenStr}`,
     `📍  ${loc}`,
     `🏅  ${sport} ${formatLabel}`,
     ...(input.rivalOrPlayersStr ? [`👥  ${input.rivalOrPlayersStr}`] : []),
     '',
-    ...(matchUrl ? [`🔗 *View match:* ${matchUrl}`, ''] : []),
-    "⚠️ We couldn't add you directly to the WhatsApp group (privacy settings).",
-    'Use the link below to join and chat with the other players:',
+    ...(matchUrl ? [`🔗 *${isEs ? 'Ver partido' : 'View match'}:* ${matchUrl}`, ''] : []),
+    isEs
+      ? '⚠️ No pudimos añadirte directamente al grupo de WhatsApp (configuración de privacidad).'
+      : "⚠️ We couldn't add you directly to the WhatsApp group (privacy settings).",
+    isEs
+      ? 'Usa el enlace de abajo para unirte y chatear con los otros jugadores:'
+      : 'Use the link below to join and chat with the other players:',
   ].join('\n');
 }
 
@@ -206,21 +171,13 @@ function formatMatchDetailsMessage(
   format: string,
   whenStr: string,
   location: string,
-  matchId: string
+  matchId: string,
+  locale?: string | null
 ): string {
   const sport = sportType.charAt(0).toUpperCase() + sportType.slice(1).toLowerCase();
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
-  const loc = (location && location.trim()) || 'TBD';
   const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
-  return [
-    '✅ *Match confirmed!*',
-    '',
-    `${sport} · ${formatLabel}`,
-    `*When:* ${whenStr}`,
-    `*Where:* ${loc}`,
-    '',
-    `🔗 *View match:* ${matchUrl}`
-  ].join('\n');
+  return getMessages(locale).matchConfirmed(sport, formatLabel, whenStr, location, matchUrl);
 }
 
 function formatInviteNoLongerAvailableMessage(
@@ -229,19 +186,11 @@ function formatInviteNoLongerAvailableMessage(
   format: string,
   dateStr: string,
   timeStr: string,
-  location: string
+  location: string,
+  locale?: string | null
 ): string {
   const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
-  const loc = (location && location.trim()) || 'TBD';
-  return [
-    'ℹ️ *Invite no longer available*',
-    '',
-    `The ${sportType} ${formatLabel} invite from ${hostName} is no longer available.`,
-    `*When:* ${dateStr} · ${timeStr}`,
-    `*Where:* ${loc}`,
-    '',
-    'You can ignore the previous invite message.',
-  ].join('\n');
+  return getMessages(locale).noLongerAvailable(hostName, sportType, formatLabel, dateStr, timeStr, location);
 }
 
 /** Reason codes when a scheduling request expires (No match) */
@@ -253,27 +202,15 @@ function formatNoMatchWhatsAppMessage(
   dateStr: string,
   timeStr: string,
   location: string,
-  reason: SchedulingExpiredReason
+  reason: SchedulingExpiredReason,
+  locale?: string | null
 ): string {
+  const msgs = getMessages(locale);
   const sport = sportType.charAt(0).toUpperCase() + sportType.slice(1).toLowerCase();
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
-  const loc = (location && location.trim()) || 'TBD';
-  const details = `${sport} · ${formatLabel}\n*When:* ${dateStr} · ${timeStr}\n*Where:* ${loc}`;
-  const reasonText =
-    reason === 'no_more_candidates'
-      ? 'No quedaban más candidatos disponibles para contactar.'
-      : reason === 'all_candidates_exhausted'
-        ? 'Todos los candidatos rechazaron o no respondieron a tiempo.'
-        : 'Se pasó la hora programada sin confirmar el partido.';
-  return [
-    '❌ *Tu solicitud de partido no tuvo match*',
-    '',
-    details,
-    '',
-    reasonText,
-    '',
-    'Puedes añadir más contactos o crear una nueva solicitud desde Matchmaker.',
-  ].join('\n');
+  const whenStr = `${dateStr} · ${timeStr}`;
+  const reasonText = msgs.noMatchReason[reason];
+  return msgs.noMatch(sport, formatLabel, whenStr, location, reasonText);
 }
 
 async function recordEvent(data: {
@@ -308,13 +245,15 @@ async function notifyHostSchedulingNoMatch(
     startTime: Date;
     endTime: Date;
     locationText: string;
-    hostUser?: { id: string; name: string | null; phone: string | null } | null;
+    hostUser?: { id: string; name: string | null; phone: string | null; locale?: string | null } | null;
   },
   reason: SchedulingExpiredReason
 ): Promise<void> {
+  const hostLocale = (request.hostUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
   const tz = (request as RequestRow).timezone ?? 'UTC';
-  const dateStr = formatInTz(request.date, 'es-ES', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-  const timeStr = `${formatInTz(request.startTime, 'es-ES', { hour: '2-digit', minute: '2-digit' }, tz)} - ${formatInTz(request.endTime, 'es-ES', { hour: '2-digit', minute: '2-digit' }, tz)}`;
+  const intlLocale = resolveLocale(hostLocale) === 'es' ? 'es-ES' : 'en-US';
+  const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+  const timeStr = `${formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)} - ${formatInTz(request.endTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)}`;
   const payload = {
     requestId: request.id,
     reason,
@@ -340,7 +279,8 @@ async function notifyHostSchedulingNoMatch(
       dateStr,
       timeStr,
       request.locationText,
-      reason
+      reason,
+      hostLocale
     );
     const result = await whatsappService.sendInviteMessage(hostPhone, msg);
     if (result.success) {
@@ -492,19 +432,7 @@ export const schedulingService = {
 
     const hostName = request.hostUser?.name || 'Someone';
     const tz = (request as RequestRow).timezone ?? 'UTC';
-    const dateStr = formatInTz(request.date, 'en-US', { weekday: 'long' }, tz);
-    const timeStr = `${formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz)} - ${formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz)}`;
     const format = (request as RequestRow).format || 'singles';
-    const message = formatInviteMessage(
-        hostName,
-        request.sportType,
-        format,
-        dateStr,
-        timeStr,
-        request.locationText,
-        true,
-        request.responseWindowMinutes ?? 240
-      );
 
     for (const candidate of toContact) {
       const phone = candidate.contactUser?.phone;
@@ -515,6 +443,16 @@ export const schedulingService = {
         void recordEvent({ schedulingRequestId: requestId, action: 'invite_sent', candidateId: candidate.id, metadata: { failed: true, reason: 'no_phone' } });
         continue;
       }
+
+      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
+      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
+      const dateStr = formatInTz(request.date, intlLocale, { weekday: 'long' }, tz);
+      const timeStr = `${formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)} - ${formatInTz(request.endTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)}`;
+      const timeLeft = formatResponseWindow(request.responseWindowMinutes ?? 240, candidateLocale);
+      const msgs = getMessages(candidateLocale);
+      const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
+      const message = msgs.invite(hostName, request.sportType, formatLabel, dateStr, timeStr, request.locationText, timeLeft);
+      const inviteButtons = getInviteButtons(candidateLocale);
 
       await prisma.$transaction(async (tx) => {
         await tx.schedulingCandidate.update({
@@ -528,7 +466,7 @@ export const schedulingService = {
       });
 
       const result = await whatsappService.sendInviteMessage(phone, message, {
-        buttons: [...INVITE_BUTTONS],
+        buttons: [...inviteButtons],
       });
       await schedulingRepository.updateCandidateStatus(candidate.id, 'waiting_reply');
 
@@ -667,10 +605,12 @@ export const schedulingService = {
       const req = candidate.schedulingRequest;
       const hostName = req.hostUser?.name ?? 'Someone';
       const tz = (req as RequestRow).timezone ?? 'UTC';
-      const dateStr = formatInTz(req.date, 'en-US', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-      const timeStr = formatInTz(req.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
+      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
+      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
+      const dateStr = formatInTz(req.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+      const timeStr = formatInTz(req.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
       const format = (req as RequestRow).format || 'singles';
-      const msg = formatInviteNoLongerAvailableMessage(hostName, req.sportType, format, dateStr, timeStr, req.locationText);
+      const msg = formatInviteNoLongerAvailableMessage(hostName, req.sportType, format, dateStr, timeStr, req.locationText, candidateLocale);
       const result = await whatsappService.sendInviteMessage(phone, msg);
       if (!result.success) logger.warn('FailedToNotifyInviteExpired', { candidateId, phone });
     }
@@ -805,9 +745,12 @@ export const schedulingService = {
 
     const usersWithPhones = await prisma.user.findMany({
       where: { id: { in: uniqueUserIds }, phone: { not: null } },
-      select: { id: true, name: true, phone: true },
+      select: { id: true, name: true, phone: true, locale: true },
     });
     const participantPhones = usersWithPhones.map((u) => u.phone).filter((p): p is string => !!p);
+
+    // Use host's locale for group messages
+    const hostUserLocale = (request.hostUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
 
     const whapiBotPhone =
       process.env.WHATSAPP_BOT_NUMBER ||
@@ -816,8 +759,9 @@ export const schedulingService = {
 
     if (participantPhones.length >= 1) {
       const tz = (request as RequestRow).timezone ?? 'UTC';
-      const dateStr = formatInTz(request.date, 'en-US', { weekday: 'long', month: 'long', day: 'numeric' }, tz);
-      const timeStr = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
+      const intlLocale = resolveLocale(hostUserLocale) === 'es' ? 'es-ES' : 'en-US';
+      const dateStr = formatInTz(request.date, intlLocale, { weekday: 'long', month: 'long', day: 'numeric' }, tz);
+      const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
       const groupName = `${dateStr} ${timeStr}`;
       const whenStr = `${dateStr} · ${timeStr}`;
 
@@ -825,7 +769,7 @@ export const schedulingService = {
       const participantByDigits = new Map(
         usersWithPhones
           .filter((u) => !!u.phone)
-          .map((u) => [normalizeDigits(u.phone as string), { id: u.id, name: u.name || '' }])
+          .map((u) => [normalizeDigits(u.phone as string), { id: u.id, name: u.name || '', locale: u.locale }])
       );
       const allNames = usersWithPhones.map((u) => u.name).filter((n): n is string => !!n && n.trim().length > 0);
 
@@ -846,7 +790,8 @@ export const schedulingService = {
           format,
           whenStr,
           request.locationText,
-          match.id
+          match.id,
+          hostUserLocale
         );
         await whatsappService.sendGroupMessage(groupResult.groupId, detailsMessage);
 
@@ -875,6 +820,7 @@ export const schedulingService = {
               location: request.locationText,
               rivalOrPlayersStr,
               matchId: match.id,
+              locale: recipient?.locale ?? hostUserLocale,
             });
           },
           whapiBotPhone || undefined
@@ -1017,10 +963,12 @@ export const schedulingService = {
     if (phone) {
       const hostName = request.hostUser?.name ?? 'Someone';
       const tz = (request as RequestRow).timezone ?? 'UTC';
-      const dateStr = formatInTz(request.date, 'en-US', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-      const timeStr = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
+      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
+      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
+      const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+      const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
       const format = (request as RequestRow).format || 'singles';
-      const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText);
+      const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, candidateLocale);
       const result = await whatsappService.sendInviteMessage(phone, msg);
       if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId, phone });
     }
@@ -1106,17 +1054,7 @@ export const schedulingService = {
 
     const hostName = request.hostUser?.name ?? 'Someone';
     const tz = (request as RequestRow).timezone ?? 'UTC';
-    const dateStr = formatInTz(request.date, 'en-US', { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-    const timeStr = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit' }, tz);
     const format = (request as RequestRow).format || 'singles';
-    const msg = formatInviteNoLongerAvailableMessage(
-      hostName,
-      request.sportType,
-      format,
-      dateStr,
-      timeStr,
-      request.locationText
-    );
 
     const candidates = request.candidates ?? [];
     const toNotify = candidates.filter((c) =>
@@ -1127,6 +1065,11 @@ export const schedulingService = {
       const phone = c.contactUser?.phone;
       if (phone) {
         try {
+          const candidateLocale = (c.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
+          const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
+          const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
+          const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
+          const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, candidateLocale);
           const result = await whatsappService.sendInviteMessage(phone, msg);
           if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId: c.id, phone });
         } catch (e) {
@@ -1155,7 +1098,7 @@ export const schedulingService = {
     if (!request) throw new AppError('Scheduling request not found', 404);
 
     const base = baseUrl || process.env.APP_BASE_URL || 'https://v0-tennis-matchmaker-mvp.vercel.app';
-    const path = `/play?invite=${request.inviteToken}`;
+    const path = `/join/${request.inviteToken}`;
     return base.endsWith('/') ? `${base.slice(0, -1)}${path}` : `${base}${path}`;
   },
 
@@ -1233,5 +1176,132 @@ export const schedulingService = {
       orderBy: { createdAt: 'desc' },
     });
     return requests.map(toRequestDTOWithCandidates);
+  },
+
+  async getSchedulingRequestForJoin(token: string): Promise<PublicSchedulingInviteDTO | null> {
+    const request = await prisma.schedulingRequest.findFirst({
+      where: { inviteToken: token },
+      include: { hostUser: { select: { name: true } } },
+    });
+    if (!request) return null;
+    return {
+      id: request.id,
+      hostName: request.hostUser?.name ?? 'Unknown',
+      sportType: request.sportType as PublicSchedulingInviteDTO['sportType'],
+      format: (request.format || 'singles') as PublicSchedulingInviteDTO['format'],
+      matchType: (request.matchType || 'competitive') as PublicSchedulingInviteDTO['matchType'],
+      date: request.date.toISOString(),
+      startTime: request.startTime.toISOString(),
+      locationText: request.locationText,
+      status: request.status,
+      bookingEnabled: (request as { bookingEnabled?: boolean }).bookingEnabled ?? false,
+      matchId: request.matchId,
+    };
+  },
+
+  async acceptViaLink(
+    token: string,
+    data: { name: string; phone: string; email?: string; socioNumber?: string }
+  ): Promise<{ status: 'accepted' | 'already_filled'; candidateId: string | null; matchId: string | null }> {
+    const request = await prisma.schedulingRequest.findFirst({
+      where: { inviteToken: token },
+    });
+    if (!request) throw new AppError('Invite not found', 404);
+
+    if (request.status === 'cancelled') {
+      throw new AppError('Invite is no longer active', 409);
+    }
+
+    if (request.status === 'completed') {
+      return { status: 'already_filled', matchId: request.matchId, candidateId: null };
+    }
+
+    // Normalize phone and find or create user
+    const normalizedPhone = normalizePhoneToCanonical(data.phone);
+    let user = await findUserByNormalizedPhone(data.phone);
+    if (!user) {
+      user = await createGuestUser(data.name, data.email, normalizedPhone || data.phone);
+    }
+    const userId = user.id;
+
+    // Idempotency check: already accepted
+    const existingAccepted = await prisma.schedulingCandidate.findFirst({
+      where: { schedulingRequestId: request.id, contactUserId: userId, status: 'accepted' },
+    });
+    if (existingAccepted) {
+      return { status: 'accepted', candidateId: existingAccepted.id, matchId: request.matchId };
+    }
+
+    const { candidateId, didComplete } = await prisma.$transaction(async (tx) => {
+      const existing = await tx.schedulingCandidate.findFirst({
+        where: { schedulingRequestId: request.id, contactUserId: userId },
+      });
+
+      let candidateId: string;
+      if (existing) {
+        await tx.schedulingCandidate.update({
+          where: { id: existing.id },
+          data: { status: 'accepted', responseAt: new Date() },
+        });
+        candidateId = existing.id;
+      } else {
+        const maxPriorityRow = await tx.schedulingCandidate.findFirst({
+          where: { schedulingRequestId: request.id },
+          orderBy: { priorityOrder: 'desc' },
+          select: { priorityOrder: true },
+        });
+        const maxPriority = maxPriorityRow?.priorityOrder ?? -1;
+        const created = await tx.schedulingCandidate.create({
+          data: {
+            schedulingRequestId: request.id,
+            contactUserId: userId,
+            priorityOrder: maxPriority + 1,
+            retryOrder: 0,
+            status: 'accepted',
+            responseAt: new Date(),
+          },
+        });
+        candidateId = created.id;
+      }
+
+      const allCandidates = await tx.schedulingCandidate.findMany({
+        where: { schedulingRequestId: request.id },
+        select: { status: true },
+      });
+      const acceptedCount = allCandidates.filter((c) => c.status === 'accepted').length;
+      const format = (request as RequestRow).format || 'singles';
+      const required = getRequiredAcceptances(format);
+
+      let didComplete = false;
+      if (acceptedCount >= required) {
+        const updated = await tx.schedulingRequest.updateMany({
+          where: { id: request.id, status: { not: 'completed' } },
+          data: { status: 'completed' },
+        });
+        didComplete = updated.count > 0;
+      }
+
+      return { candidateId, didComplete };
+    });
+
+    void recordEvent({
+      schedulingRequestId: request.id,
+      action: 'invite_link_accepted',
+      candidateId,
+      actorUserId: userId,
+      metadata: { userName: data.name, source: 'link' },
+    });
+
+    if (didComplete) {
+      await this.completeScheduling(request.id);
+    }
+
+    // socioNumber: stored as metadata in the event for now (no dedicated field on the user record)
+    // A future migration can add a socioNumber field to User or create a ClubMembership record
+    if (data.socioNumber && (request as { bookingEnabled?: boolean }).bookingEnabled) {
+      logger.info('SocioNumberReceived', { userId, schedulingRequestId: request.id, socioNumber: data.socioNumber });
+    }
+
+    return { status: 'accepted', candidateId, matchId: null };
   },
 };

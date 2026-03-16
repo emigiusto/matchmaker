@@ -20,7 +20,6 @@ import { seedGroups } from './groups.seeder';
 import { seedGroupMembers } from './groupMembers.seeder';
 import { seedGuestContacts } from './guestContacts.seeder';
 import { seedFriendships } from './friendships.seeder';
-import { seedInvites } from './invites.seeder';
 import { seedMatches } from './matches.seeder';
 // import { seedSchedulingRequests } from './schedulingRequests.seeder';
 // import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
@@ -82,10 +81,8 @@ async function main() {
   const guestContacts = await seedGuestContacts(users);
   // 8. Friendships (user-user and user-guestContact)
   const friendships = await seedFriendships(users, guestContacts);
-  // 9. Invites (for availabilities)
-  const invites = await seedInvites(users, availabilities);
-  // 10. Matches (for invites, availabilities, players, venues)
-  const matchesRaw = await seedMatches(invites, availabilities, players, venues);
+  // 9. Matches (for availabilities, players, venues)
+  const matchesRaw = await seedMatches([], availabilities, players, venues);
   // 11. Scheduling requests and candidates (WhatsApp scheduling flow) — temporarily disabled to test flow from scratch
   // const schedulingRequests = await seedSchedulingRequests(users, users);
   // const schedulingCandidates = await seedSchedulingCandidates(schedulingRequests, users);
@@ -117,7 +114,6 @@ async function main() {
     groupMembers: groupMembers.length,
     guestContacts: guestContacts.length,
     friendships: friendships.length,
-    invites: invites.length,
     matches: matches.length,
     // schedulingRequests: schedulingRequests.length,
     // schedulingCandidates: schedulingCandidates.length,

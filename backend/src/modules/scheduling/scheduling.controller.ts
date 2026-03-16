@@ -235,4 +235,35 @@ export class SchedulingController {
       next(err);
     }
   }
+
+  static async getSchedulingRequestForJoin(req: Request, res: Response, next: NextFunction) {
+    try {
+      const token = typeof req.params.token === 'string' ? req.params.token : undefined;
+      if (!token) return res.status(400).json({ error: 'Missing token' });
+      const data = await schedulingService.getSchedulingRequestForJoin(token);
+      if (!data) return res.status(404).json({ error: 'Invite not found' });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async acceptViaLink(req: Request, res: Response, next: NextFunction) {
+    try {
+      const token = typeof req.params.token === 'string' ? req.params.token : undefined;
+      if (!token) return res.status(400).json({ error: 'Missing token' });
+      const { name, phone, email, socioNumber } = req.body;
+      if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Missing or invalid name' });
+      if (!phone || typeof phone !== 'string') return res.status(400).json({ error: 'Missing or invalid phone' });
+      const result = await schedulingService.acceptViaLink(token, {
+        name,
+        phone,
+        email: typeof email === 'string' ? email : undefined,
+        socioNumber: typeof socioNumber === 'string' ? socioNumber : undefined,
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
 }

@@ -106,6 +106,7 @@ function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?
   switch (event.action) {
     case "invite_sent": return t("invites.events.inviteSent", { name })
     case "invite_accepted": return t("invites.events.inviteAccepted", { name })
+    case "invite_link_accepted": return t("inviteDetails.events.inviteLinkAccepted", { name: event.metadata?.userName as string ?? name })
     case "invite_declined": return t("invites.events.inviteDeclined", { name })
     case "invite_expired": return t("invites.events.inviteExpired", { name })
     case "candidate_cancelled": return t("invites.events.candidateCancelled", { name })
@@ -126,6 +127,7 @@ function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
   switch (action) {
     case "invite_sent": return <Loader2 className="h-3.5 w-3.5 text-blue-500" />
     case "invite_accepted": return <UserCheck className="h-3.5 w-3.5 text-green-600" />
+    case "invite_link_accepted": return <UserCheck className="h-3.5 w-3.5 text-green-600" />
     case "invite_declined": return <UserX className="h-3.5 w-3.5 text-red-500" />
     case "invite_expired": return <Hourglass className="h-3.5 w-3.5 text-muted-foreground" />
     case "candidate_cancelled": return <XCircle className="h-3.5 w-3.5 text-amber-500" />
@@ -270,7 +272,7 @@ export default function InviteDetailsPage() {
       await navigator.clipboard.writeText(fullUrl)
     } catch {
       navigator.clipboard.writeText(
-        `${window.location.origin}/invite/${request.inviteToken}`
+        `${window.location.origin}/join/${request.inviteToken}`
       )
     }
     setCopiedLink(true)
@@ -280,7 +282,7 @@ export default function InviteDetailsPage() {
 
   function handleShareWhatsApp() {
     if (!request) return
-    const link = `${window.location.origin}/invite/${request.inviteToken}`
+    const link = `${window.location.origin}/join/${request.inviteToken}`
     const message = encodeURIComponent(`Join my match! ${link}`)
     window.open(`https://wa.me/?text=${message}`, "_blank")
   }

@@ -86,6 +86,7 @@ export type SchedulingInviteEventAction =
   | 'invite_manually_accepted'
   | 'invite_declined'
   | 'invite_expired'
+  | 'invite_link_accepted'
   | 'candidate_cancelled'
   | 'candidate_retried'
   | 'candidates_added'
@@ -97,6 +98,20 @@ export type SchedulingInviteEventAction =
   | 'booking_success'
   | 'booking_failed'
   | 'booking_cancelled';
+
+export interface PublicSchedulingInviteDTO {
+  id: string;
+  hostName: string;
+  sportType: SchedulingSportType;
+  format: SchedulingFormat;
+  matchType: SchedulingMatchType;
+  date: string;
+  startTime: string;
+  locationText: string;
+  status: string;
+  bookingEnabled: boolean;
+  matchId: string | null;
+}
 
 export interface SchedulingInviteEventDTO {
   id: string;

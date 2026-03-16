@@ -8,6 +8,7 @@ import { encrypt, decrypt } from '../../shared/utils/crypto.utils'
 import { getAdapter } from './adapters/adapter.registry'
 import { logger } from '../../config/logger'
 import { whatsappService } from '../whatsapp/whatsapp.service'
+import { getMessages } from '../../lib/whatsapp-messages'
 import type {
   UpsertClubMembershipInput,
   ClubMembershipDTO,
@@ -317,7 +318,9 @@ async function runBookingJob(
 
     // Notify the WhatsApp group
     if (match.whatsappGroupId) {
-      const message = `✅ *Court booked!*\n\n🏟️ ${result.courtName}\n📅 ${date} · ${time}`
+      const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).catch(() => null)
+      const hostLocale = hostUser?.locale ?? 'es'
+      const message = getMessages(hostLocale).courtBooked(result.courtName, `${date} · ${time}`, match.availability?.locationText ?? '')
       whatsappService.sendGroupMessage(match.whatsappGroupId, message).catch((err) => {
         logger.warn(`[booking] Failed to send WhatsApp group notification for match ${matchId}:`, err)
       })

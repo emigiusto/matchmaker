@@ -14,6 +14,10 @@ router.get('/active-count', SchedulingController.getActiveCount);
 router.get('/_debug-dev-user', SchedulingController.debugDevUserCount);
 router.get('/incoming', SchedulingController.listIncomingInvites);
 router.get('/by-token/:token', SchedulingController.getSchedulingRequestByToken);
+
+// Public join routes — must come before /:requestId to avoid conflict
+router.get('/join/:token', SchedulingController.getSchedulingRequestForJoin);
+router.post('/join/:token/accept', SchedulingController.acceptViaLink);
 router.get('/:requestId/invite-link', SchedulingController.getInviteLink);
 router.get('/:requestId/events', SchedulingController.getEventHistory);
 router.get('/:requestId', SchedulingController.getSchedulingRequest);

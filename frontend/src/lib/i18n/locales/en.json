@@ -349,7 +349,8 @@
       "candidateRetried": "{{name}} queued for retry",
       "candidatesAdded": "{{count}} contact(s) added",
       "bookingSuccess": "Court booked{{court}}",
-      "bookingFailed": "Booking failed{{error}}"
+      "bookingFailed": "Booking failed{{error}}",
+      "inviteLinkAccepted": "{{name}} accepted via invite link"
     },
     "candidateStatus": {
       "pending": "Pending",
@@ -450,7 +451,36 @@
     "responseWindowMin": "{{n}} min",
     "responseWindowH": "{{n}}h",
     "responseWindowDay": "{{n}} day",
-    "responseWindowDays": "{{n}} days"
+    "responseWindowDays": "{{n}} days",
+    "events": {
+      "inviteLinkAccepted": "{{name}} accepted via invite link"
+    }
+  },
+  "joinRequest": {
+    "title": "You're invited to play",
+    "subtitle": "{{hostName}} wants to play with you",
+    "matchDetails": "Match details",
+    "form": {
+      "name": "Your name",
+      "namePlaceholder": "Full name",
+      "phone": "WhatsApp number",
+      "phonePlaceholder": "+34 600 000 000",
+      "email": "Email (optional)",
+      "emailPlaceholder": "you@example.com",
+      "socioNumber": "Socio number",
+      "socioNumberHint": "Required for automatic court booking",
+      "submit": "Accept invite",
+      "submitting": "Accepting..."
+    },
+    "states": {
+      "loading": "Loading invite...",
+      "notFound": "This invite link is no longer valid.",
+      "cancelled": "This invite has been cancelled.",
+      "alreadyFilled": "This match is already full.",
+      "alreadyFilledDesc": "Someone else accepted before you — the spot is taken.",
+      "successTitle": "You're in!",
+      "successDesc": "Your spot has been confirmed. See you on the court!"
+    }
   },
   "inviteConfirm": {
     "loading": "Loading invite...",

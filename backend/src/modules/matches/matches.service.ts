@@ -13,6 +13,7 @@ import { RatingService } from '../rating/rating.service';
 import { createNotification } from '../notifications/notifications.service';
 import { validateResultMatchConsistency } from '../results/results.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
+import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
 
 /**
  * Fetch a match by its ID. Throws AppError if not found.
@@ -418,14 +419,20 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
   const groupId = match.whatsappGroupId;
   if (groupId && groupId.trim()) {
     try {
-      const message = [
-        '⚠️ *Match cancelled*',
-        '',
-        `${dateStr}${timeStr ? ` · ${timeStr}` : ''}`,
-        `📍 ${location}`,
-        '',
-        'This match has been cancelled. Thanks for your understanding.',
-      ].join('\n');
+      const hostUserId = (match.availability as any)?.userId as string | undefined;
+      let hostLocale = 'es';
+      if (hostUserId) {
+        const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } });
+        hostLocale = hostUser?.locale ?? 'es';
+      }
+      const intlLocale = resolveLocale(hostLocale) === 'es' ? 'es-ES' : 'en-US';
+      const localeDateStr = av?.date
+        ? new Date(av.date).toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'short' })
+        : 'TBD';
+      const sport = (match as any).schedulingRequest?.sportType ?? 'tennis';
+      const format = (match as any).schedulingRequest?.format ?? 'singles';
+      const whenStr = `${localeDateStr}${timeStr ? ` · ${timeStr}` : ''}`;
+      const message = getMessages(hostLocale).matchCancelled(sport, format, whenStr, location);
       await whatsappService.sendGroupMessage(groupId, message);
       logger.info('MatchCancelledWhatsAppSent', { matchId: match.id, groupId });
     } catch (err) {

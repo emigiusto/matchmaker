@@ -15,7 +15,8 @@ export interface AuthResponse {
 
 export const authService = {
   async signup(name: string, email: string, password: string): Promise<AuthResponse> {
-    const res = await apiClient.post<AuthResponse>("/auth/signup", { name, email, password })
+    const locale = navigator.language?.toLowerCase().startsWith("en") ? "en" : "es"
+    const res = await apiClient.post<AuthResponse>("/auth/signup", { name, email, password, locale })
     if (res?.token) {
       localStorage.setItem(AUTH_TOKEN_KEY, res.token)
     }

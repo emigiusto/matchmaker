@@ -349,7 +349,8 @@
       "candidateRetried": "{{name}} en cola para reintento",
       "candidatesAdded": "{{count}} contacto(s) añadido(s)",
       "bookingSuccess": "Pista reservada{{court}}",
-      "bookingFailed": "Error en la reserva{{error}}"
+      "bookingFailed": "Error en la reserva{{error}}",
+      "inviteLinkAccepted": "{{name}} aceptó a través del enlace de invitación"
     },
     "candidateStatus": {
       "pending": "Pendiente",
@@ -450,7 +451,36 @@
     "responseWindowMin": "{{n}} min",
     "responseWindowH": "{{n}}h",
     "responseWindowDay": "{{n}} día",
-    "responseWindowDays": "{{n}} días"
+    "responseWindowDays": "{{n}} días",
+    "events": {
+      "inviteLinkAccepted": "{{name}} aceptó a través del enlace de invitación"
+    }
+  },
+  "joinRequest": {
+    "title": "Te han invitado a jugar",
+    "subtitle": "{{hostName}} quiere jugar contigo",
+    "matchDetails": "Detalles del partido",
+    "form": {
+      "name": "Tu nombre",
+      "namePlaceholder": "Nombre completo",
+      "phone": "Número de WhatsApp",
+      "phonePlaceholder": "+34 600 000 000",
+      "email": "Email (opcional)",
+      "emailPlaceholder": "tu@correo.com",
+      "socioNumber": "Número de socio",
+      "socioNumberHint": "Necesario para la reserva automática de pista",
+      "submit": "Aceptar invitación",
+      "submitting": "Aceptando..."
+    },
+    "states": {
+      "loading": "Cargando invitación...",
+      "notFound": "Este enlace de invitación ya no es válido.",
+      "cancelled": "Esta invitación ha sido cancelada.",
+      "alreadyFilled": "Este partido ya está completo.",
+      "alreadyFilledDesc": "Alguien más aceptó antes que tú — el lugar está ocupado.",
+      "successTitle": "¡Estás dentro!",
+      "successDesc": "Tu plaza ha sido confirmada. ¡Nos vemos en la pista!"
+    }
   },
   "inviteConfirm": {
     "loading": "Cargando invitación...",

@@ -6,37 +6,7 @@ import cron from 'node-cron';
 import { prisma } from '../../prisma';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { logger } from '../../config/logger';
-
-function formatMatchMessage(match: {
-  availability?: { locationText: string; date: Date; startTime: Date } | null;
-  participants?: { userId: string; user?: { name: string | null } }[];
-  type: string;
-}, forUserId: string): string {
-  const av = match.availability;
-  const dateStr = av?.date
-    ? new Date(av.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
-    : 'TBD';
-  const timeStr = av?.startTime
-    ? new Date(av.startTime).toTimeString().slice(0, 5)
-    : '';
-  const location = av?.locationText ?? 'TBD';
-  const opponents = (match.participants ?? [])
-    .filter((p) => p.userId !== forUserId)
-    .map((p) => p.user?.name ?? 'Opponent')
-    .filter(Boolean);
-  const opponentStr = opponents.length > 0 ? opponents.join(' & ') : 'your opponent';
-  const typeLabel = match.type === 'competitive' ? 'Match' : 'Practice';
-
-  return [
-    '⏰ *Matchmaker reminder*',
-    '',
-    `Your ${typeLabel.toLowerCase()} vs ${opponentStr} is coming up.`,
-    `📅 ${dateStr}${timeStr ? ` · ${timeStr}` : ''}`,
-    `📍 ${location}`,
-    '',
-    'Good luck and have fun! 🎾',
-  ].join('\n');
-}
+import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
 
 /**
  * Process pending reminders that are due. Send WhatsApp, mark as sent/failed.
@@ -47,7 +17,7 @@ async function processPendingReminders() {
   const pending = await prisma.reminder.findMany({
     where: { status: 'pending', scheduledAt: { lte: now } },
     include: {
-      user: { select: { id: true, phone: true, name: true } },
+      user: { select: { id: true, phone: true, name: true, locale: true } },
       match: {
         include: {
           availability: { select: { locationText: true, date: true, startTime: true } },
@@ -87,7 +57,21 @@ async function processPendingReminders() {
         continue;
       }
 
-      const message = formatMatchMessage(reminder.match, reminder.userId);
+      const userLocale = (reminder.user as any)?.locale ?? 'es';
+      const intlLocale = resolveLocale(userLocale) === 'es' ? 'es-ES' : 'en-US';
+      const av = reminder.match.availability;
+      const dateStr = av?.date
+        ? new Date(av.date).toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'short' })
+        : 'TBD';
+      const timeStr = av?.startTime ? new Date(av.startTime).toTimeString().slice(0, 5) : '';
+      const location = av?.locationText ?? 'TBD';
+      const opponents = (reminder.match.participants ?? [])
+        .filter((p) => p.userId !== reminder.userId)
+        .map((p) => p.user?.name ?? 'Opponent')
+        .filter(Boolean);
+      const opponentStr = opponents.length > 0 ? opponents.join(' & ') : (resolveLocale(userLocale) === 'es' ? 'tu rival' : 'your opponent');
+      const whenStr = `${dateStr}${timeStr ? ` · ${timeStr}` : ''}`;
+      const message = getMessages(userLocale).reminder(opponentStr, '', '', whenStr, location);
       const result = await whatsappService.sendInviteMessage(phone, message);
 
       if (result.success) {

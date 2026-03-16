@@ -434,7 +434,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [linkCopied, setLinkCopied] = useState(false)
 
   function handleCopyInviteLink() {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/invite/tok-${Date.now()}` : ""
+    const url = typeof window !== "undefined" ? `${window.location.origin}/join/tok-${Date.now()}` : ""
     navigator.clipboard.writeText(url)
     setLinkCopied(true)
     toast.success(t("wizard.toast.linkCopied"))
@@ -483,7 +483,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold tracking-tight">
             {step === 1 && t("wizard.steps.whenWhere")}
@@ -572,11 +572,11 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
             {/* Location — optional: Place (court/club) or City, defaults to user's preferred club */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <Label className="text-base font-medium">
                   {t("wizard.location")} <span className="text-muted-foreground font-normal">{t("wizard.locationOptional")}</span>
                 </Label>
-                <div className="flex rounded-lg border border-border/60 bg-muted/30 p-0.5 text-xs">
+                <div className="flex rounded-lg border border-border/60 bg-muted/30 p-0.5 text-xs shrink-0">
                   <button
                     type="button"
                     onClick={() => setLocationType("place")}
@@ -1009,27 +1009,25 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">{t("wizard.addManuallyHint")}</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(120px,1fr)_minmax(200px,2fr)_90px_auto] sm:items-end">
+                <div className="flex flex-col gap-2">
                   <Input
                     placeholder={t("wizard.namePlaceholder")}
                     value={manualName}
                     onChange={(e) => setManualName(e.target.value)}
-                    className="w-full"
                   />
-                  <div className="min-w-0">
-                    <PhoneInput
-                      value={manualPhone}
-                      onChange={setManualPhone}
-                      defaultCountryCode="34"
+                  <PhoneInput
+                    value={manualPhone}
+                    onChange={setManualPhone}
+                    defaultCountryCode="34"
+                  />
+                  {bookingEnabled && (
+                    <Input
+                      placeholder={t("wizard.socioPlaceholder")}
+                      value={manualSocio}
+                      onChange={(e) => setManualSocio(e.target.value)}
                     />
-                  </div>
-                  <Input
-                    placeholder={t("wizard.socioPlaceholder")}
-                    value={manualSocio}
-                    onChange={(e) => setManualSocio(e.target.value)}
-                    className="w-full"
-                  />
-                  <Button variant="secondary" size="sm" className="shrink-0 sm:self-end" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={handleAddManualContact} disabled={!manualName.trim() || !manualPhone.trim()}>
                     {t("wizard.addButton")}
                   </Button>
                 </div>
@@ -1120,9 +1118,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
             {/* Response window */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-1">
                 <Label className="text-base font-medium">{t("wizard.responseWindowLabel")}</Label>
-                <span className="text-sm font-semibold text-primary">
+                <span className="text-sm font-semibold text-primary shrink-0">
                   {responseWindow < 1
                     ? t("wizard.responseWindowSec", { n: Math.round(responseWindow * 60) })
                     : responseWindow < 60
@@ -1166,9 +1164,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
             {/* Parallel candidates */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-1">
                 <Label className="text-base font-medium">{t("wizard.contactAtOnceLabel")}</Label>
-                <span className="text-sm font-semibold text-primary">
+                <span className="text-sm font-semibold text-primary shrink-0">
                   {maxParallelCandidates === 1
                     ? t("wizard.contactAtOncePerson", { n: maxParallelCandidates })
                     : t("wizard.contactAtOncePeople", { n: maxParallelCandidates })}
