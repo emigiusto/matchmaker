@@ -20,7 +20,6 @@ import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
  * Invariant: A Match always has a valid Invite and Availability.
  */
 const matchInclude = {
-  invite: true,
   availability: true,
   schedulingRequest: { select: { sportType: true, format: true } },
   participants: { include: { user: { select: { id: true, name: true } } } },
@@ -49,7 +48,6 @@ export async function listMatchesForUser(userId: string): Promise<MatchDTO[]> {
   const player = await prisma.player.findUnique({ where: { userId } });
 
   const orConditions: Prisma.MatchWhereInput[] = [
-    { invite: { inviterUserId: userId } },
     { availability: { userId } },
     { participants: { some: { userId } } },
   ];
@@ -58,7 +56,7 @@ export async function listMatchesForUser(userId: string): Promise<MatchDTO[]> {
     orConditions.push({ playerBId: player.id });
   }
 
-  // Defensive: Always fetch related Invite and Availability, sort, and deduplicate
+  // Defensive: Always fetch related Availability, sort, and deduplicate
   const matches = await prisma.match.findMany({
     where: { OR: orConditions },
     include: matchInclude,
@@ -102,7 +100,6 @@ export async function listUpcomingMatchesForUser(userId: string): Promise<MatchD
   const now = new Date();
   const player = await prisma.player.findUnique({ where: { userId } });
   const orConditions: Prisma.MatchWhereInput[] = [
-    { invite: { inviterUserId: userId } },
     { availability: { userId } },
     { participants: { some: { userId } } },
   ];
@@ -131,7 +128,6 @@ export async function listPastMatchesForUser(userId: string): Promise<MatchDTO[]
   const now = new Date();
   const player = await prisma.player.findUnique({ where: { userId } });
   const orConditions: Prisma.MatchWhereInput[] = [
-    { invite: { inviterUserId: userId } },
     { availability: { userId } },
     { participants: { some: { userId } } },
   ];
@@ -161,7 +157,7 @@ export async function listMatchesForVenue(venueId: string): Promise<MatchDTO[]> 
     include: matchInclude,
     orderBy: { scheduledAt: 'desc' },
   });
-  return matches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
+  return matches.filter((m) => !!m.availability).map(toMatchDTO);
 }
 
 
@@ -173,7 +169,6 @@ export async function listRecentMatches(limit: number, userId?: string): Promise
   if (userId) {
     const player = await prisma.player.findUnique({ where: { userId } });
     const orConditions: Prisma.MatchWhereInput[] = [
-      { invite: { inviterUserId: userId } },
       { availability: { userId } },
     ];
     if (player) {
@@ -188,7 +183,7 @@ export async function listRecentMatches(limit: number, userId?: string): Promise
     orderBy: { scheduledAt: 'desc' },
     take: limit,
   });
-  return matches.filter((m) => !!m.invite && !!m.availability).map(toMatchDTO);
+  return matches.filter((m) => !!m.availability).map(toMatchDTO);
 }
 
 /**
@@ -371,7 +366,6 @@ export async function createMatch(
   if (input.venueId) data.venue = { connect: { id: input.venueId } };
   if (input.playerAId) data.playerA = { connect: { id: input.playerAId } };
   if (input.playerBId) data.playerB = { connect: { id: input.playerBId } };
-  if (input.inviteId) data.invite = { connect: { id: input.inviteId } };
 
   const match = await db.match.create({
     data,
@@ -497,7 +491,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
   const sportType = (sr?.sportType === 'padel' || sr?.sportType === 'tennis' ? sr.sportType : 'tennis') as 'tennis' | 'padel';
   return {
     id: match.id,
-    inviteId: match.inviteId,
+    inviteId: null,
     availabilityId: match.availabilityId,
     venueId: match.venueId,
     playerAId: match.playerAId,

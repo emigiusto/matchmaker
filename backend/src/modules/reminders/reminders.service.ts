@@ -25,7 +25,6 @@ export async function createReminder(input: CreateReminderInput) {
     where: { id: matchId },
     include: {
       participants: true,
-      invite: true,
       availability: { select: { userId: true } },
     },
   });
@@ -42,10 +41,9 @@ export async function createReminder(input: CreateReminderInput) {
   }
 
   const isParticipant = match.participants.some((p) => p.userId === userId);
-  const isInviter = match.invite ? match.invite.inviterUserId === userId : false;
   const isAvailabilityOwner = match.availability?.userId === userId;
 
-  if (!isParticipant && !isInviter && !isAvailabilityOwner) {
+  if (!isParticipant && !isAvailabilityOwner) {
     throw new AppError('You are not a participant in this match', 403);
   }
 

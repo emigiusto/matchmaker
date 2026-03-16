@@ -23,7 +23,6 @@ export type RatingTx = {
   match: {
     findUnique: (args: { where: { id: string } }) => Promise<{
       id: string;
-      inviteId: string | null;
       availabilityId: string;
       venueId: string | null;
       playerAId: string | null;
