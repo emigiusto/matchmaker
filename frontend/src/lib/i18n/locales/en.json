@@ -696,6 +696,7 @@
     "viewMatch": "View match",
     "viewInvite": "View invite",
     "viewInvites": "View invites",
+    "viewAll": "View all notifications",
     "unreadSingular": "1 unread",
     "unreadPlural": "{{count}} unread",
     "atTime": "at {{time}}",

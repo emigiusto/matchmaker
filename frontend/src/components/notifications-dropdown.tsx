@@ -13,6 +13,8 @@ import {
 import { notificationsService } from "@/lib/services/notifications.service"
 import type { Notification } from "@/lib/types"
 import { getCurrentUserId } from "@/lib/current-user"
+import { useTranslation } from "@/lib/i18n"
+import { useNotificationText } from "@/lib/hooks/use-notification-text"
 
 const iconMap: Record<string, typeof Bell> = {
   invite_received: Mail,
@@ -26,6 +28,8 @@ const iconMap: Record<string, typeof Bell> = {
 
 export function NotificationsDropdown() {
   const currentUserId = getCurrentUserId()
+  const { t } = useTranslation()
+  const { getTitle, getMessage } = useNotificationText()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const unreadCount = notifications.filter((n) => !n.read).length
@@ -77,16 +81,18 @@ export function NotificationsDropdown() {
               {unreadCount}
             </span>
           )}
-          <span className="sr-only">Notifications</span>
+          <span className="sr-only">{t("notifications.title")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-96">
         <DropdownMenuLabel className="flex items-center justify-between py-3">
-          <span className="text-base font-semibold">Notifications</span>
+          <span className="text-base font-semibold">{t("notifications.title")}</span>
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary">
-                {unreadCount} new
+                {unreadCount === 1
+                  ? t("notifications.unreadSingular")
+                  : t("notifications.unreadPlural", { count: unreadCount })}
               </span>
             )}
             {unreadCount > 0 && (
@@ -97,7 +103,7 @@ export function NotificationsDropdown() {
                 onClick={handleMarkAllRead}
               >
                 <Check className="mr-1 h-3 w-3" />
-                Mark all as read
+                {t("notifications.markAllRead")}
               </Button>
             )}
           </div>
@@ -106,11 +112,11 @@ export function NotificationsDropdown() {
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading…
+            {t("common.loading")}
           </div>
         ) : notifications.length === 0 ? (
           <div className="py-6 text-center text-sm text-muted-foreground">
-            No notifications
+            {t("notifications.noNotifications")}
           </div>
         ) : (
           notifications.slice(0, 5).map((notification) => {
@@ -143,10 +149,10 @@ export function NotificationsDropdown() {
                         : "font-medium text-foreground"
                     }`}
                   >
-                    {notification.title}
+                    {getTitle(notification)}
                   </p>
                   <p className="text-sm leading-snug text-muted-foreground line-clamp-2">
-                    {notification.message}
+                    {getMessage(notification)}
                   </p>
                 </div>
                 {!notification.read && (
@@ -175,7 +181,7 @@ export function NotificationsDropdown() {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild className="justify-center py-3">
           <Link to="/notifications" className="text-base font-medium text-primary">
-            View all notifications
+            {t("notifications.viewAll")}
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

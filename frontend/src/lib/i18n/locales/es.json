@@ -696,6 +696,7 @@
     "viewMatch": "Ver partido",
     "viewInvite": "Ver invitación",
     "viewInvites": "Ver invitaciones",
+    "viewAll": "Ver todas las notificaciones",
     "unreadSingular": "1 no leída",
     "unreadPlural": "{{count}} no leídas",
     "atTime": "a las {{time}}",

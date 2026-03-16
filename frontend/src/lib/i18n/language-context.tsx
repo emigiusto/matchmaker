@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState } from "react"
 import type { ReactNode } from "react"
 
 type Language = "en" | "es"
@@ -10,19 +10,15 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("en")
+function detectLanguage(): Language {
+  const saved = localStorage.getItem("language")
+  if (saved === "en" || saved === "es") return saved
+  const browserLang = navigator.language?.toLowerCase() ?? ""
+  return browserLang.startsWith("en") ? "en" : "es"
+}
 
-  useEffect(() => {
-    const savedLanguage = localStorage.getItem("language") as Language | null
-    if (savedLanguage && (savedLanguage === "en" || savedLanguage === "es")) {
-      setLanguageState(savedLanguage)
-    } else {
-      // Detect browser language; default to "es"
-      const browserLang = navigator.language?.toLowerCase() ?? ""
-      setLanguageState(browserLang.startsWith("en") ? "en" : "es")
-    }
-  }, [])
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(detectLanguage)
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang)
