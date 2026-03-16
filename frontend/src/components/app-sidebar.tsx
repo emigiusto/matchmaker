@@ -8,6 +8,7 @@ import {
   CirclePlay,
   Zap,
   LogOut,
+  BookUser,
 } from "lucide-react"
 import {
   Sidebar,
@@ -61,11 +62,11 @@ export function AppSidebar() {
       .catch(() => {})
   }, [currentUserId])
 
-  // v1: Dashboard, My Invites, Matches
   const mainNav = [
     { title: t("navigation.dashboard"), href: "/dashboard", icon: LayoutDashboard },
     { title: t("navigation.myInvites"), href: "/play", icon: CirclePlay },
     { title: t("navigation.matches"), href: "/matches", icon: Swords },
+    { title: t("navigation.contacts"), href: "/contacts", icon: BookUser },
   ]
 
   // Disabled for v1 - kept for future use
