@@ -858,8 +858,8 @@ export const schedulingService = {
 
     const candidate = request.candidates?.find((c) => c.id === candidateId);
     if (!candidate) throw new AppError('Candidate not found', 404);
-    const retryable = ['expired', 'cancelled'].includes(candidate.status);
-    if (!retryable) throw new AppError('Only expired or cancelled candidates can be retried (not declined)', 400);
+    const retryable = ['expired', 'cancelled', 'send_failed'].includes(candidate.status);
+    if (!retryable) throw new AppError('Only expired, cancelled, or send_failed candidates can be retried', 400);
 
     const maxRetry = await schedulingRepository.getMaxRetryOrder(requestId);
     const retryOrder = maxRetry + 1;

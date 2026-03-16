@@ -342,7 +342,7 @@ describe('SchedulingService', () => {
 
       await expect(
         schedulingService.retryCandidate('req1', 'cand1', 'host1')
-      ).rejects.toThrow('Only expired or cancelled candidates can be retried');
+      ).rejects.toThrow('Only expired, cancelled, or send_failed candidates can be retried');
     });
 
     it('reactivates expired request and contacts next candidates', async () => {

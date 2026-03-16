@@ -157,6 +157,10 @@ export default function InviteDetailsPage() {
     candidateId: string
     contactName: string
   } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{
+    candidateId: string
+    action: "accept" | "cancel" | "retry" | "cancelAccepted"
+  } | null>(null)
 
   const fetchRequest = useCallback(async (initial = false) => {
     if (!requestId) return
@@ -217,6 +221,7 @@ export default function InviteDetailsPage() {
 
   async function handleCancelContact(candidateId: string) {
     if (!requestId) return
+    setPendingAction({ candidateId, action: "cancel" })
     try {
       const updated = await schedulingService.cancelContacted(requestId, candidateId, currentUserId)
       setRequest(updated)
@@ -224,11 +229,14 @@ export default function InviteDetailsPage() {
       toast.success(t("inviteDetails.toast.inviteCancelled"))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.cancelFailed"))
+    } finally {
+      setPendingAction(null)
     }
   }
 
   async function handleCancelAccepted(candidateId: string) {
     if (!requestId) return
+    setPendingAction({ candidateId, action: "cancelAccepted" })
     try {
       const updated = await schedulingService.cancelAccepted(requestId, candidateId, currentUserId)
       setRequest(updated)
@@ -236,11 +244,14 @@ export default function InviteDetailsPage() {
       toast.success(t("inviteDetails.toast.acceptanceCancelled"))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.cancelAcceptanceFailed"))
+    } finally {
+      setPendingAction(null)
     }
   }
 
   async function handleManualAccept(candidateId: string) {
     if (!requestId) return
+    setPendingAction({ candidateId, action: "accept" })
     try {
       const updated = await schedulingService.manualAccept(requestId, candidateId, currentUserId)
       setRequest(updated)
@@ -249,11 +260,14 @@ export default function InviteDetailsPage() {
       toast.success(t("inviteDetails.toast.candidateAccepted"))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.acceptFailed"))
+    } finally {
+      setPendingAction(null)
     }
   }
 
   async function handleRetry(candidateId: string) {
     if (!requestId) return
+    setPendingAction({ candidateId, action: "retry" })
     try {
       const updated = await schedulingService.retry(requestId, candidateId, currentUserId)
       setRequest(updated)
@@ -261,6 +275,8 @@ export default function InviteDetailsPage() {
       toast.success(t("inviteDetails.toast.retryQueued"))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.retryFailed"))
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -519,47 +535,63 @@ export default function InviteDetailsPage() {
                   <div className="flex items-center gap-1">
                     {displayStatus !== "matched" &&
                       displayStatus !== "cancelled" &&
-                      (uiStatus === "pending" || uiStatus === "contacted" || uiStatus === "no_response" || uiStatus === "cancelled") && (
-                        <button
-                          onClick={() => setAcceptConfirm({ candidateId: candidate.id, contactName })}
-                          title={t("invites.actions.accept")}
-                          className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10"
-                        >
-                          <UserCheck className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                      (uiStatus === "pending" || uiStatus === "contacted" || uiStatus === "no_response" || uiStatus === "cancelled") && (() => {
+                        const busy = pendingAction?.candidateId === candidate.id && pendingAction.action === "accept"
+                        return (
+                          <button
+                            onClick={() => setAcceptConfirm({ candidateId: candidate.id, contactName })}
+                            disabled={!!pendingAction}
+                            title={t("invites.actions.accept")}
+                            className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10 disabled:opacity-50"
+                          >
+                            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
+                          </button>
+                        )
+                      })()}
                     {displayStatus !== "matched" &&
                       displayStatus !== "cancelled" &&
-                      uiStatus === "contacted" && (
-                        <button
-                          onClick={() => handleCancelContact(candidate.id)}
-                          title={t("invites.actions.cancelInvite")}
-                          className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                      uiStatus === "contacted" && (() => {
+                        const busy = pendingAction?.candidateId === candidate.id && pendingAction.action === "cancel"
+                        return (
+                          <button
+                            onClick={() => handleCancelContact(candidate.id)}
+                            disabled={!!pendingAction}
+                            title={t("invites.actions.cancelInvite")}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                          >
+                            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                          </button>
+                        )
+                      })()}
                     {displayStatus !== "matched" &&
                       displayStatus !== "cancelled" &&
-                      (uiStatus === "no_response" || uiStatus === "cancelled" || uiStatus === "send_failed") && (
-                        <button
-                          onClick={() => handleRetry(candidate.id)}
-                          title={t("invites.actions.retryInvite")}
-                          className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                      (uiStatus === "no_response" || uiStatus === "cancelled" || uiStatus === "send_failed") && (() => {
+                        const busy = pendingAction?.candidateId === candidate.id && pendingAction.action === "retry"
+                        return (
+                          <button
+                            onClick={() => handleRetry(candidate.id)}
+                            disabled={!!pendingAction}
+                            title={t("invites.actions.retryInvite")}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                          >
+                            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                          </button>
+                        )
+                      })()}
                     {(displayStatus === "scheduling" || displayStatus === "expired") &&
-                      uiStatus === "accepted" && (
-                        <button
-                          onClick={() => handleCancelAccepted(candidate.id)}
-                          title={t("invites.actions.cancelAcceptance")}
-                          className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                      uiStatus === "accepted" && (() => {
+                        const busy = pendingAction?.candidateId === candidate.id && pendingAction.action === "cancelAccepted"
+                        return (
+                          <button
+                            onClick={() => handleCancelAccepted(candidate.id)}
+                            disabled={!!pendingAction}
+                            title={t("invites.actions.cancelAcceptance")}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                          >
+                            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                          </button>
+                        )
+                      })()}
                   </div>
                 </div>
               )
