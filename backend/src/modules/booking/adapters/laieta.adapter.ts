@@ -48,7 +48,7 @@ export class LaietaAdapter implements BookingAdapter {
   private async login(browser: Browser, creds: ClubCredentials): Promise<string> {
     const page = await browser.newPage()
     try {
-      logger.info('[laieta] Navigating to login page')
+      logger.info(`[laieta] Navigating to login page (socio: ${creds.socioNumber})`)
       await page.goto(`${BASE_URL}/user/login`, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((err) => {
         if (this.isOfflineError(err)) {
           throw new AppError('Club booking system is offline or unreachable', 503, 'ADAPTER_OFFLINE')
@@ -80,7 +80,7 @@ export class LaietaAdapter implements BookingAdapter {
         )
       }
 
-      logger.info('[laieta] Login successful, session cookie obtained')
+      logger.info(`[laieta] Login successful, session cookie obtained (socio: ${creds.socioNumber})`)
       return sessionCookie.value
     } finally {
       await page.close()
