@@ -13,10 +13,12 @@ import { AppError } from './AppError';
 const isDev = process.env.ENVIRONMENT === 'DEVELOPMENT' || process.env.NODE_ENV !== 'production';
 
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
-  // Log error stack for diagnostics
-  // eslint-disable-next-line no-console
-  console.error('[ERROR]', err.stack || err);
   if (err instanceof AppError) {
+    // Only log server-side errors; 4xx are expected client errors
+    if (err.statusCode >= 500) {
+      // eslint-disable-next-line no-console
+      console.error('[ERROR]', err.stack || err);
+    }
     res.status(err.statusCode).json({
       message: err.message,
       errorCode: err.errorCode,
