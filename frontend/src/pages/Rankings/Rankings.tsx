@@ -131,29 +131,27 @@ export default function RankingsPage() {
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
                         {player.name.split(" ").map((n) => n[0]).join("")}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-base font-semibold text-foreground">{player.name}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground">{player.name}</p>
                           {isCurrentUser && (
-                            <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            <span className="shrink-0 rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                               You
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground">
                           {player.city} &middot; {player.matchesPlayed} matches &middot;{" "}
                           {player.matchesPlayed > 0
                             ? ((player.wins / player.matchesPlayed) * 100).toFixed(0)
                             : 0}% win rate
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-mono text-2xl font-bold text-foreground">{player.levelValue.toFixed(1)}</p>
-                        <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground">
-                          <TrendingUp className="h-3.5 w-3.5" />
-                          <span>
-                            Confidence {Math.round(player.levelConfidence * 100)}%
-                          </span>
+                      <div className="shrink-0 text-right">
+                        <p className="font-mono text-xl font-bold text-foreground">{player.levelValue.toFixed(1)}</p>
+                        <div className="hidden items-center justify-end gap-1 text-xs text-muted-foreground sm:flex">
+                          <TrendingUp className="h-3 w-3" />
+                          <span>{Math.round(player.levelConfidence * 100)}%</span>
                         </div>
                       </div>
                     </CardContent>

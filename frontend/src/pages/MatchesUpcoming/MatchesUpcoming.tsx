@@ -180,7 +180,7 @@ export default function MatchesPage() {
                                 </div>
                               </Link>
                               {/* Actions */}
-                              <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
+                              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/30 pt-3">
                                 {!isMatchInPast(match.date, match.time) && (
                                   <AddReminderDialog
                                     matchId={match.id}
@@ -267,7 +267,7 @@ export default function MatchesPage() {
                                 </div>
                               </Link>
                               {/* Actions */}
-                              <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
+                              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/30 pt-3">
                                 {!isMatchInPast(match.date, match.time) && (
                                   <AddReminderDialog
                                     matchId={match.id}

@@ -96,29 +96,29 @@ export default function PlayerProfilePage() {
         {/* Profile Header */}
         <Card className="overflow-hidden border-border/50">
           <div className="border-b border-border/40 bg-primary/5 px-6 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-5">
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-bold text-primary">
                   {player.name.split(" ").map((n) => n[0]).join("")}
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-bold tracking-tight text-foreground">
                     {player.name}
                   </h2>
-                  <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" />
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
                       {player.city}
                     </span>
                     <span className="font-mono">
                       Level {player.levelValue.toFixed(1)}
                     </span>
-                    <span className="font-mono text-xs">
+                    <span className="hidden font-mono text-xs sm:inline">
                       ({Math.round(player.levelConfidence * 100)}% confidence)
                     </span>
                   </div>
-                  <div className="mt-2 flex items-center gap-3">
-                    <span className="font-mono text-2xl font-bold text-primary">
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="font-mono text-xl font-bold text-primary">
                       {player.levelValue.toFixed(1)}
                     </span>
                     <span className="text-sm text-muted-foreground">{t("common.level")}</span>
@@ -129,6 +129,7 @@ export default function PlayerProfilePage() {
                 <Button
                   size="sm"
                   variant="outline"
+                  className="shrink-0"
                   onClick={() => toast.success(`Friend request sent to ${player.name}`)}
                 >
                   <UserPlus className="mr-1.5 h-4 w-4" />

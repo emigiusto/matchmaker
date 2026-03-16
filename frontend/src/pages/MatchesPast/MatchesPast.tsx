@@ -69,10 +69,10 @@ export default function PastMatchesPage() {
               return (
                 <Link key={match.id} to={`/matches/${match.id}`}>
                   <Card className="transition-all hover:shadow-lg">
-                    <CardContent className="flex items-center justify-between p-5">
-                      <div className="flex items-center gap-5">
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div
-                          className={`flex h-12 w-12 items-center justify-center rounded-full text-base font-bold ${
+                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-bold ${
                             isWinner
                               ? "bg-primary/10 text-primary"
                               : "bg-muted text-muted-foreground"
@@ -80,25 +80,23 @@ export default function PastMatchesPage() {
                         >
                           {opponent.name.split(" ").map((n) => n[0]).join("")}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-base font-semibold text-foreground">
-                              vs {opponent.name}
-                            </p>
-                          </div>
-                          <div className="mt-2 flex items-center gap-5 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1.5">
-                              <Calendar className="h-4 w-4" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            vs {opponent.name}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5 shrink-0" />
                               {format(new Date(match.date), "MMM d, yyyy")}
                             </span>
-                            <span className="flex items-center gap-1.5">
-                              <MapPin className="h-4 w-4" />
-                              {match.location}
+                            <span className="flex min-w-0 items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{match.location}</span>
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="ml-2 flex shrink-0 items-center gap-3">
                         {match.result && (
                           <div className="text-right">
                             <p className="font-mono text-base font-bold text-foreground">

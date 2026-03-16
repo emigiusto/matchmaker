@@ -522,7 +522,7 @@ export default function InviteDetailsPage() {
                     )}
                   </span>
                   <span
-                    className={`flex-1 ${
+                    className={`min-w-0 flex-1 truncate ${
                       uiStatus === "declined" || uiStatus === "no_response" || uiStatus === "cancelled" || uiStatus === "send_failed"
                         ? "text-muted-foreground line-through"
                         : "text-foreground"

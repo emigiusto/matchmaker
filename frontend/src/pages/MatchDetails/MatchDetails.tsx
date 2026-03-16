@@ -251,7 +251,7 @@ export default function MatchDetailPage() {
             {match.showVsLayout !== false ? (
               (match.participants ?? []).length >= 4 ? (
                 /* Doubles with teams: Team A vs Team B — all 4 players */
-                <div className="flex items-center justify-center gap-8">
+                <div className="flex items-center justify-center gap-3 sm:gap-8">
                   <div className="flex flex-col items-center gap-3">
                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("matchDetails.teamA")}</span>
                     <div className="flex flex-wrap justify-center gap-3">
@@ -293,17 +293,17 @@ export default function MatchDetailPage() {
                 </div>
               ) : (
                 /* Singles: 1 vs 1 */
-                <div className="flex items-center justify-center gap-8">
+                <div className="flex items-center justify-center gap-3 sm:gap-8">
                   <div className="flex flex-col items-center gap-2">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
                       {currentPlayer.name.split(" ").map((n) => n[0]).join("")}
                     </div>
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-foreground">{currentPlayer.name}</p>
+                    <div className="w-20 text-center">
+                      <p className="truncate text-sm font-semibold text-foreground">{currentPlayer.name}</p>
                       <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {currentPlayer.levelValue.toFixed(1)}</p>
                     </div>
                   </div>
-                  <div className="flex flex-col items-center gap-1">
+                  <div className="flex shrink-0 flex-col items-center gap-1">
                     <span className="text-2xl font-bold text-muted-foreground/40">{t("common.vs")}</span>
                     {match.result && (
                       <p className="font-mono text-lg font-bold text-foreground">
@@ -312,11 +312,11 @@ export default function MatchDetailPage() {
                     )}
                   </div>
                   <div className="flex flex-col items-center gap-2">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-lg font-bold text-muted-foreground">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-bold text-muted-foreground">
                       {opponent.name.split(" ").map((n) => n[0]).join("")}
                     </div>
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-foreground">{opponent.name}</p>
+                    <div className="w-20 text-center">
+                      <p className="truncate text-sm font-semibold text-foreground">{opponent.name}</p>
                       <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {opponent.levelValue.toFixed(1)}</p>
                     </div>
                   </div>

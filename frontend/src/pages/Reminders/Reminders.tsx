@@ -97,28 +97,28 @@ export default function RemindersPage() {
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
                   <Clock className="h-5 w-5 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-base font-semibold text-foreground">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-foreground">
                       vs {reminder.opponent}
                     </p>
-                    <span className="rounded-lg bg-muted px-2.5 py-0.5 text-sm font-medium text-muted-foreground">
+                    <span className="shrink-0 rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       {reminder.label}
                     </span>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Bell className="h-4 w-4" />
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Bell className="h-3.5 w-3.5 shrink-0" />
                       {format(new Date(reminder.matchDate), "MMM d")} at{" "}
                       {reminder.matchTime}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4" />
-                      {reminder.location}
+                    <span className="flex min-w-0 items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{reminder.location}</span>
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
