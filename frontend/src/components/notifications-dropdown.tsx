@@ -85,8 +85,8 @@ export function NotificationsDropdown() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-96">
-        <DropdownMenuLabel className="flex items-center justify-between py-3">
-          <span className="text-base font-semibold">{t("notifications.title")}</span>
+        <DropdownMenuLabel className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 py-3">
+          <span className="text-base font-semibold shrink-0">{t("notifications.title")}</span>
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary">

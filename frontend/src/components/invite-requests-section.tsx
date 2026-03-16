@@ -392,6 +392,14 @@ export function InviteRequestsSection({
   }
 
   async function handleRetryContact(requestId: string, candidateId: string) {
+    // Optimistically move candidate to "contacted" (scheduling) before the API call
+    setInviteRequests((prev) =>
+      prev.map((r) =>
+        r.id !== requestId
+          ? r
+          : { ...r, contacts: r.contacts.map((c) => c.id === candidateId ? { ...c, status: "contacted" as const } : c) }
+      )
+    )
     try {
       const updated = await schedulingService.retry(requestId, candidateId, currentUserId)
       const mapped = mapSchedulingToInviteRequest(updated, t)
@@ -401,6 +409,14 @@ export function InviteRequestsSection({
         toast.success(t("invites.toast.retryQueued"))
       }
     } catch (e) {
+      // Revert to send_failed so the user can retry again
+      setInviteRequests((prev) =>
+        prev.map((r) =>
+          r.id !== requestId
+            ? r
+            : { ...r, contacts: r.contacts.map((c) => c.id === candidateId ? { ...c, status: "send_failed" as const } : c) }
+        )
+      )
       toast.error(e instanceof Error ? e.message : t("invites.toast.retryFailed"))
     }
   }
