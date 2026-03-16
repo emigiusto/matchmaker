@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
 import { format } from "date-fns"
-import { es as esLocale, enUS } from "date-fns/locale"
+import { es as esLocale, enUS, type Locale } from "date-fns/locale"
 import { Calendar, Clock, History, MapPin, Loader2, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
