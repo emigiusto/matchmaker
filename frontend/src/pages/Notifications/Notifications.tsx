@@ -124,54 +124,52 @@ export default function NotificationsPage() {
                   !notification.read ? "border-primary/20 bg-primary/[0.02]" : ""
                 }`}
               >
-                <CardContent className="flex items-start gap-4 p-5">
+                <CardContent className="flex items-start gap-3 p-3">
                   <div
-                    className={`mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
                       notification.read
                         ? "bg-muted"
                         : "bg-primary/10"
                     }`}
                   >
                     <Icon
-                      className={`h-5 w-5 ${
+                      className={`h-4 w-4 ${
                         notification.read
                           ? "text-muted-foreground"
                           : "text-primary"
                       }`}
                     />
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p
-                          className={`text-base leading-tight ${
-                            notification.read
-                              ? "text-muted-foreground"
-                              : "font-semibold text-foreground"
-                          }`}
-                        >
-                          {getTitle(notification)}
-                        </p>
-                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                          {getMessage(notification)}
-                        </p>
-                      </div>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`text-sm leading-tight ${
+                        notification.read
+                          ? "text-muted-foreground"
+                          : "font-semibold text-foreground"
+                      }`}
+                    >
+                      {getTitle(notification)}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                      {getMessage(notification)}
+                    </p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(notification.createdAt), {
+                          addSuffix: true,
+                          locale: dateLocale,
+                        })}
+                      </p>
                       {!notification.read && (
                         <Button
                           variant="ghost"
-                          className="shrink-0 text-sm"
+                          className="shrink-0 text-xs h-7 px-2"
                           onClick={() => handleMarkRead(notification.id)}
                         >
                           {t("notifications.markRead")}
                         </Button>
                       )}
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {formatDistanceToNow(new Date(notification.createdAt), {
-                        addSuffix: true,
-                        locale: dateLocale,
-                      })}
-                    </p>
                     {notification.metadata?.matchId && (
                       <Link
                         to={`/matches/${notification.metadata.matchId}`}

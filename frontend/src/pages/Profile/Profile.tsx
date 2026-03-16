@@ -313,16 +313,16 @@ export default function ProfilePage() {
         {/* Profile header - minimal */}
         <Card className="overflow-hidden">
           <div className="border-b border-border/30 bg-primary/5 px-6 py-6">
-            <div className="flex items-center gap-6">
-              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary">
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-bold text-primary">
                 {displayName.split(" ").map((n) => n[0]).join("") || "?"}
               </div>
-              <div>
-                <h2 className="text-xl font-bold tracking-tight text-foreground">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-bold tracking-tight text-foreground">
                   {displayName}
                 </h2>
                 {user?.email && (
-                  <p className="mt-0.5 text-sm text-muted-foreground">{user.email}</p>
+                  <p className="truncate mt-0.5 text-sm text-muted-foreground">{user.email}</p>
                 )}
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function ProfilePage() {
               return (
                 <div key={club.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-4">
                   {/* Club header */}
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-foreground">{club.label}</p>
                       {membership && !isEditing && (
@@ -512,7 +512,7 @@ export default function ProfilePage() {
                       )}
                     </div>
                     {membership && !isEditing && (
-                      <div className="flex shrink-0 gap-2">
+                      <div className="flex shrink-0 flex-wrap gap-2">
                         <Button
                           variant="outline"
                           size="sm"

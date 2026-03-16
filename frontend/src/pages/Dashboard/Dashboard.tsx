@@ -35,6 +35,7 @@ function safeFormatDate(
 export default function Dashboard() {
   const currentUserId = getCurrentUserId()
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("invites")
   const [invitesRefreshTrigger, setInvitesRefreshTrigger] = useState(0)
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([])
   const [matchesLoading, setMatchesLoading] = useState(true)
@@ -87,7 +88,7 @@ export default function Dashboard() {
         {/* Hero CTA */}
         <Card className="overflow-hidden border-0 bg-primary shadow-xl shadow-primary/15">
           <CardContent className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-2xl font-bold tracking-tight text-primary-foreground sm:text-3xl">
                 {t("dashboard.nextMatch")}
               </h2>
@@ -204,7 +205,7 @@ export default function Dashboard() {
         </div>
 
         {/* Tabs: Invites | Upcoming Matches - avoids long scroll with many invites */}
-        <Tabs defaultValue="invites" className="flex flex-col gap-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <TabsList className="h-11 w-full rounded-xl bg-muted/60 px-1.5 py-1 sm:w-auto">
               <TabsTrigger value="invites" className="flex-1 gap-2 rounded-lg px-4 data-[state=active]:shadow-md sm:flex-none">
@@ -216,18 +217,19 @@ export default function Dashboard() {
                 {t("dashboard.upcomingMatches")}
               </TabsTrigger>
             </TabsList>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" className="gap-1 text-sm text-primary" asChild>
+            {activeTab === "invites" ? (
+              <Button variant="ghost" size="sm" className="gap-1 text-xs text-primary sm:text-sm" asChild>
                 <Link to="/play">
-                  {t("dashboard.viewAllInvites")} <ArrowRight className="h-4 w-4" />
+                  {t("dashboard.viewAllInvites")} <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" className="gap-1 text-sm text-primary" asChild>
+            ) : (
+              <Button variant="ghost" size="sm" className="gap-1 text-xs text-primary sm:text-sm" asChild>
                 <Link to="/matches">
-                  {t("dashboard.viewAllMatches")} <ArrowRight className="h-4 w-4" />
+                  {t("dashboard.viewAllMatches")} <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Link>
               </Button>
-            </div>
+            )}
           </div>
 
           <TabsContent value="invites" className="mt-0">
