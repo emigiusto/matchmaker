@@ -10,22 +10,18 @@ The wizard forces a fixed 1-hour window. The user picks a start time and the end
 
 Let the host specify a flexible availability window (e.g. 10:00–13:00) so that the system can find a match within any 1-hour slot inside that range. This is more realistic: most people are free for several hours and want a match to happen whenever an opponent is available.
 
+When the host has an active club connection with `bookingEnabled`, the matched slot is also court-aware: the system picks the earliest hour in the window that has a court available, using the cached full-day availability — no extra Puppeteer call at match time.
+
 ---
 
 ## Data Model Changes
 
-### `SchedulingRequest`
-
-Currently `startTime` and `endTime` define a single 1-hour slot. No schema change is needed — the fields already support arbitrary ranges. The change is purely in the UI and matching logic.
+No schema changes needed. `startTime` and `endTime` on `SchedulingRequest` already support arbitrary ranges. The change is purely in the UI and the slot-selection logic.
 
 ```
 startTime: DateTime   // e.g. 10:00
 endTime:   DateTime   // e.g. 13:00  ← currently always startTime + 1h
 ```
-
-### `Availability` (matched player side)
-
-The matched player's availability also has `startTime` / `endTime`. The overlap between the host window and the candidate window determines valid booking slots.
 
 ---
 
@@ -34,88 +30,122 @@ The matched player's availability also has `startTime` / `endTime`. The overlap 
 ### Wizard Step 1
 
 - Remove the "Duration is fixed at 1 hour" copy.
-- Make the **End time** select interactive again (same `TIME_SLOTS` array, filtered to `> startTime`).
-- Minimum range: 1 hour. Optionally show the computed duration (`2h`, `3h`, etc.) as a hint.
+- Make the **End time** select interactive (same `TIME_SLOTS` array, filtered to `> startTime`).
+- Show the computed duration (`2h`, `3h`, etc.) as a hint next to the time picker.
 
 ```tsx
-// endTimeSlots already exists:
 const endTimeSlots = TIME_SLOTS.filter((t) => t > startTime)
 ```
 
-No other wizard changes are needed.
+### Court availability across the range
+
+When Auto-book is ON, show one line per hour inside `[startTime, endTime)` instead of a single count. This lets the host see which hours have courts and adjust their window accordingly.
+
+```
+10:00 — 2 courts ✓
+11:00 — 3 courts ✓
+12:00 — 0 courts ✗
+```
+
+The full-day availability is already fetched and cached — this is a client-side filter, no extra API call.
 
 ---
 
 ## WhatsApp Invite Message
 
-Currently the invite message shows a fixed time:
-
-```
-📅 Thursday, March 19 · 10:00 AM
-```
-
-With a range, it should show:
-
-```
-📅 Thursday, March 19 · 10:00 – 13:00
-```
-
-### Where to change
-
-`backend/src/modules/scheduling/scheduling.service.ts` — the function that builds the WhatsApp invite message sent to candidates. Replace the single-time format with a range format when `startTime !== endTime - 1h`.
+**Already implemented.** The invite message already formats the time as a range (`start – end`) at line 453 of `scheduling.service.ts`:
 
 ```ts
-// Current
-const timeLabel = format(startTime, 'h:mm a')
-
-// New
-const startLabel = format(startTime, 'h:mm a')
-const endLabel   = format(endTime,   'h:mm a')
-const timeLabel  = startLabel === endLabel
-  ? startLabel
-  : `${startLabel} – ${endLabel}`
+const timeStr = `${formatInTz(request.startTime, ...)} - ${formatInTz(request.endTime, ...)}`
 ```
+
+No changes needed here.
 
 ---
 
-## Matching Logic Changes
+## Slot Selection at Match Time
 
 ### Current
 
-The scheduler looks for candidates whose availability overlaps the exact slot `[startTime, endTime]`.
+`scheduledAt` is always set to `request.startTime` in `completeScheduling` (lines 670–680 of `scheduling.service.ts`).
 
-### New
+### New: court-aware slot selection
 
-The scheduler should find candidates available for **at least 1 hour** within the host's window. The actual booked slot is negotiated to the earliest overlapping hour.
+When `bookingEnabled` is true and the host has an active club membership, `completeScheduling` picks the best 1-hour slot within `[startTime, endTime)` using the cached court availability — reading from Redis only, never triggering a new Puppeteer session.
 
 #### Algorithm
 
 ```
-overlap_start = max(host.startTime, candidate.startTime)
-overlap_end   = min(host.endTime,   candidate.endTime)
-overlap_hours = (overlap_end - overlap_start) in hours
+for each hour H in [request.startTime, request.endTime - 1h]:
+    if cachedAvailability has courts at H:
+        matched_slot = H
+        break
 
-if overlap_hours >= 1:
-    matched_slot_start = overlap_start
-    matched_slot_end   = overlap_start + 1h
+fallback: matched_slot = request.startTime
 ```
 
-#### Where to change
+#### `pickBestSlotInRange` helper (`booking.service.ts`)
 
-`backend/src/modules/scheduling/scheduling.service.ts` — the candidate availability query and the match creation logic. The match's `scheduledAt` should be set to `matched_slot_start`, and the booking adapter will use that time.
+```ts
+export async function pickBestSlotInRange(
+  userId: string,
+  clubSlug: string,
+  date: string,    // YYYY-MM-DD
+  sport: string,
+  startTime: string,  // HH:MM
+  endTime: string,    // HH:MM
+): Promise<string>    // returns best HH:MM, defaults to startTime
+```
+
+- Reads from `cacheGet("booking:availability:{adapterType}:{clubSlug}:{date}:{sport}")` — same key written by `checkCourtAvailability`
+- Cache miss or no courts in range → returns `startTime` (safe fallback, never blocks)
+- Pure cache read: no Puppeteer, no network call
+
+#### Where to change in `completeScheduling`
+
+```ts
+// After resolving hostUser and before building scheduledAt:
+let matchedHour = /* HH:MM from request.startTime */
+
+if (request.bookingEnabled) {
+  const hostMembership = await prisma.clubMembership.findFirst({
+    where: { userId: hostUser.id, status: 'active', encryptedPassword: { not: null } }
+  })
+  if (hostMembership) {
+    matchedHour = await pickBestSlotInRange(
+      hostUser.id,
+      hostMembership.clubSlug,
+      dateStr,
+      request.sportType,
+      startHH,  // derived from request.startTime
+      endHH,    // derived from request.endTime
+    )
+  }
+}
+
+// Build scheduledAt from date + matchedHour (replaces current request.startTime usage)
+```
+
+---
+
+## Matching Logic (Candidate Overlap) — Deferred
+
+Currently candidates are selected purely by priority order with no availability filtering. Adding availability-based overlap detection (checking if a candidate is free during the matched slot) is a separate future feature and is not part of this implementation.
 
 ---
 
 ## Booking Adapter Impact
 
-The booking adapter (`laieta.adapter.ts`) uses `time` (HH:MM) derived from `match.availability.startTime`. This does not change — the adapter always books a single 1-hour court slot at the resolved `matched_slot_start`.
+No changes. `runBookingJob` already derives `time` from `match.availability.startTime`, which will now reflect the court-aware matched slot. The adapter performs a live Puppeteer check at booking time regardless, so stale cache is handled gracefully.
 
 ---
 
 ## Summary of Files to Change
 
 | File | Change |
-|------|--------|
-| `frontend/src/components/i-want-to-play-wizard.tsx` | Re-enable end time picker |
-| `backend/src/modules/scheduling/scheduling.service.ts` | WhatsApp message range format + overlap matching logic |
+|---|---|
+| `frontend/src/components/i-want-to-play-wizard.tsx` | Unlock end time picker; show per-slot court count across range |
+| `backend/src/modules/booking/booking.service.ts` | Add `pickBestSlotInRange` helper (cache read only) |
+| `backend/src/modules/scheduling/scheduling.service.ts` | Call `pickBestSlotInRange` in `completeScheduling` to set `scheduledAt` |
 | No schema changes | `startTime`/`endTime` already support ranges |
+| No WhatsApp changes | Invite message already shows `start – end` |
