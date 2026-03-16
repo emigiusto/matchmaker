@@ -15,6 +15,7 @@ import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { ResultUploadDialog } from "@/components/result-upload-dialog"
 import { CancelMatchButton } from "@/components/cancel-match-button"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { isMatchInPast } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import type { Match } from "@/lib/types"
@@ -148,14 +149,16 @@ export default function Dashboard() {
                       </div>
                     </Link>
                     <div className="mt-3 flex items-center gap-2 border-t border-primary/20 pt-3">
-                      <AddReminderDialog
-                        matchId={match.id}
-                        matchDate={match.date}
-                        matchTime={match.time}
-                        opponent={opponent.name}
-                        location={match.location}
-                        userId={currentUserId}
-                      />
+                      {!isMatchInPast(match.date, match.time) && (
+                        <AddReminderDialog
+                          matchId={match.id}
+                          matchDate={match.date}
+                          matchTime={match.time}
+                          opponent={opponent.name}
+                          location={match.location}
+                          userId={currentUserId}
+                        />
+                      )}
                       <AddToCalendarButton
                         date={match.date}
                         time={match.time}
@@ -305,14 +308,16 @@ export default function Dashboard() {
                         </div>
                       </Link>
                       <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
-                        <AddReminderDialog
-                          matchId={match.id}
-                          matchDate={match.date}
-                          matchTime={match.time}
-                          opponent={opponent.name}
-                          location={match.location}
-                          userId={currentUserId}
-                        />
+                        {!isMatchInPast(match.date, match.time) && (
+                          <AddReminderDialog
+                            matchId={match.id}
+                            matchDate={match.date}
+                            matchTime={match.time}
+                            opponent={opponent.name}
+                            location={match.location}
+                            userId={currentUserId}
+                          />
+                        )}
                         <AddToCalendarButton
                           date={match.date}
                           time={match.time}

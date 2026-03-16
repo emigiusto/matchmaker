@@ -15,6 +15,7 @@ import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import type { Match } from "@/lib/types"
 import { useTranslation } from "@/lib/i18n"
+import { isMatchInPast } from "@/lib/utils"
 
 /** Safely format a date string; returns fallback if invalid */
 function safeFormatDate(
@@ -44,7 +45,7 @@ export default function MatchesPage() {
         matchesService.getPast(currentUserId),
       ])
       setUpcomingMatches(upcoming)
-      setPastMatches(past.filter((m) => m.date <= today))
+      setPastMatches(past.filter((m) => m.date <= today && m.status !== "cancelled"))
     } catch {
       // silently keep existing state on refetch failure
     }
@@ -61,7 +62,7 @@ export default function MatchesPage() {
         ])
         if (!cancelled) {
           setUpcomingMatches(upcoming)
-          setPastMatches(past.filter((m) => m.date <= today))
+          setPastMatches(past.filter((m) => m.date <= today && m.status !== "cancelled"))
         }
       } catch {
         if (!cancelled) {
@@ -180,14 +181,16 @@ export default function MatchesPage() {
                               </Link>
                               {/* Actions */}
                               <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
-                                <AddReminderDialog
-                                  matchId={match.id}
-                                  matchDate={match.date}
-                                  matchTime={match.time}
-                                  opponent={opponent.name}
-                                  location={match.location}
-                                  userId={currentUserId}
-                                />
+                                {!isMatchInPast(match.date, match.time) && (
+                                  <AddReminderDialog
+                                    matchId={match.id}
+                                    matchDate={match.date}
+                                    matchTime={match.time}
+                                    opponent={opponent.name}
+                                    location={match.location}
+                                    userId={currentUserId}
+                                  />
+                                )}
                                 <AddToCalendarButton
                                   date={match.date}
                                   time={match.time}
@@ -265,14 +268,16 @@ export default function MatchesPage() {
                               </Link>
                               {/* Actions */}
                               <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-3">
-                                <AddReminderDialog
-                                  matchId={match.id}
-                                  matchDate={match.date}
-                                  matchTime={match.time}
-                                  opponent={opponent.name}
-                                  location={match.location}
-                                  userId={currentUserId}
-                                />
+                                {!isMatchInPast(match.date, match.time) && (
+                                  <AddReminderDialog
+                                    matchId={match.id}
+                                    matchDate={match.date}
+                                    matchTime={match.time}
+                                    opponent={opponent.name}
+                                    location={match.location}
+                                    userId={currentUserId}
+                                  />
+                                )}
                                 <AddToCalendarButton
                                   date={match.date}
                                   time={match.time}

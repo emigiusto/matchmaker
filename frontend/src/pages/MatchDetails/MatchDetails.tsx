@@ -38,6 +38,7 @@ import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
+import { isMatchInPast } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
@@ -495,7 +496,7 @@ export default function MatchDetailPage() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {(match.status === "scheduled" || match.status === "awaiting_confirmation") && (
+            {(match.status === "scheduled" || match.status === "awaiting_confirmation") && !isMatchInPast(match.date, match.time) && (
               <div className="mb-4">
                 <AddReminderDialog
                   matchId={match.id}
