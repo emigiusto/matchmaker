@@ -73,9 +73,7 @@ import { cn } from "@/lib/utils"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { usersService } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
-import { groupsService } from "@/lib/services/groups.service"
-import { friendshipsService } from "@/lib/services/friendships.service"
-import { guestContactsService } from "@/lib/services/guest-contacts.service"
+import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
 import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO, type CourtAvailabilityResult } from "@/lib/services/booking.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import { useTranslation } from "@/lib/i18n"
@@ -109,10 +107,14 @@ interface Contact {
   name: string
 }
 
-/** User or GuestContact for the "All contacts" picker */
-type AvailableContact =
-  | { id: string; name: string; type: "user" }
-  | { id: string; name: string; type: "guestContact"; phone: string; socioNumber?: string }
+/** A contact from the user's address book, for the contacts picker */
+type AvailableContact = {
+  id: string        // contactId (not userId)
+  name: string
+  phone: string
+  linkedUserId: string | null
+  socioNumbers: Record<string, string>
+}
 
 function SortableContactItem({
   contact,
@@ -189,8 +191,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [responseWindow, setResponseWindow] = useState<number>(defaultResponseWindow) // minutes (can be fractional)
   const [maxParallelCandidates, setMaxParallelCandidates] = useState(1) // 1–3 contacts reached out at once
   const [availableContacts, setAvailableContacts] = useState<AvailableContact[]>([])
-  const [groupsWithMembers, setGroupsWithMembers] = useState<import("@/lib/services/groups.service").GroupWithMembersDTO[]>([])
-  const [friends, setFriends] = useState<import("@/lib/services/friendships.service").Friend[]>([])
+  const [contactLists, setContactLists] = useState<ContactListDTO[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [bookingEnabled, setBookingEnabled] = useState(false)
   const [clubMemberships, setClubMemberships] = useState<ClubMembershipDTO[]>([])
@@ -198,8 +199,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [courtAvailability, setCourtAvailability] = useState<CourtAvailabilityResult | null>(null)
   const [courtAvailabilityLoading, setCourtAvailabilityLoading] = useState(false)
   const [courtAvailabilityError, setCourtAvailabilityError] = useState<string | null>(null)
-  // Maps userId → { gcId, socioNumber } for guest contacts in the priority list
-  const [gcMeta, setGcMeta] = useState<Record<string, { gcId: string; socioNumber: string }>>({})
+  // Maps userId → { contactId, socioNumbers } for contacts in the priority list
+  const [contactMeta, setContactMeta] = useState<Record<string, { contactId: string; socioNumbers: Record<string, string> }>>({})
   const [socioEdits, setSocioEdits] = useState<Record<string, string>>({})
   const [savingSocio, setSavingSocio] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -208,7 +209,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [manualSocio, setManualSocio] = useState("")
   const [showManualAdd, setShowManualAdd] = useState(false)
   const [searchFromList, setSearchFromList] = useState("")
-  const [searchFriends, setSearchFriends] = useState("")
   const [searchAllContacts, setSearchAllContacts] = useState("")
 
   function resetWizard() {
@@ -285,61 +285,30 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     })
   }, [bookingEnabled, date, sport, selectedMembershipId, clubMemberships, hostUserId])
 
-  // Fetch contacts for step 3: users, groups, friends, guest contacts
+  // Fetch contacts for step 3: contacts + lists (2 calls instead of 4)
   useEffect(() => {
     if (!open || !hostUserId) return
     setContactsLoading(true)
     Promise.all([
-      usersService.getAll(),
-      groupsService.listWithMembers(hostUserId).catch(() => []),
-      friendshipsService.listFriends(hostUserId).catch(() => []),
-      guestContactsService.listByOwner(hostUserId).catch(() => []),
+      contactsService.list(hostUserId).catch(() => [] as ContactDTO[]),
+      contactsService.listLists(hostUserId).catch(() => [] as ContactListDTO[]),
     ])
-      .then(([users, groups, friendsList, guestContacts]) => {
-        const withPhone = users.filter(
-          (u) => u.phone && u.id !== hostUserId && (u.name || u.email || u.id)
-        )
-        const userPhones = new Set(withPhone.map((u) => u.phone).filter(Boolean))
-        const userContacts: AvailableContact[] = withPhone.map((u) => ({
-          id: u.id,
-          name: u.name || u.email || "Unknown",
-          type: "user" as const,
-        }))
-        const gcContacts: AvailableContact[] = guestContacts
-          .filter((c) => !userPhones.has(c.phone))
+      .then(([contacts, lists]) => {
+        const ac: AvailableContact[] = contacts
+          .filter((c) => c.linkedUserId !== hostUserId)
           .map((c) => ({
             id: c.id,
             name: c.name,
-            type: "guestContact" as const,
             phone: c.phone,
-            socioNumber: c.socioNumber,
+            linkedUserId: c.linkedUserId,
+            socioNumbers: c.socioNumbers,
           }))
-        setAvailableContacts([...userContacts, ...gcContacts])
-        setGroupsWithMembers(groups)
-        setFriends(friendsList)
-
-        // Pre-populate gcMeta for guest contacts that already have a registered user account.
-        // These appear as type "user" in the picker (phone matched), so addAvailableContact
-        // won't populate gcMeta for them. Cross-reference by phone number here.
-        const phoneToUserId = new Map(withPhone.map((u) => [u.phone, u.id]))
-        const preloaded: Record<string, { gcId: string; socioNumber: string }> = {}
-        const preloadedEdits: Record<string, string> = {}
-        for (const gc of guestContacts) {
-          const userId = phoneToUserId.get(gc.phone)
-          if (userId) {
-            preloaded[userId] = { gcId: gc.id, socioNumber: gc.socioNumber ?? "" }
-            preloadedEdits[userId] = gc.socioNumber ?? ""
-          }
-        }
-        if (Object.keys(preloaded).length > 0) {
-          setGcMeta((prev) => ({ ...prev, ...preloaded }))
-          setSocioEdits((prev) => ({ ...prev, ...preloadedEdits }))
-        }
+        setAvailableContacts(ac)
+        setContactLists(lists)
       })
       .catch(() => {
         setAvailableContacts([])
-        setGroupsWithMembers([])
-        setFriends([])
+        setContactLists([])
         toast.error(t("wizard.toast.loadContactsFailed"))
       })
       .finally(() => setContactsLoading(false))
@@ -369,54 +338,79 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   }
 
   async function addAvailableContact(ac: AvailableContact) {
-    if (ac.type === "user") {
-      addContact({ id: ac.id, name: ac.name })
-      return
-    }
-    try {
-      const { user } = await guestContactsService.ensureUserByPhone(ac.phone, ac.name)
-      addContact({ id: user.id, name: user.name || ac.name })
-      setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: ac.id, socioNumber: ac.socioNumber ?? "" } }))
-      setSocioEdits((prev) => ({ ...prev, [user.id]: ac.socioNumber ?? "" }))
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("wizard.toast.contactFailed"))
-    }
+    // Use linkedUserId if available, otherwise the contactId itself acts as a stable key
+    const userId = ac.linkedUserId ?? ac.id
+    if (priorityList.some((c) => c.id === userId)) return
+    addContact({ id: userId, name: ac.name })
+    setContactMeta((prev) => ({
+      ...prev,
+      [userId]: { contactId: ac.id, socioNumbers: ac.socioNumbers },
+    }))
+    const activeClubSlug = selectedMembershipId
+      ? clubMemberships.find((m) => m.id === selectedMembershipId)?.clubSlug
+      : clubMemberships[0]?.clubSlug
+    setSocioEdits((prev) => ({
+      ...prev,
+      [userId]: activeClubSlug ? (ac.socioNumbers[activeClubSlug] ?? "") : "",
+    }))
   }
 
-  function addGroupMembers(group: import("@/lib/services/groups.service").GroupWithMembersDTO) {
-    const toAdd = group.members.filter(
-      (m) => m.id !== hostUserId && m.phone && !priorityList.some((c) => c.id === m.id)
+  function addListMembers(list: ContactListDTO) {
+    const toAdd = list.members.filter(
+      (m) => (m.linkedUserId ?? m.id) !== hostUserId &&
+        !priorityList.some((c) => c.id === (m.linkedUserId ?? m.id))
     )
     if (toAdd.length === 0) {
       toast.info(t("wizard.toast.allMembersAdded"))
       return
     }
+    const activeClubSlug = selectedMembershipId
+      ? clubMemberships.find((m) => m.id === selectedMembershipId)?.clubSlug
+      : clubMemberships[0]?.clubSlug
+    for (const m of toAdd) {
+      const userId = m.linkedUserId ?? m.id
+      setContactMeta((prev) => ({
+        ...prev,
+        [userId]: { contactId: m.id, socioNumbers: m.socioNumbers },
+      }))
+      setSocioEdits((prev) => ({
+        ...prev,
+        [userId]: activeClubSlug ? (m.socioNumbers[activeClubSlug] ?? "") : "",
+      }))
+    }
     setPriorityList((prev) => [
       ...prev,
-      ...toAdd.map((m) => ({ id: m.id, name: m.name })),
+      ...toAdd.map((m) => ({ id: m.linkedUserId ?? m.id, name: m.name })),
     ])
-    toast.success(`Added ${toAdd.length} from ${group.name}`)
+    toast.success(`Added ${toAdd.length} from ${list.name}`)
   }
 
   async function handleSaveSocio(userId: string) {
-    const meta = gcMeta[userId]
+    const meta = contactMeta[userId]
     if (!meta) return
     const value = (socioEdits[userId] ?? "").trim()
+    const activeClubSlug = selectedMembershipId
+      ? clubMemberships.find((m) => m.id === selectedMembershipId)?.clubSlug ?? "laieta"
+      : clubMemberships[0]?.clubSlug ?? "laieta"
     setSavingSocio(userId)
     try {
-      await guestContactsService.updateSocioNumber(meta.gcId, hostUserId, value)
-      setGcMeta((prev) => ({ ...prev, [userId]: { ...prev[userId], socioNumber: value } }))
+      await contactsService.updateSocioNumber(
+        meta.contactId,
+        hostUserId,
+        meta.socioNumbers,
+        activeClubSlug,
+        value,
+      )
+      setContactMeta((prev) => ({
+        ...prev,
+        [userId]: { ...prev[userId], socioNumbers: { ...prev[userId].socioNumbers, [activeClubSlug]: value } },
+      }))
       toast.success(t("wizard.toast.socioSaved"))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("wizard.toast.saveFailed"))
     } finally {
       setSavingSocio(null)
     }
-  }
-
-  function addFriend(friend: import("@/lib/services/friendships.service").Friend) {
-    if (friend.id === hostUserId) return
-    addContact({ id: friend.id, name: friend.name })
   }
 
   async function handleAddManualContact() {
@@ -432,14 +426,24 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       return
     }
     try {
-      const socio = manualSocio.trim()
-      const { guestContact, user } = await guestContactsService.create(hostUserId, name, phone, socio || undefined)
+      const { contact, user } = await contactsService.create(hostUserId, name, phone)
       setManualName("")
       setManualPhone("")
       setManualSocio("")
-      addContact({ id: user.id, name: user.name || name })
-      setGcMeta((prev) => ({ ...prev, [user.id]: { gcId: guestContact.id, socioNumber: socio } }))
-      setSocioEdits((prev) => ({ ...prev, [user.id]: socio }))
+      const userId = user.id
+      addContact({ id: userId, name: user.name || name })
+      setContactMeta((prev) => ({
+        ...prev,
+        [userId]: { contactId: contact.id, socioNumbers: {} },
+      }))
+      setSocioEdits((prev) => ({ ...prev, [userId]: "" }))
+      // Refresh available contacts list
+      contactsService.list(hostUserId).then((cs) =>
+        setAvailableContacts(cs.filter((c) => c.linkedUserId !== hostUserId).map((c) => ({
+          id: c.id, name: c.name, phone: c.phone,
+          linkedUserId: c.linkedUserId, socioNumbers: c.socioNumbers,
+        })))
+      ).catch(() => {})
       toast.success(t("wizard.toast.contactSaved"))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("wizard.toast.contactFailed"))
@@ -937,8 +941,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {/* Add from lists (groups) */}
-                  {groupsWithMembers.length > 0 && (
+                  {/* Add from contact lists */}
+                  {contactLists.length > 0 && (
                     <Popover onOpenChange={(open) => !open && setSearchFromList("")}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1.5">
@@ -957,62 +961,23 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                           />
                         </div>
                         <div className="max-h-48 overflow-y-auto space-y-0.5">
-                          {groupsWithMembers
-                            .filter((g) => !searchFromList.trim() || g.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
-                            .map((g) => (
+                          {contactLists
+                            .filter((l) => !searchFromList.trim() || l.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
+                            .map((l) => (
                               <button
-                                key={g.id}
-                                onClick={() => addGroupMembers(g)}
+                                key={l.id}
+                                onClick={() => addListMembers(l)}
                                 className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted"
                               >
-                                <span>{g.name}</span>
-                                <span className="text-xs text-muted-foreground">{g.members.length}</span>
+                                <span>{l.name}</span>
+                                <span className="text-xs text-muted-foreground">{l.members.length}</span>
                               </button>
                             ))}
                         </div>
                       </PopoverContent>
                     </Popover>
                   )}
-                  {/* Add friends */}
-                  {friends.filter((f) => f.type === "user" && !priorityList.some((p) => p.id === f.id)).length > 0 && (
-                    <Popover onOpenChange={(open) => !open && setSearchFriends("")}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                          <UserPlus className="h-4 w-4" />
-                          {t("wizard.friends")}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-64 p-2" align="start">
-                        <div className="relative mb-2">
-                          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            placeholder={t("wizard.searchFriends")}
-                            value={searchFriends}
-                            onChange={(e) => setSearchFriends(e.target.value)}
-                            className="h-8 pl-8"
-                          />
-                        </div>
-                        <div className="max-h-48 overflow-y-auto space-y-0.5">
-                          {friends
-                            .filter((f) => f.type === "user" && !priorityList.some((p) => p.id === f.id))
-                            .filter((f) => !searchFriends.trim() || f.name.toLowerCase().includes(searchFriends.trim().toLowerCase()))
-                            .map((f) => (
-                              <button
-                                key={f.id}
-                                onClick={() => addFriend(f)}
-                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                              >
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                                  {f.name[0] ?? "?"}
-                                </div>
-                                <span className="flex-1 text-left">{f.name}</span>
-                              </button>
-                            ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                  {/* Add from all users */}
+                  {/* Add from all contacts */}
                   <Popover onOpenChange={(open) => !open && setSearchAllContacts("")}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1.5" disabled={availableContacts.length === 0}>
@@ -1031,25 +996,28 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         />
                       </div>
                       <div className="max-h-48 overflow-y-auto space-y-0.5">
-                      {availableContacts
-                        .filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true)
-                        .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
-                        .map((ac) => (
-                          <button
-                            key={ac.type === "user" ? ac.id : `gc-${ac.id}`}
-                            onClick={() => addAvailableContact(ac)}
-                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                          >
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                              {ac.name[0] ?? "?"}
-                            </div>
-                            {ac.name}
-                          </button>
-                        ))}
+                        {availableContacts
+                          .filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id)))
+                          .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
+                          .map((ac) => (
+                            <button
+                              key={ac.id}
+                              onClick={() => addAvailableContact(ac)}
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                            >
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                                {ac.name[0] ?? "?"}
+                              </div>
+                              <span className="flex-1 text-left">{ac.name}</span>
+                              {ac.linkedUserId && (
+                                <span className="text-[10px] text-muted-foreground">✓</span>
+                              )}
+                            </button>
+                          ))}
                       </div>
-                      {availableContacts.filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true).filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase())).length === 0 && (
+                      {availableContacts.filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id))).length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                          {availableContacts.filter((ac) => ac.type === "user" ? !priorityList.some((p) => p.id === ac.id) : true).length === 0 ? t("wizard.allAdded") : t("wizard.noMatches")}
+                          {availableContacts.length === 0 ? t("wizard.noContactsYet") : t("wizard.allAdded")}
                         </p>
                       )}
                     </PopoverContent>
@@ -1169,10 +1137,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       <Input
                         className="h-8 w-28 text-sm"
                         placeholder={t("wizard.socioPlaceholder")}
-                        value={socioEdits[c.id] ?? gcMeta[c.id]?.socioNumber ?? ""}
+                        value={socioEdits[c.id] ?? ""}
                         onChange={(e) => setSocioEdits((p) => ({ ...p, [c.id]: e.target.value }))}
-                        onBlur={() => { if (gcMeta[c.id]) handleSaveSocio(c.id) }}
-                        onKeyDown={(e) => { if (e.key === "Enter" && gcMeta[c.id]) handleSaveSocio(c.id) }}
+                        onBlur={() => { if (contactMeta[c.id]) handleSaveSocio(c.id) }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && contactMeta[c.id]) handleSaveSocio(c.id) }}
                       />
                       {savingSocio === c.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                     </div>
