@@ -9,15 +9,9 @@ import {
 } from "@/components/ui/popover"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { groupsService } from "@/lib/services/groups.service"
-import { friendshipsService } from "@/lib/services/friendships.service"
-import { usersService } from "@/lib/services/users.service"
+import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { useTranslation } from "@/lib/i18n"
-
-type AvailableContact =
-  | { id: string; name: string; type: "user" }
-  | { id: string; name: string; type: "guestContact"; phone: string }
 
 interface AddContactsToInviteProps {
   requestId: string
@@ -36,9 +30,8 @@ export function AddContactsToInvite({
 }: AddContactsToInviteProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const [groups, setGroups] = useState<import("@/lib/services/groups.service").GroupWithMembersDTO[]>([])
-  const [friends, setFriends] = useState<import("@/lib/services/friendships.service").Friend[]>([])
-  const [availableContacts, setAvailableContacts] = useState<AvailableContact[]>([])
+  const [contacts, setContacts] = useState<ContactDTO[]>([])
+  const [lists, setLists] = useState<ContactListDTO[]>([])
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState("")
@@ -50,42 +43,27 @@ export function AddContactsToInvite({
     setSearch("")
     setSelectedIds(new Set())
     Promise.all([
-      groupsService.listWithMembers(hostUserId).catch(() => []),
-      friendshipsService.listFriends(hostUserId).catch(() => []),
-      usersService.getAll(),
+      contactsService.list(hostUserId).catch(() => [] as ContactDTO[]),
+      contactsService.listLists(hostUserId).catch(() => [] as ContactListDTO[]),
     ])
-      .then(([g, f, users]) => {
-        const withPhone = users.filter(
-          (u) => u.phone && u.id !== hostUserId && (u.name || u.email || u.id)
-        )
-        setGroups(g)
-        setFriends(f.filter((x) => x.type === "user"))
-        const userContacts: AvailableContact[] = withPhone.map((u) => ({
-          id: u.id,
-          name: u.name || u.email || t("common.unknown"),
-          type: "user" as const,
-        }))
-        setAvailableContacts(userContacts)
+      .then(([cs, ls]) => {
+        setContacts(cs.filter((c) => c.linkedUserId !== hostUserId))
+        setLists(ls)
       })
       .catch(() => {
-        setGroups([])
-        setFriends([])
-        setAvailableContacts([])
+        setContacts([])
+        setLists([])
         toast.error(t("wizard.toast.loadContactsFailed"))
       })
       .finally(() => setLoading(false))
   }, [open, hostUserId])
 
-  const allOptions = [
-    ...availableContacts.filter((c) => c.type === "user"),
-    ...friends.map((f) => ({ id: f.id, name: f.name })),
-  ]
-  const deduped = allOptions.filter(
-    (o, i, arr) => arr.findIndex((x) => x.id === o.id) === i && !existingContactIds.includes(o.id)
-  )
-  const filtered = deduped.filter(
-    (o) => !search.trim() || o.name.toLowerCase().includes(search.trim().toLowerCase())
-  )
+  // Resolve contact to userId (linkedUserId if available, else contactId as fallback key)
+  const resolveId = (c: ContactDTO) => c.linkedUserId ?? c.id
+
+  const filtered = contacts
+    .filter((c) => !existingContactIds.includes(resolveId(c)))
+    .filter((c) => !search.trim() || c.name.toLowerCase().includes(search.trim().toLowerCase()))
 
   async function handleAdd() {
     const ids = Array.from(selectedIds)
@@ -106,10 +84,10 @@ export function AddContactsToInvite({
     }
   }
 
-  function toggleGroupMembers(group: import("@/lib/services/groups.service").GroupWithMembersDTO) {
-    const toAdd = group.members
-      .filter((m) => m.id !== hostUserId && m.phone && !existingContactIds.includes(m.id))
-      .map((m) => m.id)
+  function toggleListMembers(list: ContactListDTO) {
+    const toAdd = list.members
+      .map(resolveId)
+      .filter((id) => id !== hostUserId && !existingContactIds.includes(id))
     if (toAdd.length === 0) {
       toast.info(t("invites.allMembersAdded"))
       return
@@ -146,20 +124,20 @@ export function AddContactsToInvite({
           </div>
         ) : (
           <>
-            {groups.length > 0 && (
+            {lists.length > 0 && (
               <div className="mb-3">
                 <p className="mb-1 text-xs font-medium text-muted-foreground">{t("invites.fromList")}</p>
                 <div className="flex flex-wrap gap-1">
-                  {groups.map((g) => (
+                  {lists.map((l) => (
                     <Button
-                      key={g.id}
+                      key={l.id}
                       variant="secondary"
                       size="sm"
                       className="h-7 text-xs"
-                      onClick={() => toggleGroupMembers(g)}
+                      onClick={() => toggleListMembers(l)}
                     >
                       <List className="mr-1 h-3 w-3" />
-                      {g.name}
+                      {l.name}
                     </Button>
                   ))}
                 </div>
@@ -175,22 +153,28 @@ export function AddContactsToInvite({
               />
             </div>
             <div className="max-h-40 overflow-y-auto space-y-0.5 rounded border p-1">
-              {filtered.slice(0, 50).map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => toggleSelection(o.id)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted",
-                    selectedIds.has(o.id) && "bg-primary/10"
-                  )}
-                >
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border">
-                    {selectedIds.has(o.id) ? "✓" : ""}
-                  </span>
-                  {o.name}
-                </button>
-              ))}
+              {filtered.slice(0, 50).map((c) => {
+                const id = resolveId(c)
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleSelection(id)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted",
+                      selectedIds.has(id) && "bg-primary/10"
+                    )}
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border">
+                      {selectedIds.has(id) ? "✓" : ""}
+                    </span>
+                    <span className="flex-1">{c.name}</span>
+                    {c.linkedUserId && (
+                      <span className="text-[10px] text-muted-foreground">✓</span>
+                    )}
+                  </button>
+                )
+              })}
               {filtered.length === 0 && (
                 <p className="px-2 py-4 text-center text-xs text-muted-foreground">
                   {t("invites.noContactsToAdd")}

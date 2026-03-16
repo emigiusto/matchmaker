@@ -42,6 +42,7 @@
     "playerInsights": "Análisis de Jugador",
     "overview": "Resumen",
     "matches": "Partidos",
+    "contacts": "Contactos",
     "personal": "Personal"
   },
   "dashboard": {
@@ -730,6 +731,49 @@
       "noMatchNoneAccepted": "Ninguno de tus contactos aceptó a tiempo.",
       "noMatchFound": "Tu invitación no encontró partido.",
       "noMatchFoundSport": "Tu invitación de {{sport}} no encontró partido."
+    }
+  },
+  "contactsPage": {
+    "pageTitle": "Contactos",
+    "pageDescription": "Gestiona tus contactos y listas",
+    "newContact": "Nuevo contacto",
+    "newList": "Nueva lista",
+    "noContacts": "Sin contactos",
+    "noContactsDesc": "Añade un contacto para invitar a partidos",
+    "noLists": "Sin listas",
+    "noListsDesc": "Crea una lista para agrupar tus contactos",
+    "lists": "Listas",
+    "allContacts": "Todos los contactos",
+    "linkedUser": "Usuario de la app",
+    "deleteContact": "Eliminar contacto",
+    "deleteList": "Eliminar lista",
+    "renameList": "Renombrar lista",
+    "addToList": "Añadir a lista",
+    "removeFromList": "Quitar de lista",
+    "editName": "Editar nombre",
+    "newContactTitle": "Nuevo contacto",
+    "newListTitle": "Nueva lista",
+    "listNamePlaceholder": "Nombre de la lista",
+    "namePlaceholder": "Nombre",
+    "phonePlaceholder": "Teléfono (ej. +34612345678)",
+    "socioLabel": "Número de socio (opcional)",
+    "socioPlaceholder": "ej. 1234",
+    "confirmDeleteContact": "¿Eliminar a {{name}}?",
+    "confirmDeleteContactDesc": "Se eliminará el contacto permanentemente. Esta acción no se puede deshacer.",
+    "confirmDeleteList": "¿Eliminar la lista «{{name}}»?",
+    "confirmDeleteListDesc": "Se eliminará la lista. Los contactos no se ven afectados.",
+    "membersCount": "{{count}} miembro",
+    "membersCount_plural": "{{count}} miembros",
+    "toast": {
+      "contactCreated": "Contacto añadido",
+      "contactDeleted": "Contacto eliminado",
+      "listCreated": "Lista creada",
+      "listDeleted": "Lista eliminada",
+      "listRenamed": "Lista renombrada",
+      "memberAdded": "Añadido a la lista",
+      "memberRemoved": "Eliminado de la lista",
+      "socioSaved": "Número de socio guardado",
+      "saveFailed": "No se pudo guardar"
     }
   },
   "profilePage": {

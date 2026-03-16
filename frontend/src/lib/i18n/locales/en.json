@@ -42,6 +42,7 @@
     "playerInsights": "Player Insights",
     "overview": "Overview",
     "matches": "Matches",
+    "contacts": "Contacts",
     "personal": "Personal"
   },
   "dashboard": {
@@ -730,6 +731,49 @@
       "noMatchNoneAccepted": "None of your contacts accepted in time.",
       "noMatchFound": "Your invite didn't find a match.",
       "noMatchFoundSport": "Your {{sport}} invite didn't find a match."
+    }
+  },
+  "contactsPage": {
+    "pageTitle": "Contacts",
+    "pageDescription": "Manage your contacts and lists",
+    "newContact": "New Contact",
+    "newList": "New List",
+    "noContacts": "No contacts yet",
+    "noContactsDesc": "Add a contact to start inviting people to matches",
+    "noLists": "No lists yet",
+    "noListsDesc": "Create a list to group your contacts",
+    "lists": "Lists",
+    "allContacts": "All Contacts",
+    "linkedUser": "App user",
+    "deleteContact": "Delete contact",
+    "deleteList": "Delete list",
+    "renameList": "Rename list",
+    "addToList": "Add to list",
+    "removeFromList": "Remove from list",
+    "editName": "Edit name",
+    "newContactTitle": "New Contact",
+    "newListTitle": "New List",
+    "listNamePlaceholder": "List name",
+    "namePlaceholder": "Name",
+    "phonePlaceholder": "Phone (e.g. +34612345678)",
+    "socioLabel": "Socio number (optional)",
+    "socioPlaceholder": "e.g. 1234",
+    "confirmDeleteContact": "Delete {{name}}?",
+    "confirmDeleteContactDesc": "This will permanently remove the contact. This cannot be undone.",
+    "confirmDeleteList": "Delete list \"{{name}}\"?",
+    "confirmDeleteListDesc": "The list will be deleted. Contacts are not affected.",
+    "membersCount": "{{count}} member",
+    "membersCount_plural": "{{count}} members",
+    "toast": {
+      "contactCreated": "Contact added",
+      "contactDeleted": "Contact deleted",
+      "listCreated": "List created",
+      "listDeleted": "List deleted",
+      "listRenamed": "List renamed",
+      "memberAdded": "Added to list",
+      "memberRemoved": "Removed from list",
+      "socioSaved": "Socio number saved",
+      "saveFailed": "Could not save"
     }
   },
   "profilePage": {

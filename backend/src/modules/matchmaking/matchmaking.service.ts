@@ -141,18 +141,19 @@ export async function findMatchCandidates(
   // Preload requester player
   const requesterPlayer = await PlayersService.findPlayerByUserIdCached(userId);
 
-  // Preload all friendships (bidirectional)
-  const friendships = await prisma.friendship.findMany({
+  // Preload contacts: who has who in their address book (bidirectional)
+  const contactLinks = await prisma.contact.findMany({
     where: {
       OR: [
-        { userId, friendUserId: { in: candidateUserIds } },
-        { friendUserId: userId, userId: { in: candidateUserIds } }
-      ]
-    }
+        { ownerUserId: userId, linkedUserId: { in: candidateUserIds } },
+        { ownerUserId: { in: candidateUserIds }, linkedUserId: userId },
+      ],
+    },
+    select: { ownerUserId: true, linkedUserId: true },
   });
-  // Build a set of friend pairs for quick lookup
+  // Build a set of contact pairs for quick lookup (ownerUserId|linkedUserId)
   const friendPairs = new Set(
-    friendships.map(f => `${f.userId}|${f.friendUserId}`)
+    contactLinks.map(c => `${c.ownerUserId}|${c.linkedUserId}`)
   );
 
   // Preload all matches between requester and candidates
@@ -181,11 +182,10 @@ export async function findMatchCandidates(
     const candidatePlayer = candidatePlayers.get(candidateAvail.userId);
 
     // --- Social proximity: explain WHY this person is suggested ---
-    // Friends: any explicit Friendship row (bidirectional) means friend
-    // TODO: In future, add status field to Friendship for pending/accepted distinction
+    // In contacts: either user has candidate in their address book, or vice versa
     // Previous opponents: check Match history (played together as playerA/playerB)
-    // Community: neither friend nor previous opponent
-    // Friends score highest, then previous opponents, then community
+    // Community: neither in contacts nor previous opponent
+    // Contacts score highest, then previous opponents, then community
     const isFriend = friendPairs.has(`${userId}|${candidateUser.id}`) || friendPairs.has(`${candidateUser.id}|${userId}`);
     let isPreviousOpponent = false;
     if (requesterPlayerId && candidatePlayer) {

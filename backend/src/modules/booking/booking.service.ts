@@ -298,27 +298,20 @@ async function runBookingJob(
         continue
       }
 
-      // 2. Check GuestContact by phone.
-      // GuestContact.phone may carry a uniqueness suffix (e.g. "+18806693669-023e-1") from
-      // seeded/test data or a deduplication mechanism. Strip everything after the first dash
-      // before comparing — real E.164 numbers never contain dashes.
+      // 2. Check Contact by phone (socioNumbers JSON map, key = clubSlug)
       const phone = participant.user?.phone
       if (phone) {
-        const hostGuestContacts = await prisma.guestContact.findMany({
-          where: { ownerUserId: hostUserId },
+        const contact = await prisma.contact.findUnique({
+          where: { ownerUserId_phone: { ownerUserId: hostUserId, phone: phone.replace(/\s+/g, '') } },
         })
-        const normalizeGcPhone = (p: string) => p.split('-')[0].replace(/\s+/g, '')
-        const participantPhoneNorm = phone.replace(/\s+/g, '')
-        const guestContact = hostGuestContacts.find(
-          (gc) => normalizeGcPhone(gc.phone) === participantPhoneNorm
-        ) ?? null
-        logger.info(`[booking] GuestContact phone match: participantPhone=${participantPhoneNorm}, found=${!!guestContact}, socioNumber=${guestContact?.socioNumber ?? 'none'}`)
-        if (guestContact?.socioNumber) {
-          participantSocioNumbers.push(guestContact.socioNumber)
+        const socioNumber = (contact?.socioNumbers as Record<string, string> | null)?.[membership.clubSlug]
+        logger.info(`[booking] Contact lookup: participantPhone=${phone}, found=${!!contact}, socioNumber=${socioNumber ?? 'none'}`)
+        if (socioNumber) {
+          participantSocioNumbers.push(socioNumber)
           continue
         }
       } else {
-        logger.info(`[booking] Participant has no phone — skipping GuestContact lookup`)
+        logger.info(`[booking] Participant has no phone — skipping Contact lookup`)
       }
 
       await failAttempt(

@@ -28,12 +28,12 @@ export function SuggestionCard({ suggestion }: SuggestionCardProps) {
       <CardContent className="p-0">
         {/* Header strip */}
         <div className="flex items-center justify-between border-b border-border/30 bg-muted/30 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-base font-bold text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-base font-bold text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
               {player.name.split(" ").map((n) => n[0]).join("")}
             </div>
-            <div>
-              <h3 className="text-base font-semibold text-foreground">{player.name}</h3>
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-semibold text-foreground">{player.name}</h3>
               <p className="font-mono text-sm text-muted-foreground">
                 Level {player.levelValue.toFixed(1)}
               </p>
@@ -52,7 +52,7 @@ export function SuggestionCard({ suggestion }: SuggestionCardProps) {
 
         <div className="px-5 py-5">
           {/* Metrics */}
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4 text-primary/60" />
               <span>{distance} km</span>
