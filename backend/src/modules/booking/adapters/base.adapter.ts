@@ -2,7 +2,7 @@
 // Interface that all club booking adapters must implement.
 // Adapters can use Puppeteer, REST API, SOAP, or any other method.
 
-import type { ClubCredentials, BookingSlot, BookingResult } from '../booking.types'
+import type { ClubCredentials, CourtAvailabilityResult, BookingResult } from '../booking.types'
 
 export interface BookingAdapter {
   /**
@@ -11,14 +11,17 @@ export interface BookingAdapter {
   testConnection(creds: ClubCredentials): Promise<boolean>
 
   /**
-   * Return available court slots for a given date and time window.
+   * Return available courts for a given date and sport.
+   * If time is omitted, all hours for the day are returned (preferred for caching).
+   * If time is provided, results are filtered to that hour (used internally by the booking job).
+   * Only available courts are included — the result is safe to cache.
    */
   checkAvailability(
     creds: ClubCredentials,
-    date: string,   // YYYY-MM-DD
-    time: string,   // HH:MM
+    date: string,    // YYYY-MM-DD
+    time?: string,   // HH:MM — omit to get all hours
     options?: { sport?: string },
-  ): Promise<BookingSlot[]>
+  ): Promise<CourtAvailabilityResult>
 
   /**
    * Book a court. Returns booking confirmation details.

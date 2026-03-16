@@ -76,7 +76,7 @@ import { playersService } from "@/lib/services/players.service"
 import { groupsService } from "@/lib/services/groups.service"
 import { friendshipsService } from "@/lib/services/friendships.service"
 import { guestContactsService } from "@/lib/services/guest-contacts.service"
-import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO } from "@/lib/services/booking.service"
+import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO, type CourtAvailabilityResult } from "@/lib/services/booking.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import { useTranslation } from "@/lib/i18n"
 
@@ -195,6 +195,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [bookingEnabled, setBookingEnabled] = useState(false)
   const [clubMemberships, setClubMemberships] = useState<ClubMembershipDTO[]>([])
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
+  const [courtAvailability, setCourtAvailability] = useState<CourtAvailabilityResult | null>(null)
+  const [courtAvailabilityLoading, setCourtAvailabilityLoading] = useState(false)
+  const [courtAvailabilityError, setCourtAvailabilityError] = useState<string | null>(null)
   // Maps userId → { gcId, socioNumber } for guest contacts in the priority list
   const [gcMeta, setGcMeta] = useState<Record<string, { gcId: string; socioNumber: string }>>({})
   const [socioEdits, setSocioEdits] = useState<Record<string, string>>({})
@@ -224,6 +227,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setPriorityList([])
     setBookingEnabled(false)
     setSelectedMembershipId(null)
+    setCourtAvailability(null)
+    setCourtAvailabilityLoading(false)
+    setCourtAvailabilityError(null)
     setShowManualAdd(false)
   }
 
@@ -247,6 +253,37 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       if (memberships.length > 0) setSelectedMembershipId(memberships[0].id)
     }).catch(() => setClubMemberships([]))
   }, [open, hostUserId])
+
+  // Fetch full-day court availability when Auto-book is ON and date is set.
+  // Keyed by date+sport+membership — changing the time picker reuses the cached result.
+  useEffect(() => {
+    if (!bookingEnabled || !date) {
+      setCourtAvailability(null)
+      setCourtAvailabilityError(null)
+      return
+    }
+    const membership = selectedMembershipId
+      ? clubMemberships.find((m) => m.id === selectedMembershipId)
+      : clubMemberships[0]
+    if (!membership) return
+
+    setCourtAvailabilityLoading(true)
+    setCourtAvailabilityError(null)
+    setCourtAvailability(null)
+
+    bookingService.checkAvailability({
+      userId: hostUserId,
+      clubSlug: membership.clubSlug,
+      date: format(date, "yyyy-MM-dd"),
+      sport,
+    }).then((result) => {
+      setCourtAvailability(result)
+    }).catch(() => {
+      setCourtAvailabilityError(t("wizard.courtAvailabilityServiceError"))
+    }).finally(() => {
+      setCourtAvailabilityLoading(false)
+    })
+  }, [bookingEnabled, date, sport, selectedMembershipId, clubMemberships, hostUserId])
 
   // Fetch contacts for step 3: users, groups, friends, guest contacts
   useEffect(() => {
@@ -514,6 +551,43 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         {/* Step 1: When & Where */}
         {step === 1 && (
           <div className="space-y-5 pt-2">
+            {/* Sport */}
+            <div className="space-y-2">
+              <Label className="text-base font-medium">{t("wizard.sport")}</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSport("tennis")}
+                  className={cn(
+                    "flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium transition-all",
+                    sport === "tennis"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border/50 text-foreground hover:border-primary/30"
+                  )}
+                >
+                  {t("sportFormat.tennis")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSport("padel")
+                    setMatchFormat("doubles")
+                  }}
+                  className={cn(
+                    "flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium transition-all",
+                    sport === "padel"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border/50 text-foreground hover:border-primary/30"
+                  )}
+                >
+                  {t("sportFormat.padel")}
+                </button>
+              </div>
+              {sport === "padel" && (
+                <p className="text-xs text-muted-foreground">{t("wizard.padelAlwaysDoubles")}</p>
+              )}
+            </div>
+
             {/* Date */}
             <div className="space-y-2">
               <Label className="text-base font-medium">{t("wizard.date")}</Label>
@@ -704,6 +778,35 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     </div>
                   )
                 })()}
+                {bookingEnabled && (
+                  <div className="border-t border-border/40 pt-3 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">{t("wizard.courtAvailability")}</p>
+                    {!date && (
+                      <p className="text-xs text-muted-foreground">{t("wizard.courtAvailabilityHint")}</p>
+                    )}
+                    {date && courtAvailabilityLoading && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        {t("wizard.checkingCourts")}
+                      </div>
+                    )}
+                    {date && !courtAvailabilityLoading && courtAvailabilityError && (
+                      <p className="text-xs text-muted-foreground">{courtAvailabilityError}</p>
+                    )}
+                    {date && !courtAvailabilityLoading && !courtAvailabilityError && courtAvailability && (() => {
+                      const count = startTime
+                        ? courtAvailability.availableCourts.filter((c) => c.time === startTime).length
+                        : courtAvailability.availableCourts.length
+                      return (
+                        <p className={`text-xs font-medium ${count > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                          {startTime
+                            ? t("wizard.availableCourts", { count, time: startTime })
+                            : t("wizard.courtAvailabilityHint")}
+                        </p>
+                      )
+                    })()}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-xl border border-border/40 bg-card px-4 py-3">
@@ -742,44 +845,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         {/* Step 2: Match Type */}
         {step === 2 && (
           <div className="space-y-5 pt-2">
-
-            {/* Sport first */}
-            <div className="space-y-2">
-              <Label className="text-base font-medium">{t("wizard.sport")}</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSport("tennis")}
-                  className={cn(
-                    "flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium transition-all",
-                    sport === "tennis"
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border/50 text-foreground hover:border-primary/30"
-                  )}
-                >
-                  {t("sportFormat.tennis")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSport("padel")
-                    // Padel is doubles-only — force doubles
-                    setMatchFormat("doubles")
-                  }}
-                  className={cn(
-                    "flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium transition-all",
-                    sport === "padel"
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border/50 text-foreground hover:border-primary/30"
-                  )}
-                >
-                  {t("sportFormat.padel")}
-                </button>
-              </div>
-              {sport === "padel" && (
-                <p className="text-xs text-muted-foreground">{t("wizard.padelAlwaysDoubles")}</p>
-              )}
-            </div>
 
             {/* Format: Singles / Doubles — padel locks to doubles */}
             <div className="space-y-2">

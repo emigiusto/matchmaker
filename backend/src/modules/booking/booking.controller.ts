@@ -7,6 +7,7 @@ import {
   getClubMembership,
   deleteClubMembership,
   testClubConnection,
+  checkCourtAvailability,
   getBookingAttemptByMatch,
   retryBookingForMatch,
   cancelBookingForMatch,
@@ -61,6 +62,19 @@ export class BookingController {
       }
       const ok = await testClubConnection(userId, clubSlug)
       res.json({ success: ok })
+    } catch (err) { next(err) }
+  }
+
+  // GET /booking/availability?userId=&clubSlug=&date=&sport=
+  static async getAvailability(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId, clubSlug, date, sport } = req.query
+      if (!userId || typeof userId !== 'string') return res.status(400).json({ error: 'Missing userId' })
+      if (!clubSlug || typeof clubSlug !== 'string') return res.status(400).json({ error: 'Missing clubSlug' })
+      if (!date || typeof date !== 'string') return res.status(400).json({ error: 'Missing date (YYYY-MM-DD)' })
+      if (!sport || typeof sport !== 'string') return res.status(400).json({ error: 'Missing sport' })
+      const result = await checkCourtAvailability(userId, clubSlug, date, sport)
+      res.json(result)
     } catch (err) { next(err) }
   }
 

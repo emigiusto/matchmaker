@@ -9,10 +9,12 @@ import { getAdapter } from './adapters/adapter.registry'
 import { logger } from '../../config/logger'
 import { whatsappService } from '../whatsapp/whatsapp.service'
 import { getMessages } from '../../lib/whatsapp-messages'
+import { cacheGet, cacheSet } from '../../shared/cache/redis'
 import type {
   UpsertClubMembershipInput,
   ClubMembershipDTO,
   BookingAttemptDTO,
+  CourtAvailabilityResult,
 } from './booking.types'
 
 // ─── ClubMembership ───────────────────────────────────────────────
@@ -99,6 +101,55 @@ export async function testClubConnection(userId: string, clubSlug: string): Prom
   })
 
   return ok
+}
+
+/**
+ * Fetch all available courts for a full day and sport.
+ * Results are cached in Redis for 15 minutes keyed by club/date/sport (no hour).
+ * The frontend filters availableCourts by time to show per-hour counts,
+ * so changing the time picker costs zero extra requests within the cache window.
+ */
+export async function checkCourtAvailability(
+  userId: string,
+  clubSlug: string,
+  date: string,   // YYYY-MM-DD
+  sport: string,  // 'tennis' | 'padel'
+): Promise<CourtAvailabilityResult> {
+  const membership = await prisma.clubMembership.findUnique({
+    where: { userId_clubSlug: { userId, clubSlug } },
+  })
+  if (!membership) throw new AppError('Club membership not found', 404)
+  if (!membership.encryptedPassword) throw new AppError('No password stored for this membership', 400)
+  if (membership.status !== 'active') throw new AppError('Club membership is not active — please verify your connection in your profile', 400)
+
+  const cacheKey = `booking:availability:${membership.adapterType}:${clubSlug}:${date}:${sport}`
+
+  try {
+    const cached = await cacheGet(cacheKey)
+    if (cached) {
+      logger.info(`[booking] Availability cache hit: ${cacheKey}`)
+      return JSON.parse(cached) as CourtAvailabilityResult
+    }
+  } catch (err) {
+    logger.warn('[booking] Cache get failed for availability:', err)
+  }
+
+  const adapter = getAdapter(membership.adapterType)
+  const creds = {
+    socioNumber: membership.socioNumber,
+    password: decrypt(membership.encryptedPassword),
+  }
+
+  logger.info(`[booking] Checking full-day court availability: clubSlug=${clubSlug}, date=${date}, sport=${sport}`)
+  const result = await adapter.checkAvailability(creds, date, undefined, { sport })
+
+  try {
+    await cacheSet(cacheKey, JSON.stringify(result), 900)
+  } catch (err) {
+    logger.warn('[booking] Cache set failed for availability:', err)
+  }
+
+  return result
 }
 
 // ─── BookingAttempt ───────────────────────────────────────────────
@@ -294,14 +345,14 @@ async function runBookingJob(
     const sportOptions = { sport }
 
     // Check availability and pick first available court
-    const slots = await adapter.checkAvailability(creds, date, time, sportOptions)
-    const slot = slots.find((s) => s.available)
-    if (!slot) {
+    const availability = await adapter.checkAvailability(creds, date, time, sportOptions)
+    const court = availability.availableCourts[0]
+    if (!court) {
       await failAttempt(attemptId, `No available courts at ${date} ${time}`)
       return
     }
 
-    const result = await adapter.book(creds, date, time, slot.courtId, participantSocioNumbers, sportOptions)
+    const result = await adapter.book(creds, date, time, court.courtId, participantSocioNumbers, sportOptions)
 
     await prisma.bookingAttempt.update({
       where: { id: attemptId },

@@ -5,6 +5,7 @@ import { BookingController } from './booking.controller'
 
 const router = Router()
 
+router.get('/availability', BookingController.getAvailability)
 router.get('/memberships', BookingController.listMemberships)
 router.put('/memberships', BookingController.upsertMembership)
 router.delete('/memberships/:clubSlug', BookingController.deleteMembership)

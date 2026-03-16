@@ -1,5 +1,17 @@
 import { apiClient } from "./api-client"
 
+export interface AvailableCourt {
+  courtId: string
+  courtName: string
+  time: string   // HH:MM — start of the slot
+}
+
+export interface CourtAvailabilityResult {
+  date: string
+  sport: string
+  availableCourts: AvailableCourt[]
+}
+
 export interface BookingAttemptDTO {
   id: string
   matchId: string
@@ -69,5 +81,14 @@ export const bookingService = {
 
   async cancelBooking(matchId: string): Promise<void> {
     await apiClient.post(`/booking/attempts/${matchId}/cancel`, {})
+  },
+
+  async checkAvailability(params: {
+    userId: string
+    clubSlug: string
+    date: string   // YYYY-MM-DD
+    sport: string  // 'tennis' | 'padel'
+  }): Promise<CourtAvailabilityResult> {
+    return apiClient.get<CourtAvailabilityResult>("/booking/availability", params)
   },
 }

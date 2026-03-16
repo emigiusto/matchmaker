@@ -4,7 +4,7 @@
 
 import puppeteer, { type Browser, type Page } from 'puppeteer'
 import type { BookingAdapter } from './base.adapter'
-import type { ClubCredentials, BookingSlot, BookingResult } from '../booking.types'
+import type { ClubCredentials, CourtAvailabilityResult, BookingResult } from '../booking.types'
 import { AppError } from '../../../shared/errors/AppError'
 import { logger } from '../../../config/logger'
 
@@ -198,12 +198,12 @@ export class LaietaAdapter implements BookingAdapter {
   async checkAvailability(
     creds: ClubCredentials,
     date: string,
-    time: string,
+    time?: string,
     options?: { sport?: string },
-  ): Promise<BookingSlot[]> {
+  ): Promise<CourtAvailabilityResult> {
     const sport = options?.sport ?? 'tennis'
     const sportId = SPORT_IDS[sport] ?? SPORT_IDS.tennis
-    const targetHour = time.slice(0, 2)  // "09" from "09:00"
+    const targetHour = time?.slice(0, 2)  // undefined → return all hours
 
     let browser: Browser | null = null
     try {
@@ -211,18 +211,21 @@ export class LaietaAdapter implements BookingAdapter {
       const sessionValue = await this.login(browser, creds)
       const url = `${BASE_URL}/infopistas/${sportId}/${this.toUrlDate(date)}`
 
-      logger.info(`[laieta] Checking availability: ${url} (sport=${sport}, hour=${targetHour})`)
+      const hourLabel = targetHour ? `hour=${targetHour}` : 'all hours'
+      logger.info(`[laieta] Checking availability: ${url} (sport=${sport}, ${hourLabel})`)
       const page = await this.openWithSession(browser, url, sessionValue)
       const courts = await this.scrapeAvailableSlots(page, targetHour)
 
-      logger.info(`[laieta] Found ${courts.length} available slots at ${date} ${targetHour}:00`)
-      return courts.map((c) => ({
-        courtId: c.courtName,
-        courtName: c.courtName,
+      logger.info(`[laieta] Found ${courts.length} available courts at ${date} (${hourLabel})`)
+      return {
         date,
-        time: `${c.hour}:00`,
-        available: true,
-      }))
+        sport,
+        availableCourts: courts.map((c) => ({
+          courtId: c.courtName,
+          courtName: c.courtName,
+          time: `${c.hour}:00`,
+        })),
+      }
     } finally {
       if (browser) await browser.close()
     }
