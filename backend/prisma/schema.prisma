@@ -26,15 +26,10 @@ model User {
   availabilities Availability[]
   notifications  Notification[]
 
-  // Social graph
-  friendships Friendship[] @relation("UserFriendships")
-  friendOf    Friendship[] @relation("FriendUser")
-
-  guestContacts GuestContact[]
-
-  // Groups
-  groupMemberships GroupMember[]
-  groupsOwned      Group[]       @relation("GroupsOwned")
+  // Contacts
+  ownedContacts     Contact[]     @relation("OwnedContacts")
+  linkedAsContact   Contact[]     @relation("LinkedContacts")
+  ownedContactLists ContactList[] @relation("OwnedContactLists")
 
   // Chat
   sentMessages Message[] @relation("SenderMessages")
@@ -46,11 +41,11 @@ model User {
 
   clubMemberships ClubMembership[]
 
-  resultsWon        Result[]        @relation("WinnerUser")
+  resultsWon Result[] @relation("WinnerUser")
 
-  schedulingRequestsAsHost     SchedulingRequest[] @relation("SchedulingHost")
-  schedulingRequestsAsHostPartner SchedulingRequest[] @relation("SchedulingHostPartner")
-  schedulingCandidatesAsContact SchedulingCandidate[] @relation("SchedulingContact")
+  schedulingRequestsAsHost        SchedulingRequest[]   @relation("SchedulingHost")
+  schedulingRequestsAsHostPartner SchedulingRequest[]   @relation("SchedulingHostPartner")
+  schedulingCandidatesAsContact   SchedulingCandidate[] @relation("SchedulingContact")
 
   @@index([createdAt])
 }
@@ -60,17 +55,17 @@ model User {
 ////////////////////////////////////////////////////////////
 
 model Player {
-  id              String   @id @default(uuid())
-  userId          String   @unique
+  id              String    @id @default(uuid())
+  userId          String    @unique
   levelValue      Float?
   levelConfidence Float?
   defaultCity     String?
-  preferredClub   String?  // Preferred court/club for I Want to Play default
+  preferredClub   String? // Preferred court/club for I Want to Play default
   latitude        Float?
   longitude       Float?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  isDeleted       Boolean  @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  isDeleted       Boolean   @default(false)
   deletedAt       DateTime?
   lastMatchAt     DateTime?
 
@@ -78,7 +73,7 @@ model Player {
   preferredSurfaces PlayerSurface[]
   matchesA          Match[]         @relation("PlayerA")
   matchesB          Match[]         @relation("PlayerB")
-  ratingHistory     RatingHistory[]   // <--- Add this line
+  ratingHistory     RatingHistory[] // <--- Add this line
 
   @@index([userId])
   @@index([levelValue])
@@ -101,44 +96,67 @@ model PlayerSurface {
 }
 
 ////////////////////////////////////////////////////////////
-// GUEST CONTACT
+// CONTACT — unified address book entry (replaces GuestContact + Friendship)
 ////////////////////////////////////////////////////////////
 
-model GuestContact {
+model Contact {
   id          String   @id @default(uuid())
   ownerUserId String
   name        String
-  phone       String
-  socioNumber String?  // optional club member number for court booking
+  phone       String // E.164 (e.g. +34612345678)
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  owner       User         @relation(fields: [ownerUserId], references: [id])
-  friendships Friendship[]
+  // When phone matches a registered User, link them for scheduling
+  linkedUserId String?
 
+  // Socio numbers per club: JSON map { clubSlug: socioNumber }
+  // e.g. { "laieta": "12345" }
+  socioNumbers Json @default("{}")
+
+  // Import metadata — ready for future mobile native contacts integration
+  importSource String? // "manual" | "native"
+  externalId   String? // device contact ID for dedup on re-import
+
+  owner      User  @relation("OwnedContacts", fields: [ownerUserId], references: [id])
+  linkedUser User? @relation("LinkedContacts", fields: [linkedUserId], references: [id])
+
+  listMemberships ContactListMember[]
+
+  @@unique([ownerUserId, phone])
+  @@unique([ownerUserId, externalId])
   @@index([ownerUserId])
-  @@index([phone])
+  @@index([linkedUserId])
 }
 
 ////////////////////////////////////////////////////////////
-// FRIENDSHIP — explicit social graph
-// Exactly one of friendUserId or guestContactId must be set
+// CONTACT LIST — named list of contacts (replaces Group)
 ////////////////////////////////////////////////////////////
 
-model Friendship {
-  id             String   @id @default(uuid())
-  userId         String
-  friendUserId   String?
-  guestContactId String?
-  createdAt      DateTime @default(now())
+model ContactList {
+  id          String   @id @default(uuid())
+  ownerUserId String
+  name        String
+  createdAt   DateTime @default(now())
 
-  user         User          @relation("UserFriendships", fields: [userId], references: [id])
-  friendUser   User?         @relation("FriendUser", fields: [friendUserId], references: [id])
-  guestContact GuestContact? @relation(fields: [guestContactId], references: [id])
+  owner   User                @relation("OwnedContactLists", fields: [ownerUserId], references: [id])
+  members ContactListMember[]
 
-  @@unique([userId, friendUserId, guestContactId])
-  @@index([userId])
-  @@index([friendUserId])
-  @@index([guestContactId])
+  @@index([ownerUserId])
+}
+
+model ContactListMember {
+  id            String   @id @default(uuid())
+  contactListId String
+  contactId     String
+  addedAt       DateTime @default(now())
+
+  contactList ContactList @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactListId, contactId])
+  @@index([contactListId])
+  @@index([contactId])
 }
 
 ////////////////////////////////////////////////////////////
@@ -146,19 +164,19 @@ model Friendship {
 ////////////////////////////////////////////////////////////
 
 model Availability {
-  id              String   @id @default(uuid())
-  userId          String
-  date            DateTime
-  startTime       DateTime
-  endTime         DateTime
-  locationText    String
-  minLevel        Float?
-  maxLevel        Float?
+  id               String             @id @default(uuid())
+  userId           String
+  date             DateTime
+  startTime        DateTime
+  endTime          DateTime
+  locationText     String
+  minLevel         Float?
+  maxLevel         Float?
   preferredSurface String?
-  status          AvailabilityStatus @default(open)
-  createdAt       DateTime @default(now())
+  status           AvailabilityStatus @default(open)
+  createdAt        DateTime           @default(now())
 
-  user    User     @relation(fields: [userId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
   matches Match[]
 
   @@index([userId])
@@ -167,10 +185,10 @@ model Availability {
 }
 
 enum AvailabilityStatus {
-  open        // Open to find matches
-  invited     // Has an invite sent
-  matched     // Match already confirmed
-  closed      // Canceled or closed by user
+  open // Open to find matches
+  invited // Has an invite sent
+  matched // Match already confirmed
+  closed // Canceled or closed by user
 }
 
 ////////////////////////////////////////////////////////////
@@ -180,27 +198,27 @@ enum AvailabilityStatus {
 /// availability.userId = creator/owner of the slot.
 ///
 model Match {
-  id               String   @id @default(uuid())
-  availabilityId   String
-  venueId          String?
-  playerAId        String?
-  playerBId        String?
-  scheduledAt      DateTime
-  createdAt        DateTime @default(now())
+  id             String   @id @default(uuid())
+  availabilityId String
+  venueId        String?
+  playerAId      String?
+  playerBId      String?
+  scheduledAt    DateTime
+  createdAt      DateTime @default(now())
 
   /// WhatsApp group ID for scheduling matches (opened via chat.whatsapp.com)
-  whatsappGroupId  String?
+  whatsappGroupId String?
 
   /// Match type (competitive or practice)
-  type             MatchType   @default(competitive)
+  type MatchType @default(competitive)
 
   /// Match lifecycle status
-  status           MatchStatus @default(scheduled)
+  status MatchStatus @default(scheduled)
 
-  availability   Availability   @relation(fields: [availabilityId], references: [id])
-  venue          Venue?         @relation(fields: [venueId], references: [id])
-  playerA        Player?        @relation("PlayerA", fields: [playerAId], references: [id])
-  playerB        Player?        @relation("PlayerB", fields: [playerBId], references: [id])
+  availability   Availability       @relation(fields: [availabilityId], references: [id])
+  venue          Venue?             @relation(fields: [venueId], references: [id])
+  playerA        Player?            @relation("PlayerA", fields: [playerAId], references: [id])
+  playerB        Player?            @relation("PlayerB", fields: [playerBId], references: [id])
   result         Result?
   bookingAttempt BookingAttempt?
   conversation   Conversation?
@@ -224,10 +242,10 @@ model Match {
 ////////////////////////////////////////////////////////////
 /// Participant in a match. team is assigned when result is loaded (A vs B).
 model MatchParticipant {
-  id       String   @id @default(uuid())
-  matchId  String
-  userId   String
-  team     String?  // 'A' | 'B' - null until result defines teams
+  id      String  @id @default(uuid())
+  matchId String
+  userId  String
+  team    String? // 'A' | 'B' - null until result defines teams
 
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
@@ -255,14 +273,14 @@ enum MatchType {
 ////////////////////////////////////////////////////////////
 
 model Result {
-  id             String   @id @default(uuid())
-  matchId        String   @unique
-  winnerUserId   String?
-  createdAt      DateTime @default(now())
+  id                String   @id @default(uuid())
+  matchId           String   @unique
+  winnerUserId      String?
+  createdAt         DateTime @default(now())
   submittedByUserId String?
 
   /// Result lifecycle status
-  status         ResultStatus @default(draft)
+  status ResultStatus @default(draft)
 
   /// Confirmation/dispute tracking
   confirmedByHostAt     DateTime?
@@ -270,9 +288,9 @@ model Result {
   disputedByHostAt      DateTime?
   disputedByOpponentAt  DateTime?
 
-  match        Match       @relation(fields: [matchId], references: [id])
-  winnerUser   User?       @relation("WinnerUser", fields: [winnerUserId], references: [id], onDelete: Restrict)
-  sets         SetResult[]
+  match      Match       @relation(fields: [matchId], references: [id])
+  winnerUser User?       @relation("WinnerUser", fields: [winnerUserId], references: [id], onDelete: Restrict)
+  sets       SetResult[]
 
   @@index([matchId])
   @@index([winnerUserId])
@@ -331,14 +349,14 @@ model Venue {
 ////////////////////////////////////////////////////////////
 
 model Reminder {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   userId      String
   matchId     String
   scheduledAt DateTime
   status      ReminderStatus @default(pending)
   sentAt      DateTime?
   error       String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime       @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
@@ -373,36 +391,6 @@ model Notification {
   @@index([type])
   @@index([readAt])
   @@index([createdAt])
-}
-
-////////////////////////////////////////////////////////////
-// GROUPS
-////////////////////////////////////////////////////////////
-
-model Group {
-  id          String   @id @default(uuid())
-  name        String
-  ownerUserId String
-  createdAt   DateTime @default(now())
-
-  owner   User          @relation("GroupsOwned", fields: [ownerUserId], references: [id])
-  members GroupMember[]
-
-  @@index([ownerUserId])
-}
-
-model GroupMember {
-  id       String   @id @default(uuid())
-  groupId  String
-  userId   String
-  joinedAt DateTime @default(now())
-
-  group Group @relation(fields: [groupId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
-
-  @@unique([groupId, userId])
-  @@index([groupId])
-  @@index([userId])
 }
 
 ////////////////////////////////////////////////////////////
@@ -446,15 +434,15 @@ model Message {
 ////////////////////////////////////////////////////////////
 
 model RatingHistory {
-  id             String   @id @default(uuid())
-  playerId       String
-  matchId        String
-  oldRating      Float
-  newRating      Float
-  delta          Float
-  oldConfidence  Float
-  newConfidence  Float
-  createdAt      DateTime @default(now())
+  id            String   @id @default(uuid())
+  playerId      String
+  matchId       String
+  oldRating     Float
+  newRating     Float
+  delta         Float
+  oldConfidence Float
+  newConfidence Float
+  createdAt     DateTime @default(now())
 
   player Player @relation(fields: [playerId], references: [id])
 
@@ -467,33 +455,33 @@ model RatingHistory {
 ////////////////////////////////////////////////////////////
 
 model SchedulingRequest {
-  id                    String                @id @default(uuid())
+  id                    String                  @id @default(uuid())
   hostUserId            String
   hostPartnerUserId     String?
   sportType             SchedulingSportType
-  format                SchedulingFormat      @default(singles)
-  matchType             SchedulingMatchType   @default(competitive)
+  format                SchedulingFormat        @default(singles)
+  matchType             SchedulingMatchType     @default(competitive)
   date                  DateTime
   startTime             DateTime
   endTime               DateTime
   locationText          String
   radiusKm              Float?
-  responseWindowMinutes Float                 @default(240)
-  maxParallelCandidates Int                   @default(1)
-  inviteToken           String                @unique
+  responseWindowMinutes Float                   @default(240)
+  maxParallelCandidates Int                     @default(1)
+  inviteToken           String                  @unique
   status                SchedulingRequestStatus @default(active)
-  bookingEnabled        Boolean               @default(false)
-  timezone              String                @default("UTC")
-  currentCandidateIndex Int                   @default(0)
-  matchId               String?               @unique
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  bookingEnabled        Boolean                 @default(false)
+  timezone              String                  @default("UTC")
+  currentCandidateIndex Int                     @default(0)
+  matchId               String?                 @unique
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
 
-  hostUser       User                 @relation("SchedulingHost", fields: [hostUserId], references: [id], onDelete: Restrict)
-  hostPartner    User?                @relation("SchedulingHostPartner", fields: [hostPartnerUserId], references: [id], onDelete: SetNull)
-  candidates     SchedulingCandidate[]
-  events         SchedulingInviteEvent[]
-  match          Match?               @relation("SchedulingMatch", fields: [matchId], references: [id], onDelete: SetNull)
+  hostUser    User                    @relation("SchedulingHost", fields: [hostUserId], references: [id], onDelete: Restrict)
+  hostPartner User?                   @relation("SchedulingHostPartner", fields: [hostPartnerUserId], references: [id], onDelete: SetNull)
+  candidates  SchedulingCandidate[]
+  events      SchedulingInviteEvent[]
+  match       Match?                  @relation("SchedulingMatch", fields: [matchId], references: [id], onDelete: SetNull)
 
   @@index([hostUserId])
   @@index([status])
@@ -523,19 +511,19 @@ enum SchedulingSportType {
 }
 
 model SchedulingCandidate {
-  id                    String                 @id @default(uuid())
-  schedulingRequestId   String
-  contactUserId         String
-  priorityOrder         Int
-  retryOrder            Int?
-  status                SchedulingCandidateStatus @default(pending)
-  contactedAt           DateTime?
-  responseAt            DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  id                  String                    @id @default(uuid())
+  schedulingRequestId String
+  contactUserId       String
+  priorityOrder       Int
+  retryOrder          Int?
+  status              SchedulingCandidateStatus @default(pending)
+  contactedAt         DateTime?
+  responseAt          DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
 
-  schedulingRequest SchedulingRequest @relation(fields: [schedulingRequestId], references: [id], onDelete: Cascade)
-  contactUser       User               @relation("SchedulingContact", fields: [contactUserId], references: [id], onDelete: Restrict)
+  schedulingRequest SchedulingRequest       @relation(fields: [schedulingRequestId], references: [id], onDelete: Cascade)
+  contactUser       User                    @relation("SchedulingContact", fields: [contactUserId], references: [id], onDelete: Restrict)
   events            SchedulingInviteEvent[]
 
   @@index([schedulingRequestId])
@@ -545,13 +533,13 @@ model SchedulingCandidate {
 }
 
 model SchedulingInviteEvent {
-  id                  String    @id @default(uuid())
+  id                  String   @id @default(uuid())
   schedulingRequestId String
   candidateId         String?
   actorUserId         String?
   action              String
   metadata            Json?
-  createdAt           DateTime  @default(now())
+  createdAt           DateTime @default(now())
 
   schedulingRequest SchedulingRequest    @relation(fields: [schedulingRequestId], references: [id], onDelete: Cascade)
   candidate         SchedulingCandidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
@@ -564,9 +552,9 @@ enum SchedulingCandidateStatus {
   contacted
   waiting_reply
   accepted
-  declined    // invitee said no (rejected)
-  expired     // no response in time
-  cancelled   // host cancelled/skipped the candidate
+  declined // invitee said no (rejected)
+  expired // no response in time
+  cancelled // host cancelled/skipped the candidate
   send_failed // WhatsApp message could not be delivered (bad/unreachable number)
 }
 
@@ -575,16 +563,16 @@ enum SchedulingCandidateStatus {
 ////////////////////////////////////////////////////////////
 
 model ClubMembership {
-  id                String              @id @default(uuid())
+  id                String               @id @default(uuid())
   userId            String
-  clubSlug          String              // e.g. "laieta"
-  adapterType       String              // e.g. "miclubonline"
+  clubSlug          String // e.g. "laieta"
+  adapterType       String // e.g. "miclubonline"
   socioNumber       String
-  encryptedPassword String?             // only needed for hosts who book courts
+  encryptedPassword String? // only needed for hosts who book courts
   status            ClubMembershipStatus @default(unverified)
   lastVerifiedAt    DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookingAttempts BookingAttempt[]
@@ -605,15 +593,15 @@ enum ClubMembershipStatus {
 ////////////////////////////////////////////////////////////
 
 model BookingAttempt {
-  id                 String         @id @default(uuid())
-  matchId            String         @unique
-  clubMembershipId   String
-  status             BookingStatus  @default(pending)
-  externalBookingId  String?        // reference from the external booking system
-  courtName          String?
-  errorMessage       String?
-  attemptedAt        DateTime       @default(now())
-  completedAt        DateTime?
+  id                String        @id @default(uuid())
+  matchId           String        @unique
+  clubMembershipId  String
+  status            BookingStatus @default(pending)
+  externalBookingId String? // reference from the external booking system
+  courtName         String?
+  errorMessage      String?
+  attemptedAt       DateTime      @default(now())
+  completedAt       DateTime?
 
   match          Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
   clubMembership ClubMembership @relation(fields: [clubMembershipId], references: [id])
