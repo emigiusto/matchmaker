@@ -1,34 +1,34 @@
 # Next Steps & Roadmap
 
-Potential improvements and next steps for both repositories, plus a plan to migrate to mobile for native contact access.
+*Last updated: 2026-03-16*
 
 ---
 
-## Backend – Potential Next Steps
+## Backend
 
 | Priority | Item | Description |
 |----------|------|-------------|
-| High | **Render startup** | Ensure Start Command is `npm run start:prod` so migrations run on each deploy (DB_* env vars required). |
-| High | **WhatsApp webhook signature** | Verify webhook requests (HMAC) so only Whapi/Wasender can POST. See [backend/docs/TECH_DEBT.md](backend/docs/TECH_DEBT.md). |
-| Medium | **Competitive / Practice** | Reintroduce match type (competitive vs practice) in API and UI. See [backend/docs/TECH_DEBT.md](backend/docs/TECH_DEBT.md). |
-| Medium | **Rate limiting** | Add rate limiting on auth, webhook, and scheduling endpoints. |
-| Medium | ~~Health check~~ | Done. `GET /health` and `GET /` return DB + Redis connectivity. |
+| High | **Apply pending migrations** | Run `npx prisma migrate deploy` with `DATABASE_URL` set: adds `User.locale` and drops the `Invite` table. Also run `npx prisma generate` to regenerate the client. |
+| High | **SocioNumber → ClubMembership** | The join-via-link form captures `socioNumber` when `bookingEnabled=true`, but it's only logged — not persisted. Create/upsert a `ClubMembership` row for the guest user so court booking can be triggered post-join. |
+| High | **WhatsApp webhook signature** | Verify incoming webhook requests (HMAC) so only Whapi/Wasender can POST. See [TECH_DEBT.md](../backend/docs/TECH_DEBT.md). |
+| Medium | **Competitive / Practice in UI** | Restore match type selector in wizard and badges across Dashboard, Matches, MatchDetails. See [TECH_DEBT.md](../backend/docs/TECH_DEBT.md). |
+| Medium | **Rate limiting** | Add rate limiting on auth, webhook, and `/scheduling/join/:token/accept` endpoints. |
+| Medium | **Reminder locale** | `reminder.job.ts` resolves user locale via `(user as any).locale` — add `locale` to the Prisma select and remove the cast. |
 | Low | **API versioning** | Introduce `/v1/` prefix for future backward compatibility. |
-| Low | **OpenAPI spec** | Auto-generate OpenAPI from Swagger for client generation. |
+| Low | **OpenAPI spec** | Auto-generate OpenAPI from controllers for client SDK generation. |
 
 ---
 
-## Frontend – Potential Next Steps
+## Frontend
 
 | Priority | Item | Description |
 |----------|------|-------------|
-| High | **Wire mock data to API** | Replace `lib/mock-data.ts` usage with real services. See [frontend/docs/INTEGRATION_NOTES.md](frontend/docs/INTEGRATION_NOTES.md). |
-| High | **API client consolidation** | Standardize on `api-client.ts` / services; deprecate `api.client.ts` and legacy `*.api.ts` files. |
-| Medium | **Invite flow wiring** | Ensure InviteConfirm uses `invitesService.getByToken`, `accept`, `decline`. |
-| Medium | **Candidate selection UX** | Improve how users pick friends/contacts for scheduling; depends on contact access (see mobile plan). |
-| Medium | **Offline support** | Service worker for basic offline caching of dashboard/invites. |
-| Low | **PWA manifest** | Add `manifest.json` for “Add to Home Screen” and basic PWA behavior. |
-| Low | **Analytics / telemetry** | Optional analytics for usage and error tracking. |
+| High | **JoinRequest socioNumber UX** | Conditionally show the socio number field only for clubs with `bookingEnabled=true`; validate format per club (e.g. numeric-only for miclubonline). |
+| Medium | **Candidate selection UX** | Improve how users pick friends/contacts for scheduling; depends on contact access (see mobile plan below). |
+| Medium | **Locale selector in profile** | Allow users to change `User.locale` (currently defaults to `"es"`). Changing it updates WhatsApp message language for that user. |
+| Medium | **Offline support** | Service worker for basic offline caching of dashboard and match views. |
+| Low | **PWA manifest** | Add `manifest.json` for "Add to Home Screen" and basic PWA behavior. |
+| Low | **Analytics / telemetry** | Optional error tracking and usage analytics. |
 
 ---
 
@@ -40,9 +40,9 @@ On the web, access to the device contact list is limited. A mobile app enables d
 
 Migrate (or extend) the frontend to a mobile app so users can:
 
-- Pick contacts from their device when adding invitees
+- Pick contacts from their device when adding scheduling candidates
 - Match phone numbers to existing users or create guest contacts
-- Keep the same scheduling, invites, and match flows
+- Keep the same scheduling and match flows
 
 ### Recommended Approach: React Native (Expo)
 
@@ -55,11 +55,11 @@ Migrate (or extend) the frontend to a mobile app so users can:
 
 **Phases:**
 
-1. **Setup** – Create `mobile/` (Expo) next to `frontend/`. Share API types and base URLs via a small shared package or copy.
-2. **Auth** – Implement Login/Signup, JWT storage (secure store), protected navigation.
-3. **Core flows** – Dashboard, I Want to Play, scheduling, invite confirm. Use native UI components.
-4. **Contact picker** – Add `expo-contacts`; show contact list, filter by phone, map to users/guests.
-5. **Push notifications** – `expo-notifications` for invites and reminders.
+1. **Setup** — Create `mobile/` (Expo) next to `frontend/`. Share API types via a small shared package or copy.
+2. **Auth** — Login/Signup, JWT storage (secure store), protected navigation.
+3. **Core flows** — Dashboard, I Want to Play, scheduling, join-via-link. Native UI components.
+4. **Contact picker** — `expo-contacts`; show contact list, filter by phone, map to users/guests.
+5. **Push notifications** — `expo-notifications` for scheduling invites and match reminders.
 
 **Contacts integration example:**
 
@@ -77,21 +77,21 @@ if (status === 'granted') {
 
 ### Alternative: Capacitor (Wrap Existing Web App)
 
-> **Detailed guide:** See [docs/CAPACITOR_MIGRATION.md](CAPACITOR_MIGRATION.md) for the full migration document.
+> **Detailed guide:** See [CAPACITOR_MIGRATION.md](CAPACITOR_MIGRATION.md).
 
 | Factor | Notes |
 |--------|-------|
 | **Code reuse** | Reuse the full Vite/React frontend. |
-| **Contacts** | Use `@capacitor-community/contacts` plugin. |
-| **Trade-off** | Less native feel; still renders a WebView. |
+| **Contacts** | `@capacitor-community/contacts` plugin. |
+| **Trade-off** | Less native feel; renders a WebView. |
 
 **Phases:**
 
 1. Add Capacitor to `frontend/`, run `npx cap add ios` and `npx cap add android`.
 2. Install `@capacitor-community/contacts`, add permission handling.
-3. Implement a “Pick from contacts” action that calls the plugin and returns phone numbers.
-4. Map phone numbers to `User` or `GuestContact` via backend; feed into existing scheduling flow.
-5. Build native apps with `npx cap sync` and open in Xcode/Android Studio.
+3. Implement "Pick from contacts" → returns phone numbers.
+4. Map phones to `User` or `GuestContact` via backend; feed into scheduling flow.
+5. Build with `npx cap sync` and open in Xcode / Android Studio.
 
 ---
 
@@ -109,11 +109,8 @@ if (status === 'granted') {
 
 ### Backend Impact
 
-- No schema changes required for contact picking; backend already supports:
-  - `User.phone` for existing users
-  - `GuestContact` for invites to non-users
-- Optional: endpoint to bulk-resolve phone numbers to users/guests for smoother UX.
+No schema changes required for contact picking. Backend already supports:
 
----
-
-*Last updated: 2026-03*
+- `User.phone` for existing users
+- `GuestContact` for non-users
+- Optional: bulk phone-number resolver endpoint for smoother UX.
