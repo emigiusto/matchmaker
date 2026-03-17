@@ -337,20 +337,38 @@ export class LaietaAdapter implements BookingAdapter {
 
       await page.click('button#edit-submit[name="reserva"]')
 
-      // Wait for post-submit navigation or inline confirmation
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {
-        // Some flows show a confirmation inline without navigating — that's fine
+      // Wait for the success alert specifically (can take 2-3s — inline, no navigation).
+      // Also race against a navigation in case the portal redirects instead.
+      await Promise.race([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }),
+        page.waitForSelector('.alert.alert-block.alert-success', { timeout: 15000 }),
+      ]).catch(() => {
+        // Neither fired — proceed and let the checks below decide
       })
 
       // Check for errors on confirmation page
       await this.checkForPageError(page)
 
-      // Try to extract a booking reference from the confirmation page
-      const bookingRef = await page.evaluate(() => {
-        const text = document.body.textContent ?? ''
-        const match = text.match(/reserva\s*[:#]?\s*([A-Z0-9\-]{4,})/i)
-        return match?.[1] ?? null
+      // Confirm that the success alert is present — if it's missing, something went wrong
+      const { hasSuccess, bookingRef, confirmationMsg } = await page.evaluate(() => {
+        const successEl = document.querySelector('.alert.alert-block.alert-success')
+        let confirmationMsg: string | null = null
+        if (successEl) {
+          const clone = successEl.cloneNode(true) as HTMLElement
+          clone.querySelectorAll('.element-invisible, .close').forEach((n) => n.remove())
+          confirmationMsg = clone.textContent?.trim() ?? null
+        }
+
+        const bodyText = document.body.textContent ?? ''
+        const match = bodyText.match(/reserva\s*[:#]?\s*([A-Z0-9\-]{4,})/i)
+        return { hasSuccess: !!successEl, bookingRef: match?.[1] ?? null, confirmationMsg }
       })
+
+      if (!hasSuccess) {
+        throw new AppError('Booking submit did not produce a success confirmation', 502, 'BOOKING_NO_CONFIRMATION')
+      }
+
+      logger.info(`[laieta] Confirmation: ${confirmationMsg ?? '(no text)'}`)
 
       const externalId = bookingRef ?? `${courtId}::${date}::${targetHour}`
       logger.info(`[laieta] Booking confirmed: court=${courtId}, ref=${externalId}`)
