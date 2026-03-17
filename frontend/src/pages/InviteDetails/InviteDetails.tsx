@@ -157,6 +157,7 @@ export default function InviteDetailsPage() {
   const [eventsLoading, setEventsLoading] = useState(true)
   const [copiedLink, setCopiedLink] = useState(false)
   const historyBottomRef = useRef<HTMLDivElement>(null)
+  const prevEventsCountRef = useRef(0)
   const [acceptConfirm, setAcceptConfirm] = useState<{
     candidateId: string
     contactName: string
@@ -210,7 +211,10 @@ export default function InviteDetailsPage() {
   }, [fetchRequest, fetchEvents])
 
   useEffect(() => {
-    historyBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    if (events.length > prevEventsCountRef.current) {
+      historyBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    }
+    prevEventsCountRef.current = events.length
   }, [events])
 
   // Poll when active
