@@ -353,6 +353,7 @@
       "inviteDeclined": "{{name}} declined",
       "inviteExpired": "No response from {{name}}",
       "candidateCancelled": "{{name}} cancelled",
+      "candidateCancelledByHost": "You cancelled {{name}}",
       "candidateRetried": "{{name}} queued for retry",
       "candidatesAdded": "{{count}} contact(s) added",
       "bookingSuccess": "Court booked{{court}}",

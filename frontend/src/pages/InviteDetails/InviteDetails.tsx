@@ -102,7 +102,7 @@ function getDisplayStatus(r: SchedulingRequestDTO) {
   return r.status
 }
 
-function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?: Record<string, string | number>) => string): string {
+function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?: Record<string, string | number>) => string, currentUserId?: string): string {
   const name = event.candidateUserName ?? t("common.unknown")
   switch (event.action) {
     case "invite_sent": return t("invites.events.inviteSent", { name })
@@ -110,7 +110,10 @@ function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?
     case "invite_link_accepted": return t("inviteDetails.events.inviteLinkAccepted", { name: event.metadata?.userName as string ?? name })
     case "invite_declined": return t("invites.events.inviteDeclined", { name })
     case "invite_expired": return t("invites.events.inviteExpired", { name })
-    case "candidate_cancelled": return t("invites.events.candidateCancelled", { name })
+    case "candidate_cancelled":
+      return event.actorUserId === currentUserId
+        ? t("invites.events.candidateCancelledByHost", { name })
+        : t("invites.events.candidateCancelled", { name })
     case "candidate_retried": return t("invites.events.candidateRetried", { name })
     case "candidates_added": {
       const count = (event.metadata?.count as number) ?? 1
@@ -638,7 +641,7 @@ export default function InviteDetailsPage() {
                         {getEventIcon(event.action)}
                       </span>
                       <div className="flex flex-1 items-baseline justify-between gap-2">
-                        <span className="text-sm text-foreground">{getEventLabel(event, t)}</span>
+                        <span className="text-sm text-foreground">{getEventLabel(event, t, currentUserId)}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">
                           {format(new Date(event.createdAt), "MMM d, HH:mm", { locale: dateLocale })}
                         </span>

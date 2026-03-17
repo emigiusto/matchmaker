@@ -470,7 +470,10 @@ export function InviteRequestsSection({
       case "invite_manually_accepted": return t("invites.events.inviteManuallyAccepted", { name })
       case "invite_declined": return t("invites.events.inviteDeclined", { name })
       case "invite_expired": return t("invites.events.inviteExpired", { name })
-      case "candidate_cancelled": return t("invites.events.candidateCancelled", { name })
+      case "candidate_cancelled":
+        return event.actorUserId === currentUserId
+          ? t("invites.events.candidateCancelledByHost", { name })
+          : t("invites.events.candidateCancelled", { name })
       case "candidate_retried": return t("invites.events.candidateRetried", { name })
       case "candidates_added": {
         const count = (event.metadata?.count as number) ?? 1

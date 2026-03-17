@@ -353,6 +353,7 @@
       "inviteDeclined": "{{name}} rechazó",
       "inviteExpired": "Sin respuesta de {{name}}",
       "candidateCancelled": "{{name}} canceló",
+      "candidateCancelledByHost": "Cancelaste a {{name}}",
       "candidateRetried": "{{name}} en cola para reintento",
       "candidatesAdded": "{{count}} contacto(s) añadido(s)",
       "bookingSuccess": "Pista reservada{{court}}",
