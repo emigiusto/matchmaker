@@ -42,6 +42,8 @@ export interface MatchDTO {
   date?: string;
   /** Time HH:mm (when included) */
   time?: string;
+  /** End time HH:mm (when included) */
+  endTime?: string;
   /** Sport type (when match created via scheduling) */
   sportType?: 'tennis' | 'padel';
   /** Format: singles or doubles (when match created via scheduling) */

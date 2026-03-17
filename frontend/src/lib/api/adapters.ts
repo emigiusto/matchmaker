@@ -25,6 +25,7 @@ export interface BackendMatchDTO {
   location?: string
   date?: string
   time?: string
+  endTime?: string
   sportType?: "tennis" | "padel"
   format?: "singles" | "doubles"
 }
@@ -300,6 +301,7 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
     player2,
     date: dateStr,
     time: timeStr,
+    endTime: dto.endTime,
     location: dto.location ?? "",
     matchType: dto.type,
     status: dto.status as Match["status"],

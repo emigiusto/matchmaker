@@ -163,6 +163,7 @@ export default function Dashboard() {
                       <AddToCalendarButton
                         date={match.date}
                         time={match.time}
+                        endTime={match.endTime}
                         location={match.location}
                         participants={
                           (match.participants ?? []).length >= 4
@@ -323,6 +324,7 @@ export default function Dashboard() {
                         <AddToCalendarButton
                           date={match.date}
                           time={match.time}
+                          endTime={match.endTime}
                           location={match.location}
                           participants={
                             (match.participants ?? []).length >= 4

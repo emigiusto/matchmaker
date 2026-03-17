@@ -52,6 +52,7 @@ export interface Match {
   player2: Player
   date: string
   time: string
+  endTime?: string
   location: string
   matchType: "competitive" | "practice"
   status: "scheduled" | "awaiting_confirmation" | "completed" | "cancelled" | "disputed"
