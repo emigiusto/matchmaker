@@ -327,12 +327,14 @@ async function runBookingJob(
       password: decrypt(membership.encryptedPassword),
     }
 
+    const tz = schedulingRequest?.timezone ?? 'UTC'
     const date = match.availability?.date
       ? new Date(match.availability.date).toISOString().slice(0, 10)
       : new Date(match.scheduledAt).toISOString().slice(0, 10)
-    const time = match.availability?.startTime
-      ? new Date(match.availability.startTime).toTimeString().slice(0, 5)
-      : new Date(match.scheduledAt).toTimeString().slice(0, 5)
+    const rawTime = match.availability?.startTime
+      ? new Date(match.availability.startTime)
+      : new Date(match.scheduledAt)
+    const time = rawTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
 
     const sport = schedulingRequest?.sportType ?? 'tennis'
     const sportOptions = { sport }

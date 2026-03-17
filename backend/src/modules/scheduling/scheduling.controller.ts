@@ -25,6 +25,7 @@ export class SchedulingController {
         hostPartnerUserId: body.hostPartnerUserId ?? null,
         candidateUserIds: body.candidateUserIds || [],
         bookingEnabled: body.bookingEnabled === true,
+        timezone: body.timezone ?? 'UTC',
       };
       const request = await schedulingService.createSchedulingRequest(input);
       res.status(201).json(request);

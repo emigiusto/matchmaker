@@ -15,13 +15,22 @@ import { validateResultMatchConsistency } from '../results/results.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
 
+/** Format a UTC Date as "HH:mm" in the given IANA timezone, falling back to UTC. */
+function formatTimeInTz(date: Date, timezone: string): string {
+  try {
+    return date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone });
+  } catch {
+    return date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' });
+  }
+}
+
 /**
  * Fetch a match by its ID. Throws AppError if not found.
  * Invariant: A Match always has a valid Invite and Availability.
  */
 const matchInclude = {
   availability: true,
-  schedulingRequest: { select: { sportType: true, format: true } },
+  schedulingRequest: { select: { sportType: true, format: true, timezone: true } },
   participants: { include: { user: { select: { id: true, name: true } } } },
 } as const;
 
@@ -472,8 +481,8 @@ export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<
 
 
 type EnrichedMatch = Match & {
-  availability?: { locationText: string; date: Date; startTime: Date } | null;
-  schedulingRequest?: { sportType: string; format: string } | null;
+  availability?: { locationText: string; date: Date; startTime: Date; endTime: Date } | null;
+  schedulingRequest?: { sportType: string; format: string; timezone?: string | null } | null;
   participants?: { userId: string; team: string | null; user?: { id: string; name: string | null } }[];
 };
 
@@ -506,7 +515,8 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     ...(av && {
       location: av.locationText,
       date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),
-      time: av.startTime instanceof Date ? av.startTime.toTimeString().slice(0, 5) : String(av.startTime).slice(0, 5),
+      time: formatTimeInTz(av.startTime instanceof Date ? av.startTime : new Date(av.startTime), sr?.timezone ?? 'UTC'),
+      endTime: formatTimeInTz(av.endTime instanceof Date ? av.endTime : new Date(av.endTime), sr?.timezone ?? 'UTC'),
     }),
   };
 }
