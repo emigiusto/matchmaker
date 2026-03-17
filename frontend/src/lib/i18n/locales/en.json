@@ -270,6 +270,7 @@
     "checkingCourts": "Checking available courts…",
     "availableCourts": "{{count}} court(s) available at {{time}}",
     "courtAvailabilityServiceError": "Court availability service is not available at the moment.",
+    "courtAvailabilityTimeout": "Court availability check timed out. Auto-book has been disabled.",
     "continue": "Continue",
     "sport": "Sport",
     "padelAlwaysDoubles": "Padel is always doubles — format is set automatically.",

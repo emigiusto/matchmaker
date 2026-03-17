@@ -255,6 +255,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
   // Fetch full-day court availability when Auto-book is ON and date is set.
   // Keyed by date+sport+membership — changing the time picker reuses the cached result.
+  // Disables the toggle if the check doesn't return within the timeout.
   useEffect(() => {
     if (!bookingEnabled || !date) {
       setCourtAvailability(null)
@@ -270,18 +271,38 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setCourtAvailabilityError(null)
     setCourtAvailability(null)
 
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      setBookingEnabled(false)
+      setCourtAvailabilityLoading(false)
+      toast.warning(t("wizard.courtAvailabilityTimeout"))
+    }, 20_000)
+
     bookingService.checkAvailability({
       userId: hostUserId,
       clubSlug: membership.clubSlug,
       date: format(date, "yyyy-MM-dd"),
       sport,
     }).then((result) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
       setCourtAvailability(result)
+      setCourtAvailabilityLoading(false)
     }).catch(() => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
       setCourtAvailabilityError(t("wizard.courtAvailabilityServiceError"))
-    }).finally(() => {
       setCourtAvailabilityLoading(false)
     })
+
+    return () => {
+      settled = true
+      clearTimeout(timeout)
+    }
   }, [bookingEnabled, date, sport, selectedMembershipId, clubMemberships, hostUserId])
 
   // Fetch contacts for step 3: contacts + lists (2 calls instead of 4)
@@ -323,7 +344,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setEndTime(addOneHour(val))
   }
 
-  const canProceedStep1 = date && startTime
+  const canProceedStep1 = date && startTime && !(bookingEnabled && courtAvailabilityLoading)
   const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""

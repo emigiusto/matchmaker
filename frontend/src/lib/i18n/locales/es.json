@@ -270,6 +270,7 @@
     "checkingCourts": "Comprobando pistas disponibles…",
     "availableCourts": "{{count}} pista(s) disponible(s) a las {{time}}",
     "courtAvailabilityServiceError": "El servicio de disponibilidad de pistas no está disponible en este momento.",
+    "courtAvailabilityTimeout": "La comprobación de pistas ha tardado demasiado. La reserva automática ha sido desactivada.",
     "continue": "Continuar",
     "sport": "Deporte",
     "padelAlwaysDoubles": "El pádel siempre es dobles — el formato se establece automáticamente.",
