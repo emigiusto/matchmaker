@@ -20,8 +20,8 @@ import { seedContacts } from './contacts.seeder';
 import { seedContactLists } from './contactLists.seeder';
 import { seedContactListMembers } from './contactListMembers.seeder';
 import { seedMatches } from './matches.seeder';
-// import { seedSchedulingRequests } from './schedulingRequests.seeder';
-// import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
+import { seedSchedulingRequests } from './schedulingRequests.seeder';
+import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
 import { seedResults } from './results.seeder';
 
 async function main() {
@@ -76,11 +76,12 @@ async function main() {
   const contactLists = await seedContactLists(users);
   // 7. Contact list members
   const contactListMembers = await seedContactListMembers(contactLists, contacts);
-  // 8. Matches (for availabilities, players, venues)
-  const matchesRaw = await seedMatches([], availabilities, players, venues);
-  // 11. Scheduling requests and candidates (WhatsApp scheduling flow) — temporarily disabled to test flow from scratch
-  // const schedulingRequests = await seedSchedulingRequests(users, users);
-  // const schedulingCandidates = await seedSchedulingCandidates(schedulingRequests, users);
+  // 8. Scheduling requests (past and future, all statuses)
+  const { requests: schedulingRequests, completedRequests } = await seedSchedulingRequests(users, users);
+  // 9. Scheduling candidates
+  const schedulingCandidates = await seedSchedulingCandidates(schedulingRequests, users);
+  // 10. Matches (from completed scheduling requests)
+  const matchesRaw = await seedMatches(completedRequests, players, venues, users);
   // Pass matches with team A/B representatives for results seeder (from participants)
   const matches = matchesRaw
     .filter((m: any) => m && m.participants?.length >= 2 && m.scheduledAt && m.type)
@@ -108,9 +109,9 @@ async function main() {
     contacts: contacts.length,
     contactLists: contactLists.length,
     contactListMembers: contactListMembers.length,
+    schedulingRequests: schedulingRequests.length,
+    schedulingCandidates: schedulingCandidates.length,
     matches: matches.length,
-    // schedulingRequests: schedulingRequests.length,
-    // schedulingCandidates: schedulingCandidates.length,
     results: matches.length,
   });
 }

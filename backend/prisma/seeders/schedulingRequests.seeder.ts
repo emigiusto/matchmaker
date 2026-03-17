@@ -12,104 +12,128 @@ function generateInviteToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
-type RequestData = {
+function makeTime(base: Date, hourOffset = 0): { date: Date; startTime: Date; endTime: Date } {
+  const date = new Date(base);
+  date.setHours(0, 0, 0, 0);
+  const startTime = new Date(base);
+  startTime.setHours(faker.number.int({ min: 9, max: 18 }) + hourOffset, 0, 0, 0);
+  const endTime = new Date(startTime.getTime() + 90 * 60 * 1000);
+  return { date, startTime, endTime };
+}
+
+type RequestSeed = Prisma.SchedulingRequestUncheckedCreateInput & { id: string };
+
+// Statuses that should have a match (will get matchId set later by matches seeder)
+export type CompletedRequestSeed = {
+  id: string;
   hostUserId: string;
   hostPartnerUserId: string | null;
-  sportType: 'tennis' | 'padel';
   format: 'singles' | 'doubles';
+  sportType: 'tennis' | 'padel';
   matchType: 'competitive' | 'practice';
   date: Date;
   startTime: Date;
-  endTime: Date;
-  locationText: string;
-  radiusKm: number | null;
-  responseWindowMinutes: number;
-  inviteToken: string;
-  status: 'active' | 'completed' | 'expired';
 };
 
 export async function seedSchedulingRequests(
   users: { id: string }[],
   usersWithPhone: { id: string; phone: string | null }[]
-) {
+): Promise<{ requests: RequestSeed[]; completedRequests: CompletedRequestSeed[] }> {
   const usedTokens = new Set<string>();
-  const requests: RequestData[] = [];
+  const requests: RequestSeed[] = [];
 
-  // Padel is always doubles; tennis can be singles or doubles
-  const pickSportAndFormat = (): { sportType: 'tennis' | 'padel'; format: 'singles' | 'doubles' } => {
-    const sport = faker.helpers.arrayElement(['tennis', 'padel']);
+  function token(): string {
+    let t: string;
+    do { t = generateInviteToken(); } while (usedTokens.has(t));
+    usedTokens.add(t);
+    return t;
+  }
+
+  function pickSportAndFormat(): { sportType: 'tennis' | 'padel'; format: 'singles' | 'doubles' } {
+    const sport = faker.helpers.arrayElement(['tennis', 'padel'] as const);
     return sport === 'padel'
       ? { sportType: 'padel', format: 'doubles' }
       : { sportType: 'tennis', format: faker.datatype.boolean({ probability: 0.8 }) ? 'singles' : 'doubles' };
-  };
+  }
 
-  // Guarantee 2 active scheduling requests for the dev user (for /play My Requests)
+  function partnerFor(hostId: string): string | null {
+    const partner = usersWithPhone.find((u) => u.id !== hostId && u.phone);
+    return partner?.id ?? null;
+  }
+
+  // ─── Dev user: one scenario per filter tab ───────────────────────────────
   const devUser = usersWithPhone.find((u) => u.id === DEV_USER_ID && u.phone);
   if (devUser) {
-    for (let i = 0; i < 2; i++) {
-      let token: string;
-      do {
-        token = generateInviteToken();
-      } while (usedTokens.has(token));
-      usedTokens.add(token);
-      const date = faker.date.soon({ days: 14 });
-      const startTime = new Date(date);
-      startTime.setHours(faker.number.int({ min: 9, max: 18 }), 0, 0, 0);
-      const endTime = new Date(startTime.getTime() + 90 * 60 * 1000);
-      const { sportType, format } = pickSportAndFormat();
-      let hostPartnerUserId: string | null = null;
-      if (format === 'doubles') {
-        const partner = usersWithPhone.find((u) => u.id !== devUser.id && u.phone);
-        if (partner) hostPartnerUserId = partner.id;
-      }
+    type Scenario = { status: RequestSeed['status']; date: Date; label: string; sport?: 'tennis' | 'padel'; format?: 'singles' | 'doubles' };
+
+    const scenarios: Scenario[] = [
+      // Active (future) — shown in "Active" tab
+      { status: 'active', date: faker.date.soon({ days: 4 }),  label: 'Active 1', sport: 'tennis', format: 'singles' },
+      { status: 'active', date: faker.date.soon({ days: 8 }),  label: 'Active 2', sport: 'padel',  format: 'doubles' },
+      // Expired + future date — shown in "Expired" tab
+      { status: 'expired', date: faker.date.soon({ days: 3 }),  label: 'Expired future 1', sport: 'tennis', format: 'singles' },
+      { status: 'expired', date: faker.date.soon({ days: 12 }), label: 'Expired future 2', sport: 'padel',  format: 'doubles' },
+      // Expired + past date — shown in "Past" tab
+      { status: 'expired', date: faker.date.recent({ days: 5 }),  label: 'Expired past 1', sport: 'tennis', format: 'singles' },
+      { status: 'expired', date: faker.date.recent({ days: 12 }), label: 'Expired past 2', sport: 'padel',  format: 'doubles' },
+      // Completed + past date (will have matches) — shown in "Confirmed" tab
+      { status: 'completed', date: faker.date.recent({ days: 3 }),  label: 'Completed past 1', sport: 'tennis', format: 'singles' },
+      { status: 'completed', date: faker.date.recent({ days: 20 }), label: 'Completed past 2', sport: 'padel',  format: 'doubles' },
+      // Completed + future date (upcoming confirmed match) — shown in "Confirmed" tab
+      { status: 'completed', date: faker.date.soon({ days: 6 }), label: 'Completed future', sport: 'tennis', format: 'singles' },
+      // Cancelled — shown in "Cancelled" tab
+      { status: 'cancelled', date: faker.date.recent({ days: 8 }), label: 'Cancelled 1', sport: 'padel', format: 'doubles' },
+    ];
+
+    for (const s of scenarios) {
+      const { date, startTime, endTime } = makeTime(s.date);
+      const sf = s.sport && s.format ? { sportType: s.sport, format: s.format } : pickSportAndFormat();
+      const hostPartnerUserId = sf.format === 'doubles' ? partnerFor(devUser.id) : null;
       requests.push({
         hostUserId: devUser.id,
         hostPartnerUserId,
-        sportType,
-        format,
-        matchType: 'competitive' as const,
+        sportType: sf.sportType,
+        format: sf.format,
+        matchType: 'competitive',
         date,
         startTime,
         endTime,
         locationText: faker.location.streetAddress(),
         radiusKm: 20,
         responseWindowMinutes: 240,
-        inviteToken: token,
-        status: 'active',
+        maxParallelCandidates: 1,
+        inviteToken: token(),
+        status: s.status,
+        timezone: 'Europe/Madrid',
       });
     }
   }
 
-  // Exclude secondary dev user from being a host so they can test scheduling from scratch
-  const hostsWithPhone = usersWithPhone.filter((u) => u.phone && u.id !== DEV_USER_2_ID);
-  const hostCount = Math.min(25, Math.floor(hostsWithPhone.length / 2));
+  // ─── Other users: random mix of past + future, all statuses ─────────────
+  const hostsWithPhone = usersWithPhone.filter((u) => u.phone && u.id !== DEV_USER_2_ID && u.id !== DEV_USER_ID);
+  const hostCount = Math.min(30, hostsWithPhone.length);
 
   for (let i = 0; i < hostCount; i++) {
     const host = faker.helpers.arrayElement(hostsWithPhone);
     const { sportType, format } = pickSportAndFormat();
-
-    let hostPartnerUserId: string | null = null;
-    if (format === 'doubles') {
-      const partner = usersWithPhone.find((u) => u.id !== host.id && u.phone);
-      if (partner) hostPartnerUserId = partner.id;
-    }
-
-    let token: string;
-    do {
-      token = generateInviteToken();
-    } while (usedTokens.has(token));
-    usedTokens.add(token);
-
-    const date = faker.date.soon({ days: 14 });
-    const startTime = new Date(date);
-    startTime.setHours(faker.number.int({ min: 9, max: 18 }), 0, 0, 0);
-    const endTime = new Date(startTime.getTime() + 90 * 60 * 1000);
+    const hostPartnerUserId = format === 'doubles' ? partnerFor(host.id) : null;
 
     const status = faker.helpers.weightedArrayElement([
-      { weight: 5, value: 'active' },
-      { weight: 2, value: 'completed' },
-      { weight: 1, value: 'expired' },
+      { weight: 4, value: 'active' as const },
+      { weight: 3, value: 'completed' as const },
+      { weight: 2, value: 'expired' as const },
+      { weight: 1, value: 'cancelled' as const },
     ]);
+
+    // Active → future; completed/expired/cancelled → mix of past and future
+    const usePast = status === 'active'
+      ? false
+      : faker.datatype.boolean({ probability: 0.6 });
+
+    const rawDate = usePast
+      ? faker.date.recent({ days: 30 })
+      : faker.date.soon({ days: 14 });
+    const { date, startTime, endTime } = makeTime(rawDate);
 
     requests.push({
       hostUserId: host.id,
@@ -123,68 +147,33 @@ export async function seedSchedulingRequests(
       locationText: faker.location.streetAddress(),
       radiusKm: faker.number.float({ min: 5, max: 50, multipleOf: 1 }),
       responseWindowMinutes: faker.helpers.arrayElement([60, 120, 240, 600]),
-      inviteToken: token,
+      maxParallelCandidates: 1,
+      inviteToken: token(),
       status,
+      timezone: 'UTC',
     });
   }
 
   const created = requests.length > 0
     ? await batchInsert(requests, 10, (r) =>
-        prisma.schedulingRequest.create({
-          data: r as Prisma.SchedulingRequestUncheckedCreateInput,
-        })
+        prisma.schedulingRequest.create({ data: r })
       )
     : [];
 
-  // Guarantee dev user has scheduling requests (fallback if not in usersWithPhone)
-  const existingCount = await prisma.schedulingRequest.count({
-    where: { hostUserId: DEV_USER_ID },
-  });
-  if (existingCount === 0) {
-    const devUser = await prisma.user.findUnique({ where: { id: DEV_USER_ID } });
-    if (devUser && devUser.phone) {
-      for (let i = 0; i < 2; i++) {
-        let token: string;
-        do {
-          token = generateInviteToken();
-        } while (usedTokens.has(token));
-        usedTokens.add(token);
-        const date = faker.date.soon({ days: 14 });
-        const startTime = new Date(date);
-        startTime.setHours(faker.number.int({ min: 9, max: 18 }), 0, 0, 0);
-        const endTime = new Date(startTime.getTime() + 90 * 60 * 1000);
-        const { sportType, format } = pickSportAndFormat();
-        let hostPartnerUserId: string | null = null;
-        if (format === 'doubles') {
-          const partner = await prisma.user.findFirst({
-            where: { id: { not: DEV_USER_ID }, phone: { not: null } },
-          });
-          if (partner) hostPartnerUserId = partner.id;
-        }
-        await prisma.schedulingRequest.create({
-          data: {
-            hostUserId: DEV_USER_ID,
-            hostPartnerUserId,
-            sportType,
-            format,
-            matchType: 'competitive',
-            date,
-            startTime,
-            endTime,
-            locationText: faker.location.streetAddress(),
-            radiusKm: 20,
-            responseWindowMinutes: 240,
-            inviteToken: token,
-            status: 'active',
-          } as Prisma.SchedulingRequestUncheckedCreateInput,
-        });
-      }
-      const fallbackCreated = await prisma.schedulingRequest.findMany({
-        where: { hostUserId: DEV_USER_ID },
-      });
-      return [...(Array.isArray(created) ? created : []), ...fallbackCreated];
-    }
-  }
+  // Build the list of completed requests (matches seeder will create matches for these)
+  const completedRequests: CompletedRequestSeed[] = created
+    .filter((r: any) => r.status === 'completed')
+    .map((r: any) => ({
+      id: r.id,
+      hostUserId: r.hostUserId,
+      hostPartnerUserId: r.hostPartnerUserId ?? null,
+      format: r.format as 'singles' | 'doubles',
+      sportType: r.sportType as 'tennis' | 'padel',
+      matchType: r.matchType as 'competitive' | 'practice',
+      date: r.date instanceof Date ? r.date : new Date(r.date),
+      startTime: r.startTime instanceof Date ? r.startTime : new Date(r.startTime),
+    }));
 
-  return created;
+  console.log(`  schedulingRequests: ${created.length} (${completedRequests.length} completed)`);
+  return { requests: created as RequestSeed[], completedRequests };
 }
