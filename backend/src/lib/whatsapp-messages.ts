@@ -59,7 +59,7 @@ const templates: Record<Locale, MessageTemplates> = {
         '',
         `📅  ${date}  ·  ${time}`,
         `📍  ${loc || 'TBD'}`,
-        `🏅  ${sportLabel}`,
+        `${sportEmoji}  ${sportLabel}`,
         '',
         `⏳ Tienes *${timeLeft}* para responder`,
       ].join('\n');
@@ -160,7 +160,7 @@ const templates: Record<Locale, MessageTemplates> = {
         '',
         `📅  ${date}  ·  ${time}`,
         `📍  ${loc || 'TBD'}`,
-        `🏅  ${sportLabel}`,
+        `${sportEmoji}  ${sportLabel}`,
         '',
         `⏳ You have *${timeLeft}* to respond`,
       ].join('\n');
