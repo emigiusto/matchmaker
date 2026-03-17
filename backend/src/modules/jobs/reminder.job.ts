@@ -22,6 +22,7 @@ async function processPendingReminders() {
         include: {
           availability: { select: { locationText: true, date: true, startTime: true } },
           participants: { include: { user: { select: { name: true } } } },
+          schedulingRequest: { select: { timezone: true } },
         },
       },
     },
@@ -60,10 +61,13 @@ async function processPendingReminders() {
       const userLocale = (reminder.user as any)?.locale ?? 'es';
       const intlLocale = resolveLocale(userLocale) === 'es' ? 'es-ES' : 'en-US';
       const av = reminder.match.availability;
+      const tz = (reminder.match as any).schedulingRequest?.timezone ?? 'UTC';
       const dateStr = av?.date
-        ? new Date(av.date).toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'short' })
+        ? new Date(av.date).toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'short', timeZone: tz })
         : 'TBD';
-      const timeStr = av?.startTime ? new Date(av.startTime).toTimeString().slice(0, 5) : '';
+      const timeStr = av?.startTime
+        ? new Date(av.startTime).toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+        : '';
       const location = av?.locationText ?? 'TBD';
       const opponents = (reminder.match.participants ?? [])
         .filter((p) => p.userId !== reminder.userId)
