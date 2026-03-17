@@ -341,9 +341,12 @@ export class LaietaAdapter implements BookingAdapter {
 
       // Wait for the success alert specifically (can take 2-3s — inline, no navigation).
       // Also race against a navigation in case the portal redirects instead.
+      // Wait for the page to fully settle after submit.
+      // Using networkidle0 on the navigation branch so that redirect chains complete
+      // before we evaluate the page — avoids "execution context was destroyed" errors.
       await Promise.race([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).then(() => logger.info('[laieta] Post-submit: navigation detected')),
-        page.waitForSelector('.alert.alert-block.alert-success', { timeout: 15000 }).then(() => logger.info('[laieta] Post-submit: success alert detected')),
+        page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 20000 }).then(() => logger.info('[laieta] Post-submit: navigation settled (networkidle0)')),
+        page.waitForSelector('.alert.alert-block.alert-success', { timeout: 20000 }).then(() => logger.info('[laieta] Post-submit: success alert detected')),
       ]).catch(() => {
         logger.warn('[laieta] Post-submit: neither navigation nor success alert fired within timeout')
       })
