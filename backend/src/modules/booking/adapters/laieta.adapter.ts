@@ -335,7 +335,9 @@ export class LaietaAdapter implements BookingAdapter {
         return { externalId, courtName: courtId }
       }
 
-      await page.click('button#edit-submit[name="reserva"]')
+      await page.evaluate(() => {
+        (document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement)?.click()
+      })
 
       // Wait for the success alert specifically (can take 2-3s — inline, no navigation).
       // Also race against a navigation in case the portal redirects instead.
@@ -366,13 +368,15 @@ export class LaietaAdapter implements BookingAdapter {
       })
 
       if (!hasSuccess) {
-        const screenshotPath = `/tmp/laieta-booking-fail-${Date.now()}.png`
-        await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
         const pageTitle = await page.title().catch(() => '?')
         const pageUrl = page.url()
         const bodySnippet = await page.evaluate(() => document.body.innerText?.slice(0, 500)).catch(() => '?')
-        logger.error(`[laieta] No success confirmation. url=${pageUrl}, title="${pageTitle}", screenshot=${screenshotPath}`)
+        const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+        logger.error(`[laieta] No success confirmation. url=${pageUrl}, title="${pageTitle}"`)
         logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
+        if (screenshotB64) {
+          logger.error(`[laieta] Screenshot (base64): data:image/png;base64,${screenshotB64}`)
+        }
         throw new AppError('Booking submit did not produce a success confirmation', 502, 'BOOKING_NO_CONFIRMATION')
       }
 
