@@ -340,10 +340,10 @@ export class LaietaAdapter implements BookingAdapter {
       // Wait for the success alert specifically (can take 2-3s — inline, no navigation).
       // Also race against a navigation in case the portal redirects instead.
       await Promise.race([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }),
-        page.waitForSelector('.alert.alert-block.alert-success', { timeout: 15000 }),
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).then(() => logger.info('[laieta] Post-submit: navigation detected')),
+        page.waitForSelector('.alert.alert-block.alert-success', { timeout: 15000 }).then(() => logger.info('[laieta] Post-submit: success alert detected')),
       ]).catch(() => {
-        // Neither fired — proceed and let the checks below decide
+        logger.warn('[laieta] Post-submit: neither navigation nor success alert fired within timeout')
       })
 
       // Check for errors on confirmation page
@@ -366,6 +366,13 @@ export class LaietaAdapter implements BookingAdapter {
       })
 
       if (!hasSuccess) {
+        const screenshotPath = `/tmp/laieta-booking-fail-${Date.now()}.png`
+        await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
+        const pageTitle = await page.title().catch(() => '?')
+        const pageUrl = page.url()
+        const bodySnippet = await page.evaluate(() => document.body.innerText?.slice(0, 500)).catch(() => '?')
+        logger.error(`[laieta] No success confirmation. url=${pageUrl}, title="${pageTitle}", screenshot=${screenshotPath}`)
+        logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
         throw new AppError('Booking submit did not produce a success confirmation', 502, 'BOOKING_NO_CONFIRMATION')
       }
 
