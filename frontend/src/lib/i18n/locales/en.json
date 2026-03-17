@@ -721,7 +721,8 @@
       "newInvite": "New invite",
       "resultPending": "Result pending",
       "ratingUpdated": "Rating updated",
-      "noPlayersFound": "No players found"
+      "noPlayersFound": "No players found",
+      "courtBooked": "Court booked"
     },
     "messages": {
       "scheduledForDate": "A match was scheduled for {{date}}.",
@@ -736,7 +737,9 @@
       "noMatchTimePassed": "The match time passed before enough players confirmed.",
       "noMatchNoneAccepted": "None of your contacts accepted in time.",
       "noMatchFound": "Your invite didn't find a match.",
-      "noMatchFoundSport": "Your {{sport}} invite didn't find a match."
+      "noMatchFoundSport": "Your {{sport}} invite didn't find a match.",
+      "courtBooked": "{{court}} has been booked for your match.",
+      "courtBookedGeneric": "Your court has been booked."
     }
   },
   "contactsPage": {

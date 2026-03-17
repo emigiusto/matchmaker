@@ -10,6 +10,7 @@ import { logger } from '../../config/logger'
 import { whatsappService } from '../whatsapp/whatsapp.service'
 import { getMessages } from '../../lib/whatsapp-messages'
 import { cacheGet, cacheSet } from '../../shared/cache/redis'
+import { createNotification } from '../notifications/notifications.service'
 import type {
   UpsertClubMembershipInput,
   ClubMembershipDTO,
@@ -383,6 +384,10 @@ async function runBookingJob(
 
     logBookingEvent(matchId, 'booking_success', { courtName: result.courtName, externalId: result.externalId }).catch(() => {})
     logger.info(`[booking] Court booked for match ${matchId}: ${result.courtName} (${result.externalId})`)
+
+    createNotification(hostUserId, 'booking.success', { matchId, courtName: result.courtName }).catch((err) => {
+      logger.warn(`[booking] Failed to send booking.success notification for match ${matchId}:`, err instanceof Error ? err.message : err)
+    })
 
     // Notify the WhatsApp group
     if (match.whatsappGroupId) {

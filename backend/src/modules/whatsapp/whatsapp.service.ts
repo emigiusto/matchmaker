@@ -130,6 +130,9 @@ export const whatsappService = {
     );
     if (expectedSet.size === 0) return { sentTo: [], errors: [] };
 
+    // Wait briefly for the WhatsApp API to propagate group membership after creation
+    await new Promise((r) => setTimeout(r, 3000));
+
     const participantsRes = await provider.getGroupParticipants(groupId);
     if (!participantsRes.success || !participantsRes.participantPhones) {
       logger.warn('CouldNotGetGroupParticipants', {

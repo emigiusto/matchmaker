@@ -26,6 +26,7 @@ export function useNotificationText() {
       case "invite_received":      return t("notifications.titles.newInvite")
       case "result_pending":       return t("notifications.titles.resultPending")
       case "rating_change":        return t("notifications.titles.ratingUpdated")
+      case "booking.success":      return t("notifications.titles.courtBooked")
       default:                     return n.title
     }
   }
@@ -82,6 +83,12 @@ export function useNotificationText() {
       case "invite_received":  return t("notifications.messages.inviteReceived")
       case "result_pending":   return t("notifications.messages.resultPending")
       case "rating_change":    return t("notifications.messages.ratingUpdated")
+      case "booking.success": {
+        const courtName = m.courtName ?? null
+        return courtName
+          ? t("notifications.messages.courtBooked", { court: courtName })
+          : t("notifications.messages.courtBookedGeneric")
+      }
       default:                 return n.message
     }
   }
