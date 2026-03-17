@@ -294,6 +294,111 @@ describe('SchedulingService', () => {
       expect(result.status).toBe('active');
       expect(mockTx.schedulingRequest.create).toHaveBeenCalled();
     });
+
+    it('stores the provided timezone in the scheduling request', async () => {
+      mockRepo.countActiveByHostUserId.mockResolvedValue(0);
+      mockTx.user.findUnique.mockResolvedValue({ id: 'host1', name: 'Host' });
+      const now = new Date();
+      const createdReq = {
+        id: 'req-tz',
+        hostUserId: 'host1',
+        hostPartnerUserId: null,
+        sportType: 'tennis',
+        format: 'singles',
+        matchType: 'competitive',
+        date: new Date('2025-04-15'),
+        startTime: new Date('2025-04-15T10:00:00.000Z'),
+        endTime: new Date('2025-04-15T11:00:00.000Z'),
+        locationText: 'Court 1',
+        radiusKm: null,
+        responseWindowMinutes: 240,
+        maxParallelCandidates: 1,
+        inviteToken: 'tok-tz',
+        status: 'active',
+        currentCandidateIndex: 0,
+        matchId: null,
+        timezone: 'Europe/Madrid',
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockTx.schedulingRequest.create.mockResolvedValue(createdReq);
+      mockTx.schedulingCandidate.create.mockResolvedValue({
+        id: 'c-tz',
+        schedulingRequestId: 'req-tz',
+        contactUserId: 'cand1',
+        priorityOrder: 0,
+        status: 'pending',
+      });
+      mockRepo.findRequestById.mockResolvedValue({
+        ...createdReq,
+        hostUser: { id: 'host1', name: 'Host' },
+        hostPartner: null,
+        candidates: [],
+        match: null,
+      });
+
+      await schedulingService.createSchedulingRequest({
+        ...baseInput,
+        timezone: 'Europe/Madrid',
+      });
+
+      expect(mockTx.schedulingRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ timezone: 'Europe/Madrid' }),
+        }),
+      );
+    });
+
+    it('defaults timezone to UTC when not provided', async () => {
+      mockRepo.countActiveByHostUserId.mockResolvedValue(0);
+      mockTx.user.findUnique.mockResolvedValue({ id: 'host1', name: 'Host' });
+      const now = new Date();
+      const createdReq = {
+        id: 'req-utc',
+        hostUserId: 'host1',
+        hostPartnerUserId: null,
+        sportType: 'tennis',
+        format: 'singles',
+        matchType: 'competitive',
+        date: new Date('2025-04-15'),
+        startTime: new Date('2025-04-15T10:00:00.000Z'),
+        endTime: new Date('2025-04-15T11:00:00.000Z'),
+        locationText: 'Court 1',
+        radiusKm: null,
+        responseWindowMinutes: 240,
+        maxParallelCandidates: 1,
+        inviteToken: 'tok-utc',
+        status: 'active',
+        currentCandidateIndex: 0,
+        matchId: null,
+        timezone: 'UTC',
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockTx.schedulingRequest.create.mockResolvedValue(createdReq);
+      mockTx.schedulingCandidate.create.mockResolvedValue({
+        id: 'c-utc',
+        schedulingRequestId: 'req-utc',
+        contactUserId: 'cand1',
+        priorityOrder: 0,
+        status: 'pending',
+      });
+      mockRepo.findRequestById.mockResolvedValue({
+        ...createdReq,
+        hostUser: { id: 'host1', name: 'Host' },
+        hostPartner: null,
+        candidates: [],
+        match: null,
+      });
+
+      await schedulingService.createSchedulingRequest(baseInput); // no timezone field
+
+      expect(mockTx.schedulingRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ timezone: 'UTC' }),
+        }),
+      );
+    });
   });
 
   describe('retryCandidate', () => {

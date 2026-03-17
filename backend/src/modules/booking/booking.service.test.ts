@@ -421,6 +421,23 @@ describe('retryBookingForMatch', () => {
       data: { status: 'pending', errorMessage: null, completedAt: null },
     });
   });
+
+  it('resets attemptedAt on retry so the timeout sentinel is refreshed', async () => {
+    const failedAttempt = { ...baseAttempt, status: 'failed', errorMessage: 'timeout' };
+    mockPrisma.bookingAttempt.findUnique.mockResolvedValue(failedAttempt);
+    mockPrisma.bookingAttempt.update.mockResolvedValue({ ...failedAttempt, status: 'pending' });
+    mockPrisma.schedulingRequest.findUnique.mockResolvedValue(null);
+
+    const before = Date.now();
+    await retryBookingForMatch('match1');
+    const after = Date.now();
+
+    const updateCall = mockPrisma.bookingAttempt.update.mock.calls[0][0];
+    expect(updateCall.data.attemptedAt).toBeInstanceOf(Date);
+    const resetAt = (updateCall.data.attemptedAt as Date).getTime();
+    expect(resetAt).toBeGreaterThanOrEqual(before);
+    expect(resetAt).toBeLessThanOrEqual(after);
+  });
 });
 
 // ─── cancelBookingForMatch ────────────────────────────────────────

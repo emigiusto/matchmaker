@@ -35,8 +35,11 @@ RUN npm ci
 COPY prisma ./prisma
 RUN npx prisma generate
 
-# Build TypeScript
+# Run tests (mocked — no DB needed)
 COPY . .
+RUN npm test
+
+# Build TypeScript
 RUN npm run build
 
 EXPOSE 3000
