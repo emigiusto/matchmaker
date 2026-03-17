@@ -159,6 +159,66 @@ export class LaietaAdapter implements BookingAdapter {
 
   // ─── Helpers ──────────────────────────────────────────────────────
 
+  /**
+   * Check /reservas for an existing booking matching date, hour, sport, and at least one
+   * of the given socio numbers. Called when a BOOKING_QUOTA_EXCEEDED error is thrown after
+   * submit, to detect whether a previous attempt already succeeded on the portal.
+   */
+  private async findExistingBookingOnReservas(
+    browser: Browser,
+    sessionValue: string,
+    date: string,           // YYYY-MM-DD
+    targetHour: string,     // "09"
+    sport: string,
+    socioNumbers: string[], // host + all participants
+  ): Promise<BookingResult | null> {
+    try {
+      const page = await this.openWithSession(browser, `${BASE_URL}/reservas`, sessionValue)
+
+      const [year, month, day] = date.split('-')
+      const pageDate = `${day}-${month}-${year}`  // DD-MM-YYYY as shown on the page
+      const pageHour = `${targetHour}:00`
+      const sportUpper = sport.toUpperCase()
+
+      const found = await page.evaluate(
+        (pageDate: string, pageHour: string, sportUpper: string, socioNumbers: string[]) => {
+          const fieldsets = document.querySelectorAll('fieldset.panel.panel-default')
+          for (const fieldset of fieldsets) {
+            const dateEl = fieldset.querySelector('[id^="edit-date"]')
+            const hourEl = fieldset.querySelector('[id^="edit-hour"]')
+            const placeEl = fieldset.querySelector('[id^="edit-place"]')
+            const playersEl = fieldset.querySelector('[id^="edit-players"]')
+            if (!dateEl || !hourEl || !placeEl) continue
+
+            const bookingDate = dateEl.textContent?.trim() ?? ''
+            const bookingHour = hourEl.textContent?.trim() ?? ''
+            const bookingPlace = placeEl.textContent?.trim() ?? ''
+            const playersText = playersEl?.textContent ?? ''
+
+            if (bookingDate !== pageDate || bookingHour !== pageHour) continue
+            if (!bookingPlace.toUpperCase().includes(sportUpper)) continue
+
+            // Confirm at least one of our socio numbers appears in the players list
+            const hasSocio = socioNumbers.some((n) => playersText.includes(`[${n}]`))
+            if (!hasSocio) continue
+
+            return { courtName: bookingPlace.replace(/\s+/g, ' ').trim() }
+          }
+          return null
+        },
+        pageDate, pageHour, sportUpper, socioNumbers,
+      )
+
+      if (!found) return null
+      const externalId = `${found.courtName}::${date}::${targetHour}`
+      logger.info(`[laieta] Existing booking found on /reservas: ${externalId}`)
+      return { externalId, courtName: found.courtName }
+    } catch (err) {
+      logger.warn('[laieta] Could not check /reservas for existing booking:', err instanceof Error ? err.message : err)
+      return null
+    }
+  }
+
   /** Throws if the page contains a .alert.alert-block.alert-danger block. */
   private async checkForPageError(page: Page): Promise<void> {
     const errorText = await page.evaluate(() => {
@@ -169,9 +229,15 @@ export class LaietaAdapter implements BookingAdapter {
       clone.querySelectorAll('.element-invisible, .close').forEach((n) => n.remove())
       return clone.textContent?.trim() ?? null
     })
-    if (errorText) {
-      throw new AppError(errorText, 409, 'BOOKING_PAGE_ERROR')
+    if (!errorText) return
+
+    // Quota / already-booked error — court is taken, likely by a previous attempt
+    const isQuotaError = /nombre m.xim de reserves|quota|límit de reserves/i.test(errorText)
+    if (isQuotaError) {
+      throw new AppError(errorText, 409, 'BOOKING_QUOTA_EXCEEDED')
     }
+
+    throw new AppError(errorText, 409, 'BOOKING_PAGE_ERROR')
   }
 
   // ─── BookingAdapter implementation ────────────────────────────────
@@ -339,22 +405,39 @@ export class LaietaAdapter implements BookingAdapter {
         (document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement)?.click()
       })
 
-      // Wait for the success alert specifically (can take 2-3s — inline, no navigation).
-      // Also race against a navigation in case the portal redirects instead.
       // Wait for the page to fully settle after submit.
-      // Using networkidle0 on the navigation branch so that redirect chains complete
-      // before we evaluate the page — avoids "execution context was destroyed" errors.
+      // The portal may respond with an inline success alert (no navigation) or redirect
+      // to a confirmation/bookings page (navigation). Track which happened so we can
+      // use navigation as a success signal when no alert is present.
+      // networkidle0 ensures redirect chains fully complete before we evaluate the page.
+      let navigationOccurred = false
       await Promise.race([
-        page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 20000 }).then(() => logger.info('[laieta] Post-submit: navigation settled (networkidle0)')),
-        page.waitForSelector('.alert.alert-block.alert-success', { timeout: 20000 }).then(() => logger.info('[laieta] Post-submit: success alert detected')),
+        page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 20000 })
+          .then(() => { navigationOccurred = true; logger.info('[laieta] Post-submit: navigation settled (networkidle0)') }),
+        page.waitForSelector('.alert.alert-block.alert-success', { timeout: 20000 })
+          .then(() => logger.info('[laieta] Post-submit: success alert detected')),
       ]).catch(() => {
         logger.warn('[laieta] Post-submit: neither navigation nor success alert fired within timeout')
       })
 
-      // Check for errors on confirmation page
-      await this.checkForPageError(page)
+      // Check for explicit errors. If the portal reports quota exceeded, check /reservas
+      // to see if a previous attempt already booked this slot successfully.
+      try {
+        await this.checkForPageError(page)
+      } catch (err) {
+        if (err instanceof AppError && err.errorCode === 'BOOKING_QUOTA_EXCEEDED') {
+          logger.warn('[laieta] Quota exceeded after submit — checking /reservas for existing booking')
+          const allSocioNumbers = [creds.socioNumber, ...participantSocioNumbers]
+          const existing = await this.findExistingBookingOnReservas(browser!, sessionValue, date, targetHour, sport, allSocioNumbers)
+          if (existing) {
+            logger.info(`[laieta] Previous booking confirmed via /reservas: ${existing.externalId}`)
+            return existing
+          }
+          logger.warn('[laieta] No matching booking found on /reservas — quota error is a genuine failure')
+        }
+        throw err
+      }
 
-      // Confirm that the success alert is present — if it's missing, something went wrong
       const { hasSuccess, bookingRef, confirmationMsg } = await page.evaluate(() => {
         const successEl = document.querySelector('.alert.alert-block.alert-success')
         let confirmationMsg: string | null = null
@@ -363,19 +446,19 @@ export class LaietaAdapter implements BookingAdapter {
           clone.querySelectorAll('.element-invisible, .close').forEach((n) => n.remove())
           confirmationMsg = clone.textContent?.trim() ?? null
         }
-
         const bodyText = document.body.textContent ?? ''
-        // Require at least one digit so plain words like "confirmada" are not captured
         const match = bodyText.match(/reserva\s*[:#]?\s*([A-Z0-9\-]*\d[A-Z0-9\-]*)/i)
         return { hasSuccess: !!successEl, bookingRef: match?.[1] ?? null, confirmationMsg }
       })
 
-      if (!hasSuccess) {
+      // Navigation without an error alert means the portal accepted the booking and
+      // redirected (e.g. to a confirmation or bookings page). Treat as success.
+      if (!hasSuccess && !navigationOccurred) {
         const pageTitle = await page.title().catch(() => '?')
         const pageUrl = page.url()
         const bodySnippet = await page.evaluate(() => document.body.innerText?.slice(0, 500)).catch(() => '?')
         const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
-        logger.error(`[laieta] No success confirmation. url=${pageUrl}, title="${pageTitle}"`)
+        logger.error(`[laieta] No success confirmation and no navigation. url=${pageUrl}, title="${pageTitle}"`)
         logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
         if (screenshotB64) {
           logger.error(`[laieta] Screenshot (base64): data:image/png;base64,${screenshotB64}`)
@@ -383,7 +466,8 @@ export class LaietaAdapter implements BookingAdapter {
         throw new AppError('Booking submit did not produce a success confirmation', 502, 'BOOKING_NO_CONFIRMATION')
       }
 
-      logger.info(`[laieta] Confirmation: ${confirmationMsg ?? '(no text)'}`)
+      if (confirmationMsg) logger.info(`[laieta] Confirmation message: ${confirmationMsg}`)
+      if (navigationOccurred && !hasSuccess) logger.info('[laieta] Booking confirmed via navigation (no inline success alert)')
 
       const externalId = bookingRef ?? `${courtId}::${date}::${targetHour}`
       logger.info(`[laieta] Booking confirmed: court=${courtId}, ref=${externalId}`)
