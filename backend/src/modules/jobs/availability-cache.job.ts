@@ -12,8 +12,8 @@ import { logger } from '../../config/logger'
 import type { CourtAvailabilityResult } from '../booking/booking.types'
 
 const SPORTS = ['tennis', 'padel']
-const CACHE_TTL_SECONDS = 900  // 15 minutes
-const DAYS_AHEAD = 15
+const CACHE_TTL_SECONDS = 1800 // 30 minutes
+const DAYS_AHEAD = 10
 
 function nextNDays(n: number): string[] {
   const dates: string[] = []
