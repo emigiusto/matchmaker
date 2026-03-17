@@ -66,7 +66,7 @@ async function warmAvailabilityCache(): Promise<void> {
 }
 
 export function scheduleAvailabilityCacheJob() {
-  cron.schedule('*/15 * * * *', async () => {
+  cron.schedule('*/30 * * * *', async () => {
     try {
       await warmAvailabilityCache()
     } catch (err) {
