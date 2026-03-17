@@ -595,6 +595,7 @@
       "attempting": "Attempting to reserve a court…",
       "timedOut": "Booking timed out — the process took too long. You can retry below."
     },
+    "openWhatsappGroup": "Open WhatsApp Group",
     "reminders": {
       "title": "Reminders",
       "matchCancelled": "This match was cancelled. No reminders will be sent.",

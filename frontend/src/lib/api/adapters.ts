@@ -28,6 +28,7 @@ export interface BackendMatchDTO {
   endTime?: string
   sportType?: "tennis" | "padel"
   format?: "singles" | "doubles"
+  whatsappGroupId?: string | null
 }
 
 // Backend InviteDTO shape (from /invites endpoints)
@@ -309,5 +310,6 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
     showVsLayout,
     sport,
     format,
+    whatsappGroupId: dto.whatsappGroupId ?? null,
   }
 }

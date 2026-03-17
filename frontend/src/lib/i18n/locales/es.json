@@ -595,6 +595,7 @@
       "attempting": "Intentando reservar una pista…",
       "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación."
     },
+    "openWhatsappGroup": "Abrir grupo de WhatsApp",
     "reminders": {
       "title": "Recordatorios",
       "matchCancelled": "Este partido fue cancelado. No se enviarán recordatorios.",

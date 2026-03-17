@@ -41,6 +41,7 @@ import {
 import { toast } from "sonner"
 import { getCurrentUserId } from "@/lib/current-user"
 import { useTranslation } from "@/lib/i18n"
+import { matchesService } from "@/lib/services/matches.service"
 import {
   schedulingService,
   type SchedulingRequestDTO,
@@ -161,6 +162,19 @@ export default function InviteDetailsPage() {
     candidateId: string
     action: "accept" | "cancel" | "retry" | "cancelAccepted"
   } | null>(null)
+  const [fetchingGroupLink, setFetchingGroupLink] = useState(false)
+
+  async function handleOpenWhatsappGroup(matchId: string) {
+    setFetchingGroupLink(true)
+    try {
+      const link = await matchesService.getWhatsappGroupLink(matchId)
+      window.open(link, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.generic"))
+    } finally {
+      setFetchingGroupLink(false)
+    }
+  }
 
   const fetchRequest = useCallback(async (initial = false) => {
     if (!requestId) return
@@ -417,19 +431,17 @@ export default function InviteDetailsPage() {
                 </Link>
               </Button>
             )}
-            {request.whatsappGroupId ? (
+            {request.whatsappGroupId && request.matchId ? (
               <Button
                 className="gap-1.5 bg-[#25D366] text-white hover:bg-[#25D366]/90"
-                asChild
+                onClick={() => handleOpenWhatsappGroup(request.matchId!)}
+                disabled={fetchingGroupLink}
               >
-                <a
-                  href={`https://chat.whatsapp.com/${request.whatsappGroupId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  {t("invites.actions.openWhatsApp")}
-                </a>
+                {fetchingGroupLink
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <CheckCircle className="h-4 w-4" />
+                }
+                {t("invites.actions.openWhatsApp")}
               </Button>
             ) : (
               <Button

@@ -65,6 +65,8 @@ export interface Match {
   sport?: "tennis" | "padel"
   /** Format: singles or doubles */
   format?: "singles" | "doubles"
+  /** WhatsApp group JID — use /whatsapp-group-link endpoint to get the shareable invite URL */
+  whatsappGroupId?: string | null
 }
 
 export interface PostMatchQuestionnaire {

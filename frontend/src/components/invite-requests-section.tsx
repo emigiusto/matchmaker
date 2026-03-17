@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { schedulingService } from "@/lib/services/scheduling.service"
+import { matchesService } from "@/lib/services/matches.service"
 import { PageHeader } from "@/components/page-header"
 import { useTranslation } from "@/lib/i18n"
 
@@ -226,6 +227,7 @@ export function InviteRequestsSection({
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
   const [historyMap, setHistoryMap] = useState<Record<string, SchedulingInviteEventDTO[]>>({})
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null)
+  const [groupLinkLoadingId, setGroupLinkLoadingId] = useState<string | null>(null)
 
   async function fetchSchedulingData(isInitial = false) {
     if (isInitial) setLoading(true)
@@ -273,6 +275,18 @@ export function InviteRequestsSection({
     }, SCHEDULING_POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [inviteRequests, currentUserId])
+
+  async function handleOpenWhatsappGroup(matchId: string, requestId: string) {
+    setGroupLinkLoadingId(requestId)
+    try {
+      const link = await matchesService.getWhatsappGroupLink(matchId)
+      window.open(link, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.generic"))
+    } finally {
+      setGroupLinkLoadingId(null)
+    }
+  }
 
   const getDisplayStatus = (r: InviteRequest) => {
     const hasActiveContact = r.contacts.some((c) => c.status === "contacted")
@@ -907,20 +921,18 @@ export function InviteRequestsSection({
                               </Link>
                             </Button>
                           )}
-                          {request.whatsappGroupId ? (
+                          {request.whatsappGroupId && request.matchId ? (
                             <Button
                               size="sm"
                               className="gap-1.5 bg-[#25D366] text-white hover:bg-[#25D366]/90"
-                              asChild
+                              onClick={() => handleOpenWhatsappGroup(request.matchId!, request.id)}
+                              disabled={groupLinkLoadingId === request.id}
                             >
-                              <a
-                                href={`https://chat.whatsapp.com/${request.whatsappGroupId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <CheckCircle className="h-3.5 w-3.5" />
-                                {t("invites.actions.openWhatsApp")}
-                              </a>
+                              {groupLinkLoadingId === request.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <CheckCircle className="h-3.5 w-3.5" />
+                              }
+                              {t("invites.actions.openWhatsApp")}
                             </Button>
                           ) : (
                             <Button
@@ -947,8 +959,8 @@ export function InviteRequestsSection({
   )
 
   const standaloneHeader = variant === "standalone" && (
-    <div className="flex items-center gap-3">
-      <span className="text-sm text-muted-foreground">
+    <div className="flex items-center gap-2 sm:gap-3">
+      <span className="hidden text-sm text-muted-foreground sm:inline">
         <span
           className={
             atCapacity ? "font-semibold text-destructive" : "font-semibold text-foreground"
@@ -959,18 +971,18 @@ export function InviteRequestsSection({
         <span> {t("invites.activeSuffix", { max: MAX_ACTIVE_REQUESTS })}</span>
       </span>
       <Button
-        size="lg"
-        className="gap-2 shadow-lg shadow-primary/20"
+        size="sm"
+        className="gap-2 shadow-lg shadow-primary/20 sm:h-11 sm:rounded-lg sm:px-6"
         onClick={() => setWizardOpen(true)}
         disabled={atCapacity}
         title={
           atCapacity
             ? t("invites.atCapacityTooltip", { max: MAX_ACTIVE_REQUESTS })
-            : undefined
+            : t("common.iWantToPlay")
         }
       >
-        <Zap className="h-5 w-5" />
-        {t("common.iWantToPlay")}
+        <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
+        <span className="hidden sm:inline">{t("common.iWantToPlay")}</span>
       </Button>
     </div>
   )

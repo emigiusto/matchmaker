@@ -3,7 +3,7 @@
 
 import { logger } from '../../config/logger';
 import type { IWhatsAppProvider, InviteMessageOptions } from './whatsapp.provider.interface';
-import type { CreateGroupResult, WhatsAppProvider, WebhookIncomingMessage } from './whatsapp.types';
+import type { CreateGroupResult, GetGroupInviteLinkResult, WhatsAppProvider, WebhookIncomingMessage } from './whatsapp.types';
 import { WhapiProvider } from './providers/whapi.provider';
 import { WasenderProvider } from './providers/wasender.provider';
 import { MockWhatsAppProvider } from './providers/mock.provider';
@@ -175,6 +175,11 @@ export const whatsappService = {
     }
 
     return { sentTo, errors };
+  },
+
+  /** Fetch the shareable invite link for a WhatsApp group. */
+  async getGroupInviteLink(groupId: string): Promise<GetGroupInviteLinkResult> {
+    return provider.getGroupInviteLink(groupId);
   },
 
   /** Parse provider-specific webhook body into normalized message. Returns null if not an incoming 1:1 text. */

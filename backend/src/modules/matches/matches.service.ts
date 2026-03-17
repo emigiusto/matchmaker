@@ -44,6 +44,15 @@ export async function getMatchById(matchId: string): Promise<MatchDTO> {
   return toMatchDTO(match);
 }
 
+export async function getWhatsappGroupLink(matchId: string): Promise<string> {
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { whatsappGroupId: true } });
+  if (!match) throw new AppError('Match not found', 404);
+  if (!match.whatsappGroupId) throw new AppError('No WhatsApp group for this match', 404);
+  const result = await whatsappService.getGroupInviteLink(match.whatsappGroupId);
+  if (!result.success || !result.inviteLink) throw new AppError(`Could not get group invite link: ${result.error ?? 'No link returned'}`, 502);
+  return result.inviteLink;
+}
+
 /**
  * List all matches for a given user (read-only).
  * Returns matches where:
@@ -512,6 +521,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     type: match.type || 'competitive',
     sportType,
     format,
+    whatsappGroupId: match.whatsappGroupId ?? null,
     ...(av && {
       location: av.locationText,
       date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),

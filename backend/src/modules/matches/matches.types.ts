@@ -48,6 +48,8 @@ export interface MatchDTO {
   sportType?: 'tennis' | 'padel';
   /** Format: singles or doubles (when match created via scheduling) */
   format?: 'singles' | 'doubles';
+  /** WhatsApp group JID — use /whatsapp-group-link to get the shareable invite URL */
+  whatsappGroupId?: string | null;
 }
 
 export interface CreateMatchInput {

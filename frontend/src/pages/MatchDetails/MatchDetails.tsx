@@ -62,6 +62,7 @@ export default function MatchDetailPage() {
   const [retryingBooking, setRetryingBooking] = useState(false)
   const [cancellingBooking, setCancellingBooking] = useState(false)
   const [cancelBookingError, setCancelBookingError] = useState<string | null>(null)
+  const [fetchingGroupLink, setFetchingGroupLink] = useState(false)
   const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function fetchReminders() {
@@ -156,6 +157,19 @@ export default function MatchDetailPage() {
       setCancelBookingError(err instanceof Error ? err.message : "Failed to cancel booking")
     } finally {
       setCancellingBooking(false)
+    }
+  }
+
+  async function handleOpenWhatsappGroup() {
+    if (!id) return
+    setFetchingGroupLink(true)
+    try {
+      const link = await matchesService.getWhatsappGroupLink(id)
+      window.open(link, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to get WhatsApp group link")
+    } finally {
+      setFetchingGroupLink(false)
     }
   }
 
@@ -493,6 +507,25 @@ export default function MatchDetailPage() {
                   </div>
                 )
               })()}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* WhatsApp Group */}
+        {match.whatsappGroupId && (
+          <Card className="border-border/50">
+            <CardContent className="pt-4">
+              <Button
+                className="w-full gap-2 bg-[#25D366] text-white hover:bg-[#25D366]/90"
+                onClick={handleOpenWhatsappGroup}
+                disabled={fetchingGroupLink}
+              >
+                {fetchingGroupLink
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <CheckCircle className="h-4 w-4" />
+                }
+                {t("matchDetails.openWhatsappGroup")}
+              </Button>
             </CardContent>
           </Card>
         )}

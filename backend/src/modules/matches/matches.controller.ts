@@ -161,6 +161,21 @@ export class MatchesController {
   }
 
   /**
+   * GET /matches/:id/whatsapp-group-link
+   * Returns the shareable WhatsApp invite link for the match's group
+   */
+  static async getWhatsappGroupLink(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      if (!id || typeof id !== 'string') return res.status(400).json({ error: 'Missing or invalid id' });
+      const inviteLink = await MatchesService.getWhatsappGroupLink(id);
+      res.json({ inviteLink });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * POST /matches
    * Directly create a match (bypassing invite flow)
    */

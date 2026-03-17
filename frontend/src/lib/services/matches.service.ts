@@ -28,4 +28,9 @@ export const matchesService = {
     const dto = await apiClient.post<BackendMatchDTO>(`/matches/${matchId}/cancel`, { userId })
     return adaptMatch(dto)
   },
+
+  async getWhatsappGroupLink(matchId: string): Promise<string> {
+    const res = await apiClient.get<{ inviteLink: string }>(`/matches/${matchId}/whatsapp-group-link`)
+    return res.inviteLink
+  },
 }
