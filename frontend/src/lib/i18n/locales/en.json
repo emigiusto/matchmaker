@@ -592,7 +592,8 @@
       "cancelBooking": "Cancel booking",
       "bookingFailed": "Booking failed",
       "retryBooking": "Retry booking",
-      "attempting": "Attempting to reserve a court…"
+      "attempting": "Attempting to reserve a court…",
+      "timedOut": "Booking timed out — the process took too long. You can retry below."
     },
     "reminders": {
       "title": "Reminders",

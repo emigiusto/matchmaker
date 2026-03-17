@@ -384,7 +384,7 @@ async function failAttempt(attemptId: string, errorMessage: string): Promise<voi
   await prisma.bookingAttempt.update({
     where: { id: attemptId },
     data: { status: 'failed', errorMessage, completedAt: new Date() },
-  }).catch(() => {}) // don't throw if update fails
+  }).catch((e) => logger.error(`[booking] Failed to mark attempt ${attemptId} as failed:`, e))
 }
 
 /**

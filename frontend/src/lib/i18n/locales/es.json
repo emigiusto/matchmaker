@@ -592,7 +592,8 @@
       "cancelBooking": "Cancelar reserva",
       "bookingFailed": "Reserva fallida",
       "retryBooking": "Reintentar reserva",
-      "attempting": "Intentando reservar una pista…"
+      "attempting": "Intentando reservar una pista…",
+      "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación."
     },
     "reminders": {
       "title": "Recordatorios",

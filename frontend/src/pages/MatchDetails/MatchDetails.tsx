@@ -472,12 +472,26 @@ export default function MatchDetailPage() {
                   </Button>
                 </div>
               )}
-              {bookingAttempt.status === "pending" && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("matchDetails.booking.attempting")}
-                </div>
-              )}
+              {bookingAttempt.status === "pending" && (() => {
+                const stale = Date.now() - new Date(bookingAttempt.attemptedAt).getTime() > 10 * 60 * 1000
+                return stale ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-2 text-sm">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                      <span className="text-destructive">{t("matchDetails.booking.timedOut")}</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={handleRetryBooking} disabled={retryingBooking}>
+                      {retryingBooking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                      {t("matchDetails.booking.retryBooking")}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("matchDetails.booking.attempting")}
+                  </div>
+                )
+              })()}
             </CardContent>
           </Card>
         )}
