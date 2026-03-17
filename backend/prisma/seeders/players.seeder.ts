@@ -7,7 +7,6 @@ const prisma = new PrismaClient();
 
 type PlayerSeed = {
   userId: string;
-  displayName?: string;
   levelValue: number;
   levelConfidence: number;
   defaultCity: string;
@@ -75,7 +74,7 @@ function generateLevel() {
 }
 
 export async function seedPlayers(
-  users: { id: string; name: string | null }[]
+  users: { id: string }[]
 ) {
   if (!users.length) {
     throw new Error('No users provided to seedPlayers');
@@ -100,7 +99,6 @@ export async function seedPlayers(
 
     players.push({
       userId: user.id,
-      displayName: user.name ?? undefined,
       levelValue,
       levelConfidence: faker.number.float({
         min: isActive ? 0.7 : 0.4,

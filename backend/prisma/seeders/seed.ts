@@ -16,10 +16,9 @@ import { seedUsers } from './users.seeder';
 import { seedPlayers } from './players.seeder';
 import { seedAvailabilities } from './availabilities.seeder';
 import { seedVenues } from './venues.seeder';
-import { seedGroups } from './groups.seeder';
-import { seedGroupMembers } from './groupMembers.seeder';
-import { seedGuestContacts } from './guestContacts.seeder';
-import { seedFriendships } from './friendships.seeder';
+import { seedContacts } from './contacts.seeder';
+import { seedContactLists } from './contactLists.seeder';
+import { seedContactListMembers } from './contactListMembers.seeder';
 import { seedMatches } from './matches.seeder';
 // import { seedSchedulingRequests } from './schedulingRequests.seeder';
 // import { seedSchedulingCandidates } from './schedulingCandidates.seeder';
@@ -44,21 +43,19 @@ async function main() {
   await prisma.result.deleteMany();
   await prisma.message.deleteMany();
   await prisma.notification.deleteMany();
-  await prisma.groupMember.deleteMany();
-  await prisma.friendship.deleteMany();
-  await prisma.guestContact.deleteMany();
+  await prisma.contactListMember.deleteMany();
+  await prisma.contactList.deleteMany();
+  await prisma.contact.deleteMany();
   await prisma.schedulingCandidate.deleteMany();
   await prisma.schedulingRequest.deleteMany();
   await prisma.ratingHistory.deleteMany(); // refs Player, Match — before match
   await prisma.matchParticipant.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.match.deleteMany();
-  await prisma.invite.deleteMany();
   await prisma.availability.deleteMany();
   await prisma.playerSurface.deleteMany();
   await prisma.player.deleteMany();
   await prisma.venue.deleteMany();
-  await prisma.group.deleteMany();
   await prisma.user.deleteMany();
   } finally {
     await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1');
@@ -73,15 +70,13 @@ async function main() {
   const availabilities = await seedAvailabilities(users);
   // 4. Venues
   const venues = await seedVenues();
-  // 5. Groups
-  const groups = await seedGroups(users);
-  // 6. Group members
-  const groupMembers = await seedGroupMembers(groups, users);
-  // 7. Guest contacts (users' address book entries)
-  const guestContacts = await seedGuestContacts(users);
-  // 8. Friendships (user-user and user-guestContact)
-  const friendships = await seedFriendships(users, guestContacts);
-  // 9. Matches (for availabilities, players, venues)
+  // 5. Contacts (unified address book: unlinked + linked to registered users)
+  const contacts = await seedContacts(users);
+  // 6. Contact lists (named groups of contacts)
+  const contactLists = await seedContactLists(users);
+  // 7. Contact list members
+  const contactListMembers = await seedContactListMembers(contactLists, contacts);
+  // 8. Matches (for availabilities, players, venues)
   const matchesRaw = await seedMatches([], availabilities, players, venues);
   // 11. Scheduling requests and candidates (WhatsApp scheduling flow) — temporarily disabled to test flow from scratch
   // const schedulingRequests = await seedSchedulingRequests(users, users);
@@ -110,10 +105,9 @@ async function main() {
     players: players.length,
     availabilities: availabilities.length,
     venues: venues.length,
-    groups: groups.length,
-    groupMembers: groupMembers.length,
-    guestContacts: guestContacts.length,
-    friendships: friendships.length,
+    contacts: contacts.length,
+    contactLists: contactLists.length,
+    contactListMembers: contactListMembers.length,
     matches: matches.length,
     // schedulingRequests: schedulingRequests.length,
     // schedulingCandidates: schedulingCandidates.length,
