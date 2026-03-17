@@ -172,7 +172,7 @@ describe('getWhatsappGroupLink', () => {
     });
 
     await expect(getWhatsappGroupLink('match1')).rejects.toThrow(AppError);
-    const err = await getWhatsappGroupLink('match1').catch((e) => e as AppError);
+    const err = await getWhatsappGroupLink('match1').catch((e) => e) as AppError;
     expect(err.statusCode).toBe(502);
     expect(err.message).toContain('Group not found');
   });
