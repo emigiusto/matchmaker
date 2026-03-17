@@ -401,7 +401,7 @@ export async function retryBookingForMatch(matchId: string): Promise<void> {
   // Reset attempt to pending
   await prisma.bookingAttempt.update({
     where: { id: existing.id },
-    data: { status: 'pending', errorMessage: null, completedAt: null },
+    data: { status: 'pending', errorMessage: null, completedAt: null, attemptedAt: new Date() },
   })
 
   logBookingEvent(matchId, 'booking_pending', { retry: true }).catch(() => {})
