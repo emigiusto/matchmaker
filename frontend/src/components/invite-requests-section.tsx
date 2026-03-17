@@ -222,8 +222,8 @@ export function InviteRequestsSection({
     contactName: string
   } | null>(null)
   const [cancelConfirm, setCancelConfirm] = useState<string | null>(null)
-  type InviteFilter = "all" | "past" | "completed" | "cancelled"
-  const [inviteFilter, setInviteFilter] = useState<InviteFilter>("all")
+  type InviteFilter = "active" | "expired" | "past" | "confirmed" | "cancelled"
+  const [inviteFilter, setInviteFilter] = useState<InviteFilter>("active")
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
   const [historyMap, setHistoryMap] = useState<Record<string, SchedulingInviteEventDTO[]>>({})
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null)
@@ -307,24 +307,27 @@ export function InviteRequestsSection({
     .filter((r) => {
       const displayStatus = getDisplayStatus(r)
       const past = isInThePast(r)
-      if (inviteFilter === "all") return !past && (displayStatus === "scheduling" || displayStatus === "expired")
-      if (inviteFilter === "past") return past && (displayStatus === "scheduling" || displayStatus === "expired")
-      if (inviteFilter === "completed") return displayStatus === "matched"
+      if (inviteFilter === "active") return displayStatus === "scheduling"
+      if (inviteFilter === "expired") return !past && displayStatus === "expired"
+      if (inviteFilter === "past") return past && displayStatus === "expired"
+      if (inviteFilter === "confirmed") return displayStatus === "matched"
       if (inviteFilter === "cancelled") return displayStatus === "cancelled"
       return true
     })
     .sort((a, b) => {
-      if (inviteFilter !== "all") return 0
+      if (inviteFilter !== "active") return 0
       const rank = (r: InviteRequest) => (getDisplayStatus(r) === "scheduling" ? 0 : 1)
       return rank(a) - rank(b)
     })
 
   function switchToFilterForStatus(status: InviteRequest["status"], request?: InviteRequest, forceSwitch = false) {
-    if (inviteFilter === "all" && !forceSwitch) return
-    if (status === "scheduling" || status === "expired") {
-      setInviteFilter(request && isInThePast(request) ? "past" : "all")
+    if (inviteFilter === "active" && !forceSwitch) return
+    if (status === "scheduling") {
+      setInviteFilter("active")
+    } else if (status === "expired") {
+      setInviteFilter(request && isInThePast(request) ? "past" : "expired")
     } else if (status === "cancelled") setInviteFilter("cancelled")
-    else if (status === "matched") setInviteFilter("completed")
+    else if (status === "matched") setInviteFilter("confirmed")
   }
 
   const activeRequestCount = inviteRequests.filter(
@@ -530,17 +533,14 @@ export function InviteRequestsSection({
         <div className="flex items-center justify-end">{headerAction}</div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-          {(["all", "past", "completed", "cancelled"] as const).map((f) => (
+          {(["active", "expired", "past", "confirmed", "cancelled"] as const).map((f) => (
             <Button
               key={f}
               variant={inviteFilter === f ? "default" : "outline"}
               size="sm"
               onClick={() => setInviteFilter(f)}
             >
-              {f === "all" && t("invites.filter.active")}
-              {f === "past" && t("invites.filter.expired")}
-              {f === "completed" && t("invites.filter.confirmed")}
-              {f === "cancelled" && t("invites.filter.cancelled")}
+              {t(`invites.filter.${f}`)}
             </Button>
           ))}
         </div>
@@ -568,11 +568,13 @@ export function InviteRequestsSection({
                   <p className="mt-4 text-lg font-medium text-foreground">
                     {inviteRequests.length === 0
                       ? t("invites.empty.noInvitesYet")
-                      : inviteFilter === "all"
+                      : inviteFilter === "active"
                         ? t("invites.empty.noActiveInvites")
-                        : inviteFilter === "past"
+                        : inviteFilter === "expired"
                           ? t("invites.empty.noExpiredInvites")
-                          : inviteFilter === "cancelled"
+                          : inviteFilter === "past"
+                            ? t("invites.empty.noPastInvites")
+                            : inviteFilter === "cancelled"
                               ? t("invites.empty.noCancelledInvites")
                               : t("invites.empty.noConfirmedMatches")}
                   </p>

@@ -386,6 +386,7 @@
     "filter": {
       "active": "Activo",
       "expired": "Expirado",
+      "past": "Pasado",
       "confirmed": "Confirmado",
       "cancelled": "Cancelado"
     },
@@ -393,6 +394,7 @@
       "noInvitesYet": "Sin invitaciones todavía",
       "noActiveInvites": "Sin invitaciones activas",
       "noExpiredInvites": "Sin invitaciones expiradas",
+      "noPastInvites": "Sin invitaciones pasadas",
       "noCancelledInvites": "Sin invitaciones canceladas",
       "noConfirmedMatches": "Sin partidos confirmados",
       "tapToCreate": "Pulsa \"Quiero Jugar\" para crear tu primera invitación",

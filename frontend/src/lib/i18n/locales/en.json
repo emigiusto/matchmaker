@@ -386,6 +386,7 @@
     "filter": {
       "active": "Active",
       "expired": "Expired",
+      "past": "Past",
       "confirmed": "Confirmed",
       "cancelled": "Cancelled"
     },
@@ -393,6 +394,7 @@
       "noInvitesYet": "No invites yet",
       "noActiveInvites": "No active invites",
       "noExpiredInvites": "No expired invites",
+      "noPastInvites": "No past invites",
       "noCancelledInvites": "No cancelled invites",
       "noConfirmedMatches": "No confirmed matches",
       "tapToCreate": "Tap \"I Want to Play\" to create your first invite",
