@@ -13,7 +13,7 @@ interface MessageTemplates {
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
   noMatch(sport: string, format: string, when: string, loc: string, reason: string, url: string): string;
   noMatchReason: Record<NoMatchReasonKey, string>;
-  matchCancelled(sport: string, format: string, when: string, loc: string): string;
+  matchCancelled(sport: string, format: string, when: string, loc: string, participants: string, url: string): string;
   reminder(opponentName: string, sport: string, format: string, when: string, loc: string, url?: string): string;
   courtBooked(courtName: string, when: string, loc: string): string;
 }
@@ -115,14 +115,17 @@ const templates: Record<Locale, MessageTemplates> = {
       scheduled_time_passed: 'Se pasó la hora programada sin confirmar el partido.',
     },
 
-    matchCancelled(sport, format, when, loc) {
+    matchCancelled(sport, format, when, loc, participants, url) {
       return [
         '⚠️ *Partido cancelado*',
         '',
-        `${when}`,
+        `📅 ${when}`,
         `📍 ${loc || 'TBD'}`,
+        `👥 ${participants}`,
         '',
         'Este partido ha sido cancelado. Gracias por tu comprensión.',
+        '',
+        `🔗 *Ver partido:* ${url}`,
       ].join('\n');
     },
 
@@ -216,14 +219,17 @@ const templates: Record<Locale, MessageTemplates> = {
       scheduled_time_passed: 'The scheduled time passed without confirming the match.',
     },
 
-    matchCancelled(sport, format, when, loc) {
+    matchCancelled(sport, format, when, loc, participants, url) {
       return [
         '⚠️ *Match cancelled*',
         '',
-        `${when}`,
+        `📅 ${when}`,
         `📍 ${loc || 'TBD'}`,
+        `👥 ${participants}`,
         '',
         'This match has been cancelled. Thanks for your understanding.',
+        '',
+        `🔗 *View match:* ${url}`,
       ].join('\n');
     },
 

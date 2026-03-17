@@ -16,6 +16,8 @@ import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
 import { cancelBookingForMatch } from '../booking/booking.service';
 
+const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
+
 /** Format a UTC Date as "HH:mm" in the given IANA timezone, falling back to UTC. */
 function formatTimeInTz(date: Date, timezone: string): string {
   try {
@@ -471,13 +473,19 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
         hostLocale = hostUser?.locale ?? 'es';
       }
       const intlLocale = resolveLocale(hostLocale) === 'es' ? 'es-ES' : 'en-US';
-      const localeDateStr = av?.date
+      const rawDateStr = av?.date
         ? new Date(av.date).toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'short' })
         : 'TBD';
+      const localeDateStr = rawDateStr.charAt(0).toUpperCase() + rawDateStr.slice(1);
       const sport = (match as any).schedulingRequest?.sportType ?? 'tennis';
       const format = (match as any).schedulingRequest?.format ?? 'singles';
       const whenStr = `${localeDateStr}${timeStr ? ` · ${timeStr}` : ''}`;
-      const message = getMessages(hostLocale).matchCancelled(sport, format, whenStr, location);
+      const participantNames = ((match as any).participants as { user?: { name: string | null } }[] | undefined)
+        ?.map((p) => p.user?.name)
+        .filter((n): n is string => Boolean(n)) ?? [];
+      const participantsStr = participantNames.join(', ') || '—';
+      const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
+      const message = getMessages(hostLocale).matchCancelled(sport, format, whenStr, location, participantsStr, matchUrl);
       await whatsappService.sendGroupMessage(groupId, message);
       logger.info('MatchCancelledWhatsAppSent', { matchId: match.id, groupId });
     } catch (err) {
