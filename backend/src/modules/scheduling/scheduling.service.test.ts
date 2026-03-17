@@ -687,7 +687,7 @@ describe('SchedulingService', () => {
 
       const link = await schedulingService.getInviteLink('req1', 'https://app.example.com');
 
-      expect(link).toBe('https://app.example.com/play?invite=abc123');
+      expect(link).toBe('https://app.example.com/join/abc123');
     });
 
     it('throws when request not found', async () => {

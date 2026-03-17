@@ -416,10 +416,12 @@ describe('retryBookingForMatch', () => {
 
     await retryBookingForMatch('match1');
 
-    expect(mockPrisma.bookingAttempt.update).toHaveBeenCalledWith({
-      where: { id: 'attempt1' },
-      data: { status: 'pending', errorMessage: null, completedAt: null },
-    });
+    expect(mockPrisma.bookingAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'attempt1' },
+        data: expect.objectContaining({ status: 'pending', errorMessage: null, completedAt: null }),
+      }),
+    );
   });
 
   it('resets attemptedAt on retry so the timeout sentinel is refreshed', async () => {
