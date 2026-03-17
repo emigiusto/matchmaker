@@ -360,7 +360,8 @@ export class LaietaAdapter implements BookingAdapter {
         }
 
         const bodyText = document.body.textContent ?? ''
-        const match = bodyText.match(/reserva\s*[:#]?\s*([A-Z0-9\-]{4,})/i)
+        // Require at least one digit so plain words like "confirmada" are not captured
+        const match = bodyText.match(/reserva\s*[:#]?\s*([A-Z0-9\-]*\d[A-Z0-9\-]*)/i)
         return { hasSuccess: !!successEl, bookingRef: match?.[1] ?? null, confirmationMsg }
       })
 
