@@ -122,7 +122,7 @@ export async function checkCourtAvailability(
   if (!membership.encryptedPassword) throw new AppError('No password stored for this membership', 400)
   if (membership.status !== 'active') throw new AppError('Club membership is not active — please verify your connection in your profile', 400)
 
-  const cacheKey = `booking:availability:${membership.adapterType}:${clubSlug}:${date}:${sport}`
+  const cacheKey = `matchmaker:booking:availability:${membership.adapterType}:${clubSlug}:${date}:${sport}`
 
   try {
     const cached = await cacheGet(cacheKey)
@@ -339,9 +339,31 @@ async function runBookingJob(
     const sport = schedulingRequest?.sportType ?? 'tennis'
     const sportOptions = { sport }
 
-    // Check availability and pick first available court
-    const availability = await adapter.checkAvailability(creds, date, time, sportOptions)
-    const court = availability.availableCourts[0]
+    // Check availability — use cached full-day result to avoid redundant Puppeteer scrape
+    const availCacheKey = `matchmaker:booking:availability:${membership.adapterType}:${membership.clubSlug}:${date}:${sport}`
+    let availability: CourtAvailabilityResult | undefined
+    try {
+      const cached = await cacheGet(availCacheKey)
+      if (cached) {
+        logger.info(`[booking] Availability cache hit for booking job: ${availCacheKey}`)
+        availability = JSON.parse(cached) as CourtAvailabilityResult
+      }
+    } catch (err) {
+      logger.warn('[booking] Cache get failed in booking job:', err)
+    }
+    if (!availability) {
+      availability = await adapter.checkAvailability(creds, date, undefined, sportOptions)
+      try {
+        await cacheSet(availCacheKey, JSON.stringify(availability), 900)
+      } catch (err) {
+        logger.warn('[booking] Cache set failed in booking job:', err)
+      }
+    }
+
+    // Filter courts to the target hour
+    const targetHourStr = time.slice(0, 5)  // e.g. "09:00"
+    const filteredCourts = availability.availableCourts.filter((c) => c.time === targetHourStr)
+    const court = filteredCourts[0] ?? availability.availableCourts[0]
     if (!court) {
       await failAttempt(attemptId, `No available courts at ${date} ${time}`)
       return
