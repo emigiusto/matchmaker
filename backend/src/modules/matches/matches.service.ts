@@ -14,6 +14,7 @@ import { createNotification } from '../notifications/notifications.service';
 import { validateResultMatchConsistency } from '../results/results.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
+import { cancelBookingForMatch } from '../booking/booking.service';
 
 /** Format a UTC Date as "HH:mm" in the given IANA timezone, falling back to UTC. */
 function formatTimeInTz(date: Date, timezone: string): string {
@@ -333,6 +334,7 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
       throw new AppError('Cannot cancel match after scheduled time', 409);
     }
     // Update status
+    const hostUserId = match.availability?.userId ?? null;
     const updated = await tx.match.update({
       where: { id: match.id },
       data: { status: 'cancelled' as MatchStatus },
@@ -343,8 +345,39 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
     notifyMatchParticipantsOnCancel(updated as EnrichedMatch & { whatsappGroupId?: string | null }).catch((err) => {
       logger.error('Failed to notify on match cancel', { matchId: updated.id, error: err instanceof Error ? err.message : String(err) });
     });
+    // Trigger booking cancellation if a successful booking exists
+    if (hostUserId) {
+      cancelBookingOnMatchCancel(matchId, hostUserId).catch((err) => {
+        logger.error('Unexpected error in cancelBookingOnMatchCancel', { matchId, error: err instanceof Error ? err.message : String(err) });
+      });
+    }
     return dto;
   });
+}
+
+/**
+ * Fire-and-forget: cancels the court booking for a match (if any) and notifies the host.
+ * Silently skips if there is no booking or the booking is not in a cancellable state.
+ */
+async function cancelBookingOnMatchCancel(matchId: string, hostUserId: string): Promise<void> {
+  try {
+    await cancelBookingForMatch(matchId);
+    await createNotification(hostUserId, 'booking.cancelled', { matchId }).catch((err) => {
+      logger.warn('Failed to send booking.cancelled notification', { matchId, error: err instanceof Error ? err.message : String(err) });
+    });
+  } catch (err) {
+    if (err instanceof AppError && (err.statusCode === 404 || err.statusCode === 409)) {
+      // No booking to cancel or not in a cancellable state — silently skip
+      return;
+    }
+    await createNotification(hostUserId, 'booking.cancel_failed', {
+      matchId,
+      error: err instanceof Error ? err.message : String(err),
+    }).catch((notifErr) => {
+      logger.warn('Failed to send booking.cancel_failed notification', { matchId, error: notifErr instanceof Error ? notifErr.message : String(notifErr) });
+    });
+    logger.error('Failed to cancel booking on match cancel', { matchId, error: err instanceof Error ? err.message : String(err) });
+  }
 }
 
 /**
