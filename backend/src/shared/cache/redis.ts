@@ -50,16 +50,24 @@ export async function cacheGet(key: string): Promise<string | null> {
 
 export async function cacheSet(key: string, value: string, ttlSeconds?: number) {
   if (!redisAvailable()) return;
-  if (ttlSeconds) {
-    await client!.set(key, value, { EX: ttlSeconds });
-  } else {
-    await client!.set(key, value);
+  try {
+    if (ttlSeconds) {
+      await client!.set(key, value, { EX: ttlSeconds });
+    } else {
+      await client!.set(key, value);
+    }
+  } catch (err: any) {
+    console.error('[Redis] cacheSet failed for key "%s":', key, err.message);
   }
 }
 
 export async function cacheDel(key: string) {
   if (!redisAvailable()) return;
-  await client!.del(key);
+  try {
+    await client!.del(key);
+  } catch (err: any) {
+    console.error('[Redis] cacheDel failed for key "%s":', key, err.message);
+  }
 }
 
 export async function deleteKeysByPattern(pattern: string) {
@@ -68,16 +76,20 @@ export async function deleteKeysByPattern(pattern: string) {
 
   let cursor = '0';
 
-  do {
-    const { cursor: nextCursor, keys } = await client.scan(cursor, {
-      MATCH: pattern,
-      COUNT: 100,
-    });
+  try {
+    do {
+      const { cursor: nextCursor, keys } = await client.scan(cursor, {
+        MATCH: pattern,
+        COUNT: 100,
+      });
 
-    cursor = nextCursor;
+      cursor = nextCursor;
 
-    if (keys.length > 0) {
-      await client.del(keys);
-    }
-  } while (cursor !== '0');
+      if (keys.length > 0) {
+        await client.del(keys);
+      }
+    } while (cursor !== '0');
+  } catch (err: any) {
+    console.error('[Redis] deleteKeysByPattern failed for pattern "%s":', pattern, err.message);
+  }
 }
