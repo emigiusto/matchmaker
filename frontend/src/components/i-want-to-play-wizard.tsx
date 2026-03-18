@@ -114,6 +114,7 @@ type LocationType = "place" | "city"
 interface Contact {
   id: string
   name: string
+  phone?: string
 }
 
 /** A contact from the user's address book, for the contacts picker */
@@ -161,7 +162,10 @@ function SortableContactItem({
       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
         {contact.name[0]}
       </div>
-      <span className="flex-1 text-sm font-medium">{contact.name}</span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-sm font-medium leading-tight">{contact.name}</span>
+        {contact.phone && <span className="text-xs text-muted-foreground">{contact.phone}</span>}
+      </div>
       <button
         onClick={() => onRemove(contact.id)}
         className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -376,7 +380,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     // Use linkedUserId if available, otherwise the contactId itself acts as a stable key
     const userId = ac.linkedUserId ?? ac.id
     if (priorityList.some((c) => c.id === userId)) return
-    addContact({ id: userId, name: ac.name })
+    addContact({ id: userId, name: ac.name, phone: ac.phone })
     setContactMeta((prev) => ({
       ...prev,
       [userId]: { contactId: ac.id, socioNumbers: ac.socioNumbers },
@@ -415,7 +419,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     }
     setPriorityList((prev) => [
       ...prev,
-      ...toAdd.map((m) => ({ id: m.linkedUserId ?? m.id, name: m.name })),
+      ...toAdd.map((m) => ({ id: m.linkedUserId ?? m.id, name: m.name, phone: m.phone })),
     ])
     toast.success(`Added ${toAdd.length} from ${list.name}`)
   }
@@ -466,7 +470,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       setManualPhone("")
       setManualSocio("")
       const userId = user.id
-      addContact({ id: userId, name: user.name || name })
+      addContact({ id: userId, name: user.name || name, phone })
       setContactMeta((prev) => ({
         ...prev,
         [userId]: { contactId: contact.id, socioNumbers: {} },
