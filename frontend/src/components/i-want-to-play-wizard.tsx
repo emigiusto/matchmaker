@@ -222,6 +222,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [manualSocio, setManualSocio] = useState("")
   const [showManualAdd, setShowManualAdd] = useState(false)
   const [searchFromList, setSearchFromList] = useState("")
+  const [fromListOpen, setFromListOpen] = useState(false)
   const [searchAllContacts, setSearchAllContacts] = useState("")
 
   function resetWizard() {
@@ -1007,7 +1008,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 <div className="flex flex-wrap gap-2">
                   {/* Add from contact lists */}
                   {contactLists.length > 0 && (
-                    <Popover onOpenChange={(open) => !open && setSearchFromList("")}>
+                    <Popover open={fromListOpen} onOpenChange={(open) => { setFromListOpen(open); if (!open) setSearchFromList("") }}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1.5">
                           <List className="h-4 w-4" />
@@ -1024,13 +1025,13 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                             className="h-8 pl-8"
                           />
                         </div>
-                        <div className="max-h-48 overflow-y-auto space-y-0.5">
+                        <div className="max-h-48 overflow-y-auto overscroll-contain touch-pan-y space-y-0.5">
                           {contactLists
                             .filter((l) => !searchFromList.trim() || l.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
                             .map((l) => (
                               <button
                                 key={l.id}
-                                onClick={() => addListMembers(l)}
+                                onClick={() => { addListMembers(l); setFromListOpen(false) }}
                                 className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted"
                               >
                                 <span>{l.name}</span>
@@ -1059,7 +1060,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                           className="h-8 pl-8"
                         />
                       </div>
-                      <div className="max-h-48 overflow-y-auto space-y-0.5">
+                      <div className="max-h-48 overflow-y-auto overscroll-contain touch-pan-y space-y-0.5">
                         {availableContacts
                           .filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id)))
                           .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
