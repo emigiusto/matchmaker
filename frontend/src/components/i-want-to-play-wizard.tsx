@@ -1182,8 +1182,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               )}
             </div>
 
-            {/* Socio numbers — shown for all contacts when booking is enabled */}
-            {priorityList.length > 0 && (
+            {/* Socio numbers — only shown when automatic court booking is enabled */}
+            {bookingEnabled && priorityList.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-base font-medium">{t("wizard.socioNumbers")}</Label>
                 <p className="text-xs text-muted-foreground">{t("wizard.socioNumbersHint")}</p>
