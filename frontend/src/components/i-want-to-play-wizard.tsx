@@ -225,6 +225,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [searchFromList, setSearchFromList] = useState("")
   const [fromListOpen, setFromListOpen] = useState(false)
   const [searchAllContacts, setSearchAllContacts] = useState("")
+  const [showAllContacts, setShowAllContacts] = useState(false)
 
   function resetWizard() {
     setStep(1)
@@ -1006,58 +1007,61 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {/* Add from contact lists */}
-                  {contactLists.length > 0 && (
-                    <Popover open={fromListOpen} onOpenChange={(open) => { setFromListOpen(open); if (!open) setSearchFromList("") }}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                          <List className="h-4 w-4" />
-                          {t("wizard.fromList")}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-64 p-2" align="start">
-                        <div className="relative mb-2">
-                          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            placeholder={t("wizard.searchLists")}
-                            value={searchFromList}
-                            onChange={(e) => setSearchFromList(e.target.value)}
-                            className="h-8 pl-8"
-                          />
-                        </div>
-                        <ScrollArea className="h-48">
-                          <div className="space-y-0.5 pr-2">
-                            {contactLists
-                              .filter((l) => !searchFromList.trim() || l.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
-                              .map((l) => (
-                                <button
-                                  key={l.id}
-                                  onClick={() => { addListMembers(l); setFromListOpen(false) }}
-                                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted"
-                                >
-                                  <span>{l.name}</span>
-                                  <span className="text-xs text-muted-foreground">{l.members.length}</span>
-                                </button>
-                              ))}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {/* Add from contact lists */}
+                    {contactLists.length > 0 && (
+                      <Popover open={fromListOpen} onOpenChange={(open) => { setFromListOpen(open); if (!open) setSearchFromList("") }}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-1.5">
+                            <List className="h-4 w-4" />
+                            {t("wizard.fromList")}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-2" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                          <div className="relative mb-2">
+                            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              placeholder={t("wizard.searchLists")}
+                              value={searchFromList}
+                              onChange={(e) => setSearchFromList(e.target.value)}
+                              className="h-8 pl-8"
+                            />
                           </div>
-                        </ScrollArea>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                  {/* Add from all contacts */}
-                  <Popover onOpenChange={(open) => !open && setSearchAllContacts("")}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-1.5" disabled={availableContacts.length === 0}>
-                        <UserCircle className="h-4 w-4" />
-                        {t("wizard.allContacts")}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-[min(90vw,22rem)] p-2"
-                      align="center"
-                      onOpenAutoFocus={(e) => e.preventDefault()}
+                          <ScrollArea className="h-48">
+                            <div className="space-y-0.5 pr-2">
+                              {contactLists
+                                .filter((l) => !searchFromList.trim() || l.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
+                                .map((l) => (
+                                  <button
+                                    key={l.id}
+                                    onClick={() => { addListMembers(l); setFromListOpen(false) }}
+                                    className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted"
+                                  >
+                                    <span>{l.name}</span>
+                                    <span className="text-xs text-muted-foreground">{l.members.length}</span>
+                                  </button>
+                                ))}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                    {/* Add from all contacts */}
+                    <Button
+                      variant={showAllContacts ? "secondary" : "outline"}
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={availableContacts.length === 0}
+                      onClick={() => { setShowAllContacts((v) => !v); setSearchAllContacts("") }}
                     >
+                      <UserCircle className="h-4 w-4" />
+                      {t("wizard.allContacts")}
+                    </Button>
+                  </div>
+                  {/* Inline all-contacts panel */}
+                  {showAllContacts && (
+                    <div className="rounded-md border bg-popover p-2 shadow-sm">
                       <div className="relative mb-2">
                         <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -1067,35 +1071,33 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                           className="h-8 pl-8"
                         />
                       </div>
-                      <ScrollArea className="h-48">
-                        <div className="space-y-0.5 pr-2">
-                          {availableContacts
-                            .filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id)))
-                            .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
-                            .map((ac) => (
-                              <button
-                                key={ac.id}
-                                onClick={() => addAvailableContact(ac)}
-                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                              >
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                                  {ac.name[0] ?? "?"}
-                                </div>
-                                <span className="flex-1 text-left">{ac.name}</span>
-                                {ac.linkedUserId && (
-                                  <span className="text-[10px] text-muted-foreground">✓</span>
-                                )}
-                              </button>
-                            ))}
-                        </div>
-                      </ScrollArea>
-                      {availableContacts.filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id))).length === 0 && (
-                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                          {availableContacts.length === 0 ? t("wizard.noContactsYet") : t("wizard.allAdded")}
-                        </p>
-                      )}
-                    </PopoverContent>
-                  </Popover>
+                      <div className="max-h-48 overflow-y-auto space-y-0.5">
+                        {availableContacts
+                          .filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id)))
+                          .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
+                          .map((ac) => (
+                            <button
+                              key={ac.id}
+                              onClick={() => { addAvailableContact(ac); setShowAllContacts(false) }}
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                            >
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                                {ac.name[0] ?? "?"}
+                              </div>
+                              <span className="flex-1 text-left">{ac.name}</span>
+                              {ac.linkedUserId && (
+                                <span className="text-[10px] text-muted-foreground">✓</span>
+                              )}
+                            </button>
+                          ))}
+                        {availableContacts.filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id))).length === 0 && (
+                          <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            {availableContacts.length === 0 ? t("wizard.noContactsYet") : t("wizard.allAdded")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
