@@ -10,6 +10,7 @@ interface MessageTemplates {
   invite(hostName: string, sport: string, format: string, date: string, time: string, loc: string, timeLeft: string): string;
   /** Poll-based invite for multi-hour requests. Time options are shown as poll choices, not in the message body. */
   invitePoll(hostName: string, sport: string, format: string, date: string, loc: string, timeLeft: string): string;
+  inviteNoLongerAvailable(hostName: string, sport: string, date: string): string;
   inviteReply(): string;
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
   noMatch(sport: string, format: string, when: string, loc: string, reason: string, url: string): string;
@@ -84,6 +85,12 @@ const templates: Record<Locale, MessageTemplates> = {
         '',
         `⏳ Tienes *${timeLeft}* para responder`,
       ].join('\n');
+    },
+
+    inviteNoLongerAvailable(hostName, sport, date) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'pádel' : 'tenis';
+      return `${sportEmoji} La invitación de *${hostName}* para jugar ${sportName} el *${date}* ya no está disponible.`;
     },
 
     inviteReply() {
@@ -192,6 +199,11 @@ const templates: Record<Locale, MessageTemplates> = {
         '',
         `⏳ You have *${timeLeft}* to respond`,
       ].join('\n');
+    },
+
+    inviteNoLongerAvailable(hostName, sport, date) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      return `${sportEmoji} *${hostName}*'s invitation to play ${sport} on *${date}* is no longer available.`;
     },
 
     inviteReply() {

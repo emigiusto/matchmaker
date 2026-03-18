@@ -341,28 +341,9 @@ export class WasenderProvider implements IWhatsAppProvider {
     }
   }
 
-  async sendReaction(phoneNumber: string, messageId: string, emoji: string): Promise<SendMessageResult> {
-    if (!WASENDER_TOKEN) {
-      return { success: false, error: 'WASENDER_API_KEY not configured' };
-    }
-    try {
-      const to = `+${normalizePhone(phoneNumber)}`;
-      const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${WASENDER_TOKEN}`,
-        },
-        body: JSON.stringify({ to, reaction: { messageId, emoji } }),
-      });
-      const data = (await res.json()) as { success?: boolean; data?: { msgId?: string }; error?: string };
-      if (!res.ok) {
-        return { success: false, error: data.error || res.statusText };
-      }
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
+  async sendReaction(_phoneNumber: string, _messageId: string, _emoji: string): Promise<SendMessageResult> {
+    // Wasender API does not support sending reactions — reactions are receive-only via webhook.
+    return { success: false, error: 'Reactions not supported by Wasender API' };
   }
 
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {

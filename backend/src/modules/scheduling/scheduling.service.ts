@@ -248,6 +248,39 @@ async function recordEvent(data: {
   }
 }
 
+async function sendInviteNoLongerAvailable(
+  request: {
+    date: Date;
+    sportType: string;
+    timezone?: string;
+    hostUser?: { name: string | null } | null;
+  },
+  candidate: {
+    id: string;
+    contactUser?: { phone?: string | null; locale?: string | null } | null;
+  }
+): Promise<void> {
+  const phone = candidate.contactUser?.phone;
+  if (!phone) return;
+
+  const candidateLocale = candidate.contactUser?.locale ?? 'es';
+  const loc = resolveLocale(candidateLocale);
+  const intlLocale = loc === 'es' ? 'es-ES' : 'en-US';
+  const tz = request.timezone ?? 'UTC';
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const sep = loc === 'es' ? ' de ' : ' ';
+  const dateStr = `${cap(formatInTz(request.date, intlLocale, { weekday: 'long' }, tz))}, ${formatInTz(request.date, intlLocale, { day: 'numeric' }, tz)}${sep}${cap(formatInTz(request.date, intlLocale, { month: 'long' }, tz))}`;
+
+  const hostName = request.hostUser?.name ?? 'El organizador';
+  const msgs = getMessages(candidateLocale);
+  const message = msgs.inviteNoLongerAvailable(hostName, request.sportType, dateStr);
+
+  const result = await whatsappService.sendInviteMessage(phone, message);
+  if (!result.success) {
+    logger.warn('FailedToSendInviteNoLongerAvailable', { candidateId: candidate.id, phone, error: result.error });
+  }
+}
+
 async function notifyHostSchedulingNoMatch(
   request: {
     id: string;
@@ -930,6 +963,10 @@ export const schedulingService = {
           logger.warn('FailedToReactToPoll', { candidateId: candidate.id, error: err instanceof Error ? err.message : err });
         });
       }
+      // Notify contacted candidates who were not selected for the match
+      if (['contacted', 'waiting_reply'].includes(candidate.status)) {
+        void sendInviteNoLongerAvailable(request, candidate);
+      }
     }
 
     // Trigger court booking if the scheduling request opted in
@@ -1171,6 +1208,7 @@ export const schedulingService = {
     await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
     void recordEvent({ schedulingRequestId: requestId, action: 'candidate_cancelled', candidateId, actorUserId: userId });
     logger.info('ContactedCandidateCancelled', { requestId, candidateId, userId });
+    void sendInviteNoLongerAvailable(request, candidate);
     await this.contactNextCandidates(requestId);
 
     const updated = await schedulingRepository.findRequestById(requestId);
@@ -1263,6 +1301,7 @@ export const schedulingService = {
           logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, error: e });
         }
       }
+      void sendInviteNoLongerAvailable(request, c);
       await schedulingRepository.updateCandidateStatus(c.id, 'cancelled');
     }
 
