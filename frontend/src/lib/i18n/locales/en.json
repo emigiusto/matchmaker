@@ -269,6 +269,7 @@
     "courtAvailabilityHint": "Select a date to check available courts.",
     "checkingCourts": "Checking available courts…",
     "availableCourts": "{{count}} court(s) available at {{time}}",
+    "availableCourtsCount": "{{count}} court(s)",
     "courtAvailabilityServiceError": "Court availability service is not available at the moment.",
     "courtAvailabilityTimeout": "Court availability check timed out. Auto-book has been disabled.",
     "continue": "Continue",

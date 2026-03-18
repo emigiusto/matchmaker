@@ -8,7 +8,7 @@ import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
-import { triggerBookingForMatch } from '../booking/booking.service';
+import { triggerBookingForMatch, pickBestSlotInRange } from '../booking/booking.service';
 import { createNotification } from '../notifications/notifications.service';
 import type {
   CreateSchedulingRequestInput,
@@ -668,16 +668,42 @@ export const schedulingService = {
     const hostUser = request.hostUser;
     if (!hostUser) return;
 
-    // Derive scheduledAt from request.date (authoritative date) + time from request.startTime.
+    // Derive scheduledAt from request.date + the best slot within [startTime, endTime).
+    // When bookingEnabled and the host has an active club membership, pick the earliest
+    // slot in the range that has a court available (pure Redis cache read, no Puppeteer).
+    // Falls back to startTime when the cache is cold or no courts are found.
     const reqDate = new Date(request.date);
-    const reqTime = new Date(request.startTime);
+    const reqStartTime = new Date(request.startTime);
+    const reqEndTime = new Date(request.endTime);
+    const dateStr = reqDate.toISOString().slice(0, 10);
+    const startHHMM = `${String(reqStartTime.getUTCHours()).padStart(2, '0')}:${String(reqStartTime.getUTCMinutes()).padStart(2, '0')}`;
+    const endHHMM = `${String(reqEndTime.getUTCHours()).padStart(2, '0')}:${String(reqEndTime.getUTCMinutes()).padStart(2, '0')}`;
+
+    let matchedHHMM = startHHMM;
+    if (request.bookingEnabled) {
+      const hostMembership = await prisma.clubMembership.findFirst({
+        where: { userId: hostUser.id, status: 'active', encryptedPassword: { not: null } },
+      });
+      if (hostMembership) {
+        matchedHHMM = await pickBestSlotInRange(
+          hostUser.id,
+          hostMembership.clubSlug,
+          dateStr,
+          request.sportType,
+          startHHMM,
+          endHHMM,
+        );
+      }
+    }
+
+    const [matchedH, matchedM] = matchedHHMM.split(':').map(Number);
     const scheduledAt = new Date(Date.UTC(
       reqDate.getUTCFullYear(),
       reqDate.getUTCMonth(),
       reqDate.getUTCDate(),
-      reqTime.getUTCHours(),
-      reqTime.getUTCMinutes(),
-      reqTime.getUTCSeconds(),
+      matchedH,
+      matchedM,
+      0,
     ));
     const matchType = request.matchType === 'practice' ? 'practice' : 'competitive';
 

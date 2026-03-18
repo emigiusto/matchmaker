@@ -153,6 +153,52 @@ export async function checkCourtAvailability(
   return result
 }
 
+// ─── Slot selection ───────────────────────────────────────────────
+
+/**
+ * Given a [startTime, endTime) window, returns the earliest HH:MM slot that
+ * has at least one court available in the Redis cache.
+ * Falls back to startTime if the cache is empty, cold, or no courts are found.
+ * Pure cache read — never triggers a Puppeteer session.
+ */
+export async function pickBestSlotInRange(
+  userId: string,
+  clubSlug: string,
+  date: string,      // YYYY-MM-DD
+  sport: string,
+  startTime: string, // HH:MM
+  endTime: string,   // HH:MM
+): Promise<string> {
+  try {
+    const membership = await prisma.clubMembership.findUnique({
+      where: { userId_clubSlug: { userId, clubSlug } },
+    })
+    if (!membership) return startTime
+
+    const cacheKey = `matchmaker:booking:availability:${membership.adapterType}:${clubSlug}:${date}:${sport}`
+    const cached = await cacheGet(cacheKey)
+    if (!cached) return startTime
+
+    const availability = JSON.parse(cached) as CourtAvailabilityResult
+    const [sh] = startTime.split(':').map(Number)
+    const [eh] = endTime.split(':').map(Number)
+
+    for (let h = sh; h < eh; h++) {
+      const slotTime = `${String(h).padStart(2, '0')}:00`
+      const hasCourt = availability.availableCourts.some((c) => c.time === slotTime)
+      if (hasCourt) {
+        logger.info(`[booking] pickBestSlotInRange: picked ${slotTime} (first slot with courts in ${startTime}–${endTime})`)
+        return slotTime
+      }
+    }
+
+    logger.info(`[booking] pickBestSlotInRange: no courts found in range ${startTime}–${endTime}, falling back to ${startTime}`)
+  } catch (err) {
+    logger.warn('[booking] pickBestSlotInRange cache read failed:', err instanceof Error ? err.message : err)
+  }
+  return startTime
+}
+
 // ─── BookingAttempt ───────────────────────────────────────────────
 
 /**
