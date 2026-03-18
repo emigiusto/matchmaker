@@ -285,6 +285,7 @@
     "fromList": "From list",
     "friends": "Friends",
     "allContacts": "All contacts",
+    "importFromDevice": "From device",
     "addManuallyLabel": "Add manually (name + phone)",
     "hide": "Hide",
     "addManuallyHint": "Saved to your contacts. Use country code (e.g. +34 for Spain).",
@@ -327,6 +328,8 @@
       "enterNamePhone": "Enter name and phone",
       "contactSaved": "Contact saved and added to invite list",
       "contactFailed": "Failed to add contact",
+      "contactPermissionDenied": "Contact permission is required to import from your device",
+      "noDeviceContacts": "No contacts with phone numbers found on your device",
       "linkCopied": "Invite link copied to clipboard",
       "schedulingStarted": "Scheduling started! Invites will be sent via WhatsApp.",
       "schedulingFailed": "Failed to start scheduling"
