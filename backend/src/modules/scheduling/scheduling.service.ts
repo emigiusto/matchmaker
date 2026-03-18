@@ -203,18 +203,6 @@ function formatMatchDetailsMessage(
   return getMessages(locale).matchConfirmed(sport, formatLabel, whenStr, location, matchUrl);
 }
 
-function formatInviteNoLongerAvailableMessage(
-  hostName: string,
-  sportType: string,
-  format: string,
-  dateStr: string,
-  timeStr: string,
-  location: string,
-  locale?: string | null
-): string {
-  const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
-  return getMessages(locale).noLongerAvailable(hostName, sportType, formatLabel, dateStr, timeStr, location);
-}
 
 /** Reason codes when a scheduling request expires (No match) */
 type SchedulingExpiredReason = 'no_more_candidates' | 'all_candidates_exhausted' | 'scheduled_time_passed';
@@ -518,6 +506,12 @@ export const schedulingService = {
       } else {
         logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId, contactName, phone });
         void recordEvent({ schedulingRequestId: requestId, action: 'invite_sent', candidateId: candidate.id });
+        if (result.messageId) {
+          await prisma.schedulingCandidate.update({
+            where: { id: candidate.id },
+            data: { pollMessageId: result.messageId },
+          });
+        }
       }
     }
     await this.contactNextCandidates(requestId);
@@ -780,18 +774,10 @@ export const schedulingService = {
     if (!candidate || candidate.status !== 'waiting_reply') return;
 
     const phone = candidate.contactUser?.phone;
-    if (phone) {
-      const req = candidate.schedulingRequest;
-      const hostName = req.hostUser?.name ?? 'Someone';
-      const tz = (req as RequestRow).timezone ?? 'UTC';
-      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
-      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-      const dateStr = formatInTz(req.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-      const timeStr = formatInTz(req.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
-      const format = (req as RequestRow).format || 'singles';
-      const msg = formatInviteNoLongerAvailableMessage(hostName, req.sportType, format, dateStr, timeStr, req.locationText, candidateLocale);
-      const result = await whatsappService.sendInviteMessage(phone, msg);
-      if (!result.success) logger.warn('FailedToNotifyInviteExpired', { candidateId, phone });
+    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
+    if (phone && pollMessageId) {
+      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
+      if (!result.success) logger.warn('FailedToReactInviteExpired', { candidateId, phone });
     }
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'expired');
@@ -934,6 +920,17 @@ export const schedulingService = {
     });
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
+
+    // React to all open poll messages with 🔒 to signal the match has been scheduled
+    for (const candidate of request.candidates) {
+      const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
+      const phone = (candidate.contactUser as { phone?: string | null } | null)?.phone;
+      if (pollMessageId && phone) {
+        void whatsappService.sendReaction(phone, pollMessageId, '🔒').catch((err) => {
+          logger.warn('FailedToReactToPoll', { candidateId: candidate.id, error: err instanceof Error ? err.message : err });
+        });
+      }
+    }
 
     // Trigger court booking if the scheduling request opted in
     if ((request as { bookingEnabled?: boolean }).bookingEnabled) {
@@ -1165,17 +1162,10 @@ export const schedulingService = {
     }
 
     const phone = candidate.contactUser?.phone;
-    if (phone) {
-      const hostName = request.hostUser?.name ?? 'Someone';
-      const tz = (request as RequestRow).timezone ?? 'UTC';
-      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
-      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-      const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-      const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
-      const format = (request as RequestRow).format || 'singles';
-      const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, candidateLocale);
-      const result = await whatsappService.sendInviteMessage(phone, msg);
-      if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId, phone });
+    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
+    if (phone && pollMessageId) {
+      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
+      if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId, phone });
     }
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
@@ -1257,10 +1247,6 @@ export const schedulingService = {
     if (request.status === 'cancelled') return toRequestDTOWithCandidates(request);
     if (request.status === 'completed') throw new AppError('Cannot cancel a completed match', 400);
 
-    const hostName = request.hostUser?.name ?? 'Someone';
-    const tz = (request as RequestRow).timezone ?? 'UTC';
-    const format = (request as RequestRow).format || 'singles';
-
     const candidates = request.candidates ?? [];
     const toNotify = candidates.filter((c) =>
       ['contacted', 'waiting_reply', 'accepted'].includes(c.status)
@@ -1268,17 +1254,13 @@ export const schedulingService = {
 
     for (const c of toNotify) {
       const phone = c.contactUser?.phone;
-      if (phone) {
+      const pollMessageId = (c as { pollMessageId?: string | null }).pollMessageId;
+      if (phone && pollMessageId) {
         try {
-          const candidateLocale = (c.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
-          const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-          const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-          const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
-          const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, candidateLocale);
-          const result = await whatsappService.sendInviteMessage(phone, msg);
-          if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId: c.id, phone });
+          const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
+          if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, phone });
         } catch (e) {
-          logger.warn('FailedToNotifyInviteCancelled', { candidateId: c.id, error: e });
+          logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, error: e });
         }
       }
       await schedulingRepository.updateCandidateStatus(c.id, 'cancelled');

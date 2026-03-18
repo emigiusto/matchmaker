@@ -11,7 +11,6 @@ interface MessageTemplates {
   /** Poll-based invite for multi-hour requests. Time options are shown as poll choices, not in the message body. */
   invitePoll(hostName: string, sport: string, format: string, date: string, loc: string, timeLeft: string): string;
   inviteReply(): string;
-  noLongerAvailable(hostName: string, sport: string, format: string, date: string, time: string, loc: string): string;
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
   noMatch(sport: string, format: string, when: string, loc: string, reason: string, url: string): string;
   noMatchReason: Record<NoMatchReasonKey, string>;
@@ -89,18 +88,6 @@ const templates: Record<Locale, MessageTemplates> = {
 
     inviteReply() {
       return 'Responde *SÍ* ✅ para aceptar o *NO* ❌ para declinar';
-    },
-
-    noLongerAvailable(hostName, sport, format, date, time, loc) {
-      return [
-        'ℹ️ *Invitación no disponible*',
-        '',
-        `La invitación de ${sport} ${format} de ${hostName} ya no está disponible.`,
-        `*Cuándo:* ${date} · ${time}`,
-        `*Dónde:* ${loc || 'TBD'}`,
-        '',
-        'Puedes ignorar el mensaje anterior.',
-      ].join('\n');
     },
 
     matchConfirmed(sport, format, when, loc, url) {
@@ -209,18 +196,6 @@ const templates: Record<Locale, MessageTemplates> = {
 
     inviteReply() {
       return 'Reply *YES* ✅ to accept or *NO* ❌ to decline';
-    },
-
-    noLongerAvailable(hostName, sport, format, date, time, loc) {
-      return [
-        'ℹ️ *Invite no longer available*',
-        '',
-        `The ${sport} ${format} invite from ${hostName} is no longer available.`,
-        `*When:* ${date} · ${time}`,
-        `*Where:* ${loc || 'TBD'}`,
-        '',
-        'You can ignore the previous invite message.',
-      ].join('\n');
     },
 
     matchConfirmed(sport, format, when, loc, url) {

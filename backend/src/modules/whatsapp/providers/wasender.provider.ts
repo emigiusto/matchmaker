@@ -341,6 +341,30 @@ export class WasenderProvider implements IWhatsAppProvider {
     }
   }
 
+  async sendReaction(phoneNumber: string, messageId: string, emoji: string): Promise<SendMessageResult> {
+    if (!WASENDER_TOKEN) {
+      return { success: false, error: 'WASENDER_API_KEY not configured' };
+    }
+    try {
+      const to = `+${normalizePhone(phoneNumber)}`;
+      const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${WASENDER_TOKEN}`,
+        },
+        body: JSON.stringify({ to, reaction: { messageId, emoji } }),
+      });
+      const data = (await res.json()) as { success?: boolean; data?: { msgId?: string }; error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
     const b = body as Record<string, unknown>;
     const data = b?.data as Record<string, unknown> | undefined;

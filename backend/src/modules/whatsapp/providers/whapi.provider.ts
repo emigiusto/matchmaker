@@ -252,6 +252,30 @@ export class WhapiProvider implements IWhatsAppProvider {
     }
   }
 
+  async sendReaction(phoneNumber: string, messageId: string, emoji: string): Promise<SendMessageResult> {
+    if (!WHAPI_TOKEN) {
+      return { success: false, error: 'WHAPI_API_TOKEN not configured' };
+    }
+    try {
+      const to = normalizePhone(phoneNumber);
+      const res = await fetch(`${WHAPI_BASE}/messages/reaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${WHAPI_TOKEN}`,
+        },
+        body: JSON.stringify({ to, message_id: messageId, emoji }),
+      });
+      const data = (await res.json()) as { id?: string; error?: string };
+      if (!res.ok) {
+        return { success: false, error: data.error || res.statusText };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
     const b = body as Record<string, unknown>;
     const msg = Array.isArray(b?.messages) ? (b.messages as unknown[])[0] : null;

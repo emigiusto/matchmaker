@@ -53,6 +53,12 @@ export interface IWhatsAppProvider {
   getGroupParticipants(groupId: string): Promise<GetGroupParticipantsResult>;
 
   /**
+   * React to a previously sent message with an emoji (e.g. '🔒' to close a poll).
+   * No-op / best-effort — callers should not rely on success.
+   */
+  sendReaction(phoneNumber: string, messageId: string, emoji: string): Promise<SendMessageResult>;
+
+  /**
    * Parse provider-specific webhook body into normalized incoming message.
    * Returns null if the payload is not an incoming 1:1 text message we care about.
    */
