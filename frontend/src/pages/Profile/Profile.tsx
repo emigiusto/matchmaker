@@ -144,7 +144,7 @@ export default function ProfilePage() {
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" })
       setHighlightedHash(hash)
-      const t = setTimeout(() => setHighlightedHash(null), 1200)
+      const t = setTimeout(() => setHighlightedHash(null), 1800)
       return () => clearTimeout(t)
     }
   }, [hash])
@@ -440,7 +440,7 @@ export default function ProfilePage() {
         </Card>
 
         {/* Club Connections */}
-        <Card id="club-connections" className={`transition-shadow duration-500 ${highlightedHash === "#club-connections" ? "ring-2 ring-primary/50 shadow-lg shadow-primary/10" : ""}`}>
+        <Card id="club-connections" className={`transition-all duration-700 ${highlightedHash === "#club-connections" ? "ring-2 ring-primary/60 bg-primary/5" : "ring-0 bg-transparent"}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
               <Building2 className="h-5 w-5 text-primary" />
