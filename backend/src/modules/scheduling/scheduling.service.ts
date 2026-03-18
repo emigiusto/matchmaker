@@ -27,6 +27,10 @@ const ACCEPT_PATTERNS = /^(yes|y|accept|sí|si|s|👍)$|👍/i;
 const DECLINE_PATTERNS = /^(no|n|decline)$/i;
 const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
 
+// Debounce poll quorum evaluation so rapid multi-select clicks are treated as one vote batch
+const POLL_VOTE_DEBOUNCE_MS = 3000;
+const pollDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 /** Minimum accepted candidates required before marking request completed. Singles: 1. Doubles: 3 (host + 3 = 4 players). */
 function getRequiredAcceptances(format: string): number {
   return format === 'doubles' ? 3 : 1;
@@ -668,16 +672,38 @@ export const schedulingService = {
 
     logger.info('PollVoteRecorded', { requestId: request.id, candidateId: candidate.id, hours: votedHours });
 
-    // Check quorum
-    const format = request.format || 'singles';
+    // Debounce quorum evaluation — Wasender fires one poll.results webhook per click,
+    // each containing the FULL current poll state. We reset the timer on every vote so
+    // quorum is only evaluated once the user stops clicking (3 s of silence).
+    const existing = pollDebounceTimers.get(request.id);
+    if (existing) clearTimeout(existing);
+    pollDebounceTimers.set(
+      request.id,
+      setTimeout(() => {
+        pollDebounceTimers.delete(request.id);
+        void this.checkPollQuorum(request.id);
+      }, POLL_VOTE_DEBOUNCE_MS),
+    );
+
+    return { processed: true };
+  },
+
+  async checkPollQuorum(requestId: string): Promise<void> {
+    const request = await prisma.schedulingRequest.findUnique({
+      where: { id: requestId },
+      include: { hostUser: true },
+    });
+    if (!request || request.status !== 'active') return;
+
+    const format = (request as RequestRow).format || 'singles';
     const required = getRequiredAcceptances(format);
 
     const allVoteEvents = await prisma.schedulingInviteEvent.findMany({
-      where: { schedulingRequestId: request.id, action: 'poll_vote' },
+      where: { schedulingRequestId: requestId, action: 'poll_vote' },
       orderBy: { createdAt: 'asc' },
     });
 
-    // Latest vote per candidate
+    // Latest vote per candidate (replay events — last write wins)
     const latestVotes = new Map<string, string[]>();
     for (const ev of allVoteEvents) {
       if (ev.candidateId) {
@@ -685,7 +711,7 @@ export const schedulingService = {
       }
     }
 
-    if (latestVotes.size < required) return { processed: true }; // not enough voters
+    if (latestVotes.size < required) return; // not enough voters yet
 
     // Count votes per slot
     const voteCounts = new Map<string, number>();
@@ -701,12 +727,12 @@ export const schedulingService = {
     const windowSlots = slotsInRange(startHHMM, endHHMM);
     const confirmedSlots = windowSlots.filter((slot) => (voteCounts.get(slot.slice(0, 2)) ?? 0) >= required);
 
-    if (confirmedSlots.length === 0) return { processed: true }; // no quorum yet
+    if (confirmedSlots.length === 0) return; // no quorum yet
 
-    // Pick best slot (earliest, or earliest with court if booking enabled)
+    // Pick best slot (earliest, or earliest with court available if booking enabled)
     let bestSlot = confirmedSlots[0];
     if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled) {
-      const hostUser = (request as RequestRow & { hostUser?: { id: string } | null }).hostUser;
+      const hostUser = request.hostUser;
       if (hostUser) {
         const dateStr = new Date(request.date).toISOString().slice(0, 10);
         const hostMembership = await prisma.clubMembership.findFirst({
@@ -732,16 +758,15 @@ export const schedulingService = {
         data: { status: 'accepted', responseAt: new Date() },
       });
       await tx.schedulingRequest.update({
-        where: { id: request.id },
+        where: { id: requestId },
         data: { status: 'completed' },
       });
     });
 
-    logger.info('PollQuorumReached', { requestId: request.id, bestSlot, confirmedSlots });
-    void recordEvent({ schedulingRequestId: request.id, action: 'request_completed', metadata: { via: 'poll', bestSlot } });
+    logger.info('PollQuorumReached', { requestId, bestSlot, confirmedSlots });
+    void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { via: 'poll', bestSlot } });
 
-    await this.completeScheduling(request.id, bestSlot);
-    return { processed: true };
+    await this.completeScheduling(requestId, bestSlot);
   },
 
   async expireCandidate(candidateId: string): Promise<void> {

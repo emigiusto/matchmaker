@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppError } from '../../shared/errors/AppError';
 
 // ------------------------------------------------------
@@ -1381,6 +1381,10 @@ describe('SchedulingService', () => {
       schedulingRequest: multiHourRequest,
     };
 
+    // Prevent debounce timers from leaking across tests
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
     it('ignores unrecognized text for single-hour requests (not routed to poll)', async () => {
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
         ...baseRequest.candidates![0],
@@ -1459,13 +1463,13 @@ describe('SchedulingService', () => {
       schedulingRequest: multiHourRequest,
     };
 
+    // Quorum is now debounced — fake timers let us control when checkPollQuorum fires
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
     it('records poll_vote event with parsed hours', async () => {
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
       mockTx.schedulingInviteEvent.create.mockResolvedValue({});
-      // Only 1 voter so far — not enough for quorum yet (requires 1, but findMany returns the new vote)
-      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
-        { candidateId: 'cand1', metadata: { hours: ['10', '11'] } },
-      ]);
 
       await schedulingService.handleCandidateResponse('+456', '10:00', ['10:00', '11:00']);
 
@@ -1488,7 +1492,18 @@ describe('SchedulingService', () => {
         { candidateId: 'cand1', metadata: { hours: ['10'] } }, // latest vote
       ]);
 
-      // First $transaction = quorum marker (updateMany + request completed)
+      // checkPollQuorum re-fetches the request (active), then completeScheduling re-fetches (completed)
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...multiHourRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...multiHourRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: [{ ...candidate, status: 'accepted', contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null } }],
+        });
+
+      // First $transaction = quorum commit (updateMany + request completed)
       const mockTxQuorum = {
         schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
         schedulingRequest: { update: vi.fn() },
@@ -1502,16 +1517,10 @@ describe('SchedulingService', () => {
         .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
         .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
 
-      mockTx.schedulingRequest.findUnique.mockResolvedValue({
-        ...multiHourRequest,
-        status: 'completed',
-        hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
-        hostPartner: null,
-        candidates: [{ ...candidate, status: 'accepted', contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null } }],
-      });
       mockTx.user.findMany.mockResolvedValue([]);
 
       await schedulingService.handleCandidateResponse('+456', '10:00', ['10:00']);
+      await vi.runAllTimersAsync(); // fire debounce and await checkPollQuorum
 
       expect(mockTxQuorum.schedulingRequest.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ status: 'completed' }) }),
@@ -1521,23 +1530,33 @@ describe('SchedulingService', () => {
     it('does not complete when no slot has enough votes', async () => {
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
       mockTx.schedulingInviteEvent.create.mockResolvedValue({});
-      // No votes exist yet after recording (only this candidate, quorum = 1 for singles)
-      // Simulate quorum not reached: no events returned
-      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([]);
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([]); // no votes recorded yet
+      mockTx.schedulingRequest.findUnique.mockResolvedValue({ ...multiHourRequest, status: 'active', hostUser: null });
 
       const result = await schedulingService.handleCandidateResponse('+456', '10:00');
+      await vi.runAllTimersAsync();
 
       expect(result).toEqual({ processed: true });
-      // No transaction for completing the request
       expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
     });
 
     it('picks earliest confirmed slot when multiple slots reach quorum', async () => {
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
       // Candidate voted for 10:00 and 11:00 — both reach quorum for singles
       mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
         { candidateId: 'cand1', metadata: { hours: ['10', '11'] } },
       ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...multiHourRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...multiHourRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: [{ ...candidate, status: 'accepted', contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null } }],
+        });
 
       const mockTxQuorum = {
         schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
@@ -1551,18 +1570,11 @@ describe('SchedulingService', () => {
         .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
         .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
 
-      mockTx.schedulingRequest.findUnique.mockResolvedValue({
-        ...multiHourRequest,
-        status: 'completed',
-        hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
-        hostPartner: null,
-        candidates: [{ ...candidate, status: 'accepted', contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null } }],
-      });
       mockTx.user.findMany.mockResolvedValue([]);
-      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
 
       const { createMatch } = await import('../matches/matches.service');
       await schedulingService.handleCandidateResponse('+456', '10:00', ['10:00', '11:00']);
+      await vi.runAllTimersAsync();
 
       // scheduledAt should be derived from the earliest confirmed slot (10:00)
       expect(vi.mocked(createMatch)).toHaveBeenCalledWith(
@@ -1578,8 +1590,10 @@ describe('SchedulingService', () => {
       mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
         { candidateId: 'cand1', metadata: { hours: ['08'] } },
       ]);
+      mockTx.schedulingRequest.findUnique.mockResolvedValue({ ...multiHourRequest, status: 'active', hostUser: null });
 
       const result = await schedulingService.handleCandidateResponse('+456', '08:00', ['08:00']);
+      await vi.runAllTimersAsync();
 
       expect(result).toEqual({ processed: true });
       expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
