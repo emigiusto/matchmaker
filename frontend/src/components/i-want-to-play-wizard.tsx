@@ -277,8 +277,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       settled = true
       setBookingEnabled(false)
       setCourtAvailabilityLoading(false)
-      toast.warning(t("wizard.courtAvailabilityTimeout"))
-    }, 35_000)
+      toast.error(t("wizard.courtAvailabilityServiceError"))
+    }, 20_000)
 
     bookingService.checkAvailability({
       userId: hostUserId,
