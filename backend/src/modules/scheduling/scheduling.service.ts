@@ -468,8 +468,8 @@ export const schedulingService = {
 
       const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
       const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-      const rawDateStr = formatInTz(request.date, intlLocale, { weekday: 'long', day: 'numeric', month: 'short' }, tz);
-      const dateStr = rawDateStr.charAt(0).toUpperCase() + rawDateStr.slice(1);
+      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      const dateStr = `${cap(formatInTz(request.date, intlLocale, { weekday: 'long' }, tz))}, ${formatInTz(request.date, intlLocale, { day: 'numeric' }, tz)} ${cap(formatInTz(request.date, intlLocale, { month: 'long' }, tz))}`;
       const timeStr = `${formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)} · ${formatInTz(request.endTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)}`;
       const timeLeft = formatResponseWindow(request.responseWindowMinutes ?? 240, candidateLocale);
       const msgs = getMessages(candidateLocale);
