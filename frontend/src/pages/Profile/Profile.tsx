@@ -137,10 +137,16 @@ export default function ProfilePage() {
     fetchMemberships()
   }, [currentUserId])
 
+  const [highlightedHash, setHighlightedHash] = useState<string | null>(null)
   useEffect(() => {
     if (!hash) return
     const el = document.querySelector(hash)
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" })
+      setHighlightedHash(hash)
+      const t = setTimeout(() => setHighlightedHash(null), 1200)
+      return () => clearTimeout(t)
+    }
   }, [hash])
 
   async function handleSaveLocation(e: React.FormEvent) {
@@ -434,7 +440,7 @@ export default function ProfilePage() {
         </Card>
 
         {/* Club Connections */}
-        <Card id="club-connections">
+        <Card id="club-connections" className={`transition-shadow duration-500 ${highlightedHash === "#club-connections" ? "ring-2 ring-primary/50 shadow-lg shadow-primary/10" : ""}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
               <Building2 className="h-5 w-5 text-primary" />
