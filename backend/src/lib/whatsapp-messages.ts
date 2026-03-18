@@ -55,7 +55,9 @@ const templates: Record<Locale, MessageTemplates> = {
   es: {
     invite(hostName, sport, format, date, time, loc, timeLeft) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
-      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      const sportName = sport === 'padel' ? 'Pádel' : 'Tenis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sportName} ${formatName}`;
       return [
         `${sportEmoji} *${hostName} quiere jugar contigo!*`,
         '',
@@ -69,7 +71,9 @@ const templates: Record<Locale, MessageTemplates> = {
 
     invitePoll(hostName, sport, format, date, loc, timeLeft) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
-      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      const sportName = sport === 'padel' ? 'Pádel' : 'Tenis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sportName} ${formatName}`;
       return [
         `${sportEmoji} *${hostName} quiere jugar contigo!*`,
         '',
