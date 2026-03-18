@@ -59,7 +59,7 @@ describe('WhatsappController', () => {
       next as any,
     );
 
-    expect(mockHandleCandidateResponse).toHaveBeenCalledWith('34612345678', 'YES');
+    expect(mockHandleCandidateResponse).toHaveBeenCalledWith('34612345678', 'YES', undefined);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ received: true, processed: true });
   });
