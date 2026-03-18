@@ -483,7 +483,7 @@ export default function InviteDetailsPage() {
               <Link2 className="h-3.5 w-3.5" />
               {t("invites.actions.whatsapp")}
             </Button>
-            {request.status === "active" && (
+            {(request.status === "active" || request.status === "expired") && (
               <Button
                 variant="ghost"
                 size="sm"
