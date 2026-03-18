@@ -8,6 +8,8 @@ export type NoMatchReasonKey = 'no_more_candidates' | 'all_candidates_exhausted'
 
 interface MessageTemplates {
   invite(hostName: string, sport: string, format: string, date: string, time: string, loc: string, timeLeft: string): string;
+  /** Poll-based invite for multi-hour requests. Time options are shown as poll choices, not in the message body. */
+  invitePoll(hostName: string, sport: string, format: string, date: string, loc: string, timeLeft: string): string;
   inviteReply(): string;
   noLongerAvailable(hostName: string, sport: string, format: string, date: string, time: string, loc: string): string;
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
@@ -60,6 +62,22 @@ const templates: Record<Locale, MessageTemplates> = {
         `📅  ${date}  ·  ${time}`,
         `📍  ${loc || 'TBD'}`,
         `${sportEmoji}  ${sportLabel}`,
+        '',
+        `⏳ Tienes *${timeLeft}* para responder`,
+      ].join('\n');
+    },
+
+    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      return [
+        `${sportEmoji} *${hostName} quiere jugar contigo!*`,
+        '',
+        `📅  ${date}`,
+        `📍  ${loc || 'TBD'}`,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        '¿A qué hora te va bien? (selecciona una o varias)',
         '',
         `⏳ Tienes *${timeLeft}* para responder`,
       ].join('\n');
@@ -164,6 +182,22 @@ const templates: Record<Locale, MessageTemplates> = {
         `📅  ${date}  ·  ${time}`,
         `📍  ${loc || 'TBD'}`,
         `${sportEmoji}  ${sportLabel}`,
+        '',
+        `⏳ You have *${timeLeft}* to respond`,
+      ].join('\n');
+    },
+
+    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      return [
+        `${sportEmoji} *${hostName} wants to play with you!*`,
+        '',
+        `📅  ${date}`,
+        `📍  ${loc || 'TBD'}`,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        'Which hour(s) work for you?',
         '',
         `⏳ You have *${timeLeft}* to respond`,
       ].join('\n');

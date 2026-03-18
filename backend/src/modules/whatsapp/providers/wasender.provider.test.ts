@@ -212,7 +212,7 @@ describe('WasenderProvider', () => {
         },
       };
       const result = provider.parseWebhookPayload(body);
-      expect(result).toEqual({ senderPhone: '34600972125', messageText: 'NO' });
+      expect(result).toEqual({ senderPhone: '34600972125', messageText: 'NO', votedOptions: ['NO'] });
     });
 
     it('parses poll.results event (user voted YES)', () => {
@@ -227,7 +227,7 @@ describe('WasenderProvider', () => {
         },
       };
       const result = provider.parseWebhookPayload(body);
-      expect(result).toEqual({ senderPhone: '34611111111', messageText: 'YES' });
+      expect(result).toEqual({ senderPhone: '34611111111', messageText: 'YES', votedOptions: ['YES'] });
     });
   });
 });

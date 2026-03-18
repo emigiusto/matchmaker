@@ -29,6 +29,8 @@ export interface GetGroupParticipantsResult {
 export interface WebhookIncomingMessage {
   senderPhone: string;
   messageText: string;
+  /** All currently-voted option titles for multi-select poll responses. */
+  votedOptions?: string[];
 }
 
 export type WhatsAppProvider = 'whapi' | 'wasender' | 'mock';
