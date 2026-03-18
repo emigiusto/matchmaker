@@ -1026,7 +1026,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                             className="h-8 pl-8"
                           />
                         </div>
-                        <ScrollArea className="max-h-48">
+                        <ScrollArea className="h-48">
                           <div className="space-y-0.5 pr-2">
                             {contactLists
                               .filter((l) => !searchFromList.trim() || l.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
@@ -1053,7 +1053,11 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         {t("wizard.allContacts")}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-64 p-2" align="start">
+                    <PopoverContent
+                      className="w-[min(90vw,22rem)] p-2"
+                      align="center"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
                       <div className="relative mb-2">
                         <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -1063,7 +1067,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                           className="h-8 pl-8"
                         />
                       </div>
-                      <ScrollArea className="max-h-48">
+                      <ScrollArea className="h-48">
                         <div className="space-y-0.5 pr-2">
                           {availableContacts
                             .filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id)))
