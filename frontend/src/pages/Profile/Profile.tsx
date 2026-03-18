@@ -34,6 +34,7 @@ import { PhoneInput } from "@/components/phone-input"
 import { useLanguage } from "@/lib/i18n/language-context"
 import { toE164, validatePhoneE164 } from "@/lib/phone.utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { useLocation } from "react-router-dom"
 import { getCurrentUserId } from "@/lib/current-user"
 import { usersService, type User } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
@@ -42,6 +43,7 @@ import { toast } from "sonner"
 
 export default function ProfilePage() {
   const currentUserId = getCurrentUserId()
+  const { hash } = useLocation()
   const { language, setLanguage } = useLanguage()
   const { t } = useTranslation()
   const [user, setUser] = useState<User | null>(null)
@@ -134,6 +136,12 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchMemberships()
   }, [currentUserId])
+
+  useEffect(() => {
+    if (!hash) return
+    const el = document.querySelector(hash)
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [hash])
 
   async function handleSaveLocation(e: React.FormEvent) {
     e.preventDefault()
@@ -426,7 +434,7 @@ export default function ProfilePage() {
         </Card>
 
         {/* Club Connections */}
-        <Card>
+        <Card id="club-connections">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
               <Building2 className="h-5 w-5 text-primary" />

@@ -880,7 +880,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     <p className="text-xs text-muted-foreground">
                       {t("wizard.autoBookProfileLinkBefore")}{" "}
                       <Link
-                        to="/profile"
+                        to="/profile#club-connections"
                         className="underline underline-offset-2 hover:text-foreground"
                         onClick={() => handleClose(false)}
                       >
