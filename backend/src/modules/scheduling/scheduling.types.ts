@@ -97,7 +97,8 @@ export type SchedulingInviteEventAction =
   | 'booking_pending'
   | 'booking_success'
   | 'booking_failed'
-  | 'booking_cancelled';
+  | 'booking_cancelled'
+  | 'poll_vote';
 
 export interface PublicSchedulingInviteDTO {
   id: string;

@@ -8,7 +8,7 @@ import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
-import { triggerBookingForMatch } from '../booking/booking.service';
+import { triggerBookingForMatch, pickBestSlotInRange } from '../booking/booking.service';
 import { createNotification } from '../notifications/notifications.service';
 import type {
   CreateSchedulingRequestInput,
@@ -25,6 +25,11 @@ import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/what
 
 const ACCEPT_PATTERNS = /^(yes|y|accept|sí|si|s|👍)$|👍/i;
 const DECLINE_PATTERNS = /^(no|n|decline)$/i;
+const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
+
+// Debounce poll quorum evaluation so rapid multi-select clicks are treated as one vote batch
+const POLL_VOTE_DEBOUNCE_MS = 3000;
+const pollDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /** Minimum accepted candidates required before marking request completed. Singles: 1. Doubles: 3 (host + 3 = 4 players). */
 function getRequiredAcceptances(format: string): number {
@@ -122,13 +127,31 @@ function toCandidateDTO(c: { id: string; schedulingRequestId: string; contactUse
   };
 }
 
-/** Quick-reply buttons for invite (Whapi supports; Wasender/Mock fall back to plain text) */
-function getInviteButtons(locale?: string | null) {
+/** Returns each whole-hour slot in [startHHMM, endHHMM), e.g. ['10:00', '11:00'] for 10:00–12:00 */
+function slotsInRange(startHHMM: string, endHHMM: string): string[] {
+  const [sh] = startHHMM.split(':').map(Number);
+  const [eh] = endHHMM.split(':').map(Number);
+  const slots: string[] = [];
+  for (let h = sh; h < eh; h++) {
+    slots.push(`${String(h).padStart(2, '0')}:00`);
+  }
+  return slots;
+}
+
+function isMultiHour(startTime: Date, endTime: Date): boolean {
+  return endTime.getTime() - startTime.getTime() > 60 * 60 * 1000;
+}
+
+/** Quick-reply buttons for invite. For multi-hour, returns one button per time slot. */
+function getInviteButtons(locale?: string | null, slots?: string[]): { id: string; title: string }[] {
+  if (slots && slots.length >= 2) {
+    return slots.map((slot, i) => ({ id: `slot_${i}`, title: slot }));
+  }
   const loc = resolveLocale(locale);
   return [
     { id: 'invite_yes', title: loc === 'es' ? 'SÍ' : 'YES' },
     { id: 'invite_no', title: 'NO' },
-  ] as const;
+  ];
 }
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
@@ -180,18 +203,6 @@ function formatMatchDetailsMessage(
   return getMessages(locale).matchConfirmed(sport, formatLabel, whenStr, location, matchUrl);
 }
 
-function formatInviteNoLongerAvailableMessage(
-  hostName: string,
-  sportType: string,
-  format: string,
-  dateStr: string,
-  timeStr: string,
-  location: string,
-  locale?: string | null
-): string {
-  const formatLabel = format === 'doubles' ? 'doubles' : 'singles';
-  return getMessages(locale).noLongerAvailable(hostName, sportType, formatLabel, dateStr, timeStr, location);
-}
 
 /** Reason codes when a scheduling request expires (No match) */
 type SchedulingExpiredReason = 'no_more_candidates' | 'all_candidates_exhausted' | 'scheduled_time_passed';
@@ -234,6 +245,39 @@ async function recordEvent(data: {
     });
   } catch (e) {
     logger.warn('FailedToRecordSchedulingEvent', { action: data.action, requestId: data.schedulingRequestId, error: e });
+  }
+}
+
+async function sendInviteNoLongerAvailable(
+  request: {
+    date: Date;
+    sportType: string;
+    timezone?: string;
+    hostUser?: { name: string | null } | null;
+  },
+  candidate: {
+    id: string;
+    contactUser?: { phone?: string | null; locale?: string | null } | null;
+  }
+): Promise<void> {
+  const phone = candidate.contactUser?.phone;
+  if (!phone) return;
+
+  const candidateLocale = candidate.contactUser?.locale ?? 'es';
+  const loc = resolveLocale(candidateLocale);
+  const intlLocale = loc === 'es' ? 'es-ES' : 'en-US';
+  const tz = request.timezone ?? 'UTC';
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const sep = loc === 'es' ? ' de ' : ' ';
+  const dateStr = `${cap(formatInTz(request.date, intlLocale, { weekday: 'long' }, tz))}, ${formatInTz(request.date, intlLocale, { day: 'numeric' }, tz)}${sep}${cap(formatInTz(request.date, intlLocale, { month: 'long' }, tz))}`;
+
+  const hostName = request.hostUser?.name ?? 'El organizador';
+  const msgs = getMessages(candidateLocale);
+  const message = msgs.inviteNoLongerAvailable(hostName, request.sportType, dateStr);
+
+  const result = await whatsappService.sendInviteMessage(phone, message);
+  if (!result.success) {
+    logger.warn('FailedToSendInviteNoLongerAvailable', { candidateId: candidate.id, phone, error: result.error });
   }
 }
 
@@ -449,14 +493,28 @@ export const schedulingService = {
 
       const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
       const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-      const rawDateStr = formatInTz(request.date, intlLocale, { weekday: 'long' }, tz);
-      const dateStr = rawDateStr.charAt(0).toUpperCase() + rawDateStr.slice(1);
+      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      const loc = resolveLocale(candidateLocale);
+      const sep = loc === 'es' ? ' de ' : ' ';
+      const dateStr = `${cap(formatInTz(request.date, intlLocale, { weekday: 'long' }, tz))}, ${formatInTz(request.date, intlLocale, { day: 'numeric' }, tz)}${sep}${cap(formatInTz(request.date, intlLocale, { month: 'long' }, tz))}`;
       const timeStr = `${formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)} · ${formatInTz(request.endTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)}`;
       const timeLeft = formatResponseWindow(request.responseWindowMinutes ?? 240, candidateLocale);
       const msgs = getMessages(candidateLocale);
       const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
-      const message = msgs.invite(hostName, request.sportType, formatLabel, dateStr, timeStr, request.locationText, timeLeft);
-      const inviteButtons = getInviteButtons(candidateLocale);
+
+      const multiHour = isMultiHour(new Date(request.startTime), new Date(request.endTime));
+      let message: string;
+      let inviteButtons: { id: string; title: string }[];
+      if (multiHour) {
+        const startHHMM = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+        const endHHMM = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+        const slots = slotsInRange(startHHMM, endHHMM);
+        message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
+        inviteButtons = getInviteButtons(candidateLocale, slots);
+      } else {
+        message = msgs.invite(hostName, request.sportType, formatLabel, dateStr, timeStr, request.locationText, timeLeft);
+        inviteButtons = getInviteButtons(candidateLocale);
+      }
 
       await prisma.$transaction(async (tx) => {
         await tx.schedulingCandidate.update({
@@ -481,16 +539,29 @@ export const schedulingService = {
       } else {
         logger.info('InviteSent', { requestId, candidateId: candidate.id, contactUserId: candidate.contactUserId, contactName, phone });
         void recordEvent({ schedulingRequestId: requestId, action: 'invite_sent', candidateId: candidate.id });
+        if (result.messageId) {
+          await prisma.schedulingCandidate.update({
+            where: { id: candidate.id },
+            data: { pollMessageId: result.messageId },
+          });
+        }
       }
     }
     await this.contactNextCandidates(requestId);
   },
 
-  async handleCandidateResponse(senderPhoneNumber: string, messageText: string): Promise<{ processed: boolean }> {
+  async handleCandidateResponse(senderPhoneNumber: string, messageText: string, votedOptions?: string[]): Promise<{ processed: boolean }> {
     const candidate = await schedulingRepository.findCandidateToRecordResponseByPhone(senderPhoneNumber);
     if (!candidate) {
       logger.info('InviteResponseIgnored', { reason: 'no_waiting_candidate', phone: senderPhoneNumber });
       return { processed: false };
+    }
+
+    const request = candidate.schedulingRequest;
+
+    // Poll-based flow for multi-hour scheduling requests
+    if (isMultiHour(new Date((request as RequestRow).startTime), new Date((request as RequestRow).endTime))) {
+      return this.handlePollVote(candidate, request as RequestRow, votedOptions ?? [messageText]);
     }
 
     const text = (messageText || '').trim();
@@ -502,7 +573,6 @@ export const schedulingService = {
       return { processed: false };
     }
 
-    const request = candidate.schedulingRequest;
     const isLateResponse = candidate.status === 'expired';
     if (request.status !== 'active' && !isLateResponse) {
       logger.warn('InviteIgnored', { reason: 'request_not_active', requestId: request.id });
@@ -594,6 +664,138 @@ export const schedulingService = {
     return { processed: false };
   },
 
+  async handlePollVote(
+    candidate: { id: string; status: string; contactUserId: string },
+    request: RequestRow & { status: string },
+    options: string[],
+  ): Promise<{ processed: boolean }> {
+    if (request.status !== 'active') {
+      logger.warn('PollVoteIgnored', { reason: 'request_not_active', requestId: request.id });
+      return { processed: true };
+    }
+    if (candidate.status === 'expired') {
+      logger.info('PollVoteIgnored', { reason: 'candidate_expired', candidateId: candidate.id });
+      return { processed: true };
+    }
+
+    // Parse HH:MM slots from the voted option titles
+    const votedHours = options
+      .map((o) => o.trim())
+      .filter((o) => TIME_SLOT_RE.test(o))
+      .map((o) => o.slice(0, 2)); // normalize to 'HH'
+
+    if (votedHours.length === 0) {
+      logger.info('PollVoteIgnored', { reason: 'no_valid_slots', options, candidateId: candidate.id });
+      return { processed: false };
+    }
+
+    // Record poll vote (overwrites previous; we replay events to get current state)
+    await recordEvent({
+      schedulingRequestId: request.id,
+      action: 'poll_vote',
+      candidateId: candidate.id,
+      metadata: { hours: votedHours },
+    });
+
+    logger.info('PollVoteRecorded', { requestId: request.id, candidateId: candidate.id, hours: votedHours });
+
+    // Debounce quorum evaluation — Wasender fires one poll.results webhook per click,
+    // each containing the FULL current poll state. We reset the timer on every vote so
+    // quorum is only evaluated once the user stops clicking (3 s of silence).
+    const existing = pollDebounceTimers.get(request.id);
+    if (existing) clearTimeout(existing);
+    pollDebounceTimers.set(
+      request.id,
+      setTimeout(() => {
+        pollDebounceTimers.delete(request.id);
+        void this.checkPollQuorum(request.id);
+      }, POLL_VOTE_DEBOUNCE_MS),
+    );
+
+    return { processed: true };
+  },
+
+  async checkPollQuorum(requestId: string): Promise<void> {
+    const request = await prisma.schedulingRequest.findUnique({
+      where: { id: requestId },
+      include: { hostUser: true },
+    });
+    if (!request || request.status !== 'active') return;
+
+    const format = (request as RequestRow).format || 'singles';
+    const required = getRequiredAcceptances(format);
+
+    const allVoteEvents = await prisma.schedulingInviteEvent.findMany({
+      where: { schedulingRequestId: requestId, action: 'poll_vote' },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Latest vote per candidate (replay events — last write wins)
+    const latestVotes = new Map<string, string[]>();
+    for (const ev of allVoteEvents) {
+      if (ev.candidateId) {
+        latestVotes.set(ev.candidateId, (ev.metadata as { hours?: string[] } | null)?.hours ?? []);
+      }
+    }
+
+    if (latestVotes.size < required) return; // not enough voters yet
+
+    // Count votes per slot
+    const voteCounts = new Map<string, number>();
+    for (const hours of latestVotes.values()) {
+      for (const h of hours) {
+        voteCounts.set(h, (voteCounts.get(h) ?? 0) + 1);
+      }
+    }
+
+    // Find confirmed slots within request window, sorted earliest first
+    const startHHMM = `${String(new Date(request.startTime).getUTCHours()).padStart(2, '0')}:00`;
+    const endHHMM = `${String(new Date(request.endTime).getUTCHours()).padStart(2, '0')}:00`;
+    const windowSlots = slotsInRange(startHHMM, endHHMM);
+    const confirmedSlots = windowSlots.filter((slot) => (voteCounts.get(slot.slice(0, 2)) ?? 0) >= required);
+
+    if (confirmedSlots.length === 0) return; // no quorum yet
+
+    // Pick best slot (earliest, or earliest with court available if booking enabled)
+    let bestSlot = confirmedSlots[0];
+    if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled) {
+      const hostUser = request.hostUser;
+      if (hostUser) {
+        const dateStr = new Date(request.date).toISOString().slice(0, 10);
+        const hostMembership = await prisma.clubMembership.findFirst({
+          where: { userId: hostUser.id, status: 'active', encryptedPassword: { not: null } },
+        });
+        if (hostMembership) {
+          for (const slot of confirmedSlots) {
+            const nextH = String(Number(slot.slice(0, 2)) + 1).padStart(2, '0');
+            const courtSlot = await pickBestSlotInRange(
+              hostUser.id, hostMembership.clubSlug, dateStr, request.sportType, slot, `${nextH}:00`,
+            );
+            if (courtSlot === slot) { bestSlot = slot; break; }
+          }
+        }
+      }
+    }
+
+    // Mark voting candidates as accepted and complete request
+    const votingCandidateIds = [...latestVotes.keys()];
+    await prisma.$transaction(async (tx) => {
+      await tx.schedulingCandidate.updateMany({
+        where: { id: { in: votingCandidateIds }, status: { in: ['waiting_reply', 'contacted'] } },
+        data: { status: 'accepted', responseAt: new Date() },
+      });
+      await tx.schedulingRequest.update({
+        where: { id: requestId },
+        data: { status: 'completed' },
+      });
+    });
+
+    logger.info('PollQuorumReached', { requestId, bestSlot, confirmedSlots });
+    void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { via: 'poll', bestSlot } });
+
+    await this.completeScheduling(requestId, bestSlot);
+  },
+
   async expireCandidate(candidateId: string): Promise<void> {
     const candidate = await prisma.schedulingCandidate.findUnique({
       where: { id: candidateId },
@@ -605,18 +807,10 @@ export const schedulingService = {
     if (!candidate || candidate.status !== 'waiting_reply') return;
 
     const phone = candidate.contactUser?.phone;
-    if (phone) {
-      const req = candidate.schedulingRequest;
-      const hostName = req.hostUser?.name ?? 'Someone';
-      const tz = (req as RequestRow).timezone ?? 'UTC';
-      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
-      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-      const dateStr = formatInTz(req.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-      const timeStr = formatInTz(req.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
-      const format = (req as RequestRow).format || 'singles';
-      const msg = formatInviteNoLongerAvailableMessage(hostName, req.sportType, format, dateStr, timeStr, req.locationText, candidateLocale);
-      const result = await whatsappService.sendInviteMessage(phone, msg);
-      if (!result.success) logger.warn('FailedToNotifyInviteExpired', { candidateId, phone });
+    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
+    if (phone && pollMessageId) {
+      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
+      if (!result.success) logger.warn('FailedToReactInviteExpired', { candidateId, phone });
     }
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'expired');
@@ -647,7 +841,7 @@ export const schedulingService = {
     return requests.length;
   },
 
-  async completeScheduling(requestId: string): Promise<void> {
+  async completeScheduling(requestId: string, overrideSlotHHMM?: string): Promise<void> {
     const request = await prisma.schedulingRequest.findUnique({
       where: { id: requestId },
       include: {
@@ -668,16 +862,42 @@ export const schedulingService = {
     const hostUser = request.hostUser;
     if (!hostUser) return;
 
-    // Derive scheduledAt from request.date (authoritative date) + time from request.startTime.
+    // Derive scheduledAt from request.date + the best slot within [startTime, endTime).
+    // When bookingEnabled and the host has an active club membership, pick the earliest
+    // slot in the range that has a court available (pure Redis cache read, no Puppeteer).
+    // Falls back to startTime when the cache is cold or no courts are found.
     const reqDate = new Date(request.date);
-    const reqTime = new Date(request.startTime);
+    const reqStartTime = new Date(request.startTime);
+    const reqEndTime = new Date(request.endTime);
+    const dateStr = reqDate.toISOString().slice(0, 10);
+    const startHHMM = `${String(reqStartTime.getUTCHours()).padStart(2, '0')}:${String(reqStartTime.getUTCMinutes()).padStart(2, '0')}`;
+    const endHHMM = `${String(reqEndTime.getUTCHours()).padStart(2, '0')}:${String(reqEndTime.getUTCMinutes()).padStart(2, '0')}`;
+
+    let matchedHHMM = overrideSlotHHMM ?? startHHMM;
+    if (!overrideSlotHHMM && request.bookingEnabled) {
+      const hostMembership = await prisma.clubMembership.findFirst({
+        where: { userId: hostUser.id, status: 'active', encryptedPassword: { not: null } },
+      });
+      if (hostMembership) {
+        matchedHHMM = await pickBestSlotInRange(
+          hostUser.id,
+          hostMembership.clubSlug,
+          dateStr,
+          request.sportType,
+          startHHMM,
+          endHHMM,
+        );
+      }
+    }
+
+    const [matchedH, matchedM] = matchedHHMM.split(':').map(Number);
     const scheduledAt = new Date(Date.UTC(
       reqDate.getUTCFullYear(),
       reqDate.getUTCMonth(),
       reqDate.getUTCDate(),
-      reqTime.getUTCHours(),
-      reqTime.getUTCMinutes(),
-      reqTime.getUTCSeconds(),
+      matchedH,
+      matchedM,
+      0,
     ));
     const matchType = request.matchType === 'practice' ? 'practice' : 'competitive';
 
@@ -733,6 +953,21 @@ export const schedulingService = {
     });
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
+
+    // React to all open poll messages with 🔒 to signal the match has been scheduled
+    for (const candidate of request.candidates) {
+      const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
+      const phone = (candidate.contactUser as { phone?: string | null } | null)?.phone;
+      if (pollMessageId && phone) {
+        void whatsappService.sendReaction(phone, pollMessageId, '🔒').catch((err) => {
+          logger.warn('FailedToReactToPoll', { candidateId: candidate.id, error: err instanceof Error ? err.message : err });
+        });
+      }
+      // Notify contacted candidates who were not selected for the match
+      if (['contacted', 'waiting_reply'].includes(candidate.status)) {
+        void sendInviteNoLongerAvailable(request, candidate);
+      }
+    }
 
     // Trigger court booking if the scheduling request opted in
     if ((request as { bookingEnabled?: boolean }).bookingEnabled) {
@@ -964,22 +1199,16 @@ export const schedulingService = {
     }
 
     const phone = candidate.contactUser?.phone;
-    if (phone) {
-      const hostName = request.hostUser?.name ?? 'Someone';
-      const tz = (request as RequestRow).timezone ?? 'UTC';
-      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
-      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-      const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-      const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
-      const format = (request as RequestRow).format || 'singles';
-      const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, candidateLocale);
-      const result = await whatsappService.sendInviteMessage(phone, msg);
-      if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId, phone });
+    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
+    if (phone && pollMessageId) {
+      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
+      if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId, phone });
     }
 
     await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
     void recordEvent({ schedulingRequestId: requestId, action: 'candidate_cancelled', candidateId, actorUserId: userId });
     logger.info('ContactedCandidateCancelled', { requestId, candidateId, userId });
+    void sendInviteNoLongerAvailable(request, candidate);
     await this.contactNextCandidates(requestId);
 
     const updated = await schedulingRepository.findRequestById(requestId);
@@ -1056,10 +1285,6 @@ export const schedulingService = {
     if (request.status === 'cancelled') return toRequestDTOWithCandidates(request);
     if (request.status === 'completed') throw new AppError('Cannot cancel a completed match', 400);
 
-    const hostName = request.hostUser?.name ?? 'Someone';
-    const tz = (request as RequestRow).timezone ?? 'UTC';
-    const format = (request as RequestRow).format || 'singles';
-
     const candidates = request.candidates ?? [];
     const toNotify = candidates.filter((c) =>
       ['contacted', 'waiting_reply', 'accepted'].includes(c.status)
@@ -1067,19 +1292,16 @@ export const schedulingService = {
 
     for (const c of toNotify) {
       const phone = c.contactUser?.phone;
-      if (phone) {
+      const pollMessageId = (c as { pollMessageId?: string | null }).pollMessageId;
+      if (phone && pollMessageId) {
         try {
-          const candidateLocale = (c.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
-          const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-          const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
-          const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
-          const msg = formatInviteNoLongerAvailableMessage(hostName, request.sportType, format, dateStr, timeStr, request.locationText, candidateLocale);
-          const result = await whatsappService.sendInviteMessage(phone, msg);
-          if (!result.success) logger.warn('FailedToNotifyInviteCancelled', { candidateId: c.id, phone });
+          const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
+          if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, phone });
         } catch (e) {
-          logger.warn('FailedToNotifyInviteCancelled', { candidateId: c.id, error: e });
+          logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, error: e });
         }
       }
+      void sendInviteNoLongerAvailable(request, c);
       await schedulingRepository.updateCandidateStatus(c.id, 'cancelled');
     }
 

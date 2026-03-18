@@ -8,8 +8,10 @@ export type NoMatchReasonKey = 'no_more_candidates' | 'all_candidates_exhausted'
 
 interface MessageTemplates {
   invite(hostName: string, sport: string, format: string, date: string, time: string, loc: string, timeLeft: string): string;
+  /** Poll-based invite for multi-hour requests. Time options are shown as poll choices, not in the message body. */
+  invitePoll(hostName: string, sport: string, format: string, date: string, loc: string, timeLeft: string): string;
+  inviteNoLongerAvailable(hostName: string, sport: string, date: string): string;
   inviteReply(): string;
-  noLongerAvailable(hostName: string, sport: string, format: string, date: string, time: string, loc: string): string;
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
   noMatch(sport: string, format: string, when: string, loc: string, reason: string, url: string): string;
   noMatchReason: Record<NoMatchReasonKey, string>;
@@ -53,7 +55,9 @@ const templates: Record<Locale, MessageTemplates> = {
   es: {
     invite(hostName, sport, format, date, time, loc, timeLeft) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
-      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      const sportName = sport === 'padel' ? 'Pádel' : 'Tenis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sportName} ${formatName}`;
       return [
         `${sportEmoji} *${hostName} quiere jugar contigo!*`,
         '',
@@ -65,20 +69,32 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
-    inviteReply() {
-      return 'Responde *SÍ* ✅ para aceptar o *NO* ❌ para declinar';
+    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'Pádel' : 'Tenis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sportName} ${formatName}`;
+      return [
+        `${sportEmoji} *${hostName} quiere jugar contigo!*`,
+        '',
+        `📅  ${date}`,
+        `📍  ${loc || 'TBD'}`,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        '¿A qué hora te va bien? (selecciona una o varias)',
+        '',
+        `⏳ Tienes *${timeLeft}* para responder`,
+      ].join('\n');
     },
 
-    noLongerAvailable(hostName, sport, format, date, time, loc) {
-      return [
-        'ℹ️ *Invitación no disponible*',
-        '',
-        `La invitación de ${sport} ${format} de ${hostName} ya no está disponible.`,
-        `*Cuándo:* ${date} · ${time}`,
-        `*Dónde:* ${loc || 'TBD'}`,
-        '',
-        'Puedes ignorar el mensaje anterior.',
-      ].join('\n');
+    inviteNoLongerAvailable(hostName, sport, date) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'pádel' : 'tenis';
+      return `${sportEmoji} La invitación de *${hostName}* para jugar ${sportName} el *${date}* ya no está disponible.`;
+    },
+
+    inviteReply() {
+      return 'Responde *SÍ* ✅ para aceptar o *NO* ❌ para declinar';
     },
 
     matchConfirmed(sport, format, when, loc, url) {
@@ -169,20 +185,29 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
-    inviteReply() {
-      return 'Reply *YES* ✅ to accept or *NO* ❌ to decline';
+    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      return [
+        `${sportEmoji} *${hostName} wants to play with you!*`,
+        '',
+        `📅  ${date}`,
+        `📍  ${loc || 'TBD'}`,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        'Which hour(s) work for you?',
+        '',
+        `⏳ You have *${timeLeft}* to respond`,
+      ].join('\n');
     },
 
-    noLongerAvailable(hostName, sport, format, date, time, loc) {
-      return [
-        'ℹ️ *Invite no longer available*',
-        '',
-        `The ${sport} ${format} invite from ${hostName} is no longer available.`,
-        `*When:* ${date} · ${time}`,
-        `*Where:* ${loc || 'TBD'}`,
-        '',
-        'You can ignore the previous invite message.',
-      ].join('\n');
+    inviteNoLongerAvailable(hostName, sport, date) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      return `${sportEmoji} *${hostName}*'s invitation to play ${sport} on *${date}* is no longer available.`;
+    },
+
+    inviteReply() {
+      return 'Reply *YES* ✅ to accept or *NO* ❌ to decline';
     },
 
     matchConfirmed(sport, format, when, loc, url) {

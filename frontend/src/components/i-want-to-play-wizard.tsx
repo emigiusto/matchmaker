@@ -99,11 +99,22 @@ function addOneHour(time: string): string {
   return `${String(newH).padStart(2, "0")}:00`
 }
 
+/** Returns every HH:00 slot in [startTime, endTime) as an array of "HH:MM" strings */
+function slotsInRange(startTime: string, endTime: string): string[] {
+  if (!startTime || !endTime) return []
+  const [sh] = startTime.split(":").map(Number)
+  const [eh] = endTime.split(":").map(Number)
+  const slots: string[] = []
+  for (let h = sh; h < eh; h++) slots.push(`${String(h).padStart(2, "0")}:00`)
+  return slots
+}
+
 type LocationType = "place" | "city"
 
 interface Contact {
   id: string
   name: string
+  phone?: string
 }
 
 /** A contact from the user's address book, for the contacts picker */
@@ -151,7 +162,10 @@ function SortableContactItem({
       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
         {contact.name[0]}
       </div>
-      <span className="flex-1 text-sm font-medium">{contact.name}</span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-sm font-medium leading-tight">{contact.name}</span>
+        {contact.phone && <span className="text-xs text-muted-foreground">{contact.phone}</span>}
+      </div>
       <button
         onClick={() => onRemove(contact.id)}
         className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -277,8 +291,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       settled = true
       setBookingEnabled(false)
       setCourtAvailabilityLoading(false)
-      toast.warning(t("wizard.courtAvailabilityTimeout"))
-    }, 35_000)
+      toast.error(t("wizard.courtAvailabilityServiceError"))
+    }, 20_000)
 
     bookingService.checkAvailability({
       userId: hostUserId,
@@ -341,10 +355,15 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
   function handleStartTimeChange(val: string) {
     setStartTime(val)
-    setEndTime(addOneHour(val))
+    // Keep end time if it's still after the new start; otherwise push it to start+1h
+    setEndTime((prev) => {
+      const [sh] = val.split(":").map(Number)
+      const [eh] = (prev || "").split(":").map(Number)
+      return !prev || eh <= sh ? addOneHour(val) : prev
+    })
   }
 
-  const canProceedStep1 = date && startTime && !(bookingEnabled && courtAvailabilityLoading)
+  const canProceedStep1 = date && startTime && endTime && !(bookingEnabled && courtAvailabilityLoading)
   const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
@@ -361,7 +380,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     // Use linkedUserId if available, otherwise the contactId itself acts as a stable key
     const userId = ac.linkedUserId ?? ac.id
     if (priorityList.some((c) => c.id === userId)) return
-    addContact({ id: userId, name: ac.name })
+    addContact({ id: userId, name: ac.name, phone: ac.phone })
     setContactMeta((prev) => ({
       ...prev,
       [userId]: { contactId: ac.id, socioNumbers: ac.socioNumbers },
@@ -400,7 +419,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     }
     setPriorityList((prev) => [
       ...prev,
-      ...toAdd.map((m) => ({ id: m.linkedUserId ?? m.id, name: m.name })),
+      ...toAdd.map((m) => ({ id: m.linkedUserId ?? m.id, name: m.name, phone: m.phone })),
     ])
     toast.success(`Added ${toAdd.length} from ${list.name}`)
   }
@@ -451,7 +470,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       setManualPhone("")
       setManualSocio("")
       const userId = user.id
-      addContact({ id: userId, name: user.name || name })
+      addContact({ id: userId, name: user.name || name, phone })
       setContactMeta((prev) => ({
         ...prev,
         [userId]: { contactId: contact.id, socioNumbers: {} },
@@ -660,12 +679,28 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   </Select>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm opacity-60">
+                <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm">
                   <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeEnd")}</span>
-                  <span className="text-sm font-semibold">{endTime || "--:--"}</span>
+                  <Select
+                    value={endTime}
+                    onValueChange={setEndTime}
+                    disabled={!startTime}
+                  >
+                    <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
+                      <SelectValue placeholder="--:--" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_SLOTS.filter((s) => {
+                        const [sh] = (startTime || "").split(":").map(Number)
+                        const [h] = s.split(":").map(Number)
+                        return h > sh
+                      }).map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">{t("wizard.durationFixed")}</p>
             </div>
 
             {/* Location — optional: Place (court/club) or City, defaults to user's preferred club */}
@@ -818,15 +853,24 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       <p className="text-xs text-muted-foreground">{courtAvailabilityError}</p>
                     )}
                     {date && !courtAvailabilityLoading && !courtAvailabilityError && courtAvailability && (() => {
-                      const count = startTime
-                        ? courtAvailability.availableCourts.filter((c) => c.time === startTime).length
-                        : courtAvailability.availableCourts.length
+                      const slots = slotsInRange(startTime, endTime)
+                      if (slots.length === 0) return (
+                        <p className="text-xs text-muted-foreground">{t("wizard.courtAvailabilityHint")}</p>
+                      )
                       return (
-                        <p className={`text-xs font-medium ${count > 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                          {startTime
-                            ? t("wizard.availableCourts", { count, time: startTime })
-                            : t("wizard.courtAvailabilityHint")}
-                        </p>
+                        <div className="space-y-1">
+                          {slots.map((slot) => {
+                            const count = courtAvailability.availableCourts.filter((c) => c.time === slot).length
+                            return (
+                              <div key={slot} className="flex items-center justify-between gap-2">
+                                <span className="text-xs text-muted-foreground">{slot}</span>
+                                <span className={`text-xs font-medium ${count > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                  {t("wizard.availableCourtsCount", { count })}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
                       )
                     })()}
                   </div>
@@ -840,7 +884,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     <p className="text-xs text-muted-foreground">
                       {t("wizard.autoBookProfileLinkBefore")}{" "}
                       <Link
-                        to="/profile"
+                        to="/profile#club-connections"
                         className="underline underline-offset-2 hover:text-foreground"
                         onClick={() => handleClose(false)}
                       >
@@ -1142,8 +1186,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               )}
             </div>
 
-            {/* Socio numbers — shown for all contacts when booking is enabled */}
-            {priorityList.length > 0 && (
+            {/* Socio numbers — only shown when automatic court booking is enabled */}
+            {bookingEnabled && priorityList.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-base font-medium">{t("wizard.socioNumbers")}</Label>
                 <p className="text-xs text-muted-foreground">{t("wizard.socioNumbersHint")}</p>

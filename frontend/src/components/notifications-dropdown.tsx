@@ -123,7 +123,7 @@ export function NotificationsDropdown() {
             const Icon = iconMap[notification.type] || Bell
             const matchLink = notification.metadata?.matchId
               ? `/matches/${notification.metadata.matchId}`
-              : notification.type === "scheduling_no_match" && notification.metadata?.requestId
+              : notification.metadata?.requestId
                 ? `/play/${notification.metadata.requestId}`
                 : notification.type === "invite_received"
                   ? "/play"

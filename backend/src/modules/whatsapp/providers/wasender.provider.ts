@@ -53,7 +53,7 @@ export class WasenderProvider implements IWhatsAppProvider {
         body.poll = {
           question: message,
           options: buttons.map((b) => b.title.slice(0, 25)),
-          multiSelect: false,
+          multiSelect: true,
         };
       } else {
         body.text = message;
@@ -341,6 +341,11 @@ export class WasenderProvider implements IWhatsAppProvider {
     }
   }
 
+  async sendReaction(_phoneNumber: string, _messageId: string, _emoji: string): Promise<SendMessageResult> {
+    // Wasender API does not support sending reactions — reactions are receive-only via webhook.
+    return { success: false, error: 'Reactions not supported by Wasender API' };
+  }
+
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
     const b = body as Record<string, unknown>;
     const data = b?.data as Record<string, unknown> | undefined;
@@ -376,12 +381,13 @@ export class WasenderProvider implements IWhatsAppProvider {
     key?: Record<string, unknown>;
     pollResult: Array<{ name?: string; voters?: string[] }>;
   }): WebhookIncomingMessage | null {
-    const voted = data.pollResult.find((r) => Array.isArray(r.voters) && r.voters.length > 0);
-    if (!voted?.name) return null;
+    const allVoted = data.pollResult.filter((r) => Array.isArray(r.voters) && r.voters.length > 0);
+    if (allVoted.length === 0) return null;
 
+    const primary = allVoted[0];
     const key = data.key;
     const remoteJid = key?.remoteJid && typeof key.remoteJid === 'string' ? String(key.remoteJid) : '';
-    const voter0 = voted.voters?.[0] ? String(voted.voters[0]) : '';
+    const voter0 = primary.voters?.[0] ? String(primary.voters[0]) : '';
 
     const extractPhone = (jid: string) => jid.replace(/@.*$/, '').replace(/\D/g, '');
 
@@ -394,9 +400,11 @@ export class WasenderProvider implements IWhatsAppProvider {
     const senderPhone = is1to1 && fromRemote ? fromRemote : fromVoter || fromRemote;
     if (!senderPhone) return null;
 
+    const votedOptions = allVoted.map((r) => String(r.name).trim());
     return {
       senderPhone,
-      messageText: String(voted.name).trim().toUpperCase(),
+      messageText: votedOptions[0].toUpperCase(),
+      votedOptions,
     };
   }
 }

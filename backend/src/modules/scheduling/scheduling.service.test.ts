@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppError } from '../../shared/errors/AppError';
 
 // ------------------------------------------------------
@@ -95,6 +95,7 @@ vi.mock('../../config/logger', () => ({
 // IMPORTANT: Import AFTER all mocks
 import { prisma } from '../../prisma';
 import { schedulingService } from './scheduling.service';
+import { whatsappService } from '../whatsapp/whatsapp.service';
 
 const defaultTransaction = async (fn: (tx: any) => Promise<any>) => fn(mockTx);
 
@@ -1360,6 +1361,321 @@ describe('SchedulingService', () => {
       // Active request should NOT trigger another updateRequestStatus to 'active'
       expect(mockRepo.updateRequestStatus).not.toHaveBeenCalledWith('req1', 'active');
       expect(result).toBeDefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multi-hour poll-based scheduling
+  // ---------------------------------------------------------------------------
+
+  describe('handleCandidateResponse — multi-hour poll routing', () => {
+    const multiHourRequest = {
+      ...baseRequest,
+      startTime: new Date('2025-04-15T09:00:00.000Z'),
+      endTime: new Date('2025-04-15T12:00:00.000Z'), // 3-hour window
+      status: 'active',
+    };
+    const multiHourCandidate = {
+      ...baseRequest.candidates![0],
+      status: 'waiting_reply',
+      schedulingRequest: multiHourRequest,
+    };
+
+    // Prevent debounce timers from leaking across tests
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('ignores unrecognized text for single-hour requests (not routed to poll)', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...baseRequest.candidates![0],
+        status: 'waiting_reply',
+        schedulingRequest: { ...baseRequest, status: 'active' },
+      });
+
+      const result = await schedulingService.handleCandidateResponse('+456', '10:00');
+
+      // Single-hour request → YES/NO flow → '10:00' is unrecognized
+      expect(result).toEqual({ processed: false });
+    });
+
+    it('routes to poll flow for multi-hour request with valid time slot', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(multiHourCandidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'cand1', metadata: { hours: ['10'] } },
+      ]);
+
+      const result = await schedulingService.handleCandidateResponse('+456', '10:00');
+
+      expect(result).toEqual({ processed: true });
+      expect(mockTx.schedulingInviteEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'poll_vote', candidateId: 'cand1' }),
+        }),
+      );
+    });
+
+    it('ignores poll vote when request is not active', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...multiHourCandidate,
+        schedulingRequest: { ...multiHourRequest, status: 'completed' },
+      });
+
+      const result = await schedulingService.handleCandidateResponse('+456', '10:00');
+
+      expect(result).toEqual({ processed: true });
+      expect(mockTx.schedulingInviteEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('ignores poll vote from expired candidate', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...multiHourCandidate,
+        status: 'expired',
+      });
+
+      const result = await schedulingService.handleCandidateResponse('+456', '10:00');
+
+      expect(result).toEqual({ processed: true });
+      expect(mockTx.schedulingInviteEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('returns processed: false when voted options contain no valid HH:MM slots', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(multiHourCandidate);
+
+      const result = await schedulingService.handleCandidateResponse('+456', 'maybe', ['maybe']);
+
+      expect(result).toEqual({ processed: false });
+      expect(mockTx.schedulingInviteEvent.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handlePollVote — quorum logic', () => {
+    const multiHourRequest = {
+      ...baseRequest,
+      startTime: new Date('2025-04-15T09:00:00.000Z'),
+      endTime: new Date('2025-04-15T12:00:00.000Z'),
+      status: 'active',
+      bookingEnabled: false,
+    };
+    const candidate = {
+      ...baseRequest.candidates![0],
+      status: 'waiting_reply',
+      schedulingRequest: multiHourRequest,
+    };
+
+    // Quorum is now debounced — fake timers let us control when checkPollQuorum fires
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('records poll_vote event with parsed hours', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+
+      await schedulingService.handleCandidateResponse('+456', '10:00', ['10:00', '11:00']);
+
+      expect(mockTx.schedulingInviteEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'poll_vote',
+            metadata: { hours: ['10', '11'] },
+          }),
+        }),
+      );
+    });
+
+    it('uses latest vote per candidate when checking quorum (deduplicates multiple events)', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      // Two events for the same candidate → latest wins. Slot '10' has 1 vote = quorum for singles.
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'cand1', metadata: { hours: ['09'] } }, // older vote
+        { candidateId: 'cand1', metadata: { hours: ['10'] } }, // latest vote
+      ]);
+
+      // checkPollQuorum re-fetches the request (active), then completeScheduling re-fetches (completed)
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...multiHourRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...multiHourRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: [{ ...candidate, status: 'accepted', contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null } }],
+        });
+
+      // First $transaction = quorum commit (updateMany + request completed)
+      const mockTxQuorum = {
+        schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      // Second $transaction = completeScheduling (availability + match creation)
+      const mockTxMatchCreate = {
+        availability: { create: vi.fn().mockResolvedValue({ id: 'av1' }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction
+        .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
+        .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
+
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      await schedulingService.handleCandidateResponse('+456', '10:00', ['10:00']);
+      await vi.runAllTimersAsync(); // fire debounce and await checkPollQuorum
+
+      expect(mockTxQuorum.schedulingRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'completed' }) }),
+      );
+    });
+
+    it('does not complete when no slot has enough votes', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([]); // no votes recorded yet
+      mockTx.schedulingRequest.findUnique.mockResolvedValue({ ...multiHourRequest, status: 'active', hostUser: null });
+
+      const result = await schedulingService.handleCandidateResponse('+456', '10:00');
+      await vi.runAllTimersAsync();
+
+      expect(result).toEqual({ processed: true });
+      expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('picks earliest confirmed slot when multiple slots reach quorum', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      // Candidate voted for 10:00 and 11:00 — both reach quorum for singles
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'cand1', metadata: { hours: ['10', '11'] } },
+      ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...multiHourRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...multiHourRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: [{ ...candidate, status: 'accepted', contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null } }],
+        });
+
+      const mockTxQuorum = {
+        schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      const mockTxMatchCreate = {
+        availability: { create: vi.fn().mockResolvedValue({ id: 'av1' }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction
+        .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
+        .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
+
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      const { createMatch } = await import('../matches/matches.service');
+      await schedulingService.handleCandidateResponse('+456', '10:00', ['10:00', '11:00']);
+      await vi.runAllTimersAsync();
+
+      // scheduledAt should be derived from the earliest confirmed slot (10:00)
+      expect(vi.mocked(createMatch)).toHaveBeenCalledWith(
+        expect.objectContaining({ scheduledAt: '2025-04-15T10:00:00.000Z' }),
+        expect.anything(),
+      );
+    });
+
+    it('ignores slots outside the request window', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      // Voted for 08:00 which is before the 09:00 window start
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'cand1', metadata: { hours: ['08'] } },
+      ]);
+      mockTx.schedulingRequest.findUnique.mockResolvedValue({ ...multiHourRequest, status: 'active', hostUser: null });
+
+      const result = await schedulingService.handleCandidateResponse('+456', '08:00', ['08:00']);
+      await vi.runAllTimersAsync();
+
+      expect(result).toEqual({ processed: true });
+      expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('contactNextCandidates — multi-hour poll invite', () => {
+    it('sends poll with time slots when request window exceeds 1 hour', async () => {
+      const multiHourReq = {
+        ...baseRequest,
+        startTime: new Date('2025-04-15T10:00:00.000Z'),
+        endTime: new Date('2025-04-15T13:00:00.000Z'), // 10:00–13:00
+        status: 'active',
+        timezone: 'UTC',
+        hostUser: { ...baseRequest.hostUser, locale: 'es' },
+      };
+      mockRepo.findActiveRequestById.mockResolvedValue(multiHourReq);
+      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
+      mockRepo.findPendingCandidatesOrdered
+        .mockResolvedValueOnce([{
+          ...baseRequest.candidates![0],
+          status: 'pending',
+          contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null, locale: 'es' },
+        }])
+        .mockResolvedValue([]);
+      mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
+      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockTx.schedulingCandidate.update.mockResolvedValue({});
+      mockTx.schedulingRequest.update.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+
+      await schedulingService.contactNextCandidates('req1');
+
+      expect(whatsappService.sendInviteMessage).toHaveBeenCalledWith(
+        '+456',
+        expect.stringContaining('¿A qué hora te va bien?'),
+        expect.objectContaining({
+          buttons: expect.arrayContaining([
+            expect.objectContaining({ title: '10:00' }),
+            expect.objectContaining({ title: '11:00' }),
+            expect.objectContaining({ title: '12:00' }),
+          ]),
+        }),
+      );
+    });
+
+    it('sends YES/NO invite for single-hour request', async () => {
+      const singleHourReq = {
+        ...baseRequest,
+        startTime: new Date('2025-04-15T10:00:00.000Z'),
+        endTime: new Date('2025-04-15T11:00:00.000Z'),
+        status: 'active',
+        timezone: 'UTC',
+        hostUser: { ...baseRequest.hostUser, locale: 'es' },
+      };
+      mockRepo.findActiveRequestById.mockResolvedValue(singleHourReq);
+      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
+      mockRepo.findPendingCandidatesOrdered
+        .mockResolvedValueOnce([{
+          ...baseRequest.candidates![0],
+          status: 'pending',
+          contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null, locale: 'es' },
+        }])
+        .mockResolvedValue([]);
+      mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
+      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockTx.schedulingCandidate.update.mockResolvedValue({});
+      mockTx.schedulingRequest.update.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+
+      await schedulingService.contactNextCandidates('req1');
+
+      expect(whatsappService.sendInviteMessage).toHaveBeenCalledWith(
+        '+456',
+        expect.not.stringContaining('¿A qué hora'),
+        expect.objectContaining({
+          buttons: expect.arrayContaining([
+            expect.objectContaining({ title: 'SÍ' }),
+            expect.objectContaining({ title: 'NO' }),
+          ]),
+        }),
+      );
     });
   });
 

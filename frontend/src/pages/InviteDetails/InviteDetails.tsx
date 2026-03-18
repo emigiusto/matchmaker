@@ -396,7 +396,7 @@ export default function InviteDetailsPage() {
             </span>
           )}
           {displayStatus === "cancelled" && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
               <XCircle className="h-3.5 w-3.5 shrink-0" />
               {t("invites.status.cancelled")}
             </span>
@@ -483,7 +483,7 @@ export default function InviteDetailsPage() {
               <Link2 className="h-3.5 w-3.5" />
               {t("invites.actions.whatsapp")}
             </Button>
-            {displayStatus === "scheduling" && (
+            {(request.status === "active" || request.status === "expired") && (
               <Button
                 variant="ghost"
                 size="sm"

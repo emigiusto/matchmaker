@@ -64,6 +64,11 @@ export class MockWhatsAppProvider implements IWhatsAppProvider {
     return { success: true, participantPhones: [] };
   }
 
+  async sendReaction(phoneNumber: string, messageId: string, emoji: string): Promise<SendMessageResult> {
+    logger.info('[MOCK WhatsApp] sendReaction', { to: phoneNumber, messageId, emoji });
+    return { success: true };
+  }
+
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
     const b = body as Record<string, unknown>;
     let senderPhone: string | undefined;

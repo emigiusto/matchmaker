@@ -18,11 +18,13 @@ export class WhatsappController {
       logger.info('[WhatsApp] invite response', {
         from: parsed.senderPhone,
         text: parsed.messageText,
+        votedOptions: parsed.votedOptions,
       });
 
       const { processed } = await schedulingService.handleCandidateResponse(
         parsed.senderPhone,
         parsed.messageText,
+        parsed.votedOptions,
       );
 
       res.status(200).json({ received: true, processed });

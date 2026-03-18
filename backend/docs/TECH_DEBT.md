@@ -26,25 +26,6 @@ Cuando un usuario acepta una invite via web (`POST /scheduling/join/:token/accep
 
 ---
 
-## `(user as any).locale` en reminder.job y scheduling.service
-
-**Prioridad:** Media
-**Módulo:** `jobs`, `scheduling`
-
-Varios lugares del código acceden a `User.locale` con casts `as any` o con un tipo inline ad-hoc porque el campo `locale` se agregó después de que algunos `include`/`select` ya estaban escritos sin él.
-
-Archivos afectados:
-- `backend/src/modules/jobs/reminder.job.ts` — `(reminder.user as any)?.locale`
-- `backend/src/modules/scheduling/scheduling.service.ts` — múltiples `(candidate.contactUser as { locale?: string | null })?.locale`
-
-**Propuesta:**
-
-1. Crear un tipo `UserWithLocale = { id: string; name: string | null; phone: string | null; locale: string }` en `users.types.ts`.
-2. Actualizar todos los `select` de usuario relevantes para incluir `locale: true`.
-3. Eliminar los casts.
-
----
-
 ## Competitive / Practice – Reintroducir en la UI
 
 **Prioridad:** Media

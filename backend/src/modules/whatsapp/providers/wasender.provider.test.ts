@@ -212,7 +212,7 @@ describe('WasenderProvider', () => {
         },
       };
       const result = provider.parseWebhookPayload(body);
-      expect(result).toEqual({ senderPhone: '34600972125', messageText: 'NO' });
+      expect(result).toEqual({ senderPhone: '34600972125', messageText: 'NO', votedOptions: ['NO'] });
     });
 
     it('parses poll.results event (user voted YES)', () => {
@@ -227,7 +227,59 @@ describe('WasenderProvider', () => {
         },
       };
       const result = provider.parseWebhookPayload(body);
-      expect(result).toEqual({ senderPhone: '34611111111', messageText: 'YES' });
+      expect(result).toEqual({ senderPhone: '34611111111', messageText: 'YES', votedOptions: ['YES'] });
+    });
+
+    it('parses multi-select poll.results with multiple voted options', () => {
+      const body = {
+        event: 'poll.results',
+        data: {
+          key: { remoteJid: '34622222222@s.whatsapp.net' },
+          pollResult: [
+            { name: '10:00', voters: ['34622222222@s.whatsapp.net'] },
+            { name: '11:00', voters: ['34622222222@s.whatsapp.net'] },
+            { name: '12:00', voters: [] },
+          ],
+        },
+      };
+      const result = provider.parseWebhookPayload(body);
+      expect(result).toEqual({
+        senderPhone: '34622222222',
+        messageText: '10:00',
+        votedOptions: ['10:00', '11:00'],
+      });
+    });
+
+    it('returns null when all poll options have empty voters', () => {
+      const body = {
+        event: 'poll.results',
+        data: {
+          key: { remoteJid: '34633333333@s.whatsapp.net' },
+          pollResult: [
+            { name: '10:00', voters: [] },
+            { name: '11:00', voters: [] },
+          ],
+        },
+      };
+      const result = provider.parseWebhookPayload(body);
+      expect(result).toBeNull();
+    });
+
+    it('includes all voted options even when voter phone differs from remoteJid', () => {
+      const body = {
+        event: 'poll.results',
+        data: {
+          key: { remoteJid: '34644444444@s.whatsapp.net' },
+          pollResult: [
+            { name: '09:00', voters: ['34644444444@s.whatsapp.net'] },
+            { name: '10:00', voters: ['34644444444@s.whatsapp.net'] },
+            { name: '11:00', voters: ['34644444444@s.whatsapp.net'] },
+          ],
+        },
+      };
+      const result = provider.parseWebhookPayload(body);
+      expect(result?.votedOptions).toEqual(['09:00', '10:00', '11:00']);
+      expect(result?.messageText).toBe('09:00');
     });
   });
 });

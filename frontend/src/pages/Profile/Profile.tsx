@@ -34,6 +34,7 @@ import { PhoneInput } from "@/components/phone-input"
 import { useLanguage } from "@/lib/i18n/language-context"
 import { toE164, validatePhoneE164 } from "@/lib/phone.utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { useLocation } from "react-router-dom"
 import { getCurrentUserId } from "@/lib/current-user"
 import { usersService, type User } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
@@ -42,6 +43,7 @@ import { toast } from "sonner"
 
 export default function ProfilePage() {
   const currentUserId = getCurrentUserId()
+  const { hash } = useLocation()
   const { language, setLanguage } = useLanguage()
   const { t } = useTranslation()
   const [user, setUser] = useState<User | null>(null)
@@ -134,6 +136,18 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchMemberships()
   }, [currentUserId])
+
+  const [highlightedHash, setHighlightedHash] = useState<string | null>(null)
+  useEffect(() => {
+    if (!hash) return
+    const el = document.querySelector(hash)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" })
+      setHighlightedHash(hash)
+      const t = setTimeout(() => setHighlightedHash(null), 1800)
+      return () => clearTimeout(t)
+    }
+  }, [hash])
 
   async function handleSaveLocation(e: React.FormEvent) {
     e.preventDefault()
@@ -426,7 +440,7 @@ export default function ProfilePage() {
         </Card>
 
         {/* Club Connections */}
-        <Card>
+        <Card id="club-connections" className={`transition-all duration-700 ${highlightedHash === "#club-connections" ? "ring-2 ring-primary/60 bg-primary/5" : "ring-0 bg-transparent"}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
               <Building2 className="h-5 w-5 text-primary" />

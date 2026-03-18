@@ -185,6 +185,10 @@ export const whatsappService = {
     return provider.getGroupInviteLink(groupId);
   },
 
+  async sendReaction(phoneNumber: string, messageId: string, emoji: string) {
+    return withRateLimit(() => provider.sendReaction(phoneNumber, messageId, emoji));
+  },
+
   /** Parse provider-specific webhook body into normalized message. Returns null if not an incoming 1:1 text. */
   parseWebhookPayload(body: unknown): WebhookIncomingMessage | null {
     return provider.parseWebhookPayload(body);

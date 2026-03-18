@@ -519,6 +519,7 @@ model SchedulingCandidate {
   status              SchedulingCandidateStatus @default(pending)
   contactedAt         DateTime?
   responseAt          DateTime?
+  pollMessageId       String?
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
