@@ -65,6 +65,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { PhoneInput } from "@/components/phone-input"
 import { SportFormatBadge } from "@/components/sport-format-badge"
 import { toast } from "sonner"
@@ -1025,20 +1026,22 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                             className="h-8 pl-8"
                           />
                         </div>
-                        <div className="max-h-48 overflow-y-auto overscroll-contain touch-pan-y space-y-0.5">
-                          {contactLists
-                            .filter((l) => !searchFromList.trim() || l.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
-                            .map((l) => (
-                              <button
-                                key={l.id}
-                                onClick={() => { addListMembers(l); setFromListOpen(false) }}
-                                className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted"
-                              >
-                                <span>{l.name}</span>
-                                <span className="text-xs text-muted-foreground">{l.members.length}</span>
-                              </button>
-                            ))}
-                        </div>
+                        <ScrollArea className="max-h-48">
+                          <div className="space-y-0.5 pr-2">
+                            {contactLists
+                              .filter((l) => !searchFromList.trim() || l.name.toLowerCase().includes(searchFromList.trim().toLowerCase()))
+                              .map((l) => (
+                                <button
+                                  key={l.id}
+                                  onClick={() => { addListMembers(l); setFromListOpen(false) }}
+                                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted"
+                                >
+                                  <span>{l.name}</span>
+                                  <span className="text-xs text-muted-foreground">{l.members.length}</span>
+                                </button>
+                              ))}
+                          </div>
+                        </ScrollArea>
                       </PopoverContent>
                     </Popover>
                   )}
@@ -1060,26 +1063,28 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                           className="h-8 pl-8"
                         />
                       </div>
-                      <div className="max-h-48 overflow-y-auto overscroll-contain touch-pan-y space-y-0.5">
-                        {availableContacts
-                          .filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id)))
-                          .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
-                          .map((ac) => (
-                            <button
-                              key={ac.id}
-                              onClick={() => addAvailableContact(ac)}
-                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                            >
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                                {ac.name[0] ?? "?"}
-                              </div>
-                              <span className="flex-1 text-left">{ac.name}</span>
-                              {ac.linkedUserId && (
-                                <span className="text-[10px] text-muted-foreground">✓</span>
-                              )}
-                            </button>
-                          ))}
-                      </div>
+                      <ScrollArea className="max-h-48">
+                        <div className="space-y-0.5 pr-2">
+                          {availableContacts
+                            .filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id)))
+                            .filter((ac) => !searchAllContacts.trim() || ac.name.toLowerCase().includes(searchAllContacts.trim().toLowerCase()))
+                            .map((ac) => (
+                              <button
+                                key={ac.id}
+                                onClick={() => addAvailableContact(ac)}
+                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                              >
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                                  {ac.name[0] ?? "?"}
+                                </div>
+                                <span className="flex-1 text-left">{ac.name}</span>
+                                {ac.linkedUserId && (
+                                  <span className="text-[10px] text-muted-foreground">✓</span>
+                                )}
+                              </button>
+                            ))}
+                        </div>
+                      </ScrollArea>
                       {availableContacts.filter((ac) => !priorityList.some((p) => p.id === (ac.linkedUserId ?? ac.id))).length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                           {availableContacts.length === 0 ? t("wizard.noContactsYet") : t("wizard.allAdded")}
