@@ -859,6 +859,32 @@
       "removeFailed": "Error al eliminar la conexión"
     }
   },
+  "publicMatch": {
+    "title": "Detalles del partido",
+    "subtitle": "Aquí tienes los detalles de este próximo partido.",
+    "signUp": "Registrarse",
+    "notFoundDesc": "Este enlace puede haber expirado o el partido puede haber sido cancelado.",
+    "marketing": {
+      "title": "Organiza tus partidos de tenis con Matchmaker",
+      "description": "Matchmaker gestiona la planificación para que tú solo tengas que aparecer y jugar. Invita contactos por WhatsApp, reserva pistas automáticamente y sigue tu progreso.",
+      "cta": "Crear una cuenta gratis",
+      "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+      "features": {
+        "scheduling": {
+          "title": "Planificación automática",
+          "desc": "Envía invitaciones a tus contactos por orden de prioridad. Matchmaker pasa al siguiente si alguien rechaza o no responde."
+        },
+        "matchmaking": {
+          "title": "Reserva de pista",
+          "desc": "Conecta tu membresía del club y Matchmaker reserva una pista automáticamente cuando se confirma un partido."
+        },
+        "tracking": {
+          "title": "Historial de partidos y nivel",
+          "desc": "Registra cada partido, observa cómo evoluciona tu nivel y revisa los resultados a lo largo del tiempo."
+        }
+      }
+    }
+  },
   "profileView": {
     "title": "Perfil de Jugador",
     "addFriend": "Añadir Amigo",

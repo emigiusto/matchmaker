@@ -859,6 +859,32 @@
       "removeFailed": "Failed to remove connection"
     }
   },
+  "publicMatch": {
+    "title": "Match details",
+    "subtitle": "Here are the details for this upcoming match.",
+    "signUp": "Sign up",
+    "notFoundDesc": "This link may have expired or the match may have been cancelled.",
+    "marketing": {
+      "title": "Organize your tennis matches with Matchmaker",
+      "description": "Matchmaker handles the scheduling so you just show up and play. Invite contacts via WhatsApp, book courts automatically, and track your progress.",
+      "cta": "Create a free account",
+      "alreadyHaveAccount": "Already have an account?",
+      "features": {
+        "scheduling": {
+          "title": "Automated scheduling",
+          "desc": "Send invites to your contacts in order of priority. Matchmaker moves on to the next candidate if someone declines or doesn't reply."
+        },
+        "matchmaking": {
+          "title": "Court booking",
+          "desc": "Connect your club membership and Matchmaker reserves a court automatically when a match is confirmed."
+        },
+        "tracking": {
+          "title": "Match history & level",
+          "desc": "Track every match you play, see how your level evolves, and review results over time."
+        }
+      }
+    }
+  },
   "profileView": {
     "title": "Player Profile",
     "addFriend": "Add Friend",

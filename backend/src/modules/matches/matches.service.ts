@@ -579,7 +579,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     ...(av && {
       location: av.locationText,
       date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),
-      time: formatTimeInTz(av.startTime instanceof Date ? av.startTime : new Date(av.startTime), sr?.timezone ?? 'UTC'),
+      time: formatTimeInTz(match.scheduledAt instanceof Date ? match.scheduledAt : new Date(match.scheduledAt), sr?.timezone ?? 'UTC'),
       endTime: formatTimeInTz(av.endTime instanceof Date ? av.endTime : new Date(av.endTime), sr?.timezone ?? 'UTC'),
     }),
   };
