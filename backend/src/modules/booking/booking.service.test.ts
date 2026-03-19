@@ -452,7 +452,7 @@ describe('cancelBookingForMatch', () => {
   });
 
   it('throws 409 when attempt status is not success', async () => {
-    mockPrisma.bookingAttempt.findUnique.mockResolvedValue({ ...baseAttempt, status: 'pending' });
+    mockPrisma.bookingAttempt.findUnique.mockResolvedValue({ ...baseAttempt, status: 'failed' });
 
     await expect(cancelBookingForMatch('match1')).rejects.toThrow(AppError);
     await expect(cancelBookingForMatch('match1')).rejects.toThrow(/Cannot cancel/);
