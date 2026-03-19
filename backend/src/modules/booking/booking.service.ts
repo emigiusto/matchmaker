@@ -385,73 +385,110 @@ async function runBookingJob(
 
     const sport = schedulingRequest?.sportType ?? 'tennis'
     const sportOptions = { sport }
-
-    // Check availability — use cached full-day result to avoid redundant Puppeteer scrape
     const availCacheKey = `matchmaker:booking:availability:${membership.adapterType}:${membership.clubSlug}:${date}:${sport}`
-    let availability: CourtAvailabilityResult | undefined
-    try {
-      const cached = await cacheGet(availCacheKey)
-      if (cached) {
-        logger.info(`[booking] Availability cache hit for booking job: ${availCacheKey}`)
-        availability = JSON.parse(cached) as CourtAvailabilityResult
+
+    const MAX_RETRIES = 2
+    const RETRY_DELAY_MS = 5000
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        logger.info(`[booking] Retry ${attempt}/${MAX_RETRIES} for match ${matchId} — waiting ${RETRY_DELAY_MS}ms`)
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
       }
-    } catch (err) {
-      logger.warn('[booking] Cache get failed in booking job:', err)
-    }
-    if (!availability) {
-      availability = await adapter.checkAvailability(creds, date, undefined, sportOptions)
       try {
-        await cacheSet(availCacheKey, JSON.stringify(availability), 900)
+        // Check availability — use cached full-day result to avoid redundant Puppeteer scrape.
+        // On retries bypass the cache to get a fresh view of court availability.
+        let availability: CourtAvailabilityResult | undefined
+        if (attempt === 0) {
+          try {
+            const cached = await cacheGet(availCacheKey)
+            if (cached) {
+              logger.info(`[booking] Availability cache hit for booking job: ${availCacheKey}`)
+              availability = JSON.parse(cached) as CourtAvailabilityResult
+            }
+          } catch (err) {
+            logger.warn('[booking] Cache get failed in booking job:', err)
+          }
+        }
+        if (!availability) {
+          availability = await adapter.checkAvailability(creds, date, undefined, sportOptions)
+          try {
+            await cacheSet(availCacheKey, JSON.stringify(availability), 900)
+          } catch (err) {
+            logger.warn('[booking] Cache set failed in booking job:', err)
+          }
+        }
+
+        // Filter courts to the target hour
+        const targetHourStr = time.slice(0, 5)  // e.g. "09:00"
+        const filteredCourts = availability.availableCourts.filter((c) => c.time === targetHourStr)
+        const court = filteredCourts[0] ?? availability.availableCourts[0]
+        if (!court) {
+          await failAttempt(attemptId, `No available courts at ${date} ${time}`)
+          return
+        }
+
+        const result = await adapter.book(creds, date, time, court.courtId, participantSocioNumbers, sportOptions)
+
+        // Conditionally update to success only if still pending (not cancelled mid-flight).
+        const updated = await prisma.bookingAttempt.updateMany({
+          where: { id: attemptId, status: 'pending' },
+          data: {
+            status: 'success',
+            externalBookingId: result.externalId,
+            courtName: result.courtName,
+            completedAt: new Date(),
+          },
+        })
+
+        // Match was cancelled while booking was in progress — cancel the just-made reservation.
+        if (updated.count === 0) {
+          logger.warn(`[booking] Match ${matchId} was cancelled during booking — cancelling reservation ${result.externalId}`)
+          await adapter.cancel(creds, result.externalId).catch((err) => {
+            logger.warn(`[booking] Failed to cancel mid-flight reservation for match ${matchId}:`, err instanceof Error ? err.message : err)
+          })
+          logBookingEvent(matchId, 'booking_cancelled', { reason: 'match_cancelled_mid_flight' }).catch(() => {})
+          return
+        }
+
+        logBookingEvent(matchId, 'booking_success', { courtName: result.courtName, externalId: result.externalId }).catch(() => {})
+        logger.info(`[booking] Court booked for match ${matchId}: ${result.courtName} (${result.externalId})`)
+
+        createNotification(hostUserId, 'booking.success', { matchId, courtName: result.courtName }).catch((err) => {
+          logger.warn(`[booking] Failed to send booking.success notification for match ${matchId}:`, err instanceof Error ? err.message : err)
+        })
+
+        // Notify the WhatsApp group
+        if (match.whatsappGroupId) {
+          const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).catch(() => null)
+          const hostLocale = hostUser?.locale ?? 'es'
+          const message = getMessages(hostLocale).courtBooked(result.courtName, `${date} · ${time}`, match.availability?.locationText ?? '')
+          whatsappService.sendGroupMessage(match.whatsappGroupId, message).catch((err) => {
+            logger.warn(`[booking] Failed to send WhatsApp group notification for match ${matchId}:`, err)
+          })
+        }
+        return // success — exit retry loop
       } catch (err) {
-        logger.warn('[booking] Cache set failed in booking job:', err)
+        const offline = isOfflineError(err)
+        const message = offline
+          ? 'Club booking system is offline or unreachable'
+          : (err instanceof Error ? err.message : String(err))
+
+        if (attempt < MAX_RETRIES) {
+          logger.warn(`[booking] Attempt ${attempt + 1} failed for match ${matchId}, will retry: ${message}`)
+        } else {
+          await failAttempt(attemptId, message)
+          logBookingEvent(matchId, 'booking_failed', { errorMessage: message, attempts: attempt + 1 }).catch(() => {})
+          logger.error(`[booking] Booking failed for match ${matchId} after ${attempt + 1} attempt(s): ${message}`)
+        }
       }
-    }
-
-    // Filter courts to the target hour
-    const targetHourStr = time.slice(0, 5)  // e.g. "09:00"
-    const filteredCourts = availability.availableCourts.filter((c) => c.time === targetHourStr)
-    const court = filteredCourts[0] ?? availability.availableCourts[0]
-    if (!court) {
-      await failAttempt(attemptId, `No available courts at ${date} ${time}`)
-      return
-    }
-
-    const result = await adapter.book(creds, date, time, court.courtId, participantSocioNumbers, sportOptions)
-
-    await prisma.bookingAttempt.update({
-      where: { id: attemptId },
-      data: {
-        status: 'success',
-        externalBookingId: result.externalId,
-        courtName: result.courtName,
-        completedAt: new Date(),
-      },
-    })
-
-    logBookingEvent(matchId, 'booking_success', { courtName: result.courtName, externalId: result.externalId }).catch(() => {})
-    logger.info(`[booking] Court booked for match ${matchId}: ${result.courtName} (${result.externalId})`)
-
-    createNotification(hostUserId, 'booking.success', { matchId, courtName: result.courtName }).catch((err) => {
-      logger.warn(`[booking] Failed to send booking.success notification for match ${matchId}:`, err instanceof Error ? err.message : err)
-    })
-
-    // Notify the WhatsApp group
-    if (match.whatsappGroupId) {
-      const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).catch(() => null)
-      const hostLocale = hostUser?.locale ?? 'es'
-      const message = getMessages(hostLocale).courtBooked(result.courtName, `${date} · ${time}`, match.availability?.locationText ?? '')
-      whatsappService.sendGroupMessage(match.whatsappGroupId, message).catch((err) => {
-        logger.warn(`[booking] Failed to send WhatsApp group notification for match ${matchId}:`, err)
-      })
     }
   } catch (err) {
-    const offline = isOfflineError(err)
-    const message = offline
-      ? 'Club booking system is offline or unreachable'
-      : (err instanceof Error ? err.message : String(err))
+    // Setup phase errors (unexpected — membership/match lookup failures)
+    const message = err instanceof Error ? err.message : String(err)
     await failAttempt(attemptId, message)
     logBookingEvent(matchId, 'booking_failed', { errorMessage: message }).catch(() => {})
-    logger.error(`[booking] Booking failed for match ${matchId}: ${message}`)
+    logger.error(`[booking] Unexpected setup error for match ${matchId}: ${message}`)
   }
 }
 
@@ -493,6 +530,18 @@ export async function retryBookingForMatch(matchId: string): Promise<void> {
 export async function cancelBookingForMatch(matchId: string): Promise<void> {
   const attempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
   if (!attempt) throw new AppError('No booking attempt found for this match', 404)
+
+  // If the booking job is still running, mark it cancelled so the job won't write success.
+  if (attempt.status === 'pending') {
+    await prisma.bookingAttempt.update({
+      where: { id: attempt.id },
+      data: { status: 'cancelled', completedAt: new Date() },
+    })
+    logBookingEvent(matchId, 'booking_cancelled').catch(() => {})
+    logger.info(`[booking] Pending booking cancelled for match ${matchId}`)
+    return
+  }
+
   if (attempt.status !== 'success') {
     throw new AppError(`Cannot cancel — booking status is "${attempt.status}"`, 409)
   }

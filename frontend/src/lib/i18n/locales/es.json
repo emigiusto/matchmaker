@@ -230,7 +230,7 @@
       "startScheduling": "Revisa e inicia la secuencia automática de invitaciones"
     },
     "pickDate": "Elige una fecha",
-    "courtPlaceholder": "Pista, club o instalación (ej. Club Tennis Barcelona)",
+    "courtPlaceholder": "Pista o club (ej. Club Tennis Barcelona)",
     "cityPlaceholder": "Ciudad (ej. Barcelona)",
     "toBeDecided": "Por definir",
     "autoBook": "Reservar pista automáticamente",
@@ -274,7 +274,6 @@
     "courtAvailabilityTimeout": "La comprobación de pistas ha tardado demasiado. La reserva automática ha sido desactivada.",
     "continue": "Continuar",
     "sport": "Deporte",
-    "padelAlwaysDoubles": "El pádel siempre es dobles — el formato se establece automáticamente.",
     "format": "Formato",
     "doublesNote4": "4 jugadores en total — tú + 3 más.",
     "mode": "Modo",
@@ -417,6 +416,12 @@
     "expiredNotEnough": "No hubo suficientes respuestas a tiempo. Añade más contactos o inicia una nueva solicitud.",
     "expiredNoOne": "Nadie respondió a tiempo. Añade más contactos o inicia una nueva solicitud.",
     "whatsappNotAvailable": "Enlace al grupo de WhatsApp no disponible",
+    "cancelRequestDialog": {
+      "title": "Cancelar solicitud de invitación",
+      "description": "Esto cancelará la solicitud de invitación y notificará a los candidatos contactados. Esta acción no se puede deshacer.",
+      "keep": "Mantenerla",
+      "confirm": "Cancelar solicitud"
+    },
     "toast": {
       "requestCancelled": "Solicitud de invitación cancelada",
       "cancelRequestFailed": "Error al cancelar la solicitud",
@@ -723,7 +728,9 @@
       "resultPending": "Resultado pendiente",
       "ratingUpdated": "Clasificación actualizada",
       "noPlayersFound": "No se encontraron jugadores",
-      "courtBooked": "Pista reservada"
+      "courtBooked": "Pista reservada",
+      "bookingCancelled": "Reserva de pista cancelada",
+      "bookingCancelFailed": "No se pudo cancelar la reserva de pista"
     },
     "messages": {
       "scheduledForDate": "Se programó un partido para el {{date}}.",
@@ -740,7 +747,9 @@
       "noMatchFound": "Tu invitación no encontró partido.",
       "noMatchFoundSport": "Tu invitación de {{sport}} no encontró partido.",
       "courtBooked": "{{court}} ha sido reservada para tu partido.",
-      "courtBookedGeneric": "Tu pista ha sido reservada."
+      "courtBookedGeneric": "Tu pista ha sido reservada.",
+      "bookingCancelled": "La reserva de pista para tu partido cancelado ha sido cancelada correctamente.",
+      "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club."
     }
   },
   "contactsPage": {

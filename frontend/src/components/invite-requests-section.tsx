@@ -1030,18 +1030,18 @@ export function InviteRequestsSection({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel invite request</AlertDialogTitle>
+            <AlertDialogTitle>{t("invites.cancelRequestDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will cancel the invite request and notify any contacted candidates. This action cannot be undone.
+              {t("invites.cancelRequestDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogCancel>{t("invites.cancelRequestDialog.keep")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => cancelConfirm && handleCancelRequest(cancelConfirm)}
             >
-              Cancel request
+              {t("invites.cancelRequestDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

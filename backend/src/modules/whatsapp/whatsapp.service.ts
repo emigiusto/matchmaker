@@ -130,21 +130,29 @@ export const whatsappService = {
     );
     if (expectedSet.size === 0) return { sentTo: [], errors: [] };
 
-    // Wait briefly for the WhatsApp API to propagate group membership after creation
-    await new Promise((r) => setTimeout(r, 3000));
+    // Fetch group participants, retrying once with a longer delay if the first
+    // response is empty — the WhatsApp API can take several seconds to propagate
+    // group membership after creation.
+    const fetchActualSet = async (delayMs: number): Promise<Set<string> | null> => {
+      await new Promise((r) => setTimeout(r, delayMs));
+      const res = await provider.getGroupParticipants(groupId);
+      if (!res.success || !res.participantPhones) {
+        logger.warn('CouldNotGetGroupParticipants', { groupId, error: res.error });
+        return null;
+      }
+      return new Set(res.participantPhones.map(normalizePhone).filter(Boolean));
+    };
 
-    const participantsRes = await provider.getGroupParticipants(groupId);
-    if (!participantsRes.success || !participantsRes.participantPhones) {
-      logger.warn('CouldNotGetGroupParticipants', {
-        groupId,
-        error: participantsRes.error,
-      });
-      return { sentTo: [], errors: [participantsRes.error ?? 'Unknown error'] };
+    let actualSet = await fetchActualSet(3000);
+    if (actualSet === null) return { sentTo: [], errors: ['getGroupParticipants failed'] };
+
+    // If the API returned no participants at all, retry once with a longer delay —
+    // this is a sign of propagation lag, not that every user truly failed to join.
+    if (actualSet.size === 0) {
+      logger.info('GroupParticipantsEmptyRetrying', { groupId });
+      actualSet = await fetchActualSet(6000) ?? new Set();
     }
 
-    const actualSet = new Set(
-      (participantsRes.participantPhones ?? []).map(normalizePhone).filter(Boolean)
-    );
     const missing: string[] = [];
     for (const p of expectedSet) {
       if (!actualSet.has(p)) missing.push(p);

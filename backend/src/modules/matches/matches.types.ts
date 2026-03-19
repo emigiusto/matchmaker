@@ -50,6 +50,8 @@ export interface MatchDTO {
   format?: 'singles' | 'doubles';
   /** WhatsApp group JID — use /whatsapp-group-link to get the shareable invite URL */
   whatsappGroupId?: string | null;
+  /** Public token for sharing match details without requiring login */
+  publicToken?: string | null;
 }
 
 export interface CreateMatchInput {

@@ -4,6 +4,7 @@
 // No creation or mutation logic here. No WhatsApp or external messaging logic.
 // Guest fallback: playerA/playerB may be null for guest users or incomplete data.
 
+import crypto from 'crypto';
 import { AppError } from '../../shared/errors/AppError';
 import { prisma } from '../../prisma';
 import { logger } from '../../config/logger';
@@ -36,6 +37,16 @@ const matchInclude = {
   schedulingRequest: { select: { sportType: true, format: true, timezone: true } },
   participants: { include: { user: { select: { id: true, name: true } } } },
 } as const;
+
+export async function getMatchByPublicToken(token: string): Promise<MatchDTO> {
+  const match = await prisma.match.findUnique({
+    where: { publicToken: token },
+    include: matchInclude,
+  });
+  if (!match) throw new AppError('Match not found', 404);
+  if (!match.availability) throw new AppError('Invariant violation: Match missing Availability', 500);
+  return toMatchDTO(match);
+}
 
 export async function getMatchById(matchId: string): Promise<MatchDTO> {
   const match = await prisma.match.findUnique({
@@ -412,6 +423,7 @@ export async function createMatch(
     status: 'scheduled',
     availability: { connect: { id: input.availabilityId } },
     type: matchType,
+    publicToken: crypto.randomBytes(32).toString('base64url'),
     participants: {
       create: uniqueIds.map((userId) => ({ userId, team: null })),
     },
@@ -563,6 +575,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     sportType,
     format,
     whatsappGroupId: match.whatsappGroupId ?? null,
+    publicToken: (match as any).publicToken ?? null,
     ...(av && {
       location: av.locationText,
       date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),

@@ -209,6 +209,9 @@ model Match {
   /// WhatsApp group ID for scheduling matches (opened via chat.whatsapp.com)
   whatsappGroupId String?
 
+  /// Public access token — shared via WhatsApp links, no login required
+  publicToken String? @unique
+
   /// Match type (competitive or practice)
   type MatchType @default(competitive)
 
@@ -235,6 +238,7 @@ model Match {
   @@index([createdAt])
   @@index([status])
   @@index([type])
+  @@index([publicToken])
 }
 
 ////////////////////////////////////////////////////////////

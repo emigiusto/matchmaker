@@ -629,9 +629,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   {t("sportFormat.padel")}
                 </button>
               </div>
-              {sport === "padel" && (
-                <p className="text-xs text-muted-foreground">{t("wizard.padelAlwaysDoubles")}</p>
-              )}
             </div>
 
             {/* Date */}

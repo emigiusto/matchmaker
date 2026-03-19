@@ -26,7 +26,9 @@ export function useNotificationText() {
       case "invite_received":      return t("notifications.titles.newInvite")
       case "result_pending":       return t("notifications.titles.resultPending")
       case "rating_change":        return t("notifications.titles.ratingUpdated")
-      case "booking.success":      return t("notifications.titles.courtBooked")
+      case "booking.success":       return t("notifications.titles.courtBooked")
+      case "booking.cancelled":     return t("notifications.titles.bookingCancelled")
+      case "booking.cancel_failed": return t("notifications.titles.bookingCancelFailed")
       default:                     return n.title
     }
   }
@@ -89,6 +91,8 @@ export function useNotificationText() {
           ? t("notifications.messages.courtBooked", { court: courtName })
           : t("notifications.messages.courtBookedGeneric")
       }
+      case "booking.cancelled":     return t("notifications.messages.bookingCancelled")
+      case "booking.cancel_failed": return t("notifications.messages.bookingCancelFailed")
       default:                 return n.message
     }
   }

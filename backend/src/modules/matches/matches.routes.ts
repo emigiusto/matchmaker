@@ -156,6 +156,7 @@ router.get('/by-player/:playerId', MatchesController.listMatchesForPlayer);
  *       404:
  *         description: Match not found
  */
+router.get('/public/:token', MatchesController.getMatchByPublicToken);
 router.get('/:id/whatsapp-group-link', MatchesController.getWhatsappGroupLink);
 router.get('/:id', MatchesController.getMatchById);
 

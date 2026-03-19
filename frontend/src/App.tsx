@@ -19,6 +19,7 @@ import Signup from '@/pages/Signup/Signup'
 // import Suggested from '@/pages/Suggested/Suggested'
 // import MatchesPast from '@/pages/MatchesPast/MatchesPast'
 import MatchDetails from '@/pages/MatchDetails/MatchDetails'
+import PublicMatchDetails from '@/pages/MatchDetails/PublicMatchDetails'
 import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
 import ProfileView from '@/pages/ProfileView/ProfileView'
@@ -68,6 +69,8 @@ function App() {
 
               {/* Public join page (no sidebar) */}
               <Route path="/join/:token" element={<JoinRequest />} />
+              {/* Public match details (no login required) */}
+              <Route path="/match/:token" element={<PublicMatchDetails />} />
 
               {/* Protected: Dashboard layout (with sidebar) */}
               <Route

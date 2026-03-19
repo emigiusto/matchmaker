@@ -274,7 +274,6 @@
     "courtAvailabilityTimeout": "Court availability check timed out. Auto-book has been disabled.",
     "continue": "Continue",
     "sport": "Sport",
-    "padelAlwaysDoubles": "Padel is always doubles — format is set automatically.",
     "format": "Format",
     "doublesNote4": "4 players total — you + 3 others.",
     "mode": "Mode",
@@ -417,6 +416,12 @@
     "expiredNotEnough": "Not enough contacts responded in time. Add more contacts or start a new request.",
     "expiredNoOne": "No one responded in time. Add more contacts or start a new request.",
     "whatsappNotAvailable": "WhatsApp group link not available",
+    "cancelRequestDialog": {
+      "title": "Cancel invite request",
+      "description": "This will cancel the invite request and notify any contacted candidates. This action cannot be undone.",
+      "keep": "Keep it",
+      "confirm": "Cancel request"
+    },
     "toast": {
       "requestCancelled": "Invite request cancelled",
       "cancelRequestFailed": "Failed to cancel request",
@@ -723,7 +728,9 @@
       "resultPending": "Result pending",
       "ratingUpdated": "Rating updated",
       "noPlayersFound": "No players found",
-      "courtBooked": "Court booked"
+      "courtBooked": "Court booked",
+      "bookingCancelled": "Court booking cancelled",
+      "bookingCancelFailed": "Court booking cancellation failed"
     },
     "messages": {
       "scheduledForDate": "A match was scheduled for {{date}}.",
@@ -740,7 +747,9 @@
       "noMatchFound": "Your invite didn't find a match.",
       "noMatchFoundSport": "Your {{sport}} invite didn't find a match.",
       "courtBooked": "{{court}} has been booked for your match.",
-      "courtBookedGeneric": "Your court has been booked."
+      "courtBookedGeneric": "Your court has been booked.",
+      "bookingCancelled": "The court booking for your cancelled match has been successfully cancelled.",
+      "bookingCancelFailed": "The court booking could not be cancelled automatically. Please cancel it manually at the club."
     }
   },
   "contactsPage": {

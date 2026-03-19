@@ -1598,6 +1598,413 @@ describe('SchedulingService', () => {
       expect(result).toEqual({ processed: true });
       expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
     });
+
+    // ── helpers shared across new quorum tests ───────────────────────────
+
+    function makeQuorumTransactionMocks() {
+      const mockTxQuorum = {
+        schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      const mockTxMatchCreate = {
+        availability: { create: vi.fn().mockResolvedValue({ id: 'av1' }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction
+        .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
+        .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
+      return { mockTxQuorum, mockTxMatchCreate };
+    }
+
+    // ── singles: slot-acceptance correctness ─────────────────────────────
+
+    it('only accepts the candidate who voted for bestSlot, not others (singles)', async () => {
+      // candA votes "09", candB votes "11" — both reach singles quorum (required=1)
+      // bestSlot = "09" (earliest) → only candA should be marked accepted
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'candA', metadata: { hours: ['09'] } },
+        { candidateId: 'candB', metadata: { hours: ['11'] } },
+      ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...multiHourRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...multiHourRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: [{
+            ...candidate,
+            id: 'candA',
+            status: 'accepted',
+            contactUser: { id: 'candA', name: 'Player A', phone: '+001', email: null },
+          }],
+        });
+
+      const { mockTxQuorum } = makeQuorumTransactionMocks();
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      await schedulingService.handleCandidateResponse('+456', '09:00', ['09:00']);
+      await vi.runAllTimersAsync();
+
+      expect(mockTxQuorum.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['candA'] } }), // candB excluded
+        }),
+      );
+    });
+
+    it('no match when neither candidate voted for the other slot (no overlap)', async () => {
+      // candA votes "09" only, candB votes "11" only, required=1 for singles
+      // BUT: singles required=1 so each slot individually has quorum → this test
+      // instead checks the doubles case where overlap IS required across 3 players
+      // For singles "no overlap" scenario, see the doubles tests below.
+      // This test verifies that a candidate who voted for a DIFFERENT slot from
+      // bestSlot does NOT get their candidacy incorrectly scheduled.
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      // candA votes only "11" — slot "11" is in window [09,12) but "09" and "10" have 0 votes
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'candA', metadata: { hours: ['11'] } },
+      ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...multiHourRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...multiHourRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: [{
+            ...candidate,
+            id: 'candA',
+            status: 'accepted',
+            contactUser: { id: 'candA', name: 'Player A', phone: '+001', email: null },
+          }],
+        });
+
+      const { mockTxQuorum } = makeQuorumTransactionMocks();
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      const { createMatch } = await import('../matches/matches.service');
+      await schedulingService.handleCandidateResponse('+456', '11:00', ['11:00']);
+      await vi.runAllTimersAsync();
+
+      // bestSlot must be "11:00", not "09:00" or "10:00"
+      expect(vi.mocked(createMatch)).toHaveBeenCalledWith(
+        expect.objectContaining({ scheduledAt: '2025-04-15T11:00:00.000Z' }),
+        expect.anything(),
+      );
+      expect(mockTxQuorum.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['candA'] } }),
+        }),
+      );
+    });
+
+    // ── timezone offset ───────────────────────────────────────────────────
+
+    it('matches votes against local timezone window and creates match at correct UTC time', async () => {
+      // Europe/Madrid = UTC+2 in April (CEST)
+      // startTime 15:00 UTC → 17:00 Madrid, endTime 19:00 UTC → 21:00 Madrid
+      // Poll shows local slots: ["17:00", "18:00", "19:00", "20:00"]
+      // User votes "19" (local) → bestSlot "19:00" local → 17:00 UTC
+      const tzRequest = {
+        ...multiHourRequest,
+        startTime: new Date('2025-04-15T15:00:00.000Z'),
+        endTime: new Date('2025-04-15T19:00:00.000Z'),
+        timezone: 'Europe/Madrid',
+      };
+
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...candidate,
+        schedulingRequest: tzRequest,
+      });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'cand1', metadata: { hours: ['19'] } }, // 19:00 Madrid
+      ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...tzRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...tzRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: [{
+            ...candidate,
+            status: 'accepted',
+            contactUser: { id: 'cand1', name: 'Cand', phone: '+456', email: null },
+          }],
+        });
+
+      const { mockTxQuorum } = makeQuorumTransactionMocks();
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      const { createMatch } = await import('../matches/matches.service');
+      await schedulingService.handleCandidateResponse('+456', '19:00', ['19:00']);
+      await vi.runAllTimersAsync();
+
+      // 19:00 Madrid (UTC+2) = 17:00 UTC
+      expect(vi.mocked(createMatch)).toHaveBeenCalledWith(
+        expect.objectContaining({ scheduledAt: '2025-04-15T17:00:00.000Z' }),
+        expect.anything(),
+      );
+      expect(mockTxQuorum.schedulingRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'completed' }) }),
+      );
+    });
+
+    it('does not create match when vote is only valid in UTC window but not in local window', async () => {
+      // Europe/Madrid UTC+2: window 17:00–21:00 local = 15:00–19:00 UTC
+      // User votes "15" (which is in the UTC window but NOT in the local [17,21) window)
+      const tzRequest = {
+        ...multiHourRequest,
+        startTime: new Date('2025-04-15T15:00:00.000Z'),
+        endTime: new Date('2025-04-15T19:00:00.000Z'),
+        timezone: 'Europe/Madrid',
+      };
+
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...candidate,
+        schedulingRequest: tzRequest,
+      });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'cand1', metadata: { hours: ['15'] } }, // not a valid local slot
+      ]);
+
+      mockTx.schedulingRequest.findUnique.mockResolvedValue({
+        ...tzRequest,
+        status: 'active',
+        hostUser: null,
+      });
+
+      await schedulingService.handleCandidateResponse('+456', '15:00', ['15:00']);
+      await vi.runAllTimersAsync();
+
+      expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
+    });
+
+    // ── doubles quorum ────────────────────────────────────────────────────
+
+    it('doubles: reaches quorum when all 3 candidates vote for the same slot', async () => {
+      const doublesRequest = { ...multiHourRequest, format: 'doubles' };
+      const doublesCandidates = [
+        { ...candidate, id: 'c1', contactUserId: 'c1', status: 'accepted', priorityOrder: 0, contactUser: { id: 'c1', name: 'P1', phone: '+001', email: null } },
+        { ...candidate, id: 'c2', contactUserId: 'c2', status: 'accepted', priorityOrder: 1, contactUser: { id: 'c2', name: 'P2', phone: '+002', email: null } },
+        { ...candidate, id: 'c3', contactUserId: 'c3', status: 'accepted', priorityOrder: 2, contactUser: { id: 'c3', name: 'P3', phone: '+003', email: null } },
+      ];
+
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...candidate,
+        schedulingRequest: doublesRequest,
+      });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'c1', metadata: { hours: ['10'] } },
+        { candidateId: 'c2', metadata: { hours: ['10'] } },
+        { candidateId: 'c3', metadata: { hours: ['10'] } },
+      ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...doublesRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...doublesRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: doublesCandidates,
+        });
+
+      const mockTxQuorum = {
+        schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 3 }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      const mockTxMatchCreate = {
+        availability: { create: vi.fn().mockResolvedValue({ id: 'av1' }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction
+        .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
+        .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      await schedulingService.handleCandidateResponse('+001', '10:00', ['10:00']);
+      await vi.runAllTimersAsync();
+
+      expect(mockTxQuorum.schedulingRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'completed' }) }),
+      );
+      expect(mockTxQuorum.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['c1', 'c2', 'c3'] } }),
+        }),
+      );
+    });
+
+    it('doubles: no quorum when no slot has 3 votes', async () => {
+      const doublesRequest = { ...multiHourRequest, format: 'doubles' };
+
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...candidate,
+        schedulingRequest: doublesRequest,
+      });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      // c1+c2 vote "10", c3 votes "11" → no slot reaches 3
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'c1', metadata: { hours: ['10'] } },
+        { candidateId: 'c2', metadata: { hours: ['10'] } },
+        { candidateId: 'c3', metadata: { hours: ['11'] } },
+      ]);
+      mockTx.schedulingRequest.findUnique.mockResolvedValue({
+        ...doublesRequest,
+        status: 'active',
+        hostUser: null,
+      });
+
+      await schedulingService.handleCandidateResponse('+001', '10:00', ['10:00']);
+      await vi.runAllTimersAsync();
+
+      expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('doubles: no quorum when fewer than 3 candidates have voted in total', async () => {
+      const doublesRequest = { ...multiHourRequest, format: 'doubles' };
+
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...candidate,
+        schedulingRequest: doublesRequest,
+      });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      // Only 2 voters recorded — not enough even to check slots (required=3)
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'c1', metadata: { hours: ['10'] } },
+        { candidateId: 'c2', metadata: { hours: ['10'] } },
+      ]);
+      mockTx.schedulingRequest.findUnique.mockResolvedValue({
+        ...doublesRequest,
+        status: 'active',
+        hostUser: null,
+      });
+
+      await schedulingService.handleCandidateResponse('+001', '10:00', ['10:00']);
+      await vi.runAllTimersAsync();
+
+      expect(mockTx.schedulingRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('doubles: only the 3 candidates who voted for bestSlot are accepted, extras excluded', async () => {
+      // 4 candidates all vote "10", but doubles only needs 3 → c4 must not be accepted
+      const doublesRequest = { ...multiHourRequest, format: 'doubles' };
+      const doublesCandidates = [
+        { ...candidate, id: 'c1', contactUserId: 'c1', status: 'accepted', priorityOrder: 0, contactUser: { id: 'c1', name: 'P1', phone: '+001', email: null } },
+        { ...candidate, id: 'c2', contactUserId: 'c2', status: 'accepted', priorityOrder: 1, contactUser: { id: 'c2', name: 'P2', phone: '+002', email: null } },
+        { ...candidate, id: 'c3', contactUserId: 'c3', status: 'accepted', priorityOrder: 2, contactUser: { id: 'c3', name: 'P3', phone: '+003', email: null } },
+      ];
+
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...candidate,
+        schedulingRequest: doublesRequest,
+      });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'c1', metadata: { hours: ['10'] } },
+        { candidateId: 'c2', metadata: { hours: ['10'] } },
+        { candidateId: 'c3', metadata: { hours: ['10'] } },
+        { candidateId: 'c4', metadata: { hours: ['10'] } }, // extra voter
+      ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...doublesRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...doublesRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: doublesCandidates,
+        });
+
+      const mockTxQuorum = {
+        schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 3 }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      const mockTxMatchCreate = {
+        availability: { create: vi.fn().mockResolvedValue({ id: 'av1' }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction
+        .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
+        .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      await schedulingService.handleCandidateResponse('+001', '10:00', ['10:00']);
+      await vi.runAllTimersAsync();
+
+      // Exactly 3 accepted, c4 excluded
+      expect(mockTxQuorum.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['c1', 'c2', 'c3'] } }), // not c4
+        }),
+      );
+    });
+
+    it('doubles: only candidates who voted for bestSlot are accepted, others excluded', async () => {
+      // c1+c2+c3 vote "10", c4 votes "11" only → bestSlot "10", c4 must NOT be accepted
+      const doublesRequest = { ...multiHourRequest, format: 'doubles' };
+      const doublesCandidates = [
+        { ...candidate, id: 'c1', contactUserId: 'c1', status: 'accepted', priorityOrder: 0, contactUser: { id: 'c1', name: 'P1', phone: '+001', email: null } },
+        { ...candidate, id: 'c2', contactUserId: 'c2', status: 'accepted', priorityOrder: 1, contactUser: { id: 'c2', name: 'P2', phone: '+002', email: null } },
+        { ...candidate, id: 'c3', contactUserId: 'c3', status: 'accepted', priorityOrder: 2, contactUser: { id: 'c3', name: 'P3', phone: '+003', email: null } },
+      ];
+
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
+        ...candidate,
+        schedulingRequest: doublesRequest,
+      });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([
+        { candidateId: 'c1', metadata: { hours: ['10'] } },
+        { candidateId: 'c2', metadata: { hours: ['10'] } },
+        { candidateId: 'c3', metadata: { hours: ['10'] } },
+        { candidateId: 'c4', metadata: { hours: ['11'] } }, // voted for a different slot
+      ]);
+
+      mockTx.schedulingRequest.findUnique
+        .mockResolvedValueOnce({ ...doublesRequest, status: 'active', hostUser: null })
+        .mockResolvedValueOnce({
+          ...doublesRequest,
+          status: 'completed',
+          hostUser: { id: 'host1', name: 'Host', email: null, phone: '+123' },
+          hostPartner: null,
+          candidates: doublesCandidates,
+        });
+
+      const mockTxQuorum = {
+        schedulingCandidate: { updateMany: vi.fn().mockResolvedValue({ count: 3 }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      const mockTxMatchCreate = {
+        availability: { create: vi.fn().mockResolvedValue({ id: 'av1' }) },
+        schedulingRequest: { update: vi.fn() },
+      };
+      (prisma as any).$transaction
+        .mockImplementationOnce(async (fn: any) => fn(mockTxQuorum))
+        .mockImplementationOnce(async (fn: any) => fn(mockTxMatchCreate));
+      mockTx.user.findMany.mockResolvedValue([]);
+
+      await schedulingService.handleCandidateResponse('+001', '10:00', ['10:00']);
+      await vi.runAllTimersAsync();
+
+      expect(mockTxQuorum.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['c1', 'c2', 'c3'] } }), // not c4
+        }),
+      );
+    });
   });
 
   describe('contactNextCandidates — multi-hour poll invite', () => {

@@ -33,4 +33,9 @@ export const matchesService = {
     const res = await apiClient.get<{ inviteLink: string }>(`/matches/${matchId}/whatsapp-group-link`)
     return res.inviteLink
   },
+
+  async getByPublicToken(token: string): Promise<Match> {
+    const dto = await apiClient.get<BackendMatchDTO>(`/matches/public/${token}`)
+    return adaptMatch(dto)
+  },
 }

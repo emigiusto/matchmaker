@@ -162,14 +162,14 @@ function formatGroupInviteFallbackMessage(input: {
   whenStr: string;
   location: string;
   rivalOrPlayersStr?: string;
-  matchId?: string;
+  matchUrl?: string;
   locale?: string | null;
 }): string {
   const sportEmoji = input.sportType === 'padel' ? '🏓' : '🎾';
   const sport = input.sportType.charAt(0).toUpperCase() + input.sportType.slice(1).toLowerCase();
   const formatLabel = input.format === 'doubles' ? 'Doubles' : 'Singles';
   const loc = (input.location && input.location.trim()) || 'TBD';
-  const matchUrl = input.matchId ? `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${input.matchId}` : null;
+  const matchUrl = input.matchUrl ?? null;
   const isEs = resolveLocale(input.locale) === 'es';
   return [
     `${sportEmoji} *${isEs ? '¡Tu partido está confirmado!' : 'Your match is confirmed!'}*`,
@@ -194,12 +194,11 @@ function formatMatchDetailsMessage(
   format: string,
   whenStr: string,
   location: string,
-  matchId: string,
+  matchUrl: string,
   locale?: string | null
 ): string {
   const sport = sportType.charAt(0).toUpperCase() + sportType.slice(1).toLowerCase();
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
-  const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
   return getMessages(locale).matchConfirmed(sport, formatLabel, whenStr, location, matchUrl);
 }
 
@@ -748,15 +747,30 @@ export const schedulingService = {
       }
     }
 
-    // Find confirmed slots within request window, sorted earliest first
-    const startHHMM = `${String(new Date(request.startTime).getUTCHours()).padStart(2, '0')}:00`;
-    const endHHMM = `${String(new Date(request.endTime).getUTCHours()).padStart(2, '0')}:00`;
-    const windowSlots = slotsInRange(startHHMM, endHHMM);
-    const confirmedSlots = windowSlots.filter((slot) => (voteCounts.get(slot.slice(0, 2)) ?? 0) >= required);
+    // Find confirmed slots within request window, sorted earliest first.
+    // Use the request timezone so slot hours match what was shown in the poll buttons.
+    const tz = (request as RequestRow).timezone ?? 'UTC';
+    const localStartHHMM = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+    const localEndHHMM = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+    const windowSlots = slotsInRange(localStartHHMM, localEndHHMM);
+    // A slot requires ALL required players to have voted for it — not just any required count.
+    const confirmedSlots = windowSlots.filter((slot) => {
+      const h = slot.slice(0, 2);
+      let count = 0;
+      for (const hours of latestVotes.values()) {
+        if (hours.includes(h)) count++;
+      }
+      return count >= required;
+    });
 
     if (confirmedSlots.length === 0) return; // no quorum yet
 
-    // Pick best slot (earliest, or earliest with court available if booking enabled)
+    // Pick best slot (earliest, or earliest with court available if booking enabled).
+    // Convert local bestSlot to UTC for completeScheduling.
+    const utcStartH = new Date(request.startTime).getUTCHours();
+    const localStartH = Number(localStartHHMM.slice(0, 2));
+    const tzOffsetH = localStartH - utcStartH; // e.g. +2 for Europe/Madrid in summer
+
     let bestSlot = confirmedSlots[0];
     if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled) {
       const hostUser = request.hostUser;
@@ -777,11 +791,20 @@ export const schedulingService = {
       }
     }
 
-    // Mark voting candidates as accepted and complete request
-    const votingCandidateIds = [...latestVotes.keys()];
+    // Convert bestSlot (local) to UTC before passing to completeScheduling
+    const bestSlotUtcH = ((Number(bestSlot.slice(0, 2)) - tzOffsetH) + 24) % 24;
+    const bestSlotUTC = `${String(bestSlotUtcH).padStart(2, '0')}:00`;
+
+    // Only mark candidates who voted for bestSlot as accepted
+    const bestSlotH = bestSlot.slice(0, 2);
+    const acceptingCandidateIds = [...latestVotes.entries()]
+      .filter(([, hours]) => hours.includes(bestSlotH))
+      .map(([id]) => id)
+      .slice(0, required);
+
     await prisma.$transaction(async (tx) => {
       await tx.schedulingCandidate.updateMany({
-        where: { id: { in: votingCandidateIds }, status: { in: ['waiting_reply', 'contacted'] } },
+        where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted'] } },
         data: { status: 'accepted', responseAt: new Date() },
       });
       await tx.schedulingRequest.update({
@@ -790,10 +813,10 @@ export const schedulingService = {
       });
     });
 
-    logger.info('PollQuorumReached', { requestId, bestSlot, confirmedSlots });
-    void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { via: 'poll', bestSlot } });
+    logger.info('PollQuorumReached', { requestId, bestSlot, bestSlotUTC, confirmedSlots });
+    void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { via: 'poll', bestSlot, bestSlotUTC } });
 
-    await this.completeScheduling(requestId, bestSlot);
+    await this.completeScheduling(requestId, bestSlotUTC);
   },
 
   async expireCandidate(candidateId: string): Promise<void> {
@@ -1001,7 +1024,6 @@ export const schedulingService = {
       const intlLocale = resolveLocale(hostUserLocale) === 'es' ? 'es-ES' : 'en-US';
       const dateStr = formatInTz(request.date, intlLocale, { weekday: 'long', month: 'long', day: 'numeric' }, tz);
       const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
-      const groupName = `${dateStr} ${timeStr}`;
       const whenStr = `${dateStr} · ${timeStr}`;
 
       const normalizeDigits = (phone: string) => phone.replace(/\D/g, '');
@@ -1011,6 +1033,18 @@ export const schedulingService = {
           .map((u) => [normalizeDigits(u.phone as string), { id: u.id, name: u.name || '', locale: u.locale }])
       );
       const allNames = usersWithPhones.map((u) => u.name).filter((n): n is string => !!n && n.trim().length > 0);
+
+      const isEs = resolveLocale(hostUserLocale) === 'es';
+      const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      const firstName = (full: string) => full.trim().split(/\s+/)[0] ?? full.trim();
+      const nameLabel = allNames.length > 0
+        ? format === 'doubles'
+          ? `${firstName(allNames[0])} ${isEs ? 'y otros' : 'and others'}`
+          : firstName(allNames[0])
+        : null;
+      const groupName = nameLabel
+        ? `${capitalize(dateStr)} · ${timeStr} · ${nameLabel}`
+        : `${capitalize(dateStr)} · ${timeStr}`;
 
       const groupResult = await whatsappService.createMatchGroup({
         participantPhones,
@@ -1024,12 +1058,15 @@ export const schedulingService = {
           where: { id: match.id },
           data: { whatsappGroupId: groupResult.groupId },
         });
+        const publicMatchUrl = match.publicToken
+          ? `${FRONTEND_BASE.replace(/\/$/, '')}/match/${match.publicToken}`
+          : `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
         const detailsMessage = formatMatchDetailsMessage(
           request.sportType,
           format,
           whenStr,
           request.locationText,
-          match.id,
+          publicMatchUrl,
           hostUserLocale
         );
         await whatsappService.sendGroupMessage(groupResult.groupId, detailsMessage);
@@ -1058,7 +1095,7 @@ export const schedulingService = {
               whenStr,
               location: request.locationText,
               rivalOrPlayersStr,
-              matchId: match.id,
+              matchUrl: publicMatchUrl,
               locale: recipient?.locale ?? hostUserLocale,
             });
           },

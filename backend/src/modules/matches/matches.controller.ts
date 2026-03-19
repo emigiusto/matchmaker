@@ -72,6 +72,21 @@ export class MatchesController {
     }
   }
   /**
+   * GET /matches/public/:token
+   * Fetch a match by its public token — no auth required
+   */
+  static async getMatchByPublicToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token } = req.params;
+      if (!token || typeof token !== 'string') return res.status(400).json({ error: 'Missing or invalid token' });
+      const match = await MatchesService.getMatchByPublicToken(token);
+      res.json(match);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * GET /matches/:id
    * Fetch a single match by ID
    */
