@@ -1022,8 +1022,8 @@ export const schedulingService = {
     if (participantPhones.length >= 1) {
       const tz = (request as RequestRow).timezone ?? 'UTC';
       const intlLocale = resolveLocale(hostUserLocale) === 'es' ? 'es-ES' : 'en-US';
-      const dateStr = formatInTz(request.date, intlLocale, { weekday: 'long', month: 'long', day: 'numeric' }, tz);
-      const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
+      const dateStr = formatInTz(scheduledAt, intlLocale, { weekday: 'long', month: 'long', day: 'numeric' }, tz);
+      const timeStr = formatInTz(scheduledAt, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
       const whenStr = `${dateStr} · ${timeStr}`;
 
       const normalizeDigits = (phone: string) => phone.replace(/\D/g, '');

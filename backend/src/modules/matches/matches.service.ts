@@ -560,6 +560,8 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
   const participantCount = participants.length;
   const format = (sr?.format === 'doubles' || sr?.format === 'singles' ? sr.format : participantCount >= 4 ? 'doubles' : 'singles') as 'singles' | 'doubles';
   const sportType = (sr?.sportType === 'padel' || sr?.sportType === 'tennis' ? sr.sportType : 'tennis') as 'tennis' | 'padel';
+  const tz = sr?.timezone ?? 'UTC';
+  const scheduled = match.scheduledAt instanceof Date ? match.scheduledAt : new Date(match.scheduledAt);
   return {
     id: match.id,
     inviteId: null,
@@ -568,7 +570,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     playerAId: match.playerAId,
     playerBId: match.playerBId,
     participants,
-    scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
+    scheduledAt: scheduled.toISOString(),
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
     status: match.status,
     type: match.type || 'competitive',
@@ -578,9 +580,9 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     publicToken: (match as any).publicToken ?? null,
     ...(av && {
       location: av.locationText,
-      date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),
-      time: formatTimeInTz(match.scheduledAt instanceof Date ? match.scheduledAt : new Date(match.scheduledAt), sr?.timezone ?? 'UTC'),
-      endTime: formatTimeInTz(av.endTime instanceof Date ? av.endTime : new Date(av.endTime), sr?.timezone ?? 'UTC'),
+      date: scheduled.toLocaleDateString('en-CA', { timeZone: tz }),
+      time: formatTimeInTz(scheduled, tz),
+      endTime: formatTimeInTz(av.endTime instanceof Date ? av.endTime : new Date(av.endTime), tz),
     }),
   };
 }
