@@ -161,7 +161,10 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
       : (payload.date && typeof payload.date === "string"
           ? new Date(payload.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
           : null)
-  const timeStr = payload.time && typeof payload.time === "string" ? payload.time : null
+  const timeStr =
+    scheduledAt && typeof scheduledAt === "string"
+      ? new Date(scheduledAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
+      : (payload.time && typeof payload.time === "string" ? payload.time : null)
   const location = payload.location && typeof payload.location === "string" ? payload.location.trim() : null
   const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
 
