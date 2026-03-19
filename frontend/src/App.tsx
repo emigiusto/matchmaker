@@ -20,6 +20,7 @@ import Signup from '@/pages/Signup/Signup'
 // import MatchesPast from '@/pages/MatchesPast/MatchesPast'
 import MatchDetails from '@/pages/MatchDetails/MatchDetails'
 import PublicMatchDetails from '@/pages/MatchDetails/PublicMatchDetails'
+import Onboarding from '@/pages/Onboarding/Onboarding'
 import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
 import ProfileView from '@/pages/ProfileView/ProfileView'
@@ -71,6 +72,16 @@ function App() {
               <Route path="/join/:token" element={<JoinRequest />} />
               {/* Public match details (no login required) */}
               <Route path="/match/:token" element={<PublicMatchDetails />} />
+
+              {/* Onboarding — requires auth but no sidebar, skips the onboarding check */}
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute skipOnboardingCheck>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected: Dashboard layout (with sidebar) */}
               <Route

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { createGuestUser, findAllUsers, findUserById, findUserByPhone, findProfileByUserId } from './users.service';
+import { createGuestUser, findAllUsers, findUserById, findUserByPhone, findProfileByUserId, completeOnboarding } from './users.service';
 import { createGuestUserSchema } from './users.validators';
 import { createUser, updateUser, deleteUser } from './users.service';
 import { createUserSchema, updateUserSchema } from './users.validators';
@@ -69,6 +69,16 @@ export async function findProfileByIdController(req: Request, res: Response, nex
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const profile = await findProfileByUserId(id);
     res.json(profile);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function completeOnboardingController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await completeOnboarding(id);
+    res.status(204).send();
   } catch (err) {
     next(err);
   }

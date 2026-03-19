@@ -859,6 +859,36 @@
       "removeFailed": "Error al eliminar la conexión"
     }
   },
+  "onboarding": {
+    "stepOf": "Paso {{current}} de {{total}}",
+    "continue": "Continuar",
+    "skip": "Omitir por ahora",
+    "step1": {
+      "title": "Tu número de teléfono",
+      "description": "Necesario para invitaciones de WhatsApp y recordatorios de partidos.",
+      "phoneLabel": "Teléfono"
+    },
+    "step2": {
+      "title": "¿Dónde juegas?",
+      "description": "Establece tu club y ciudad por defecto. Puedes cambiarlos en cualquier momento.",
+      "clubLabel": "Club o pista preferida",
+      "clubPlaceholder": "ej. Club Tennis Barcelona",
+      "cityLabel": "Ciudad",
+      "cityPlaceholder": "ej. Barcelona"
+    },
+    "step3": {
+      "title": "Conecta tu club",
+      "description": "Habilita la reserva automática de pista cuando se confirme un partido. Puedes configurarlo más tarde en tu perfil.",
+      "clubLabel": "Club",
+      "socioLabel": "Número de socio",
+      "socioPlaceholder": "ej. 12345",
+      "passwordLabel": "Contraseña del portal",
+      "passwordPlaceholder": "Tu contraseña del portal del club",
+      "passwordNote": "Almacenado cifrado. Solo se usa para iniciar sesión en el portal del club en tu nombre.",
+      "connect": "Conectar club",
+      "skipLabel": "Lo configuraré más adelante"
+    }
+  },
   "profileView": {
     "title": "Perfil de Jugador",
     "addFriend": "Añadir Amigo",

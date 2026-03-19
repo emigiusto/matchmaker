@@ -2,7 +2,7 @@
 // Express routes for User identity/contact info only.
 
 import { Router } from 'express';
-import { createGuestUserController, createUserController, findUserByIdController, findProfileByIdController, updateUserController, deleteUserController, findAllUsersController } from './users.controller';
+import { createGuestUserController, createUserController, findUserByIdController, findProfileByIdController, updateUserController, deleteUserController, findAllUsersController, completeOnboardingController } from './users.controller';
 
 const router = Router();
 
@@ -101,6 +101,7 @@ router.get('/', findAllUsersController);
  *         description: Profile with user and player (player may be null)
  */
 router.get('/:id/profile', findProfileByIdController);
+router.post('/:id/complete-onboarding', completeOnboardingController);
 
 /**
  * @openapi
