@@ -150,7 +150,7 @@ export default function PublicMatchDetails() {
   )
 }
 
-function MarketingSection({ t }: { t: (key: string, params?: Record<string, unknown>) => string }) {
+function MarketingSection({ t }: { t: (key: string, params?: Record<string, string | number> | string) => string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
