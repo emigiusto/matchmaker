@@ -375,13 +375,11 @@ async function runBookingJob(
     }
 
     const tz = schedulingRequest?.timezone ?? 'UTC'
-    const date = match.availability?.date
-      ? new Date(match.availability.date).toISOString().slice(0, 10)
-      : new Date(match.scheduledAt).toISOString().slice(0, 10)
-    const rawTime = match.availability?.startTime
-      ? new Date(match.availability.startTime)
-      : new Date(match.scheduledAt)
-    const time = rawTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+    const scheduled = new Date(match.scheduledAt)
+    const date = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
+    const time = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+    
+    logger.info(`[booking] Booking job parameters: date=${date}, time=${time}, tz=${tz}, participantSocioNumbers=${participantSocioNumbers.join(', ')}`)
 
     const sport = schedulingRequest?.sportType ?? 'tennis'
     const sportOptions = { sport }
