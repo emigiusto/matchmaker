@@ -9,7 +9,7 @@
 | Priority | Item | Description |
 |----------|------|-------------|
 | High | **Apply pending migrations** | Run `npx prisma migrate deploy` with `DATABASE_URL` set: adds `User.locale` and drops the `Invite` table. Also run `npx prisma generate` to regenerate the client. |
-| High | **SocioNumber → ClubMembership** | The join-via-link form captures `socioNumber` when `bookingEnabled=true`, but it's only logged — not persisted. Create/upsert a `ClubMembership` row for the guest user so court booking can be triggered post-join. |
+| ~~High~~ ✅ | ~~**SocioNumber → ClubMembership**~~ | Fixed: `acceptViaLink` now upserts a `ClubMembership` for the guest (deriving `clubSlug`/`adapterType` from the host's active membership). |
 | High | **WhatsApp webhook signature** | Verify incoming webhook requests (HMAC) so only Whapi/Wasender can POST. See [TECH_DEBT.md](../backend/docs/TECH_DEBT.md). |
 | Medium | **Competitive / Practice in UI** | Restore match type selector in wizard and badges across Dashboard, Matches, MatchDetails. See [TECH_DEBT.md](../backend/docs/TECH_DEBT.md). |
 | Medium | **Rate limiting** | Add rate limiting on auth, webhook, and `/scheduling/join/:token/accept` endpoints. |

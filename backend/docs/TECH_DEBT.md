@@ -4,28 +4,6 @@
 
 ---
 
-## SocioNumber no se persiste en el join-via-link
-
-**Prioridad:** Alta
-**Módulo:** `scheduling`
-
-Cuando un usuario acepta una invite via web (`POST /scheduling/join/:token/accept`) y el request tiene `bookingEnabled=true`, el campo `socioNumber` del formulario se recibe pero solo se loguea (`logger.info('SocioNumberReceived', ...)`). No se crea ni actualiza ningún registro de `ClubMembership`.
-
-**Propuesta:**
-
-1. En `schedulingService.acceptViaLink`, tras crear/encontrar el usuario, hacer upsert de `ClubMembership`:
-   ```ts
-   await prisma.clubMembership.upsert({
-     where: { userId_clubSlug: { userId, clubSlug: request.clubSlug } },
-     create: { userId, clubSlug: request.clubSlug, adapterType: '...', socioNumber, status: 'unverified' },
-     update: { socioNumber },
-   });
-   ```
-2. Agregar `clubSlug` al modelo `SchedulingRequest` (o derivarlo del `locationText`/venue).
-3. Con `ClubMembership` creada, el booking automático puede ejecutarse post-join igual que para el host.
-
----
-
 ## Competitive / Practice – Reintroducir en la UI
 
 **Prioridad:** Media

@@ -1570,10 +1570,30 @@ export const schedulingService = {
       await this.completeScheduling(request.id);
     }
 
-    // socioNumber: stored as metadata in the event for now (no dedicated field on the user record)
-    // A future migration can add a socioNumber field to User or create a ClubMembership record
+    // Persist socioNumber as a ClubMembership for the guest so the booking service
+    // can include them when booking the court for this match.
     if (data.socioNumber && (request as { bookingEnabled?: boolean }).bookingEnabled) {
-      logger.info('SocioNumberReceived', { userId, schedulingRequestId: request.id, socioNumber: data.socioNumber });
+      const hostMembership = await prisma.clubMembership.findFirst({
+        where: { userId: request.hostUserId, status: 'active' },
+        select: { clubSlug: true, adapterType: true },
+      });
+      if (hostMembership) {
+        await prisma.clubMembership.upsert({
+          where: { userId_clubSlug: { userId, clubSlug: hostMembership.clubSlug } },
+          create: {
+            id: crypto.randomUUID(),
+            userId,
+            clubSlug: hostMembership.clubSlug,
+            adapterType: hostMembership.adapterType,
+            socioNumber: data.socioNumber,
+            status: 'unverified',
+          },
+          update: { socioNumber: data.socioNumber },
+        });
+        logger.info('GuestClubMembershipUpserted', { userId, clubSlug: hostMembership.clubSlug, schedulingRequestId: request.id });
+      } else {
+        logger.warn('SocioNumberReceivedButNoHostMembership', { userId, schedulingRequestId: request.id });
+      }
     }
 
     return { status: 'accepted', candidateId, matchId: null };
