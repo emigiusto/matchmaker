@@ -34,7 +34,7 @@ function formatTimeInTz(date: Date, timezone: string): string {
  */
 const matchInclude = {
   availability: true,
-  schedulingRequest: { select: { sportType: true, format: true, timezone: true } },
+  schedulingRequest: { select: { sportType: true, format: true, timezone: true, bookingEnabled: true } },
   participants: { include: { user: { select: { id: true, name: true } } } },
 } as const;
 
@@ -715,6 +715,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     format,
     whatsappGroupId: match.whatsappGroupId ?? null,
     publicToken: (match as any).publicToken ?? null,
+    bookingEnabled: sr?.bookingEnabled ?? false,
     ...(av && {
       location: av.locationText,
       date: scheduled.toLocaleDateString('en-CA', { timeZone: tz }),

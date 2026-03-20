@@ -52,6 +52,8 @@ export interface MatchDTO {
   whatsappGroupId?: string | null;
   /** Public token for sharing match details without requiring login */
   publicToken?: string | null;
+  /** Whether automatic court booking was enabled on the scheduling request */
+  bookingEnabled?: boolean;
 }
 
 export interface CreateMatchInput {

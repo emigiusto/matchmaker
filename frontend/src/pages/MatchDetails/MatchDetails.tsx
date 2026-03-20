@@ -417,32 +417,55 @@ export default function MatchDetailPage() {
         </Card>
 
         {/* Court Booking Status */}
-        {bookingAttempt && (
+        {(match.bookingEnabled || bookingAttempt) && (
           <Card className={`border-border/50 ${
-            bookingAttempt.status === "success" ? "border-green-500/30 bg-green-500/5" :
-            bookingAttempt.status === "failed" ? "border-destructive/30 bg-destructive/5" :
-            bookingAttempt.status === "cancelled" ? "border-muted bg-muted/20" : ""
+            bookingAttempt?.status === "success" ? "border-green-500/30 bg-green-500/5" :
+            bookingAttempt?.status === "failed" ? "border-destructive/30 bg-destructive/5" :
+            bookingAttempt?.status === "cancelled" ? "border-muted bg-muted/20" : ""
           }`}>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight">
                 <Building2 className="h-4 w-4" />
                 {t("matchDetails.booking.title")}
-                <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  bookingAttempt.status === "success"
-                    ? "bg-green-500/10 text-green-700 dark:text-green-400"
-                    : bookingAttempt.status === "failed"
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                }`}>
-                  {bookingAttempt.status === "pending" ? t("matchDetails.booking.inProgress") :
-                   bookingAttempt.status === "success" ? t("matchDetails.booking.booked") :
-                   bookingAttempt.status === "failed" ? t("matchDetails.booking.failed") :
-                   bookingAttempt.status === "cancelled" ? t("matchDetails.booking.cancelled") : bookingAttempt.status}
-                </span>
+                {bookingAttempt && (
+                  <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    bookingAttempt.status === "success"
+                      ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                      : bookingAttempt.status === "failed"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                  }`}>
+                    {bookingAttempt.status === "pending" ? t("matchDetails.booking.inProgress") :
+                     bookingAttempt.status === "success" ? t("matchDetails.booking.booked") :
+                     bookingAttempt.status === "failed" ? t("matchDetails.booking.failed") :
+                     bookingAttempt.status === "cancelled" ? t("matchDetails.booking.cancelled") : bookingAttempt.status}
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {bookingAttempt.status === "success" && (
+              {!bookingAttempt && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("matchDetails.booking.attempting")}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleRetryBooking}
+                    disabled={retryingBooking}
+                  >
+                    {retryingBooking
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <RefreshCw className="h-3.5 w-3.5" />
+                    }
+                    {t("matchDetails.booking.retryBooking")}
+                  </Button>
+                </div>
+              )}
+              {bookingAttempt?.status === "success" && (
                 <div className="space-y-3">
                   {bookingAttempt.courtName && (
                     <div className="flex items-center gap-2 text-sm">
@@ -476,7 +499,7 @@ export default function MatchDetailPage() {
                   )}
                 </div>
               )}
-              {bookingAttempt.status === "failed" && (
+              {bookingAttempt?.status === "failed" && (
                 <div className="space-y-3">
                   <div className="flex items-start gap-2 text-sm">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
@@ -499,7 +522,7 @@ export default function MatchDetailPage() {
                   </Button>
                 </div>
               )}
-              {bookingAttempt.status === "pending" && (() => {
+              {bookingAttempt?.status === "pending" && (() => {
                 const stale = Date.now() - new Date(bookingAttempt.attemptedAt).getTime() > 10 * 60 * 1000
                 return stale ? (
                   <div className="space-y-3">
