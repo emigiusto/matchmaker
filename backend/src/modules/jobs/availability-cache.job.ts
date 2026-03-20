@@ -73,5 +73,5 @@ export function scheduleAvailabilityCacheJob() {
       logger.error('[availability-cache-job] Unhandled error:', err instanceof Error ? err.message : String(err))
     }
   })
-  logger.info('Availability cache job scheduled (every 15 minutes)')
+  logger.info('Availability cache job scheduled (every 30 minutes)')
 }
