@@ -496,7 +496,7 @@ async function runBookingJob(
       const scheduled = new Date(m.scheduledAt)
       const d = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
       const t = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
-      const hId = sr?.hostUserId ?? m.availability?.userId ?? membership?.userId ?? ''
+      const hId = sr?.hostUserId ?? m.availability?.userId ?? ''
       notifyBookingFailed(m, hId, d, t, tz, message)
     }
   }
