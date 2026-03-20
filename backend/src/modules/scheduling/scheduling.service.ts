@@ -1034,13 +1034,10 @@ export const schedulingService = {
       );
       const allNames = usersWithPhones.map((u) => u.name).filter((n): n is string => !!n && n.trim().length > 0);
 
-      const isEs = resolveLocale(hostUserLocale) === 'es';
       const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       const firstName = (full: string) => full.trim().split(/\s+/)[0] ?? full.trim();
-      const nameLabel = allNames.length > 0
-        ? format === 'doubles'
-          ? `${firstName(allNames[0])} ${isEs ? 'y otros' : 'and others'}`
-          : firstName(allNames[0])
+      const nameLabel = format !== 'doubles' && allNames.length > 0
+        ? allNames.map(firstName).join(' · ')
         : null;
       const groupName = nameLabel
         ? `${capitalize(dateStr)} · ${timeStr} · ${nameLabel}`
@@ -1058,9 +1055,7 @@ export const schedulingService = {
           where: { id: match.id },
           data: { whatsappGroupId: groupResult.groupId },
         });
-        const publicMatchUrl = match.publicToken
-          ? `${FRONTEND_BASE.replace(/\/$/, '')}/match/${match.publicToken}`
-          : `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
+        const publicMatchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
         const detailsMessage = formatMatchDetailsMessage(
           request.sportType,
           format,

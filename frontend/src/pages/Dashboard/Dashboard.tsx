@@ -15,7 +15,7 @@ import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { ResultUploadDialog } from "@/components/result-upload-dialog"
 import { CancelMatchButton } from "@/components/cancel-match-button"
 import { useTranslation } from "@/lib/i18n/use-translation"
-import { isMatchInPast } from "@/lib/utils"
+import { isMatchInPast, matchParticipantsLabel } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import type { Match } from "@/lib/types"
@@ -135,7 +135,7 @@ export default function Dashboard() {
                           size="sm"
                         />
                         <p className="text-base font-semibold text-foreground">
-                          {t("common.vs")} {opponent.name}
+                          {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                         </p>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -163,7 +163,7 @@ export default function Dashboard() {
                       <AddToCalendarButton
                         date={match.date}
                         time={match.time}
-                        endTime={match.endTime}
+
                         location={match.location}
                         participants={
                           (match.participants ?? []).length >= 4
@@ -292,7 +292,7 @@ export default function Dashboard() {
                             size="sm"
                           />
                           <p className="text-base font-semibold text-foreground">
-                            {t("common.vs")} {opponent.name}
+                            {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                           </p>
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -324,7 +324,7 @@ export default function Dashboard() {
                         <AddToCalendarButton
                           date={match.date}
                           time={match.time}
-                          endTime={match.endTime}
+  
                           location={match.location}
                           participants={
                             (match.participants ?? []).length >= 4

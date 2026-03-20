@@ -380,7 +380,7 @@ export default function MatchDetailPage() {
                 <AddToCalendarButton
                   date={match.date}
                   time={match.time}
-                  endTime={match.endTime}
+
                   location={match.location}
                   participants={
                     (match.participants ?? []).length >= 4

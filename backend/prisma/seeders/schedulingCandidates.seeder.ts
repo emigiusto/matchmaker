@@ -64,7 +64,7 @@ export async function seedSchedulingCandidates(
 
     if (reqStatus === 'completed') {
       acceptedCount = format === 'singles' ? 1 : 3;
-      previousCount = faker.number.int({ min: acceptedCount, max: Math.min(chosen.length - 1, acceptedCount + 3) });
+      previousCount = faker.number.int({ min: acceptedCount, max: Math.max(acceptedCount, Math.min(chosen.length - 1, acceptedCount + 3)) });
       previousCount = Math.max(previousCount, acceptedCount);
       inProgressCount = 0;
     } else if (reqStatus === 'active') {

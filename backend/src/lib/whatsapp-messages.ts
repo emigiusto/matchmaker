@@ -18,6 +18,7 @@ interface MessageTemplates {
   matchCancelled(sport: string, format: string, when: string, loc: string, participants: string, url: string): string;
   reminder(opponentName: string, sport: string, format: string, when: string, loc: string, url?: string): string;
   courtBooked(courtName: string, when: string, loc: string): string;
+  courtBookingFailed(when: string, loc: string, reason: string): string;
 }
 
 /**
@@ -168,6 +169,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
       ].join('\n');
     },
+
+    courtBookingFailed(when, loc, reason) {
+      return [
+        '⚠️ *No se pudo reservar la pista automáticamente.*',
+        '',
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `Motivo: ${reason}`,
+        '',
+        'Por favor, reserva la pista manualmente.',
+      ].join('\n');
+    },
   },
 
   en: {
@@ -279,6 +293,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `🏟️ ${courtName}`,
         `📅 ${when}`,
         `📍 ${loc || 'TBD'}`,
+      ].join('\n');
+    },
+
+    courtBookingFailed(when, loc, reason) {
+      return [
+        '⚠️ *Court could not be booked automatically.*',
+        '',
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `Reason: ${reason}`,
+        '',
+        'Please book the court manually.',
       ].join('\n');
     },
   },

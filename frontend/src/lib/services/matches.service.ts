@@ -34,8 +34,4 @@ export const matchesService = {
     return res.inviteLink
   },
 
-  async getByPublicToken(token: string): Promise<Match> {
-    const dto = await apiClient.get<BackendMatchDTO>(`/matches/public/${token}`)
-    return adaptMatch(dto)
-  },
 }

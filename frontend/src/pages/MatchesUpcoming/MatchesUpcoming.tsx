@@ -15,7 +15,7 @@ import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import type { Match } from "@/lib/types"
 import { useTranslation } from "@/lib/i18n"
-import { isMatchInPast } from "@/lib/utils"
+import { isMatchInPast, matchParticipantsLabel } from "@/lib/utils"
 
 /** Safely format a date string; returns fallback if invalid */
 function safeFormatDate(
@@ -26,8 +26,10 @@ function safeFormatDate(
 ): string {
   if (!value) return fallback
   const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? fallback : format(d, formatStr, { locale })
+  const s = Number.isNaN(d.getTime()) ? fallback : format(d, formatStr, { locale })
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
+
 
 export default function MatchesPage() {
   const { t, language } = useTranslation()
@@ -165,7 +167,7 @@ export default function MatchesPage() {
                                     size="sm"
                                   />
                                   <p className="text-base font-semibold text-foreground">
-                                    {t("common.vs")} {opponent.name}
+                                    {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                                   </p>
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -194,7 +196,7 @@ export default function MatchesPage() {
                                 <AddToCalendarButton
                                   date={match.date}
                                   time={match.time}
-                                  endTime={match.endTime}
+
                                   location={match.location}
                                   participants={
                                     (match.participants ?? []).length >= 4
@@ -249,7 +251,7 @@ export default function MatchesPage() {
                                     size="sm"
                                   />
                                   <p className="text-base font-semibold text-foreground">
-                                    {t("common.vs")} {opponent.name}
+                                    {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                                   </p>
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -282,7 +284,7 @@ export default function MatchesPage() {
                                 <AddToCalendarButton
                                   date={match.date}
                                   time={match.time}
-                                  endTime={match.endTime}
+
                                   location={match.location}
                                   participants={
                                     (match.participants ?? []).length >= 4
@@ -330,10 +332,6 @@ export default function MatchesPage() {
                 <Card>
                   <CardContent className="space-y-3 pt-4">
                     {pastMatches.map((match) => {
-                      const opponent =
-                        match.player1.userId === currentUserId
-                          ? match.player2
-                          : match.player1
                       return (
                         <Link
                           key={match.id}
@@ -347,7 +345,7 @@ export default function MatchesPage() {
                               size="sm"
                             />
                             <p className="text-base font-semibold text-foreground">
-                              {t("common.vs")} {opponent.name}
+                              {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                             </p>
                             <span
                               className={`rounded-full px-2 py-0.5 text-xs font-medium ${

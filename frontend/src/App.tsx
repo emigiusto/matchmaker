@@ -18,8 +18,7 @@ import Signup from '@/pages/Signup/Signup'
 // Disabled for v1 - components kept for future use
 // import Suggested from '@/pages/Suggested/Suggested'
 // import MatchesPast from '@/pages/MatchesPast/MatchesPast'
-import MatchDetails from '@/pages/MatchDetails/MatchDetails'
-import PublicMatchDetails from '@/pages/MatchDetails/PublicMatchDetails'
+import MatchDetailsGate from '@/pages/MatchDetails/MatchDetailsGate'
 import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
 import ProfileView from '@/pages/ProfileView/ProfileView'
@@ -69,8 +68,8 @@ function App() {
 
               {/* Public join page (no sidebar) */}
               <Route path="/join/:token" element={<JoinRequest />} />
-              {/* Public match details (no login required) */}
-              <Route path="/match/:token" element={<PublicMatchDetails />} />
+              {/* Match details: public view if not logged in, full view if logged in */}
+              <Route path="/matches/:id" element={<MatchDetailsGate />} />
 
               {/* Protected: Dashboard layout (with sidebar) */}
               <Route
@@ -86,7 +85,6 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/matches" element={<MatchesUpcoming />} />
-                <Route path="/matches/:id" element={<MatchDetails />} />
                 <Route path="/profile/:userId" element={<ProfileView />} />
                 <Route path="/contacts" element={<Contacts />} />
               </Route>

@@ -327,6 +327,11 @@ async function runBookingJob(
 
     logger.info(`[booking] hostUserId resolved: ${hostUserId} (schedulingRequest=${schedulingRequest?.id ?? 'none'}, availability.userId=${match.availability?.userId ?? 'none'}, membership.userId=${membership.userId})`)
 
+    const tz = schedulingRequest?.timezone ?? 'UTC'
+    const scheduled = new Date(match.scheduledAt)
+    const date = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
+    const time = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+
     const otherParticipants = match.participants.filter((p) => p.userId !== hostUserId)
     logger.info(`[booking] Participants: total=${match.participants.length}, other=${otherParticipants.length}, ids=${otherParticipants.map(p => `${p.userId}(${p.user?.name})`).join(', ')}`)
 
@@ -361,10 +366,10 @@ async function runBookingJob(
         logger.info(`[booking] Participant has no phone — skipping Contact lookup`)
       }
 
-      await failAttempt(
-        attemptId,
-        `Missing socio number for participant ${participant.user?.name ?? participant.userId}`,
-      )
+      const reason = `Missing socio number for participant ${participant.user?.name ?? participant.userId}`
+      await failAttempt(attemptId, reason)
+      logBookingEvent(matchId, 'booking_failed', { errorMessage: reason }).catch(() => {})
+      notifyBookingFailed(match, hostUserId, date, time, tz, reason)
       return
     }
 
@@ -373,11 +378,6 @@ async function runBookingJob(
       socioNumber: membership.socioNumber,
       password: decrypt(membership.encryptedPassword),
     }
-
-    const tz = schedulingRequest?.timezone ?? 'UTC'
-    const scheduled = new Date(match.scheduledAt)
-    const date = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
-    const time = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
     
     logger.info(`[booking] Booking job parameters: date=${date}, time=${time}, tz=${tz}, participantSocioNumbers=${participantSocioNumbers.join(', ')}`)
 
@@ -478,6 +478,7 @@ async function runBookingJob(
           await failAttempt(attemptId, message)
           logBookingEvent(matchId, 'booking_failed', { errorMessage: message, attempts: attempt + 1 }).catch(() => {})
           logger.error(`[booking] Booking failed for match ${matchId} after ${attempt + 1} attempt(s): ${message}`)
+          notifyBookingFailed(match, hostUserId, date, time, tz, message)
         }
       }
     }
@@ -487,6 +488,44 @@ async function runBookingJob(
     await failAttempt(attemptId, message)
     logBookingEvent(matchId, 'booking_failed', { errorMessage: message }).catch(() => {})
     logger.error(`[booking] Unexpected setup error for match ${matchId}: ${message}`)
+    // Reload match for group notification (match variable may not be in scope)
+    const m = await prisma.match.findUnique({ where: { id: matchId }, include: { availability: true } }).catch(() => null)
+    if (m) {
+      const sr = await prisma.schedulingRequest.findUnique({ where: { matchId } }).catch(() => null)
+      const tz = sr?.timezone ?? 'UTC'
+      const scheduled = new Date(m.scheduledAt)
+      const d = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
+      const t = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+      const hId = sr?.hostUserId ?? m.availability?.userId ?? membership?.userId ?? ''
+      notifyBookingFailed(m, hId, d, t, tz, message)
+    }
+  }
+}
+
+function notifyBookingFailed(
+  match: { id: string; whatsappGroupId: string | null; availability: { locationText?: string | null } | null },
+  hostUserId: string,
+  date: string,
+  time: string,
+  tz: string,
+  reason: string,
+): void {
+  createNotification(hostUserId, 'booking.cancel_failed', { matchId: match.id }).catch((err) => {
+    logger.warn(`[booking] Failed to send booking.cancel_failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
+  })
+
+  if (match.whatsappGroupId) {
+    prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } })
+      .then((hostUser) => {
+        const locale = hostUser?.locale ?? 'es'
+        const when = `${date} · ${time}`
+        const loc = match.availability?.locationText ?? ''
+        const message = getMessages(locale).courtBookingFailed(when, loc, reason)
+        return whatsappService.sendGroupMessage(match.whatsappGroupId!, message)
+      })
+      .catch((err) => {
+        logger.warn(`[booking] Failed to send booking failed WhatsApp for match ${match.id}:`, err instanceof Error ? err.message : err)
+      })
   }
 }
 
