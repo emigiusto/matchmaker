@@ -603,7 +603,20 @@
       "bookingFailed": "Booking failed",
       "retryBooking": "Retry booking",
       "attempting": "Attempting to reserve a court…",
-      "timedOut": "Booking timed out — the process took too long. You can retry below."
+      "timedOut": "Booking timed out — the process took too long. You can retry below.",
+      "errors": {
+        "missingSocioNumber": "A participant is missing their socio number",
+        "noAvailableCourts": "No courts available at the selected time",
+        "systemOffline": "The club booking system is currently unavailable",
+        "slotNoLongerAvailable": "This time slot is no longer available",
+        "unknown": "An error occurred while booking the court"
+      },
+      "toast": {
+        "retryQueued": "Booking retry queued",
+        "retryFailed": "Failed to retry booking",
+        "cancelSuccess": "Booking cancelled",
+        "cancelFailed": "Failed to cancel booking"
+      }
     },
     "openWhatsappGroup": "Open WhatsApp Group",
     "reminders": {

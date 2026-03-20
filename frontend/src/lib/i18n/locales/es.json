@@ -603,7 +603,20 @@
       "bookingFailed": "Reserva fallida",
       "retryBooking": "Reintentar reserva",
       "attempting": "Intentando reservar una pista…",
-      "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación."
+      "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación.",
+      "errors": {
+        "missingSocioNumber": "Falta el número de socio de un participante",
+        "noAvailableCourts": "No hay pistas disponibles en el horario seleccionado",
+        "systemOffline": "El sistema de reservas del club no está disponible en este momento",
+        "slotNoLongerAvailable": "Este horario ya no está disponible",
+        "unknown": "Se produjo un error al reservar la pista"
+      },
+      "toast": {
+        "retryQueued": "Reintento de reserva en cola",
+        "retryFailed": "Error al reintentar la reserva",
+        "cancelSuccess": "Reserva cancelada",
+        "cancelFailed": "Error al cancelar la reserva"
+      }
     },
     "openWhatsappGroup": "Abrir grupo de WhatsApp",
     "reminders": {

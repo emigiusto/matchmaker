@@ -605,6 +605,7 @@ model BookingAttempt {
   externalBookingId String? // reference from the external booking system
   courtName         String?
   errorMessage      String?
+  errorCode         String? // machine-readable code for i18n (e.g. SLOT_NOT_FOUND, ADAPTER_OFFLINE)
   attemptedAt       DateTime      @default(now())
   completedAt       DateTime?
 

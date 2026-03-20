@@ -20,6 +20,7 @@ export interface BookingAttemptDTO {
   externalBookingId: string | null
   courtName: string | null
   errorMessage: string | null
+  errorCode: string | null
   attemptedAt: string
   completedAt: string | null
 }

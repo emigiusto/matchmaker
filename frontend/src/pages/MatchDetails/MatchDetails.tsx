@@ -38,7 +38,7 @@ import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
-import { isMatchInPast } from "@/lib/utils"
+import { isMatchInPast, getBookingErrorMessage } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
@@ -136,10 +136,10 @@ export default function MatchDetailPage() {
     try {
       await bookingService.retryBooking(id)
       setBookingAttempt((prev) => prev ? { ...prev, status: "pending" } : prev)
-      toast.success("Booking retry queued")
+      toast.success(t("matchDetails.booking.toast.retryQueued"))
       startBookingPoll(id)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to retry booking")
+      toast.error(err instanceof Error ? err.message : t("matchDetails.booking.toast.retryFailed"))
     } finally {
       setRetryingBooking(false)
     }
@@ -152,9 +152,9 @@ export default function MatchDetailPage() {
     try {
       await bookingService.cancelBooking(id)
       setBookingAttempt((prev) => prev ? { ...prev, status: "cancelled" } : prev)
-      toast.success("Booking cancelled")
+      toast.success(t("matchDetails.booking.toast.cancelSuccess"))
     } catch (err) {
-      setCancelBookingError(err instanceof Error ? err.message : "Failed to cancel booking")
+      setCancelBookingError(err instanceof Error ? err.message : t("matchDetails.booking.toast.cancelFailed"))
     } finally {
       setCancellingBooking(false)
     }
@@ -466,7 +466,7 @@ export default function MatchDetailPage() {
                   <div className="flex items-start gap-2 text-sm">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                     <span className="text-destructive">
-                      {bookingAttempt.errorMessage ?? t("matchDetails.booking.bookingFailed")}
+                      {getBookingErrorMessage(bookingAttempt.errorCode, t)}
                     </span>
                   </div>
                   <Button

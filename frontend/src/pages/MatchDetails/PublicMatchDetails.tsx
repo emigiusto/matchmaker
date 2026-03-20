@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Link } from "react-router-dom"
 import { format } from "date-fns"
 import {
@@ -21,6 +21,7 @@ import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { matchesService } from "@/lib/services/matches.service"
 import { bookingService, type BookingAttemptDTO } from "@/lib/services/booking.service"
 import { useTranslation } from "@/lib/i18n"
+import { getBookingErrorMessage } from "@/lib/utils"
 import type { Match } from "@/lib/types"
 
 function TennisBallIcon({ className }: { className?: string }) {
@@ -48,15 +49,42 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
   const [match, setMatch] = useState<Match | null>(null)
   const [state, setState] = useState<"loading" | "found" | "not-found">("loading")
   const [bookingAttempt, setBookingAttempt] = useState<BookingAttemptDTO | null>(null)
+  const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopBookingPoll = useCallback(() => {
+    if (bookingPollRef.current) {
+      clearInterval(bookingPollRef.current)
+      bookingPollRef.current = null
+    }
+  }, [])
+
+  const startBookingPoll = useCallback((id: string) => {
+    stopBookingPoll()
+    bookingPollRef.current = setInterval(async () => {
+      try {
+        const attempt = await bookingService.getAttempt(id)
+        setBookingAttempt(attempt)
+        if (!attempt || attempt.status !== "pending") {
+          stopBookingPoll()
+        }
+      } catch {
+        stopBookingPoll()
+      }
+    }, 3000)
+  }, [stopBookingPoll])
 
   useEffect(() => {
     matchesService.getById(matchId)
       .then((m) => {
         setMatch(m)
         setState("found")
-        bookingService.getAttempt(m.id).then(setBookingAttempt).catch(() => {})
+        bookingService.getAttempt(m.id).then((attempt) => {
+          setBookingAttempt(attempt)
+          if (attempt?.status === "pending") startBookingPoll(m.id)
+        }).catch(() => {})
       })
       .catch(() => setState("not-found"))
+    return stopBookingPoll
   }, [matchId])
 
   const participants = match?.participants ?? []
@@ -294,7 +322,7 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
                     <div className="flex items-start gap-2 text-sm">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                       <span className="text-destructive">
-                        {bookingAttempt.errorMessage ?? t("matchDetails.booking.bookingFailed")}
+                        {getBookingErrorMessage(bookingAttempt.errorCode, t)}
                       </span>
                     </div>
                   )}

@@ -367,7 +367,7 @@ async function runBookingJob(
       }
 
       const reason = `Missing socio number for participant ${participant.user?.name ?? participant.userId}`
-      await failAttempt(attemptId, reason)
+      await failAttempt(attemptId, reason, 'MISSING_SOCIO_NUMBER')
       logBookingEvent(matchId, 'booking_failed', { errorMessage: reason }).catch(() => {})
       notifyBookingFailed(match, hostUserId, date, time, tz, reason)
       return
@@ -422,7 +422,7 @@ async function runBookingJob(
         const filteredCourts = availability.availableCourts.filter((c) => c.time === targetHourStr)
         const court = filteredCourts[0] ?? availability.availableCourts[0]
         if (!court) {
-          await failAttempt(attemptId, `No available courts at ${date} ${time}`)
+          await failAttempt(attemptId, `No available courts at ${date} ${time}`, 'NO_AVAILABLE_COURTS')
           return
         }
 
@@ -471,11 +471,14 @@ async function runBookingJob(
         const message = offline
           ? 'Club booking system is offline or unreachable'
           : (err instanceof Error ? err.message : String(err))
+        const errorCode = offline
+          ? 'ADAPTER_OFFLINE'
+          : (err instanceof AppError ? err.errorCode : undefined)
 
         if (attempt < MAX_RETRIES) {
           logger.warn(`[booking] Attempt ${attempt + 1} failed for match ${matchId}, will retry: ${message}`)
         } else {
-          await failAttempt(attemptId, message)
+          await failAttempt(attemptId, message, errorCode)
           logBookingEvent(matchId, 'booking_failed', { errorMessage: message, attempts: attempt + 1 }).catch(() => {})
           logger.error(`[booking] Booking failed for match ${matchId} after ${attempt + 1} attempt(s): ${message}`)
           notifyBookingFailed(match, hostUserId, date, time, tz, message)
@@ -529,10 +532,10 @@ function notifyBookingFailed(
   }
 }
 
-async function failAttempt(attemptId: string, errorMessage: string): Promise<void> {
+async function failAttempt(attemptId: string, errorMessage: string, errorCode?: string): Promise<void> {
   await prisma.bookingAttempt.update({
     where: { id: attemptId },
-    data: { status: 'failed', errorMessage, completedAt: new Date() },
+    data: { status: 'failed', errorMessage, errorCode: errorCode ?? null, completedAt: new Date() },
   }).catch((e) => logger.error(`[booking] Failed to mark attempt ${attemptId} as failed:`, e))
 }
 
@@ -550,7 +553,7 @@ export async function retryBookingForMatch(matchId: string): Promise<void> {
   // Reset attempt to pending
   await prisma.bookingAttempt.update({
     where: { id: existing.id },
-    data: { status: 'pending', errorMessage: null, completedAt: null, attemptedAt: new Date() },
+    data: { status: 'pending', errorMessage: null, errorCode: null, completedAt: null, attemptedAt: new Date() },
   })
 
   logBookingEvent(matchId, 'booking_pending', { retry: true }).catch(() => {})
@@ -642,7 +645,8 @@ function toMembershipDTO(m: {
 function toAttemptDTO(a: {
   id: string; matchId: string; clubMembershipId: string; status: string
   externalBookingId: string | null; courtName: string | null
-  errorMessage: string | null; attemptedAt: Date; completedAt: Date | null
+  errorMessage: string | null; errorCode: string | null
+  attemptedAt: Date; completedAt: Date | null
 }): BookingAttemptDTO {
   return {
     id: a.id,
@@ -652,6 +656,7 @@ function toAttemptDTO(a: {
     externalBookingId: a.externalBookingId,
     courtName: a.courtName,
     errorMessage: a.errorMessage,
+    errorCode: a.errorCode,
     attemptedAt: a.attemptedAt.toISOString(),
     completedAt: a.completedAt?.toISOString() ?? null,
   }
