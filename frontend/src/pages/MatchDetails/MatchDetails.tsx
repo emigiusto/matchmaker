@@ -255,9 +255,6 @@ export default function MatchDetailPage() {
                 format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
               />
               <StatusBadge status={match.status} />
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(match.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}
-              </span>
             </div>
           </div>
           <CardContent className={`p-6 ${match.status === "cancelled" ? "opacity-75" : ""}`}>
