@@ -3,9 +3,10 @@
 
 import { Router } from 'express';
 import { WhatsappController } from './whatsapp.controller';
+import { verifyWebhookSignature } from './webhook-signature.middleware';
 
 const router = Router();
 
-router.post('/webhook', WhatsappController.webhook);
+router.post('/webhook', verifyWebhookSignature, WhatsappController.webhook);
 
 export default router;

@@ -10,7 +10,7 @@
 |----------|------|-------------|
 | High | **Apply pending migrations** | Run `npx prisma migrate deploy` with `DATABASE_URL` set: adds `User.locale` and drops the `Invite` table. Also run `npx prisma generate` to regenerate the client. |
 | ~~High~~ ✅ | ~~**SocioNumber → ClubMembership**~~ | Fixed: `acceptViaLink` now upserts a `ClubMembership` for the guest (deriving `clubSlug`/`adapterType` from the host's active membership). |
-| High | **WhatsApp webhook signature** | Verify incoming webhook requests (HMAC) so only Whapi/Wasender can POST. See [TECH_DEBT.md](../backend/docs/TECH_DEBT.md). |
+| ~~High~~ ✅ | ~~**WhatsApp webhook signature**~~ | Fixed: `verifyWebhookSignature` middleware added to `POST /whatsapp/webhook`. Set `WHAPI_WEBHOOK_SECRET` / `WASENDER_WEBHOOK_SECRET` in production to activate. |
 | Medium | **Competitive / Practice in UI** | Restore match type selector in wizard and badges across Dashboard, Matches, MatchDetails. See [TECH_DEBT.md](../backend/docs/TECH_DEBT.md). |
 | Medium | **Rate limiting** | Add rate limiting on auth, webhook, and `/scheduling/join/:token/accept` endpoints. |
 | Medium | **Reminder locale** | `reminder.job.ts` resolves user locale via `(user as any).locale` — add `locale` to the Prisma select and remove the cast. |

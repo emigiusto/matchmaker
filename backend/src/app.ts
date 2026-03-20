@@ -19,8 +19,12 @@ app.use(cors(isDev
   ? { origin: true } // allow any origin in development
   : corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : {}));
 
-// Parse JSON bodies
-app.use(express.json());
+// Parse JSON bodies — capture raw buffer for webhook HMAC verification
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    (req as unknown as { rawBody: Buffer }).rawBody = buf;
+  },
+}));
 
 // Swagger/OpenAPI setup
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

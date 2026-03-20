@@ -21,26 +21,6 @@ La distinción Competitive/Practice existe en el schema (`MatchType`, `Schedulin
 
 ---
 
-## WhatsApp Webhook – Verificación de firma
-
-**Prioridad:** Media
-**Módulo:** `whatsapp`
-
-El webhook (`POST /whatsapp/webhook`) acepta cualquier request sin validar que provenga realmente de Wasender/Whapi. Cualquiera que conozca la URL podría enviar POSTs falsos y simular respuestas YES/NO de candidatos.
-
-**Propuesta:**
-
-1. Guardar el secret del provider en env:
-   ```
-   WASENDER_WEBHOOK_SECRET=...
-   WHAPI_WEBHOOK_SECRET=...
-   ```
-2. Implementar verificación de firma en `WhatsappController.webhook`:
-   - Consultar la docs de cada provider para el header y algoritmo (HMAC-SHA256 habitual).
-   - Validar antes de procesar el body; devolver 401 si es inválido.
-3. Mantener el comportamiento actual cuando no se configure secret (desarrollo / mock provider).
-
----
 
 ## Rate limiting en endpoints públicos
 
