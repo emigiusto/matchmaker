@@ -15,7 +15,7 @@ import { createNotification } from '../notifications/notifications.service';
 import { validateResultMatchConsistency } from '../results/results.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
-import { cancelBookingForMatch } from '../booking/booking.service';
+import { cancelBookingForMatch, resetBookingForReschedule } from '../booking/booking.service';
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
@@ -390,6 +390,138 @@ async function cancelBookingOnMatchCancel(matchId: string, hostUserId: string): 
       logger.warn('Failed to send booking.cancel_failed notification', { matchId, error: notifErr instanceof Error ? notifErr.message : String(notifErr) });
     });
     logger.error('Failed to cancel booking on match cancel', { matchId, error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/**
+ * Reschedule a match to a new date/time.
+ * Only participants can reschedule; only scheduled matches can be rescheduled.
+ * Fires-and-forgets a booking reset (cancel old + rebook) if auto-booking is active.
+ */
+export async function rescheduleMatch(matchId: string, userId: string, scheduledAt: string): Promise<MatchDTO> {
+  const newTime = new Date(scheduledAt)
+  if (isNaN(newTime.getTime())) throw new AppError('Invalid scheduledAt value', 400)
+  if (newTime <= new Date()) throw new AppError('New scheduled time must be in the future', 400)
+
+  let timezone = 'UTC'
+  const dto = await prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({
+      where: { id: matchId },
+      include: {
+        availability: true,
+        participants: { select: { userId: true } },
+        schedulingRequest: { select: { sportType: true, format: true, timezone: true } },
+      },
+    })
+    if (!match) throw new AppError('Match not found', 404)
+    if (match.status !== 'scheduled') throw new AppError('Only scheduled matches can be rescheduled', 409)
+
+    const isParticipant = (match as any).participants?.some((p: { userId: string }) => p.userId === userId)
+    if (!isParticipant) throw new AppError('Only participants can reschedule this match', 403)
+
+    if (newTime.getTime() === match.scheduledAt.getTime()) {
+      throw new AppError('New time is the same as the current scheduled time', 400)
+    }
+
+    timezone = (match as any).schedulingRequest?.timezone ?? 'UTC'
+
+    const updated = await tx.match.update({
+      where: { id: matchId },
+      data: { scheduledAt: newTime },
+      include: matchInclude,
+    })
+
+    // Keep Availability.startTime in sync so date/time derived fields stay consistent
+    if (match.availabilityId) {
+      await tx.availability.update({
+        where: { id: match.availabilityId },
+        data: { startTime: newTime, date: newTime },
+      })
+    }
+
+    // Delete stale pending reminders (they were scheduled against the old time)
+    await tx.reminder.deleteMany({
+      where: { matchId, status: 'pending' },
+    })
+
+    return toMatchDTO(updated as EnrichedMatch)
+  })
+
+  // Fire-and-forget: reset court booking with new time
+  resetBookingForReschedule(matchId).catch((err) => {
+    logger.error('Failed to reset booking on reschedule', { matchId, error: err instanceof Error ? err.message : String(err) })
+  })
+
+  // Notify all participants + send WhatsApp message + rename group
+  notifyMatchParticipantsOnReschedule(matchId, dto, timezone).catch((err) => {
+    logger.error('Failed to notify on match reschedule', { matchId, error: err instanceof Error ? err.message : String(err) })
+  })
+
+  return dto
+}
+
+async function notifyMatchParticipantsOnReschedule(matchId: string, match: MatchDTO, timezone: string): Promise<void> {
+  const participants = match.participants ?? []
+  for (const p of participants) {
+    try {
+      await createNotification(p.userId, 'match.rescheduled', {
+        matchId: match.id,
+        scheduledAt: match.scheduledAt,
+        date: match.date,
+        time: match.time,
+        location: match.location,
+      })
+    } catch (err) {
+      logger.error('Failed to create match.rescheduled notification', {
+        userId: p.userId,
+        matchId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  const groupId = (match as any).whatsappGroupId as string | null | undefined
+  if (!groupId) return
+
+  try {
+    const tz = timezone
+    const scheduled = new Date(match.scheduledAt)
+    const hostUser = await prisma.user.findFirst({
+      where: { id: { in: participants.map((p) => p.userId) } },
+      select: { locale: true },
+    })
+    const hostLocale = resolveLocale(hostUser?.locale)
+    const intlLocale = hostLocale === 'es' ? 'es-ES' : 'en-US'
+
+    const dateStr = scheduled.toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz })
+    const timeStr = formatTimeInTz(scheduled, tz)
+    const whenStr = `${dateStr.charAt(0).toUpperCase()}${dateStr.slice(1)} · ${timeStr}`
+    const loc = match.location ?? ''
+    const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`
+
+    // Send WhatsApp message with new time
+    const message = getMessages(hostLocale).matchRescheduled(whenStr, loc, matchUrl)
+    await whatsappService.sendGroupMessage(groupId, message)
+
+    // Rename group to reflect new date/time
+    const participantNames = participants
+      .map((p) => p.userName)
+      .filter((n): n is string => !!n)
+      .map((n) => n.trim().split(/\s+/)[0] ?? n)
+    const nameLabel = (match.format ?? 'singles') !== 'doubles' && participantNames.length > 0
+      ? participantNames.join(' · ')
+      : null
+    const newGroupName = nameLabel
+      ? `${whenStr} · ${nameLabel}`
+      : whenStr
+    await whatsappService.updateGroupSubject(groupId, newGroupName)
+
+    logger.info('MatchRescheduledWhatsAppSent', { matchId, groupId, newGroupName })
+  } catch (err) {
+    logger.error('Failed to send WhatsApp group message for rescheduled match', {
+      matchId,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 

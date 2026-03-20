@@ -617,6 +617,48 @@ export async function cancelBookingForMatch(matchId: string): Promise<void> {
   logger.info(`[booking] Booking cancelled for match ${matchId}`)
 }
 
+/**
+ * Cancel any existing court booking for a match and delete the BookingAttempt row,
+ * then re-trigger a fresh booking attempt. Used when a match is rescheduled.
+ * No-ops gracefully if there is no existing attempt or no active membership.
+ */
+export async function resetBookingForReschedule(matchId: string): Promise<void> {
+  const attempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
+  if (!attempt) {
+    // No prior booking — just trigger fresh
+    await triggerBookingForMatch(matchId)
+    return
+  }
+
+  // Mark as cancelled first — signals any in-flight job not to write success
+  await prisma.bookingAttempt.update({
+    where: { id: attempt.id },
+    data: { status: 'cancelled', completedAt: new Date() },
+  }).catch((err) => {
+    logger.warn(`[booking] Failed to mark attempt as cancelled on reschedule for match ${matchId}:`, err instanceof Error ? err.message : err)
+  })
+
+  // Cancel the existing court reservation at the club if it was confirmed
+  if (attempt.status === 'success' && attempt.externalBookingId) {
+    const membership = await prisma.clubMembership.findUnique({ where: { id: attempt.clubMembershipId } })
+    if (membership?.encryptedPassword) {
+      const adapter = getAdapter(membership.adapterType)
+      const creds = { socioNumber: membership.socioNumber, password: decrypt(membership.encryptedPassword) }
+      await adapter.cancel(creds, attempt.externalBookingId).catch((err) => {
+        logger.warn(`[booking] Adapter cancel on reschedule failed for match ${matchId}:`, err instanceof Error ? err.message : err)
+      })
+    }
+  }
+
+  // Delete old attempt so triggerBookingForMatch can create a fresh one
+  await prisma.bookingAttempt.delete({ where: { id: attempt.id } }).catch((err) => {
+    logger.warn(`[booking] Failed to delete old booking attempt on reschedule for match ${matchId}:`, err instanceof Error ? err.message : err)
+  })
+
+  logBookingEvent(matchId, 'booking_pending', { reschedule: true }).catch(() => {})
+  await triggerBookingForMatch(matchId)
+}
+
 export async function getBookingAttemptByMatch(matchId: string): Promise<BookingAttemptDTO | null> {
   const attempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
   return attempt ? toAttemptDTO(attempt) : null

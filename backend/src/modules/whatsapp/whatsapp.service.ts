@@ -111,6 +111,10 @@ export const whatsappService = {
     return provider.sendGroupMessage(groupId, message);
   },
 
+  async updateGroupSubject(groupId: string, subject: string) {
+    return provider.updateGroupSubject(groupId, subject);
+  },
+
   /**
    * Ensures all expected participants are in the group. If any couldn't be added directly
    * (e.g. WhatsApp privacy settings), sends them the group invite link via private message.

@@ -36,6 +36,7 @@ import { SportFormatBadge } from "@/components/sport-format-badge"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
+import { RescheduleMatchDialog } from "@/components/reschedule-match-dialog"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
 import { isMatchInPast, getBookingErrorMessage } from "@/lib/utils"
@@ -390,6 +391,20 @@ export default function MatchDetailPage() {
                       ? undefined
                       : opponent.name
                   }
+                />
+                <RescheduleMatchDialog
+                  matchId={match.id}
+                  userId={currentUserId}
+                  match={match}
+                  onSuccess={(m) => {
+                    setMatch(m)
+                    if (id) {
+                      bookingService.getAttempt(id).then((attempt) => {
+                        setBookingAttempt(attempt)
+                        if (attempt?.status === "pending") startBookingPoll(id)
+                      }).catch(() => {})
+                    }
+                  }}
                 />
                 <CancelMatchButton
                   matchId={match.id}

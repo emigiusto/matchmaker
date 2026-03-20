@@ -703,7 +703,23 @@
       "button": "Cargar Resultado",
       "submitted": "Resultado enviado, esperando confirmación"
     },
-    "notFound": "Partido no encontrado"
+    "notFound": "Partido no encontrado",
+    "rescheduleMatch": {
+      "button": "Cambiar horario",
+      "title": "Cambiar fecha/hora",
+      "description": "Elige una nueva fecha y hora para el partido. Si la reserva automática está activa, se cancelará la reserva actual e intentará una nueva.",
+      "newDate": "Nueva fecha",
+      "newTime": "Nueva hora",
+      "pickDate": "Elige una fecha",
+      "confirm": "Confirmar cambio",
+      "confirming": "Cambiando horario…",
+      "successToast": "Horario del partido actualizado",
+      "failedToReschedule": "Error al cambiar el horario",
+      "courtAvailability": "Disponibilidad de pistas",
+      "courtAvailabilityHint": "Selecciona una fecha para ver las pistas disponibles",
+      "checkingCourts": "Comprobando pistas disponibles…",
+      "noAvailabilityData": "Sin datos de disponibilidad"
+    }
   },
   "matchesUpcoming": {
     "title": "Partidos",

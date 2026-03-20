@@ -703,7 +703,23 @@
       "button": "Upload Result",
       "submitted": "Result submitted, awaiting confirmation"
     },
-    "notFound": "Match not found"
+    "notFound": "Match not found",
+    "rescheduleMatch": {
+      "button": "Reschedule",
+      "title": "Reschedule Match",
+      "description": "Choose a new date and time for the match. If auto-booking is enabled, the existing court reservation will be cancelled and a new one will be attempted.",
+      "newDate": "New date",
+      "newTime": "New time",
+      "pickDate": "Pick a date",
+      "confirm": "Confirm reschedule",
+      "confirming": "Rescheduling…",
+      "successToast": "Match rescheduled",
+      "failedToReschedule": "Failed to reschedule match",
+      "courtAvailability": "Court availability",
+      "courtAvailabilityHint": "Select a date to see available courts",
+      "checkingCourts": "Checking available courts…",
+      "noAvailabilityData": "No availability data"
+    }
   },
   "matchesUpcoming": {
     "title": "Matches",

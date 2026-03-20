@@ -176,6 +176,25 @@ export class MatchesController {
   }
 
   /**
+   * POST /matches/:id/reschedule
+   * Reschedule a match to a new date/time
+   * Any participant can reschedule
+   */
+  static async rescheduleMatch(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { userId, scheduledAt } = req.body;
+      if (!id || typeof id !== 'string') return res.status(400).json({ error: 'Missing or invalid match id' });
+      if (!userId || typeof userId !== 'string') return res.status(400).json({ error: 'Missing or invalid userId' });
+      if (!scheduledAt || typeof scheduledAt !== 'string') return res.status(400).json({ error: 'Missing or invalid scheduledAt' });
+      const match = await MatchesService.rescheduleMatch(id, userId, scheduledAt);
+      res.json(match);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * GET /matches/:id/whatsapp-group-link
    * Returns the shareable WhatsApp invite link for the match's group
    */
