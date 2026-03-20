@@ -8,7 +8,7 @@ import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
-import { triggerBookingForMatch, pickBestSlotInRange } from '../booking/booking.service';
+import { triggerBookingForMatch, pickBestSlotInRange, getCachedCourtsPerSlot } from '../booking/booking.service';
 import { createNotification } from '../notifications/notifications.service';
 import type {
   CreateSchedulingRequestInput,
@@ -21,7 +21,7 @@ import type {
 import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { findUserByNormalizedPhone, createGuestUser } from '../users/users.service';
 import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './scheduling.types';
-import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/whatsapp-messages';
+import { getMessages, formatResponseWindow, resolveLocale, buildCourtAvailabilityNote } from '../../lib/whatsapp-messages';
 
 const ACCEPT_PATTERNS = /^(yes|y|accept|sí|si|s|👍)$|👍/i;
 const DECLINE_PATTERNS = /^(no|n|decline)$/i;
@@ -509,6 +509,22 @@ export const schedulingService = {
         const endHHMM = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
         const slots = slotsInRange(startHHMM, endHHMM);
         message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
+        // Append court availability note if booking is enabled for this request
+        if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && slots.length > 0) {
+          const dateStrISO = new Date(request.date).toISOString().slice(0, 10);
+          const hostMembership = await prisma.clubMembership.findFirst({
+            where: { userId: request.hostUserId, status: 'active', encryptedPassword: { not: null } },
+          });
+          if (hostMembership) {
+            const courtsPerSlot = await getCachedCourtsPerSlot(
+              request.hostUserId, hostMembership.clubSlug, dateStrISO, request.sportType, slots,
+            );
+            if (courtsPerSlot) {
+              const note = buildCourtAvailabilityNote(courtsPerSlot, candidateLocale);
+              if (note) message = `${message}\n\n${note}`;
+            }
+          }
+        }
         inviteButtons = getInviteButtons(candidateLocale, slots);
       } else {
         message = msgs.invite(hostName, request.sportType, formatLabel, dateStr, timeStr, request.locationText, timeLeft);

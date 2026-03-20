@@ -153,6 +153,37 @@ export async function checkCourtAvailability(
   return result
 }
 
+/**
+ * Pure cache read — never triggers a Puppeteer session.
+ * Returns the number of available courts per slot for a given date/sport,
+ * or null if the cache is cold or the membership is not found.
+ */
+export async function getCachedCourtsPerSlot(
+  userId: string,
+  clubSlug: string,
+  date: string,   // YYYY-MM-DD
+  sport: string,
+  slots: string[], // HH:MM[]
+): Promise<Record<string, number> | null> {
+  try {
+    const membership = await prisma.clubMembership.findUnique({
+      where: { userId_clubSlug: { userId, clubSlug } },
+    })
+    if (!membership) return null
+    const cacheKey = `matchmaker:booking:availability:${membership.adapterType}:${clubSlug}:${date}:${sport}`
+    const cached = await cacheGet(cacheKey)
+    if (!cached) return null
+    const availability = JSON.parse(cached) as CourtAvailabilityResult
+    const result: Record<string, number> = {}
+    for (const slot of slots) {
+      result[slot] = availability.availableCourts.filter((c) => c.time === slot).length
+    }
+    return result
+  } catch {
+    return null
+  }
+}
+
 // ─── Slot selection ───────────────────────────────────────────────
 
 /**
