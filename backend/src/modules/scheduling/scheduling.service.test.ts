@@ -579,50 +579,40 @@ describe('SchedulingService', () => {
         schedulingRequest: { ...baseRequest, status: 'active' },
       };
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
 
-      const mockTxForUpdate = {
-        schedulingCandidate: {
-          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-          findMany: vi.fn().mockResolvedValue([{ status: 'pending' }]), // not enough accepted yet
-        },
-        schedulingRequest: { update: vi.fn() },
-      };
-      const prismaMock = prisma as any;
-      prismaMock.$transaction.mockImplementation(async (fn: any) => fn(mockTxForUpdate));
-
-      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
-      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
-      mockRepo.countPendingCandidates.mockResolvedValue(0);
-
-      const result = await schedulingService.handleCandidateResponse('+456', 'yes');
+      const result = await schedulingService.handleCandidateResponse('+456', '', ['10:00']);
 
       expect(result).toEqual({ processed: true });
-      expect(mockTxForUpdate.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+      expect(mockTx.schedulingInviteEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: candidate.id, status: { in: ['waiting_reply', 'contacted'] } },
-          data: expect.objectContaining({ status: 'accepted' }),
+          data: expect.objectContaining({ action: 'poll_vote', candidateId: candidate.id }),
         })
       );
     });
 
-    it('processes decline', async () => {
+    it('processes decline via None option', async () => {
       const candidate = {
         ...baseRequest.candidates![0],
         status: 'waiting_reply',
         schedulingRequest: { ...baseRequest, status: 'active' },
       };
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
-      mockRepo.updateCandidateFromWaitingReply.mockResolvedValue(true);
+      mockTx.schedulingCandidate.updateMany.mockResolvedValue({ count: 1 });
       mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
       mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
 
-      const result = await schedulingService.handleCandidateResponse('+456', 'no');
+      const result = await schedulingService.handleCandidateResponse('+456', '', ['Ninguno']);
 
       expect(result).toEqual({ processed: true });
-      expect(mockRepo.updateCandidateFromWaitingReply).toHaveBeenCalledWith(candidate.id, 'declined', expect.any(Date));
+      expect(mockTx.schedulingCandidate.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: candidate.id, status: { in: ['waiting_reply', 'contacted'] } },
+          data: expect.objectContaining({ status: 'declined' }),
+        })
+      );
     });
   });
 
@@ -927,54 +917,28 @@ describe('SchedulingService', () => {
   });
 
   describe('handleCandidateResponse additional patterns', () => {
-    it('accepts with "y"', async () => {
-      const candidate = {
+    it('text "y" is no longer a recognized response', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
         ...baseRequest.candidates![0],
         status: 'waiting_reply',
         schedulingRequest: { ...baseRequest, status: 'active' },
-      };
-      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
-      const mockTxForUpdate = {
-        schedulingCandidate: {
-          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-          findMany: vi.fn().mockResolvedValue([{ status: 'pending' }]),
-        },
-        schedulingRequest: { update: vi.fn() },
-      };
-      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(mockTxForUpdate));
-      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
-      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
-      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      });
 
       const result = await schedulingService.handleCandidateResponse('+456', 'y');
 
-      expect(result).toEqual({ processed: true });
+      expect(result).toEqual({ processed: false });
     });
 
-    it('accepts with "accept"', async () => {
-      const candidate = {
+    it('text "accept" is no longer a recognized response', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
         ...baseRequest.candidates![0],
         status: 'waiting_reply',
         schedulingRequest: { ...baseRequest, status: 'active' },
-      };
-      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
-      const mockTxForUpdate = {
-        schedulingCandidate: {
-          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-          findMany: vi.fn().mockResolvedValue([{ status: 'pending' }]),
-        },
-        schedulingRequest: { update: vi.fn() },
-      };
-      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(mockTxForUpdate));
-      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
-      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
-      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      });
 
       const result = await schedulingService.handleCandidateResponse('+456', 'accept');
 
-      expect(result).toEqual({ processed: true });
+      expect(result).toEqual({ processed: false });
     });
 
     it('returns processed true but ignores accept when request not active and not late', async () => {
@@ -1003,7 +967,7 @@ describe('SchedulingService', () => {
       expect(result).toEqual({ processed: true });
     });
 
-    it('processes decline from contacted status', async () => {
+    it('processes decline via None from contacted status', async () => {
       const candidate = {
         ...baseRequest.candidates![0],
         status: 'contacted',
@@ -1016,18 +980,18 @@ describe('SchedulingService', () => {
       mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
 
-      const result = await schedulingService.handleCandidateResponse('+456', 'no');
+      const result = await schedulingService.handleCandidateResponse('+456', '', ['Ninguno']);
 
       expect(result).toEqual({ processed: true });
       expect(mockTx.schedulingCandidate.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: candidate.id, status: 'contacted' },
+          where: { id: candidate.id, status: { in: ['waiting_reply', 'contacted'] } },
           data: expect.objectContaining({ status: 'declined' }),
         })
       );
     });
 
-    it('processes decline from expired status (late response)', async () => {
+    it('ignores vote from expired candidate', async () => {
       const candidate = {
         ...baseRequest.candidates![0],
         status: 'expired',
@@ -1035,18 +999,11 @@ describe('SchedulingService', () => {
         schedulingRequest: { ...baseRequest, status: 'expired' },
       };
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
-      mockTx.schedulingCandidate.updateMany.mockResolvedValue({ count: 1 });
-      mockRepo.findActiveRequestById.mockResolvedValue(null);
 
-      const result = await schedulingService.handleCandidateResponse('+456', 'n');
+      const result = await schedulingService.handleCandidateResponse('+456', '', ['Ninguno']);
 
       expect(result).toEqual({ processed: true });
-      expect(mockTx.schedulingCandidate.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: candidate.id, status: 'expired', responseAt: null },
-          data: expect.objectContaining({ status: 'declined' }),
-        })
-      );
+      expect(mockTx.schedulingCandidate.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -1274,57 +1231,28 @@ describe('SchedulingService', () => {
   });
 
   describe('handleCandidateResponse emoji patterns', () => {
-    it('accepts with 👍 emoji in message', async () => {
-      const candidate = {
+    it('👍 emoji is no longer a recognized response', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
         ...baseRequest.candidates![0],
         status: 'waiting_reply',
         schedulingRequest: { ...baseRequest, status: 'active' },
-      };
-      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
-      const mockTxForUpdate = {
-        schedulingCandidate: {
-          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-          findMany: vi.fn().mockResolvedValue([{ status: 'pending' }]),
-        },
-        schedulingRequest: { update: vi.fn() },
-      };
-      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(mockTxForUpdate));
-      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
-      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
-      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      });
 
       const result = await schedulingService.handleCandidateResponse('+456', '👍');
 
-      expect(result).toEqual({ processed: true });
-      expect(mockTxForUpdate.schedulingCandidate.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'accepted' }) }),
-      );
+      expect(result).toEqual({ processed: false });
     });
 
-    it('accepts when message contains 👍 alongside other text', async () => {
-      const candidate = {
+    it('text containing 👍 is no longer a recognized response', async () => {
+      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
         ...baseRequest.candidates![0],
         status: 'waiting_reply',
         schedulingRequest: { ...baseRequest, status: 'active' },
-      };
-      mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue(candidate);
-      const mockTxForUpdate = {
-        schedulingCandidate: {
-          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-          findMany: vi.fn().mockResolvedValue([{ status: 'pending' }]),
-        },
-        schedulingRequest: { update: vi.fn() },
-      };
-      (prisma as any).$transaction.mockImplementation(async (fn: any) => fn(mockTxForUpdate));
-      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
-      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
-      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      });
 
       const result = await schedulingService.handleCandidateResponse('+456', 'Sure 👍 sounds good');
 
-      expect(result).toEqual({ processed: true });
+      expect(result).toEqual({ processed: false });
     });
 
     it('does not accept with unrelated emoji', async () => {
@@ -1385,17 +1313,19 @@ describe('SchedulingService', () => {
     beforeEach(() => { vi.useFakeTimers(); });
     afterEach(() => { vi.useRealTimers(); });
 
-    it('ignores unrecognized text for single-hour requests (not routed to poll)', async () => {
+    it('processes HH:MM slot as a poll vote for single-hour requests', async () => {
       mockRepo.findCandidateToRecordResponseByPhone.mockResolvedValue({
         ...baseRequest.candidates![0],
         status: 'waiting_reply',
         schedulingRequest: { ...baseRequest, status: 'active' },
       });
+      mockTx.schedulingInviteEvent.create.mockResolvedValue({});
 
       const result = await schedulingService.handleCandidateResponse('+456', '10:00');
 
-      // Single-hour request → YES/NO flow → '10:00' is unrecognized
-      expect(result).toEqual({ processed: false });
+      // Single-hour requests now use poll flow — '10:00' is a valid slot vote
+      expect(result).toEqual({ processed: true });
+      expect(mockTx.schedulingInviteEvent.create).toHaveBeenCalled();
     });
 
     it('routes to poll flow for multi-hour request with valid time slot', async () => {
@@ -2047,7 +1977,7 @@ describe('SchedulingService', () => {
       );
     });
 
-    it('sends YES/NO invite for single-hour request', async () => {
+    it('sends poll invite with slot and None for single-hour request', async () => {
       const singleHourReq = {
         ...baseRequest,
         startTime: new Date('2025-04-15T10:00:00.000Z'),
@@ -2075,11 +2005,11 @@ describe('SchedulingService', () => {
 
       expect(whatsappService.sendInviteMessage).toHaveBeenCalledWith(
         '+456',
-        expect.not.stringContaining('¿A qué hora'),
+        expect.stringContaining('¿A qué hora'),
         expect.objectContaining({
           buttons: expect.arrayContaining([
-            expect.objectContaining({ title: 'SÍ' }),
-            expect.objectContaining({ title: 'NO' }),
+            expect.objectContaining({ title: '10:00' }),
+            expect.objectContaining({ title: 'Ninguno' }),
           ]),
         }),
       );
