@@ -514,7 +514,12 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
  * Notify all match participants that a match was created.
  * Called as a side effect after match creation; failures are logged but do not affect the match.
  */
-export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<void> {
+export async function notifyMatchParticipantsOnCreate(match: MatchDTO, timezone?: string): Promise<void> {
+  const tz = timezone ?? 'UTC';
+  const scheduled = new Date(match.scheduledAt);
+  const localDate = scheduled.toLocaleDateString('en-CA', { timeZone: tz });
+  const localTime = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+
   for (const p of match.participants) {
     const opponentNames = match.participants
       .filter((o) => o.userId !== p.userId)
@@ -524,8 +529,8 @@ export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<
       matchId: match.id,
       scheduledAt: match.scheduledAt,
       location: match.location,
-      date: match.date,
-      time: match.time,
+      date: localDate,
+      time: localTime,
       opponentNames: opponentNames.join(', '),
     };
     try {

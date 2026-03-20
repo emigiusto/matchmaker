@@ -1000,7 +1000,7 @@ export const schedulingService = {
     }
 
     // Notify all match participants
-    await notifyMatchParticipantsOnCreate(match);
+    await notifyMatchParticipantsOnCreate(match, (request as RequestRow).timezone ?? 'UTC');
 
     const userIdsForWhatsApp = match.participants.map((p) => p.userId);
     const uniqueUserIds = [...new Set(userIdsForWhatsApp)];
