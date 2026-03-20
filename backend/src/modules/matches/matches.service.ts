@@ -681,7 +681,7 @@ export async function notifyMatchParticipantsOnCreate(match: MatchDTO, timezone?
 
 type EnrichedMatch = Match & {
   availability?: { locationText: string; date: Date; startTime: Date; endTime: Date } | null;
-  schedulingRequest?: { sportType: string; format: string; timezone?: string | null } | null;
+  schedulingRequest?: { sportType: string; format: string; timezone?: string | null; bookingEnabled?: boolean | null } | null;
   participants?: { userId: string; team: string | null; user?: { id: string; name: string | null } }[];
 };
 
