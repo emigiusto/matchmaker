@@ -127,9 +127,6 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
                     format={match.format ?? (isDoubles ? "doubles" : "singles")}
                   />
                   <StatusBadge status={match.status} />
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(match.date), "EEEE, MMMM d, yyyy")}
-                  </span>
                 </div>
               </div>
               <CardContent className={`p-6 ${match.status === "cancelled" ? "opacity-75" : ""}`}>
