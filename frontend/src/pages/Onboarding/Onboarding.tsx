@@ -197,7 +197,7 @@ export default function Onboarding() {
             <div className="space-y-1">
               <StepIndicator
                 current={step}
-                onBack={step > 1 ? () => setStep(step - 1) : undefined}
+                onBack={() => setStep(step - 1)}
               />
               <p className="text-xs text-muted-foreground pl-10">
                 {t("onboarding.stepOf", { current: step, total: TOTAL_STEPS })}
