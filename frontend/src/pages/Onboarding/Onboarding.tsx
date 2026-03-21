@@ -59,6 +59,13 @@ export default function Onboarding() {
   const [searchParams] = useSearchParams()
   const redirectAfter = searchParams.get("redirect") ?? "/dashboard"
 
+  // If onboarding is already completed (e.g. done on another device), skip to destination
+  useEffect(() => {
+    if (user?.onboardingCompleted) {
+      navigate(redirectAfter, { replace: true })
+    }
+  }, [user?.onboardingCompleted, navigate, redirectAfter])
+
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [loadingProfile, setLoadingProfile] = useState(true)
