@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useAuth } from '@/lib/auth/AuthContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/lib/i18n/language-context'
 import { Toaster } from '@/components/ui/sonner'
@@ -40,6 +41,12 @@ function ServiceUnavailable() {
   )
 }
 
+function RootRedirect() {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  return <Navigate to={user ? "/dashboard" : "/login"} replace />
+}
+
 function App() {
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
 
@@ -60,8 +67,8 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              {/* Root redirects to dashboard */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              {/* Root: redirect to dashboard if authenticated, login otherwise */}
+              <Route path="/" element={<RootRedirect />} />
 
               {/* Public: Login and Signup */}
               <Route path="/login" element={<Login />} />
@@ -72,11 +79,11 @@ function App() {
               {/* Match details: public view if not logged in, full view if logged in */}
               <Route path="/matches/:id" element={<MatchDetailsGate />} />
 
-              {/* Onboarding — requires auth but no sidebar, skips the onboarding check */}
+              {/* Onboarding — requires auth, no sidebar */}
               <Route
                 path="/onboarding"
                 element={
-                  <ProtectedRoute skipOnboardingCheck>
+                  <ProtectedRoute>
                     <Onboarding />
                   </ProtectedRoute>
                 }

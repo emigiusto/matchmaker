@@ -26,8 +26,15 @@ export default function LoginPage() {
     setError("")
     setSubmitting(true)
     try {
-      await login(email, password)
-      navigate(redirect, { replace: true })
+      const user = await login(email, password)
+      if (!user.onboardingCompleted) {
+        const onboardingUrl = redirect !== "/dashboard"
+          ? `/onboarding?redirect=${encodeURIComponent(redirect)}`
+          : "/onboarding"
+        navigate(onboardingUrl, { replace: true })
+      } else {
+        navigate(redirect, { replace: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("login.failed"))
     } finally {

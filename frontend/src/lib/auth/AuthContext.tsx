@@ -4,8 +4,8 @@ import { authService, type AuthUser } from "@/lib/services/auth.service"
 interface AuthContextValue {
   user: AuthUser | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  signup: (name: string, email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<AuthUser>
+  signup: (name: string, email: string, password: string) => Promise<AuthUser>
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -30,14 +30,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
     const res = await authService.login(email, password)
     setUser(res.user)
+    return res.user
   }, [])
 
-  const signup = useCallback(async (name: string, email: string, password: string) => {
+  const signup = useCallback(async (name: string, email: string, password: string): Promise<AuthUser> => {
     const res = await authService.signup(name, email, password)
     setUser(res.user)
+    return res.user
   }, [])
 
   const logout = useCallback(() => {
