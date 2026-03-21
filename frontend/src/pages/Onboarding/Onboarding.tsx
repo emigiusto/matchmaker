@@ -53,7 +53,7 @@ function StepIndicator({ current, onBack }: { current: number; onBack?: () => vo
 }
 
 export default function Onboarding() {
-  const { user, refreshUser } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
@@ -114,7 +114,6 @@ export default function Onboarding() {
     try {
       await usersService.update(user.id, { phone: phone.trim() })
       await usersService.completeOnboarding(user.id)
-      await refreshUser()
       setStep(2)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
