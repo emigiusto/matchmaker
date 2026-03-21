@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Phone, MapPin, Building2, Loader2, Swords } from "lucide-react"
+import { Phone, MapPin, Building2, Loader2, Swords, ArrowLeft, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,7 @@ import { Link } from "react-router-dom"
 
 const TOTAL_STEPS = 3
 
+// step 0 = welcome, steps 1-3 = data, step 4 = success
 function StepIndicator({ current }: { current: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -40,7 +41,7 @@ export default function Onboarding() {
   const navigate = useNavigate()
   const { t } = useTranslation()
 
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [loadingProfile, setLoadingProfile] = useState(true)
 
@@ -75,22 +76,23 @@ export default function Onboarding() {
 
   async function finish() {
     if (!user) return
+    setSaving(true)
     try {
       await usersService.completeOnboarding(user.id)
       await refreshUser()
-      navigate("/dashboard", { replace: true })
+      setStep(4)
     } catch {
       toast.error(t("error.somethingWentWrong"))
+    } finally {
+      setSaving(false)
     }
   }
 
-  async function handleStep1(skip = false) {
+  async function handleStep1() {
     if (!user) return
     setSaving(true)
     try {
-      if (!skip && phone.trim()) {
-        await usersService.update(user.id, { phone: phone.trim() })
-      }
+      await usersService.update(user.id, { phone: phone.trim() })
       setStep(2)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
@@ -167,39 +169,62 @@ export default function Onboarding() {
 
       <main className="flex flex-1 items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8">
-          <div className="space-y-2 text-center">
-            <StepIndicator current={step} />
-            <p className="text-xs text-muted-foreground">
-              {t("onboarding.stepOf", { current: step, total: TOTAL_STEPS })}
-            </p>
-          </div>
 
+          {/* Step indicator — only for data steps 1–3 */}
+          {step >= 1 && step <= 3 && (
+            <div className="space-y-2 text-center">
+              <StepIndicator current={step} />
+              <p className="text-xs text-muted-foreground">
+                {t("onboarding.stepOf", { current: step, total: TOTAL_STEPS })}
+              </p>
+            </div>
+          )}
+
+          {/* Step 0: Welcome */}
+          {step === 0 && (
+            <StepCard
+              icon={<Swords className="h-5 w-5 text-primary" />}
+              title={t("onboarding.welcome.title")}
+              description={t("onboarding.welcome.description")}
+            >
+              <Button className="w-full" onClick={() => setStep(1)}>
+                {t("onboarding.welcome.getStarted")}
+              </Button>
+            </StepCard>
+          )}
+
+          {/* Step 1: Phone (required — no skip) */}
           {step === 1 && (
             <StepCard
               icon={<Phone className="h-5 w-5 text-primary" />}
               title={t("onboarding.step1.title")}
               description={t("onboarding.step1.description")}
+              onBack={() => setStep(0)}
             >
               <div className="space-y-1.5">
                 <Label>{t("onboarding.step1.phoneLabel")}</Label>
                 <PhoneInput value={phone} onChange={setPhone} />
               </div>
-              <StepActions
-                onContinue={() => handleStep1(false)}
-                onSkip={() => handleStep1(true)}
-                loading={saving}
-                continueLabel={t("onboarding.continue")}
-                skipLabel={t("onboarding.skip")}
-                continueDisabled={!phone.trim()}
-              />
+              <div className="flex flex-col items-center gap-3 pt-2">
+                <Button
+                  className="w-full"
+                  onClick={handleStep1}
+                  disabled={saving || !phone.trim()}
+                >
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {t("onboarding.continue")}
+                </Button>
+              </div>
             </StepCard>
           )}
 
+          {/* Step 2: Location */}
           {step === 2 && (
             <StepCard
               icon={<MapPin className="h-5 w-5 text-primary" />}
               title={t("onboarding.step2.title")}
               description={t("onboarding.step2.description")}
+              onBack={() => setStep(1)}
             >
               <div className="space-y-1.5">
                 <Label>{t("onboarding.step2.clubLabel")}</Label>
@@ -228,11 +253,13 @@ export default function Onboarding() {
             </StepCard>
           )}
 
+          {/* Step 3: Club connection */}
           {step === 3 && (
             <StepCard
               icon={<Building2 className="h-5 w-5 text-primary" />}
               title={t("onboarding.step3.title")}
               description={t("onboarding.step3.description")}
+              onBack={() => setStep(2)}
             >
               <div className="space-y-1.5">
                 <Label>{t("onboarding.step3.clubLabel")}</Label>
@@ -278,6 +305,25 @@ export default function Onboarding() {
               />
             </StepCard>
           )}
+
+          {/* Step 4: Success */}
+          {step === 4 && (
+            <div className="rounded-2xl border border-border/60 bg-card p-8 shadow-sm text-center space-y-6">
+              <div className="flex justify-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <CheckCircle2 className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-semibold tracking-tight">{t("onboarding.done.title")}</h2>
+                <p className="text-sm text-muted-foreground">{t("onboarding.done.description")}</p>
+              </div>
+              <Button className="w-full" onClick={() => navigate("/dashboard", { replace: true })}>
+                {t("onboarding.done.button")}
+              </Button>
+            </div>
+          )}
+
         </div>
       </main>
     </div>
@@ -288,16 +334,29 @@ function StepCard({
   icon,
   title,
   description,
+  onBack,
   children,
 }: {
   icon: React.ReactNode
   title: string
   description: string
+  onBack?: () => void
   children: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
       <div className="space-y-1">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {t("onboarding.back")}
+          </button>
+        )}
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
             {icon}

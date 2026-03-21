@@ -902,6 +902,17 @@
     "stepOf": "Step {{current}} of {{total}}",
     "continue": "Continue",
     "skip": "Skip for now",
+    "back": "Back",
+    "welcome": {
+      "title": "Welcome to Matchmaker!",
+      "description": "Let's get your account set up in just a few steps so you can start playing.",
+      "getStarted": "Get started"
+    },
+    "done": {
+      "title": "You're all set!",
+      "description": "Your profile is ready. Time to find your first match.",
+      "button": "Go to dashboard"
+    },
     "step1": {
       "title": "Your phone number",
       "description": "Required for WhatsApp invites and match reminders.",
@@ -925,9 +936,9 @@
       "passwordPlaceholder": "Your club portal password",
       "passwordNote": "Stored encrypted. Only used to log in to the club portal on your behalf.",
       "connect": "Connect club",
-      "skipLabel": "I'll set this up later",
-    },
-    
+      "skipLabel": "I'll set this up later"
+    }
+  },
   "publicMatch": {
     "title": "Match details",
     "subtitle": "Here are the details for this upcoming match.",

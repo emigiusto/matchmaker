@@ -902,6 +902,17 @@
     "stepOf": "Paso {{current}} de {{total}}",
     "continue": "Continuar",
     "skip": "Omitir por ahora",
+    "back": "Atrás",
+    "welcome": {
+      "title": "¡Bienvenido a Matchmaker!",
+      "description": "Configura tu cuenta en pocos pasos para empezar a jugar.",
+      "getStarted": "Empezar"
+    },
+    "done": {
+      "title": "¡Todo listo!",
+      "description": "Tu perfil está listo. Es hora de encontrar tu primer partido.",
+      "button": "Ir al panel"
+    },
     "step1": {
       "title": "Tu número de teléfono",
       "description": "Necesario para invitaciones de WhatsApp y recordatorios de partidos.",
@@ -926,6 +937,8 @@
       "passwordNote": "Almacenado cifrado. Solo se usa para iniciar sesión en el portal del club en tu nombre.",
       "connect": "Conectar club",
       "skipLabel": "Lo configuraré más adelante"
+    }
+  },
   "publicMatch": {
     "title": "Detalles del partido",
     "subtitle": "Aquí tienes los detalles de este próximo partido.",
