@@ -941,8 +941,8 @@
     }
   },
   "notFound": {
-    "title": "Partido no encontrado",
-    "description": "Esta página está fuera de los límites. La pista que buscas no existe.",
+    "title": "Bola fuera",
+    "description": "Parece que este golpe salió fuera. La página que buscas no existe.",
     "backToDashboard": "Volver al panel",
     "backToLogin": "Volver al inicio de sesión",
     "goHome": "Ir al inicio"

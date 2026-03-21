@@ -941,8 +941,8 @@
     }
   },
   "notFound": {
-    "title": "Match not found",
-    "description": "This page is out of bounds. The court you're looking for doesn't exist.",
+    "title": "Out of bounds",
+    "description": "Looks like this shot went wide. The page you're looking for doesn't exist.",
     "backToDashboard": "Back to dashboard",
     "backToLogin": "Back to login",
     "goHome": "Go home"
