@@ -16,8 +16,10 @@ interface MessageTemplates {
   noMatch(sport: string, format: string, when: string, loc: string, reason: string, url: string): string;
   noMatchReason: Record<NoMatchReasonKey, string>;
   matchCancelled(sport: string, format: string, when: string, loc: string, participants: string, url: string): string;
+  matchRescheduled(when: string, loc: string, url: string): string;
   reminder(opponentName: string, sport: string, format: string, when: string, loc: string, url?: string): string;
   courtBooked(courtName: string, when: string, loc: string): string;
+  courtBookingFailed(when: string, loc: string, reason: string): string;
 }
 
 /**
@@ -145,6 +147,17 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
+    matchRescheduled(when, loc, url) {
+      return [
+        '📅 *Horario actualizado*',
+        '',
+        `*Nuevo horario:* ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `🔗 *Ver partido:* ${url}`,
+      ].join('\n');
+    },
+
     reminder(opponentName, sport, format, when, loc, url) {
       const lines = [
         '⏰ *Recordatorio Matchmaker*',
@@ -166,6 +179,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `🏟️ ${courtName}`,
         `📅 ${when}`,
         `📍 ${loc || 'TBD'}`,
+      ].join('\n');
+    },
+
+    courtBookingFailed(when, loc, reason) {
+      return [
+        '⚠️ *No se pudo reservar la pista automáticamente.*',
+        '',
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `Motivo: ${reason}`,
+        '',
+        'Por favor, reserva la pista manualmente.',
       ].join('\n');
     },
   },
@@ -258,6 +284,17 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
+    matchRescheduled(when, loc, url) {
+      return [
+        '📅 *Schedule updated*',
+        '',
+        `*New time:* ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `🔗 *View match:* ${url}`,
+      ].join('\n');
+    },
+
     reminder(opponentName, sport, format, when, loc, url) {
       const lines = [
         '⏰ *Matchmaker reminder*',
@@ -281,6 +318,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
       ].join('\n');
     },
+
+    courtBookingFailed(when, loc, reason) {
+      return [
+        '⚠️ *Court could not be booked automatically.*',
+        '',
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `Reason: ${reason}`,
+        '',
+        'Please book the court manually.',
+      ].join('\n');
+    },
   },
 };
 
@@ -290,4 +340,31 @@ const templates: Record<Locale, MessageTemplates> = {
  */
 export function getMessages(locale?: string | null): MessageTemplates {
   return templates[resolveLocale(locale)];
+}
+
+/**
+ * Builds a short court-availability note to append to multi-hour invite messages.
+ * `courtsPerSlot` maps "HH:MM" → number of available courts (0 means none).
+ * Only slots with data are shown; if all are 0 or the map is empty, returns null.
+ */
+export function buildCourtAvailabilityNote(
+  courtsPerSlot: Record<string, number>,
+  locale?: string | null,
+): string | null {
+  const loc = resolveLocale(locale);
+  const entries = Object.entries(courtsPerSlot).sort(([a], [b]) => a.localeCompare(b));
+  if (entries.length === 0) return null;
+
+  const lines = entries.map(([slot, count]) => {
+    if (count === 0) {
+      return loc === 'es' ? `  • ${slot} — sin pistas` : `  • ${slot} — no courts`;
+    }
+    if (loc === 'es') {
+      return `  • ${slot} — ${count} ${count === 1 ? 'pista' : 'pistas'} disponible${count === 1 ? '' : 's'}`;
+    }
+    return `  • ${slot} — ${count} ${count === 1 ? 'court' : 'courts'} available`;
+  });
+
+  const header = loc === 'es' ? '🏟️ *Disponibilidad de pistas:*' : '🏟️ *Court availability:*';
+  return `${header}\n${lines.join('\n')}`;
 }

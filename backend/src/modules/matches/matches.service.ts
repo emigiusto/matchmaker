@@ -15,7 +15,7 @@ import { createNotification } from '../notifications/notifications.service';
 import { validateResultMatchConsistency } from '../results/results.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
-import { cancelBookingForMatch } from '../booking/booking.service';
+import { cancelBookingForMatch, resetBookingForReschedule } from '../booking/booking.service';
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
@@ -34,7 +34,7 @@ function formatTimeInTz(date: Date, timezone: string): string {
  */
 const matchInclude = {
   availability: true,
-  schedulingRequest: { select: { sportType: true, format: true, timezone: true } },
+  schedulingRequest: { select: { sportType: true, format: true, timezone: true, bookingEnabled: true } },
   participants: { include: { user: { select: { id: true, name: true } } } },
 } as const;
 
@@ -394,6 +394,146 @@ async function cancelBookingOnMatchCancel(matchId: string, hostUserId: string): 
 }
 
 /**
+ * Reschedule a match to a new date/time.
+ * Only participants can reschedule; only scheduled matches can be rescheduled.
+ * Fires-and-forgets a booking reset (cancel old + rebook) if auto-booking is active.
+ */
+export async function rescheduleMatch(matchId: string, userId: string, scheduledAt: string, cancelBooking?: boolean): Promise<MatchDTO> {
+  const newTime = new Date(scheduledAt)
+  if (isNaN(newTime.getTime())) throw new AppError('Invalid scheduledAt value', 400)
+  if (newTime <= new Date()) throw new AppError('New scheduled time must be in the future', 400)
+
+  let timezone = 'UTC'
+  const dto = await prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({
+      where: { id: matchId },
+      include: {
+        availability: true,
+        participants: { select: { userId: true } },
+        schedulingRequest: { select: { sportType: true, format: true, timezone: true } },
+      },
+    })
+    if (!match) throw new AppError('Match not found', 404)
+    if (match.status !== 'scheduled') throw new AppError('Only scheduled matches can be rescheduled', 409)
+
+    const isParticipant = (match as any).participants?.some((p: { userId: string }) => p.userId === userId)
+    if (!isParticipant) throw new AppError('Only participants can reschedule this match', 403)
+
+    if (newTime.getTime() === match.scheduledAt.getTime()) {
+      throw new AppError('New time is the same as the current scheduled time', 400)
+    }
+
+    timezone = (match as any).schedulingRequest?.timezone ?? 'UTC'
+
+    const updated = await tx.match.update({
+      where: { id: matchId },
+      data: { scheduledAt: newTime },
+      include: matchInclude,
+    })
+
+    // Keep Availability.startTime in sync so date/time derived fields stay consistent
+    if (match.availabilityId) {
+      await tx.availability.update({
+        where: { id: match.availabilityId },
+        data: { startTime: newTime, date: newTime },
+      })
+    }
+
+    // Delete stale pending reminders (they were scheduled against the old time)
+    await tx.reminder.deleteMany({
+      where: { matchId, status: 'pending' },
+    })
+
+    return toMatchDTO(updated as EnrichedMatch)
+  })
+
+  // Fire-and-forget: cancel old booking and rebook for new time — only if user opted in
+  if (cancelBooking) {
+    resetBookingForReschedule(matchId).catch((err) => {
+      logger.error('Failed to reset booking on reschedule', { matchId, error: err instanceof Error ? err.message : String(err) })
+    })
+  }
+
+  // Notify all participants + send WhatsApp message + rename group
+  notifyMatchParticipantsOnReschedule(matchId, dto, timezone).catch((err) => {
+    logger.error('Failed to notify on match reschedule', { matchId, error: err instanceof Error ? err.message : String(err) })
+  })
+
+  return dto
+}
+
+async function notifyMatchParticipantsOnReschedule(matchId: string, match: MatchDTO, timezone: string): Promise<void> {
+  const participants = match.participants ?? []
+  for (const p of participants) {
+    const opponentNames = participants
+      .filter((o) => o.userId !== p.userId)
+      .map((o) => o.userName ?? 'Opponent')
+      .filter(Boolean)
+      .join(', ')
+    try {
+      await createNotification(p.userId, 'match.rescheduled', {
+        matchId: match.id,
+        scheduledAt: match.scheduledAt,
+        date: match.date,
+        time: match.time,
+        location: match.location,
+        opponentNames: opponentNames || undefined,
+      })
+    } catch (err) {
+      logger.error('Failed to create match.rescheduled notification', {
+        userId: p.userId,
+        matchId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  const groupId = (match as any).whatsappGroupId as string | null | undefined
+  if (!groupId) return
+
+  try {
+    const tz = timezone
+    const scheduled = new Date(match.scheduledAt)
+    const hostUser = await prisma.user.findFirst({
+      where: { id: { in: participants.map((p) => p.userId) } },
+      select: { locale: true },
+    })
+    const hostLocale = resolveLocale(hostUser?.locale)
+    const intlLocale = hostLocale === 'es' ? 'es-ES' : 'en-US'
+
+    const dateStr = scheduled.toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz })
+    const timeStr = formatTimeInTz(scheduled, tz)
+    const whenStr = `${dateStr.charAt(0).toUpperCase()}${dateStr.slice(1)} · ${timeStr}`
+    const loc = match.location ?? ''
+    const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`
+
+    // Send WhatsApp message with new time
+    const message = getMessages(hostLocale).matchRescheduled(whenStr, loc, matchUrl)
+    await whatsappService.sendGroupMessage(groupId, message)
+
+    // Rename group to reflect new date/time
+    const participantNames = participants
+      .map((p) => p.userName)
+      .filter((n): n is string => !!n)
+      .map((n) => n.trim().split(/\s+/)[0] ?? n)
+    const nameLabel = (match.format ?? 'singles') !== 'doubles' && participantNames.length > 0
+      ? participantNames.join(' · ')
+      : null
+    const newGroupName = nameLabel
+      ? `${whenStr} · ${nameLabel}`
+      : whenStr
+    await whatsappService.updateGroupSubject(groupId, newGroupName)
+
+    logger.info('MatchRescheduledWhatsAppSent', { matchId, groupId, newGroupName })
+  } catch (err) {
+    logger.error('Failed to send WhatsApp group message for rescheduled match', {
+      matchId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+/**
  * Create a new match with the provided input data.
  *
  * Requires participantUserIds, scheduledAt, availabilityId, and type. Optionally connects venue, playerA, playerB, and invite.
@@ -514,7 +654,12 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
  * Notify all match participants that a match was created.
  * Called as a side effect after match creation; failures are logged but do not affect the match.
  */
-export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<void> {
+export async function notifyMatchParticipantsOnCreate(match: MatchDTO, timezone?: string): Promise<void> {
+  const tz = timezone ?? 'UTC';
+  const scheduled = new Date(match.scheduledAt);
+  const localDate = scheduled.toLocaleDateString('en-CA', { timeZone: tz });
+  const localTime = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+
   for (const p of match.participants) {
     const opponentNames = match.participants
       .filter((o) => o.userId !== p.userId)
@@ -524,8 +669,8 @@ export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<
       matchId: match.id,
       scheduledAt: match.scheduledAt,
       location: match.location,
-      date: match.date,
-      time: match.time,
+      date: localDate,
+      time: localTime,
       opponentNames: opponentNames.join(', '),
     };
     try {
@@ -544,7 +689,7 @@ export async function notifyMatchParticipantsOnCreate(match: MatchDTO): Promise<
 
 type EnrichedMatch = Match & {
   availability?: { locationText: string; date: Date; startTime: Date; endTime: Date } | null;
-  schedulingRequest?: { sportType: string; format: string; timezone?: string | null } | null;
+  schedulingRequest?: { sportType: string; format: string; timezone?: string | null; bookingEnabled?: boolean | null } | null;
   participants?: { userId: string; team: string | null; user?: { id: string; name: string | null } }[];
 };
 
@@ -560,6 +705,8 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
   const participantCount = participants.length;
   const format = (sr?.format === 'doubles' || sr?.format === 'singles' ? sr.format : participantCount >= 4 ? 'doubles' : 'singles') as 'singles' | 'doubles';
   const sportType = (sr?.sportType === 'padel' || sr?.sportType === 'tennis' ? sr.sportType : 'tennis') as 'tennis' | 'padel';
+  const tz = sr?.timezone ?? 'UTC';
+  const scheduled = match.scheduledAt instanceof Date ? match.scheduledAt : new Date(match.scheduledAt);
   return {
     id: match.id,
     inviteId: null,
@@ -568,7 +715,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     playerAId: match.playerAId,
     playerBId: match.playerBId,
     participants,
-    scheduledAt: match.scheduledAt instanceof Date ? match.scheduledAt.toISOString() : String(match.scheduledAt),
+    scheduledAt: scheduled.toISOString(),
     createdAt: match.createdAt instanceof Date ? match.createdAt.toISOString() : String(match.createdAt),
     status: match.status,
     type: match.type || 'competitive',
@@ -576,11 +723,12 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     format,
     whatsappGroupId: match.whatsappGroupId ?? null,
     publicToken: (match as any).publicToken ?? null,
+    bookingEnabled: sr?.bookingEnabled ?? false,
     ...(av && {
       location: av.locationText,
-      date: av.date instanceof Date ? av.date.toISOString().slice(0, 10) : String(av.date).slice(0, 10),
-      time: formatTimeInTz(av.startTime instanceof Date ? av.startTime : new Date(av.startTime), sr?.timezone ?? 'UTC'),
-      endTime: formatTimeInTz(av.endTime instanceof Date ? av.endTime : new Date(av.endTime), sr?.timezone ?? 'UTC'),
+      date: scheduled.toLocaleDateString('en-CA', { timeZone: tz }),
+      time: formatTimeInTz(scheduled, tz),
+      endTime: formatTimeInTz(av.endTime instanceof Date ? av.endTime : new Date(av.endTime), tz),
     }),
   };
 }

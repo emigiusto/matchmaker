@@ -29,6 +29,9 @@ export function useNotificationText() {
       case "booking.success":       return t("notifications.titles.courtBooked")
       case "booking.cancelled":     return t("notifications.titles.bookingCancelled")
       case "booking.cancel_failed": return t("notifications.titles.bookingCancelFailed")
+      case "match.rescheduled":    return opponents
+        ? t("notifications.titles.matchRescheduledVs", { opponents })
+        : t("notifications.titles.matchRescheduled")
       default:                     return n.title
     }
   }
@@ -93,6 +96,16 @@ export function useNotificationText() {
       }
       case "booking.cancelled":     return t("notifications.messages.bookingCancelled")
       case "booking.cancel_failed": return t("notifications.messages.bookingCancelFailed")
+      case "match.rescheduled": {
+        const parts: string[] = []
+        if (opponents) parts.push(`vs ${opponents}`)
+        if (dateStr) parts.push(dateStr)
+        if (atTime) parts.push(atTime.trim())
+        if (location) parts.push(`· ${location}`)
+        return parts.length > 0
+          ? t("notifications.messages.matchRescheduledParts", { parts: parts.join(" ") })
+          : t("notifications.messages.matchRescheduled")
+      }
       default:                 return n.message
     }
   }

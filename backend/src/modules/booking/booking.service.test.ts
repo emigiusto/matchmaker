@@ -16,6 +16,7 @@ const mockPrisma = vi.hoisted(() => ({
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
     deleteMany: vi.fn(),
   },
   match: {
@@ -26,6 +27,9 @@ const mockPrisma = vi.hoisted(() => ({
   },
   schedulingInviteEvent: {
     create: vi.fn(),
+  },
+  contact: {
+    findUnique: vi.fn(),
   },
 }));
 
@@ -49,6 +53,9 @@ vi.mock('../../config/logger', () => ({
 }));
 vi.mock('../whatsapp/whatsapp.service', () => ({
   whatsappService: { sendGroupMessage: vi.fn().mockResolvedValue(undefined) },
+}));
+vi.mock('../notifications/notifications.service', () => ({
+  createNotification: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Import AFTER mocks
@@ -522,6 +529,109 @@ describe('cancelBookingForMatch', () => {
       expect.objectContaining({
         data: expect.objectContaining({ status: 'cancelled', errorMessage: null }),
       }),
+    );
+  });
+});
+
+// ─── runBookingJob — date/time derived from scheduledAt ───────────
+
+describe('runBookingJob date/time derivation', () => {
+  // scheduledAt = 17:00 UTC = 18:00 Europe/Madrid (UTC+1 in March)
+  // availability.startTime = 15:00 UTC = 16:00 local — deliberately different to catch regressions
+  const scheduledAt = new Date('2026-03-23T17:00:00.000Z');
+  const matchWithOffset = {
+    id: 'match1',
+    scheduledAt,
+    whatsappGroupId: null,
+    availability: {
+      userId: 'user1',
+      date: new Date('2026-03-23T00:00:00.000Z'),
+      startTime: new Date('2026-03-23T15:00:00.000Z'), // window start — NOT the booked slot
+      locationText: 'Club Laieta',
+    },
+    participants: [
+      { userId: 'user1', user: { id: 'user1', name: 'Host', phone: '+34600000001' } },
+      { userId: 'user2', user: { id: 'user2', name: 'Guest', phone: '+34600000002' } },
+    ],
+  };
+  const schedulingReqMadrid = {
+    id: 'req1',
+    hostUserId: 'user1',
+    timezone: 'Europe/Madrid',
+    sportType: 'tennis',
+    matchId: 'match1',
+  };
+  const user2Membership = { ...baseMembership, id: 'mem2', userId: 'user2', socioNumber: '67890' };
+  const pendingAttempt = { ...baseAttempt, status: 'pending' };
+
+  it('books with date and time derived from scheduledAt in the correct timezone', async () => {
+    // triggerBookingForMatch lookups
+    mockPrisma.match.findUnique.mockResolvedValue(matchWithOffset);
+    mockPrisma.bookingAttempt.findUnique
+      .mockResolvedValueOnce(null)          // no existing attempt
+      .mockResolvedValue(pendingAttempt);   // runBookingJob attempt lookup
+    mockPrisma.clubMembership.findFirst
+      .mockResolvedValueOnce(baseMembership)   // host's active membership (triggerBookingForMatch)
+      .mockResolvedValue(user2Membership);     // user2's membership (runBookingJob socio lookup)
+    mockPrisma.bookingAttempt.create.mockResolvedValue(pendingAttempt);
+    // schedulingRequest used by both logBookingEvent and runBookingJob
+    mockPrisma.schedulingRequest.findUnique.mockResolvedValue(schedulingReqMadrid);
+    mockPrisma.clubMembership.findUnique.mockResolvedValue(baseMembership);
+    mockPrisma.schedulingInviteEvent.create.mockResolvedValue({});
+    mockAdapter.checkAvailability.mockResolvedValue({
+      availableCourts: [{ courtId: 'c1', time: '18:00', courtName: 'Pista 1' }],
+    });
+    mockAdapter.book.mockResolvedValue({ externalId: 'ext1', courtName: 'Pista 1' });
+    mockPrisma.bookingAttempt.updateMany.mockResolvedValue({ count: 1 });
+
+    await triggerBookingForMatch('match1');
+
+    // Wait for the async runBookingJob to complete
+    await vi.waitFor(() => {
+      expect(mockAdapter.book).toHaveBeenCalled();
+    });
+
+    expect(mockAdapter.book).toHaveBeenCalledWith(
+      expect.objectContaining({ socioNumber: '12345' }),
+      '2026-03-23',  // date in Europe/Madrid (correct — same calendar day at 18:00)
+      '18:00',       // time in Europe/Madrid from scheduledAt (17:00 UTC + 1h), NOT '16:00' from availability.startTime
+      'c1',
+      ['67890'],
+      expect.objectContaining({ sport: 'tennis' }),
+    );
+  });
+
+  it('uses UTC when no timezone is set on the scheduling request', async () => {
+    mockPrisma.match.findUnique.mockResolvedValue(matchWithOffset);
+    mockPrisma.bookingAttempt.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(pendingAttempt);
+    mockPrisma.clubMembership.findFirst
+      .mockResolvedValueOnce(baseMembership)
+      .mockResolvedValue(user2Membership);
+    mockPrisma.bookingAttempt.create.mockResolvedValue(pendingAttempt);
+    mockPrisma.schedulingRequest.findUnique.mockResolvedValue(null); // no scheduling request
+    mockPrisma.clubMembership.findUnique.mockResolvedValue(baseMembership);
+    mockPrisma.schedulingInviteEvent.create.mockResolvedValue({});
+    mockAdapter.checkAvailability.mockResolvedValue({
+      availableCourts: [{ courtId: 'c1', time: '17:00', courtName: 'Pista 1' }],
+    });
+    mockAdapter.book.mockResolvedValue({ externalId: 'ext1', courtName: 'Pista 1' });
+    mockPrisma.bookingAttempt.updateMany.mockResolvedValue({ count: 1 });
+
+    await triggerBookingForMatch('match1');
+
+    await vi.waitFor(() => {
+      expect(mockAdapter.book).toHaveBeenCalled();
+    });
+
+    expect(mockAdapter.book).toHaveBeenCalledWith(
+      expect.anything(),
+      '2026-03-23',  // UTC date
+      '17:00',       // UTC time from scheduledAt
+      'c1',
+      expect.anything(),
+      expect.anything(),
     );
   });
 });

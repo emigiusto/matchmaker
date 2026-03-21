@@ -603,7 +603,20 @@
       "bookingFailed": "Booking failed",
       "retryBooking": "Retry booking",
       "attempting": "Attempting to reserve a court…",
-      "timedOut": "Booking timed out — the process took too long. You can retry below."
+      "timedOut": "Booking timed out — the process took too long. You can retry below.",
+      "errors": {
+        "missingSocioNumber": "A participant is missing their socio number",
+        "noAvailableCourts": "No courts available at the selected time",
+        "systemOffline": "The club booking system is currently unavailable",
+        "slotNoLongerAvailable": "This time slot is no longer available",
+        "unknown": "An error occurred while booking the court"
+      },
+      "toast": {
+        "retryQueued": "Booking retry queued",
+        "retryFailed": "Failed to retry booking",
+        "cancelSuccess": "Booking cancelled",
+        "cancelFailed": "Failed to cancel booking"
+      }
     },
     "openWhatsappGroup": "Open WhatsApp Group",
     "reminders": {
@@ -690,7 +703,29 @@
       "button": "Upload Result",
       "submitted": "Result submitted, awaiting confirmation"
     },
-    "notFound": "Match not found"
+    "notFound": "Match not found",
+    "rescheduleMatch": {
+      "button": "Reschedule",
+      "title": "Reschedule Match",
+      "description": "Choose a new date and time for the match.",
+      "newDate": "New date",
+      "newTime": "New time",
+      "pickDate": "Pick a date",
+      "confirm": "Confirm reschedule",
+      "confirming": "Rescheduling…",
+      "successToast": "Match rescheduled",
+      "failedToReschedule": "Failed to reschedule match",
+      "courtAvailability": "Court availability",
+      "courtAvailabilityHint": "Select a date to see available courts",
+      "checkingCourts": "Checking available courts…",
+      "noAvailabilityData": "No availability data",
+      "cancelBookingPrompt": {
+        "title": "Cancel court booking?",
+        "description": "The match has been rescheduled. Do you want to cancel the existing court booking?",
+        "yes": "Yes, cancel booking",
+        "no": "Keep booking"
+      }
+    }
   },
   "matchesUpcoming": {
     "title": "Matches",
@@ -730,7 +765,9 @@
       "noPlayersFound": "No players found",
       "courtBooked": "Court booked",
       "bookingCancelled": "Court booking cancelled",
-      "bookingCancelFailed": "Court booking cancellation failed"
+      "bookingCancelFailed": "Court booking cancellation failed",
+      "matchRescheduled": "Match rescheduled",
+      "matchRescheduledVs": "Match vs {{opponents}} rescheduled"
     },
     "messages": {
       "scheduledForDate": "A match was scheduled for {{date}}.",
@@ -749,7 +786,9 @@
       "courtBooked": "{{court}} has been booked for your match.",
       "courtBookedGeneric": "Your court has been booked.",
       "bookingCancelled": "The court booking for your cancelled match has been successfully cancelled.",
-      "bookingCancelFailed": "The court booking could not be cancelled automatically. Please cancel it manually at the club."
+      "bookingCancelFailed": "The court booking could not be cancelled automatically. Please cancel it manually at the club.",
+      "matchRescheduled": "The match has been rescheduled.",
+      "matchRescheduledParts": "New time: {{parts}}."
     }
   },
   "contactsPage": {
@@ -886,7 +925,33 @@
       "passwordPlaceholder": "Your club portal password",
       "passwordNote": "Stored encrypted. Only used to log in to the club portal on your behalf.",
       "connect": "Connect club",
-      "skipLabel": "I'll set this up later"
+      "skipLabel": "I'll set this up later",
+    },
+    
+  "publicMatch": {
+    "title": "Match details",
+    "subtitle": "Here are the details for this upcoming match.",
+    "signUp": "Sign up",
+    "notFoundDesc": "This link may have expired or the match may have been cancelled.",
+    "marketing": {
+      "title": "Organize your tennis matches with Matchmaker",
+      "description": "Matchmaker handles the scheduling so you just show up and play. Invite contacts via WhatsApp, book courts automatically, and track your progress.",
+      "cta": "Create a free account",
+      "alreadyHaveAccount": "Already have an account?",
+      "features": {
+        "scheduling": {
+          "title": "Automated scheduling",
+          "desc": "Send invites to your contacts in order of priority. Matchmaker moves on to the next candidate if someone declines or doesn't reply."
+        },
+        "matchmaking": {
+          "title": "Court booking",
+          "desc": "Connect your club membership and Matchmaker reserves a court automatically when a match is confirmed."
+        },
+        "tracking": {
+          "title": "Match history & level",
+          "desc": "Track every match you play, see how your level evolves, and review results over time."
+        }
+      }
     }
   },
   "profileView": {

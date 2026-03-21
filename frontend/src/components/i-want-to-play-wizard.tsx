@@ -469,16 +469,31 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     }
     try {
       const { contact, user } = await contactsService.create(hostUserId, name, phone)
+      const socio = manualSocio.trim()
       setManualName("")
       setManualPhone("")
       setManualSocio("")
       const userId = user.id
       addContact({ id: userId, name: user.name || name, phone })
+
+      let savedSocioNumbers: Record<string, string> = {}
+      if (socio && bookingEnabled) {
+        const activeClubSlug = selectedMembershipId
+          ? clubMemberships.find((m) => m.id === selectedMembershipId)?.clubSlug ?? "laieta"
+          : clubMemberships[0]?.clubSlug ?? "laieta"
+        try {
+          await contactsService.updateSocioNumber(contact.id, hostUserId, {}, activeClubSlug, socio)
+          savedSocioNumbers = { [activeClubSlug]: socio }
+        } catch {
+          // Socio save failed silently — user can edit later in the list
+        }
+      }
+
       setContactMeta((prev) => ({
         ...prev,
-        [userId]: { contactId: contact.id, socioNumbers: {} },
+        [userId]: { contactId: contact.id, socioNumbers: savedSocioNumbers },
       }))
-      setSocioEdits((prev) => ({ ...prev, [userId]: "" }))
+      setSocioEdits((prev) => ({ ...prev, [userId]: socio }))
       // Refresh available contacts list
       contactsService.list(hostUserId).then((cs) =>
         setAvailableContacts(cs.filter((c) => c.linkedUserId !== hostUserId).map((c) => ({

@@ -603,7 +603,20 @@
       "bookingFailed": "Reserva fallida",
       "retryBooking": "Reintentar reserva",
       "attempting": "Intentando reservar una pista…",
-      "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación."
+      "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación.",
+      "errors": {
+        "missingSocioNumber": "Falta el número de socio de un participante",
+        "noAvailableCourts": "No hay pistas disponibles en el horario seleccionado",
+        "systemOffline": "El sistema de reservas del club no está disponible en este momento",
+        "slotNoLongerAvailable": "Este horario ya no está disponible",
+        "unknown": "Se produjo un error al reservar la pista"
+      },
+      "toast": {
+        "retryQueued": "Reintento de reserva en cola",
+        "retryFailed": "Error al reintentar la reserva",
+        "cancelSuccess": "Reserva cancelada",
+        "cancelFailed": "Error al cancelar la reserva"
+      }
     },
     "openWhatsappGroup": "Abrir grupo de WhatsApp",
     "reminders": {
@@ -690,7 +703,29 @@
       "button": "Cargar Resultado",
       "submitted": "Resultado enviado, esperando confirmación"
     },
-    "notFound": "Partido no encontrado"
+    "notFound": "Partido no encontrado",
+    "rescheduleMatch": {
+      "button": "Cambiar horario",
+      "title": "Cambiar fecha/hora",
+      "description": "Elige una nueva fecha y hora para el partido.",
+      "newDate": "Nueva fecha",
+      "newTime": "Nueva hora",
+      "pickDate": "Elige una fecha",
+      "confirm": "Confirmar cambio",
+      "confirming": "Cambiando horario…",
+      "successToast": "Horario del partido actualizado",
+      "failedToReschedule": "Error al cambiar el horario",
+      "courtAvailability": "Disponibilidad de pistas",
+      "courtAvailabilityHint": "Selecciona una fecha para ver las pistas disponibles",
+      "checkingCourts": "Comprobando pistas disponibles…",
+      "noAvailabilityData": "Sin datos de disponibilidad",
+      "cancelBookingPrompt": {
+        "title": "¿Cancelar la reserva de pista?",
+        "description": "El partido ha sido reprogramado. ¿Quieres cancelar la reserva de pista existente?",
+        "yes": "Sí, cancelar reserva",
+        "no": "Mantener reserva"
+      }
+    }
   },
   "matchesUpcoming": {
     "title": "Partidos",
@@ -730,7 +765,9 @@
       "noPlayersFound": "No se encontraron jugadores",
       "courtBooked": "Pista reservada",
       "bookingCancelled": "Reserva de pista cancelada",
-      "bookingCancelFailed": "No se pudo cancelar la reserva de pista"
+      "bookingCancelFailed": "No se pudo cancelar la reserva de pista",
+      "matchRescheduled": "Partido reprogramado",
+      "matchRescheduledVs": "Partido vs {{opponents}} reprogramado"
     },
     "messages": {
       "scheduledForDate": "Se programó un partido para el {{date}}.",
@@ -749,7 +786,9 @@
       "courtBooked": "{{court}} ha sido reservada para tu partido.",
       "courtBookedGeneric": "Tu pista ha sido reservada.",
       "bookingCancelled": "La reserva de pista para tu partido cancelado ha sido cancelada correctamente.",
-      "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club."
+      "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club.",
+      "matchRescheduled": "El partido ha sido reprogramado.",
+      "matchRescheduledParts": "Nuevo horario: {{parts}}."
     }
   },
   "contactsPage": {
@@ -887,6 +926,30 @@
       "passwordNote": "Almacenado cifrado. Solo se usa para iniciar sesión en el portal del club en tu nombre.",
       "connect": "Conectar club",
       "skipLabel": "Lo configuraré más adelante"
+  "publicMatch": {
+    "title": "Detalles del partido",
+    "subtitle": "Aquí tienes los detalles de este próximo partido.",
+    "signUp": "Registrarse",
+    "notFoundDesc": "Este enlace puede haber expirado o el partido puede haber sido cancelado.",
+    "marketing": {
+      "title": "Organiza tus partidos de tenis con Matchmaker",
+      "description": "Matchmaker gestiona la planificación para que tú solo tengas que aparecer y jugar. Invita contactos por WhatsApp, reserva pistas automáticamente y sigue tu progreso.",
+      "cta": "Crear una cuenta gratis",
+      "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+      "features": {
+        "scheduling": {
+          "title": "Planificación automática",
+          "desc": "Envía invitaciones a tus contactos por orden de prioridad. Matchmaker pasa al siguiente si alguien rechaza o no responde."
+        },
+        "matchmaking": {
+          "title": "Reserva de pista",
+          "desc": "Conecta tu membresía del club y Matchmaker reserva una pista automáticamente cuando se confirma un partido."
+        },
+        "tracking": {
+          "title": "Historial de partidos y nivel",
+          "desc": "Registra cada partido, observa cómo evoluciona tu nivel y revisa los resultados a lo largo del tiempo."
+        }
+      }
     }
   },
   "profileView": {

@@ -8,7 +8,7 @@ import { logger } from '../../config/logger';
 import { schedulingRepository } from './scheduling.repository';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
-import { triggerBookingForMatch, pickBestSlotInRange } from '../booking/booking.service';
+import { triggerBookingForMatch, pickBestSlotInRange, getCachedCourtsPerSlot } from '../booking/booking.service';
 import { createNotification } from '../notifications/notifications.service';
 import type {
   CreateSchedulingRequestInput,
@@ -21,11 +21,10 @@ import type {
 import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { findUserByNormalizedPhone, createGuestUser } from '../users/users.service';
 import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './scheduling.types';
-import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/whatsapp-messages';
+import { getMessages, formatResponseWindow, resolveLocale, buildCourtAvailabilityNote } from '../../lib/whatsapp-messages';
 
-const ACCEPT_PATTERNS = /^(yes|y|accept|sí|si|s|👍)$|👍/i;
-const DECLINE_PATTERNS = /^(no|n|decline)$/i;
 const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
+const NONE_OPTION_RE = /^(none|ninguno)$/i;
 
 // Debounce poll quorum evaluation so rapid multi-select clicks are treated as one vote batch
 const POLL_VOTE_DEBOUNCE_MS = 3000;
@@ -142,21 +141,19 @@ function isMultiHour(startTime: Date, endTime: Date): boolean {
   return endTime.getTime() - startTime.getTime() > 60 * 60 * 1000;
 }
 
-/** Quick-reply buttons for invite. For multi-hour, returns one button per time slot. */
-function getInviteButtons(locale?: string | null, slots?: string[]): { id: string; title: string }[] {
-  if (slots && slots.length >= 2) {
-    return slots.map((slot, i) => ({ id: `slot_${i}`, title: slot }));
-  }
+/** Poll buttons: one per available time slot, plus a "None" option to decline. */
+function getInviteButtons(locale: string | null | undefined, slots: string[]): { id: string; title: string }[] {
   const loc = resolveLocale(locale);
+  const noneLabel = loc === 'es' ? 'Ninguno' : 'None';
   return [
-    { id: 'invite_yes', title: loc === 'es' ? 'SÍ' : 'YES' },
-    { id: 'invite_no', title: 'NO' },
+    ...slots.map((slot, i) => ({ id: `slot_${i}`, title: slot })),
+    { id: 'invite_none', title: noneLabel },
   ];
 }
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
-function formatGroupInviteFallbackMessage(input: {
+function formatGroupInviteMessage(input: {
   sportType: string;
   format: string;
   whenStr: string;
@@ -181,11 +178,8 @@ function formatGroupInviteFallbackMessage(input: {
     '',
     ...(matchUrl ? [`🔗 *${isEs ? 'Ver partido' : 'View match'}:* ${matchUrl}`, ''] : []),
     isEs
-      ? '⚠️ No pudimos añadirte directamente al grupo de WhatsApp (configuración de privacidad).'
-      : "⚠️ We couldn't add you directly to the WhatsApp group (privacy settings).",
-    isEs
-      ? 'Usa el enlace de abajo para unirte y chatear con los otros jugadores:'
-      : 'Use the link below to join and chat with the other players:',
+      ? 'Únete al grupo de WhatsApp del partido:'
+      : 'Join the match WhatsApp group:',
   ].join('\n');
 }
 
@@ -501,19 +495,27 @@ export const schedulingService = {
       const msgs = getMessages(candidateLocale);
       const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
 
-      const multiHour = isMultiHour(new Date(request.startTime), new Date(request.endTime));
-      let message: string;
-      let inviteButtons: { id: string; title: string }[];
-      if (multiHour) {
-        const startHHMM = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
-        const endHHMM = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
-        const slots = slotsInRange(startHHMM, endHHMM);
-        message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
-        inviteButtons = getInviteButtons(candidateLocale, slots);
-      } else {
-        message = msgs.invite(hostName, request.sportType, formatLabel, dateStr, timeStr, request.locationText, timeLeft);
-        inviteButtons = getInviteButtons(candidateLocale);
+      const startHHMM = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+      const endHHMM = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+      const slots = slotsInRange(startHHMM, endHHMM);
+      let message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
+      // Append court availability note if booking is enabled for this request
+      if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && slots.length > 0) {
+        const dateStrISO = new Date(request.date).toISOString().slice(0, 10);
+        const hostMembership = await prisma.clubMembership.findFirst({
+          where: { userId: request.hostUserId, status: 'active', encryptedPassword: { not: null } },
+        });
+        if (hostMembership) {
+          const courtsPerSlot = await getCachedCourtsPerSlot(
+            request.hostUserId, hostMembership.clubSlug, dateStrISO, request.sportType, slots,
+          );
+          if (courtsPerSlot) {
+            const note = buildCourtAvailabilityNote(courtsPerSlot, candidateLocale);
+            if (note) message = `${message}\n\n${note}`;
+          }
+        }
       }
+      const inviteButtons = getInviteButtons(candidateLocale, slots);
 
       await prisma.$transaction(async (tx) => {
         await tx.schedulingCandidate.update({
@@ -558,109 +560,10 @@ export const schedulingService = {
 
     const request = candidate.schedulingRequest;
 
-    // Poll-based flow for multi-hour scheduling requests
-    if (isMultiHour(new Date((request as RequestRow).startTime), new Date((request as RequestRow).endTime))) {
-      return this.handlePollVote(candidate, request as RequestRow, votedOptions ?? [messageText]);
-    }
-
-    const text = (messageText || '').trim();
-    const isAccept = ACCEPT_PATTERNS.test(text);
-    const isDecline = DECLINE_PATTERNS.test(text);
-
-    if (!isAccept && !isDecline) {
-      logger.info('InviteResponseIgnored', { reason: 'unrecognized_text', text: text.slice(0, 50), phone: senderPhoneNumber });
-      return { processed: false };
-    }
-
-    const isLateResponse = candidate.status === 'expired';
-    if (request.status !== 'active' && !isLateResponse) {
-      logger.warn('InviteIgnored', { reason: 'request_not_active', requestId: request.id });
-      return { processed: true };
-    }
-
-    const now = new Date();
-
-    if (isAccept) {
-      if (isLateResponse) {
-        logger.info('InviteResponseIgnored', { reason: 'accept_after_expiry', candidateId: candidate.id });
-        return { processed: true };
-      }
-      const didComplete = await prisma.$transaction(async (tx) => {
-        const updateResult = await tx.schedulingCandidate.updateMany({
-          where: {
-            id: candidate.id,
-            status: { in: ['waiting_reply', 'contacted'] },
-          },
-          data: { status: 'accepted', responseAt: now },
-        });
-        if (updateResult.count === 0) {
-          return null; // duplicate or expired
-        }
-        const format = (request as RequestRow).format || 'singles';
-        const required = getRequiredAcceptances(format);
-        const candidates = await tx.schedulingCandidate.findMany({
-          where: { schedulingRequestId: request.id },
-          select: { status: true },
-        });
-        const acceptedCount = candidates.filter((c) => c.status === 'accepted').length;
-        if (acceptedCount >= required) {
-          await tx.schedulingRequest.update({
-            where: { id: request.id },
-            data: { status: 'completed' },
-          });
-          return true;
-        }
-        return false;
-      });
-
-      if (didComplete === null) {
-        logger.warn('InviteDuplicateResponse', { candidateId: candidate.id, action: 'accept' });
-        return { processed: true };
-      }
-      logger.info('InviteAccepted', { requestId: request.id, candidateId: candidate.id });
-      void recordEvent({ schedulingRequestId: request.id, action: 'invite_accepted', candidateId: candidate.id });
-      if (didComplete) {
-        await this.completeScheduling(request.id);
-      } else {
-        await this.contactNextCandidates(request.id);
-      }
-      return { processed: true };
-    }
-
-    if (isDecline) {
-      let updated: boolean;
-      if (candidate.status === 'waiting_reply') {
-        updated = await schedulingRepository.updateCandidateFromWaitingReply(candidate.id, 'declined', now);
-      } else if (candidate.status === 'contacted') {
-        const result = await prisma.schedulingCandidate.updateMany({
-          where: { id: candidate.id, status: 'contacted' },
-          data: { status: 'declined', responseAt: now },
-        });
-        updated = result.count > 0;
-      } else {
-        const result = await prisma.schedulingCandidate.updateMany({
-          where: { id: candidate.id, status: 'expired', responseAt: null },
-          data: { status: 'declined', responseAt: now },
-        });
-        updated = result.count > 0;
-      }
-      if (!updated) {
-        logger.warn('InviteDuplicateResponse', { candidateId: candidate.id, action: 'decline' });
-        return { processed: true };
-      }
-      logger.info('InviteDeclined', {
-        requestId: request.id,
-        candidateId: candidate.id,
-        lateResponse: isLateResponse,
-      });
-      void recordEvent({ schedulingRequestId: request.id, action: 'invite_declined', candidateId: candidate.id });
-      if (request.status === 'active') {
-        await this.contactNextCandidates(request.id);
-      }
-      return { processed: true };
-    }
-
-    return { processed: false };
+    // All invites use poll format. Route every response through handlePollVote.
+    // votedOptions is set for Wasender poll votes; for Whapi button clicks the
+    // button title arrives as plain messageText — treat it as a single-element array.
+    return this.handlePollVote(candidate, request as RequestRow, votedOptions ?? [messageText.trim()]);
   },
 
   async handlePollVote(
@@ -684,8 +587,28 @@ export const schedulingService = {
       .map((o) => o.slice(0, 2)); // normalize to 'HH'
 
     if (votedHours.length === 0) {
-      logger.info('PollVoteIgnored', { reason: 'no_valid_slots', options, candidateId: candidate.id });
-      return { processed: false };
+      // If the user explicitly selected the "None" option, treat it as a decline.
+      // Any other unrecognized text (e.g. a plain chat message) is silently ignored.
+      const isExplicitDecline = options.some((o) => NONE_OPTION_RE.test(o.trim()));
+      if (!isExplicitDecline) {
+        logger.info('PollVoteIgnored', { reason: 'unrecognized_response', options, candidateId: candidate.id });
+        return { processed: false };
+      }
+      const now = new Date();
+      const declineResult = await prisma.schedulingCandidate.updateMany({
+        where: { id: candidate.id, status: { in: ['waiting_reply', 'contacted'] } },
+        data: { status: 'declined', responseAt: now },
+      });
+      if (declineResult.count === 0) {
+        logger.warn('PollDeclineDuplicate', { candidateId: candidate.id });
+        return { processed: true };
+      }
+      logger.info('PollDeclined', { requestId: request.id, candidateId: candidate.id });
+      void recordEvent({ schedulingRequestId: request.id, action: 'invite_declined', candidateId: candidate.id });
+      if (request.status === 'active') {
+        await this.contactNextCandidates(request.id);
+      }
+      return { processed: true };
     }
 
     // Record poll vote (overwrites previous; we replay events to get current state)
@@ -829,13 +752,6 @@ export const schedulingService = {
     });
     if (!candidate || candidate.status !== 'waiting_reply') return;
 
-    const phone = candidate.contactUser?.phone;
-    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
-    if (phone && pollMessageId) {
-      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
-      if (!result.success) logger.warn('FailedToReactInviteExpired', { candidateId, phone });
-    }
-
     await schedulingRepository.updateCandidateStatus(candidateId, 'expired');
     logger.info('InviteExpired', { requestId: candidate.schedulingRequestId, candidateId });
     void recordEvent({ schedulingRequestId: candidate.schedulingRequestId, action: 'invite_expired', candidateId });
@@ -977,16 +893,8 @@ export const schedulingService = {
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
 
-    // React to all open poll messages with 🔒 to signal the match has been scheduled
+    // Notify contacted candidates who were not selected for the match
     for (const candidate of request.candidates) {
-      const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
-      const phone = (candidate.contactUser as { phone?: string | null } | null)?.phone;
-      if (pollMessageId && phone) {
-        void whatsappService.sendReaction(phone, pollMessageId, '🔒').catch((err) => {
-          logger.warn('FailedToReactToPoll', { candidateId: candidate.id, error: err instanceof Error ? err.message : err });
-        });
-      }
-      // Notify contacted candidates who were not selected for the match
       if (['contacted', 'waiting_reply'].includes(candidate.status)) {
         void sendInviteNoLongerAvailable(request, candidate);
       }
@@ -1000,7 +908,7 @@ export const schedulingService = {
     }
 
     // Notify all match participants
-    await notifyMatchParticipantsOnCreate(match);
+    await notifyMatchParticipantsOnCreate(match, (request as RequestRow).timezone ?? 'UTC');
 
     const userIdsForWhatsApp = match.participants.map((p) => p.userId);
     const uniqueUserIds = [...new Set(userIdsForWhatsApp)];
@@ -1022,8 +930,8 @@ export const schedulingService = {
     if (participantPhones.length >= 1) {
       const tz = (request as RequestRow).timezone ?? 'UTC';
       const intlLocale = resolveLocale(hostUserLocale) === 'es' ? 'es-ES' : 'en-US';
-      const dateStr = formatInTz(request.date, intlLocale, { weekday: 'long', month: 'long', day: 'numeric' }, tz);
-      const timeStr = formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
+      const dateStr = formatInTz(scheduledAt, intlLocale, { weekday: 'long', month: 'long', day: 'numeric' }, tz);
+      const timeStr = formatInTz(scheduledAt, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz);
       const whenStr = `${dateStr} · ${timeStr}`;
 
       const normalizeDigits = (phone: string) => phone.replace(/\D/g, '');
@@ -1034,13 +942,10 @@ export const schedulingService = {
       );
       const allNames = usersWithPhones.map((u) => u.name).filter((n): n is string => !!n && n.trim().length > 0);
 
-      const isEs = resolveLocale(hostUserLocale) === 'es';
       const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       const firstName = (full: string) => full.trim().split(/\s+/)[0] ?? full.trim();
-      const nameLabel = allNames.length > 0
-        ? format === 'doubles'
-          ? `${firstName(allNames[0])} ${isEs ? 'y otros' : 'and others'}`
-          : firstName(allNames[0])
+      const nameLabel = format !== 'doubles' && allNames.length > 0
+        ? allNames.map(firstName).join(' · ')
         : null;
       const groupName = nameLabel
         ? `${capitalize(dateStr)} · ${timeStr} · ${nameLabel}`
@@ -1058,9 +963,7 @@ export const schedulingService = {
           where: { id: match.id },
           data: { whatsappGroupId: groupResult.groupId },
         });
-        const publicMatchUrl = match.publicToken
-          ? `${FRONTEND_BASE.replace(/\/$/, '')}/match/${match.publicToken}`
-          : `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
+        const publicMatchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
         const detailsMessage = formatMatchDetailsMessage(
           request.sportType,
           format,
@@ -1089,7 +992,7 @@ export const schedulingService = {
                   ? others.join(', ')
                   : undefined;
 
-            return formatGroupInviteFallbackMessage({
+            return formatGroupInviteMessage({
               sportType: request.sportType,
               format,
               whenStr,
@@ -1235,13 +1138,6 @@ export const schedulingService = {
       throw new AppError('Only contacted candidates can be cancelled this way', 400);
     }
 
-    const phone = candidate.contactUser?.phone;
-    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
-    if (phone && pollMessageId) {
-      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
-      if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId, phone });
-    }
-
     await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
     void recordEvent({ schedulingRequestId: requestId, action: 'candidate_cancelled', candidateId, actorUserId: userId });
     logger.info('ContactedCandidateCancelled', { requestId, candidateId, userId });
@@ -1328,16 +1224,6 @@ export const schedulingService = {
     );
 
     for (const c of toNotify) {
-      const phone = c.contactUser?.phone;
-      const pollMessageId = (c as { pollMessageId?: string | null }).pollMessageId;
-      if (phone && pollMessageId) {
-        try {
-          const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
-          if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, phone });
-        } catch (e) {
-          logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, error: e });
-        }
-      }
       void sendInviteNoLongerAvailable(request, c);
       await schedulingRepository.updateCandidateStatus(c.id, 'cancelled');
     }
@@ -1559,10 +1445,30 @@ export const schedulingService = {
       await this.completeScheduling(request.id);
     }
 
-    // socioNumber: stored as metadata in the event for now (no dedicated field on the user record)
-    // A future migration can add a socioNumber field to User or create a ClubMembership record
+    // Persist socioNumber as a ClubMembership for the guest so the booking service
+    // can include them when booking the court for this match.
     if (data.socioNumber && (request as { bookingEnabled?: boolean }).bookingEnabled) {
-      logger.info('SocioNumberReceived', { userId, schedulingRequestId: request.id, socioNumber: data.socioNumber });
+      const hostMembership = await prisma.clubMembership.findFirst({
+        where: { userId: request.hostUserId, status: 'active' },
+        select: { clubSlug: true, adapterType: true },
+      });
+      if (hostMembership) {
+        await prisma.clubMembership.upsert({
+          where: { userId_clubSlug: { userId, clubSlug: hostMembership.clubSlug } },
+          create: {
+            id: crypto.randomUUID(),
+            userId,
+            clubSlug: hostMembership.clubSlug,
+            adapterType: hostMembership.adapterType,
+            socioNumber: data.socioNumber,
+            status: 'unverified',
+          },
+          update: { socioNumber: data.socioNumber },
+        });
+        logger.info('GuestClubMembershipUpserted', { userId, clubSlug: hostMembership.clubSlug, schedulingRequestId: request.id });
+      } else {
+        logger.warn('SocioNumberReceivedButNoHostMembership', { userId, schedulingRequestId: request.id });
+      }
     }
 
     return { status: 'accepted', candidateId, matchId: null };

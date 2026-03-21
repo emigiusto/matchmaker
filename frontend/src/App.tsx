@@ -21,6 +21,7 @@ import Signup from '@/pages/Signup/Signup'
 import MatchDetails from '@/pages/MatchDetails/MatchDetails'
 import PublicMatchDetails from '@/pages/MatchDetails/PublicMatchDetails'
 import Onboarding from '@/pages/Onboarding/Onboarding'
+import MatchDetailsGate from '@/pages/MatchDetails/MatchDetailsGate'
 import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
 import ProfileView from '@/pages/ProfileView/ProfileView'
@@ -70,8 +71,8 @@ function App() {
 
               {/* Public join page (no sidebar) */}
               <Route path="/join/:token" element={<JoinRequest />} />
-              {/* Public match details (no login required) */}
-              <Route path="/match/:token" element={<PublicMatchDetails />} />
+              {/* Match details: public view if not logged in, full view if logged in */}
+              <Route path="/matches/:id" element={<MatchDetailsGate />} />
 
               {/* Onboarding — requires auth but no sidebar, skips the onboarding check */}
               <Route
@@ -97,7 +98,6 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/matches" element={<MatchesUpcoming />} />
-                <Route path="/matches/:id" element={<MatchDetails />} />
                 <Route path="/profile/:userId" element={<ProfileView />} />
                 <Route path="/contacts" element={<Contacts />} />
               </Route>

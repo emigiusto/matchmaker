@@ -306,4 +306,6 @@ router.post('/:id/cancel', MatchesController.cancelMatch);
  */
 router.post('/', MatchesController.createMatch);
 
+router.post('/:id/reschedule', MatchesController.rescheduleMatch);
+
 export default router;

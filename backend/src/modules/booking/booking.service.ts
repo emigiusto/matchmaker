@@ -153,6 +153,37 @@ export async function checkCourtAvailability(
   return result
 }
 
+/**
+ * Pure cache read — never triggers a Puppeteer session.
+ * Returns the number of available courts per slot for a given date/sport,
+ * or null if the cache is cold or the membership is not found.
+ */
+export async function getCachedCourtsPerSlot(
+  userId: string,
+  clubSlug: string,
+  date: string,   // YYYY-MM-DD
+  sport: string,
+  slots: string[], // HH:MM[]
+): Promise<Record<string, number> | null> {
+  try {
+    const membership = await prisma.clubMembership.findUnique({
+      where: { userId_clubSlug: { userId, clubSlug } },
+    })
+    if (!membership) return null
+    const cacheKey = `matchmaker:booking:availability:${membership.adapterType}:${clubSlug}:${date}:${sport}`
+    const cached = await cacheGet(cacheKey)
+    if (!cached) return null
+    const availability = JSON.parse(cached) as CourtAvailabilityResult
+    const result: Record<string, number> = {}
+    for (const slot of slots) {
+      result[slot] = availability.availableCourts.filter((c) => c.time === slot).length
+    }
+    return result
+  } catch {
+    return null
+  }
+}
+
 // ─── Slot selection ───────────────────────────────────────────────
 
 /**
@@ -327,6 +358,11 @@ async function runBookingJob(
 
     logger.info(`[booking] hostUserId resolved: ${hostUserId} (schedulingRequest=${schedulingRequest?.id ?? 'none'}, availability.userId=${match.availability?.userId ?? 'none'}, membership.userId=${membership.userId})`)
 
+    const tz = schedulingRequest?.timezone ?? 'UTC'
+    const scheduled = new Date(match.scheduledAt)
+    const date = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
+    const time = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+
     const otherParticipants = match.participants.filter((p) => p.userId !== hostUserId)
     logger.info(`[booking] Participants: total=${match.participants.length}, other=${otherParticipants.length}, ids=${otherParticipants.map(p => `${p.userId}(${p.user?.name})`).join(', ')}`)
 
@@ -361,10 +397,10 @@ async function runBookingJob(
         logger.info(`[booking] Participant has no phone — skipping Contact lookup`)
       }
 
-      await failAttempt(
-        attemptId,
-        `Missing socio number for participant ${participant.user?.name ?? participant.userId}`,
-      )
+      const reason = `Missing socio number for participant ${participant.user?.name ?? participant.userId}`
+      await failAttempt(attemptId, reason, 'MISSING_SOCIO_NUMBER')
+      logBookingEvent(matchId, 'booking_failed', { errorMessage: reason }).catch(() => {})
+      notifyBookingFailed(match, hostUserId, date, time, tz, reason)
       return
     }
 
@@ -373,15 +409,8 @@ async function runBookingJob(
       socioNumber: membership.socioNumber,
       password: decrypt(membership.encryptedPassword),
     }
-
-    const tz = schedulingRequest?.timezone ?? 'UTC'
-    const date = match.availability?.date
-      ? new Date(match.availability.date).toISOString().slice(0, 10)
-      : new Date(match.scheduledAt).toISOString().slice(0, 10)
-    const rawTime = match.availability?.startTime
-      ? new Date(match.availability.startTime)
-      : new Date(match.scheduledAt)
-    const time = rawTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+    
+    logger.info(`[booking] Booking job parameters: date=${date}, time=${time}, tz=${tz}, participantSocioNumbers=${participantSocioNumbers.join(', ')}`)
 
     const sport = schedulingRequest?.sportType ?? 'tennis'
     const sportOptions = { sport }
@@ -424,7 +453,7 @@ async function runBookingJob(
         const filteredCourts = availability.availableCourts.filter((c) => c.time === targetHourStr)
         const court = filteredCourts[0] ?? availability.availableCourts[0]
         if (!court) {
-          await failAttempt(attemptId, `No available courts at ${date} ${time}`)
+          await failAttempt(attemptId, `No available courts at ${date} ${time}`, 'NO_AVAILABLE_COURTS')
           return
         }
 
@@ -473,13 +502,17 @@ async function runBookingJob(
         const message = offline
           ? 'Club booking system is offline or unreachable'
           : (err instanceof Error ? err.message : String(err))
+        const errorCode = offline
+          ? 'ADAPTER_OFFLINE'
+          : (err instanceof AppError ? err.errorCode : undefined)
 
         if (attempt < MAX_RETRIES) {
           logger.warn(`[booking] Attempt ${attempt + 1} failed for match ${matchId}, will retry: ${message}`)
         } else {
-          await failAttempt(attemptId, message)
+          await failAttempt(attemptId, message, errorCode)
           logBookingEvent(matchId, 'booking_failed', { errorMessage: message, attempts: attempt + 1 }).catch(() => {})
           logger.error(`[booking] Booking failed for match ${matchId} after ${attempt + 1} attempt(s): ${message}`)
+          notifyBookingFailed(match, hostUserId, date, time, tz, message)
         }
       }
     }
@@ -489,13 +522,51 @@ async function runBookingJob(
     await failAttempt(attemptId, message)
     logBookingEvent(matchId, 'booking_failed', { errorMessage: message }).catch(() => {})
     logger.error(`[booking] Unexpected setup error for match ${matchId}: ${message}`)
+    // Reload match for group notification (match variable may not be in scope)
+    const m = await prisma.match.findUnique({ where: { id: matchId }, include: { availability: true } }).catch(() => null)
+    if (m) {
+      const sr = await prisma.schedulingRequest.findUnique({ where: { matchId } }).catch(() => null)
+      const tz = sr?.timezone ?? 'UTC'
+      const scheduled = new Date(m.scheduledAt)
+      const d = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
+      const t = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+      const hId = sr?.hostUserId ?? m.availability?.userId ?? ''
+      notifyBookingFailed(m, hId, d, t, tz, message)
+    }
   }
 }
 
-async function failAttempt(attemptId: string, errorMessage: string): Promise<void> {
+function notifyBookingFailed(
+  match: { id: string; whatsappGroupId: string | null; availability: { locationText?: string | null } | null },
+  hostUserId: string,
+  date: string,
+  time: string,
+  tz: string,
+  reason: string,
+): void {
+  createNotification(hostUserId, 'booking.cancel_failed', { matchId: match.id }).catch((err) => {
+    logger.warn(`[booking] Failed to send booking.cancel_failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
+  })
+
+  if (match.whatsappGroupId) {
+    prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } })
+      .then((hostUser) => {
+        const locale = hostUser?.locale ?? 'es'
+        const when = `${date} · ${time}`
+        const loc = match.availability?.locationText ?? ''
+        const message = getMessages(locale).courtBookingFailed(when, loc, reason)
+        return whatsappService.sendGroupMessage(match.whatsappGroupId!, message)
+      })
+      .catch((err) => {
+        logger.warn(`[booking] Failed to send booking failed WhatsApp for match ${match.id}:`, err instanceof Error ? err.message : err)
+      })
+  }
+}
+
+async function failAttempt(attemptId: string, errorMessage: string, errorCode?: string): Promise<void> {
   await prisma.bookingAttempt.update({
     where: { id: attemptId },
-    data: { status: 'failed', errorMessage, completedAt: new Date() },
+    data: { status: 'failed', errorMessage, errorCode: errorCode ?? null, completedAt: new Date() },
   }).catch((e) => logger.error(`[booking] Failed to mark attempt ${attemptId} as failed:`, e))
 }
 
@@ -513,7 +584,7 @@ export async function retryBookingForMatch(matchId: string): Promise<void> {
   // Reset attempt to pending
   await prisma.bookingAttempt.update({
     where: { id: existing.id },
-    data: { status: 'pending', errorMessage: null, completedAt: null, attemptedAt: new Date() },
+    data: { status: 'pending', errorMessage: null, errorCode: null, completedAt: null, attemptedAt: new Date() },
   })
 
   logBookingEvent(matchId, 'booking_pending', { retry: true }).catch(() => {})
@@ -577,6 +648,48 @@ export async function cancelBookingForMatch(matchId: string): Promise<void> {
   logger.info(`[booking] Booking cancelled for match ${matchId}`)
 }
 
+/**
+ * Cancel any existing court booking for a match and delete the BookingAttempt row,
+ * then re-trigger a fresh booking attempt. Used when a match is rescheduled.
+ * No-ops gracefully if there is no existing attempt or no active membership.
+ */
+export async function resetBookingForReschedule(matchId: string): Promise<void> {
+  const attempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
+  if (!attempt) {
+    // No prior booking — just trigger fresh
+    await triggerBookingForMatch(matchId)
+    return
+  }
+
+  // Mark as cancelled first — signals any in-flight job not to write success
+  await prisma.bookingAttempt.update({
+    where: { id: attempt.id },
+    data: { status: 'cancelled', completedAt: new Date() },
+  }).catch((err) => {
+    logger.warn(`[booking] Failed to mark attempt as cancelled on reschedule for match ${matchId}:`, err instanceof Error ? err.message : err)
+  })
+
+  // Cancel the existing court reservation at the club if it was confirmed
+  if (attempt.status === 'success' && attempt.externalBookingId) {
+    const membership = await prisma.clubMembership.findUnique({ where: { id: attempt.clubMembershipId } })
+    if (membership?.encryptedPassword) {
+      const adapter = getAdapter(membership.adapterType)
+      const creds = { socioNumber: membership.socioNumber, password: decrypt(membership.encryptedPassword) }
+      await adapter.cancel(creds, attempt.externalBookingId).catch((err) => {
+        logger.warn(`[booking] Adapter cancel on reschedule failed for match ${matchId}:`, err instanceof Error ? err.message : err)
+      })
+    }
+  }
+
+  // Delete old attempt so triggerBookingForMatch can create a fresh one
+  await prisma.bookingAttempt.delete({ where: { id: attempt.id } }).catch((err) => {
+    logger.warn(`[booking] Failed to delete old booking attempt on reschedule for match ${matchId}:`, err instanceof Error ? err.message : err)
+  })
+
+  logBookingEvent(matchId, 'booking_pending', { reschedule: true }).catch(() => {})
+  await triggerBookingForMatch(matchId)
+}
+
 export async function getBookingAttemptByMatch(matchId: string): Promise<BookingAttemptDTO | null> {
   const attempt = await prisma.bookingAttempt.findUnique({ where: { matchId } })
   return attempt ? toAttemptDTO(attempt) : null
@@ -605,7 +718,8 @@ function toMembershipDTO(m: {
 function toAttemptDTO(a: {
   id: string; matchId: string; clubMembershipId: string; status: string
   externalBookingId: string | null; courtName: string | null
-  errorMessage: string | null; attemptedAt: Date; completedAt: Date | null
+  errorMessage: string | null; errorCode: string | null
+  attemptedAt: Date; completedAt: Date | null
 }): BookingAttemptDTO {
   return {
     id: a.id,
@@ -615,6 +729,7 @@ function toAttemptDTO(a: {
     externalBookingId: a.externalBookingId,
     courtName: a.courtName,
     errorMessage: a.errorMessage,
+    errorCode: a.errorCode,
     attemptedAt: a.attemptedAt.toISOString(),
     completedAt: a.completedAt?.toISOString() ?? null,
   }

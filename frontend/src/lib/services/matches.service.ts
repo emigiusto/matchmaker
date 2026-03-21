@@ -29,13 +29,14 @@ export const matchesService = {
     return adaptMatch(dto)
   },
 
+  async reschedule(matchId: string, userId: string, scheduledAt: string, cancelBooking?: boolean): Promise<Match> {
+    const dto = await apiClient.post<BackendMatchDTO>(`/matches/${matchId}/reschedule`, { userId, scheduledAt, cancelBooking })
+    return adaptMatch(dto)
+  },
+
   async getWhatsappGroupLink(matchId: string): Promise<string> {
     const res = await apiClient.get<{ inviteLink: string }>(`/matches/${matchId}/whatsapp-group-link`)
     return res.inviteLink
   },
 
-  async getByPublicToken(token: string): Promise<Match> {
-    const dto = await apiClient.get<BackendMatchDTO>(`/matches/public/${token}`)
-    return adaptMatch(dto)
-  },
 }

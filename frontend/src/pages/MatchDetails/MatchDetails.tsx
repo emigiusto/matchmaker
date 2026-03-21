@@ -36,9 +36,10 @@ import { SportFormatBadge } from "@/components/sport-format-badge"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
+import { RescheduleMatchDialog } from "@/components/reschedule-match-dialog"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
-import { isMatchInPast } from "@/lib/utils"
+import { isMatchInPast, getBookingErrorMessage } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
@@ -136,10 +137,10 @@ export default function MatchDetailPage() {
     try {
       await bookingService.retryBooking(id)
       setBookingAttempt((prev) => prev ? { ...prev, status: "pending" } : prev)
-      toast.success("Booking retry queued")
+      toast.success(t("matchDetails.booking.toast.retryQueued"))
       startBookingPoll(id)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to retry booking")
+      toast.error(err instanceof Error ? err.message : t("matchDetails.booking.toast.retryFailed"))
     } finally {
       setRetryingBooking(false)
     }
@@ -152,9 +153,9 @@ export default function MatchDetailPage() {
     try {
       await bookingService.cancelBooking(id)
       setBookingAttempt((prev) => prev ? { ...prev, status: "cancelled" } : prev)
-      toast.success("Booking cancelled")
+      toast.success(t("matchDetails.booking.toast.cancelSuccess"))
     } catch (err) {
-      setCancelBookingError(err instanceof Error ? err.message : "Failed to cancel booking")
+      setCancelBookingError(err instanceof Error ? err.message : t("matchDetails.booking.toast.cancelFailed"))
     } finally {
       setCancellingBooking(false)
     }
@@ -255,9 +256,6 @@ export default function MatchDetailPage() {
                 format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
               />
               <StatusBadge status={match.status} />
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(match.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}
-              </span>
             </div>
           </div>
           <CardContent className={`p-6 ${match.status === "cancelled" ? "opacity-75" : ""}`}>
@@ -380,7 +378,7 @@ export default function MatchDetailPage() {
                 <AddToCalendarButton
                   date={match.date}
                   time={match.time}
-                  endTime={match.endTime}
+
                   location={match.location}
                   participants={
                     (match.participants ?? []).length >= 4
@@ -394,6 +392,20 @@ export default function MatchDetailPage() {
                       : opponent.name
                   }
                 />
+                <RescheduleMatchDialog
+                  matchId={match.id}
+                  userId={currentUserId}
+                  match={match}
+                  onSuccess={(m) => {
+                    setMatch(m)
+                    if (id) {
+                      bookingService.getAttempt(id).then((attempt) => {
+                        setBookingAttempt(attempt)
+                        if (attempt?.status === "pending") startBookingPoll(id)
+                      }).catch(() => {})
+                    }
+                  }}
+                />
                 <CancelMatchButton
                   matchId={match.id}
                   userId={currentUserId}
@@ -405,32 +417,55 @@ export default function MatchDetailPage() {
         </Card>
 
         {/* Court Booking Status */}
-        {bookingAttempt && (
+        {(match.bookingEnabled || bookingAttempt) && (
           <Card className={`border-border/50 ${
-            bookingAttempt.status === "success" ? "border-green-500/30 bg-green-500/5" :
-            bookingAttempt.status === "failed" ? "border-destructive/30 bg-destructive/5" :
-            bookingAttempt.status === "cancelled" ? "border-muted bg-muted/20" : ""
+            bookingAttempt?.status === "success" ? "border-green-500/30 bg-green-500/5" :
+            bookingAttempt?.status === "failed" ? "border-destructive/30 bg-destructive/5" :
+            bookingAttempt?.status === "cancelled" ? "border-muted bg-muted/20" : ""
           }`}>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight">
                 <Building2 className="h-4 w-4" />
                 {t("matchDetails.booking.title")}
-                <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  bookingAttempt.status === "success"
-                    ? "bg-green-500/10 text-green-700 dark:text-green-400"
-                    : bookingAttempt.status === "failed"
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                }`}>
-                  {bookingAttempt.status === "pending" ? t("matchDetails.booking.inProgress") :
-                   bookingAttempt.status === "success" ? t("matchDetails.booking.booked") :
-                   bookingAttempt.status === "failed" ? t("matchDetails.booking.failed") :
-                   bookingAttempt.status === "cancelled" ? t("matchDetails.booking.cancelled") : bookingAttempt.status}
-                </span>
+                {bookingAttempt && (
+                  <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    bookingAttempt.status === "success"
+                      ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                      : bookingAttempt.status === "failed"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                  }`}>
+                    {bookingAttempt.status === "pending" ? t("matchDetails.booking.inProgress") :
+                     bookingAttempt.status === "success" ? t("matchDetails.booking.booked") :
+                     bookingAttempt.status === "failed" ? t("matchDetails.booking.failed") :
+                     bookingAttempt.status === "cancelled" ? t("matchDetails.booking.cancelled") : bookingAttempt.status}
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {bookingAttempt.status === "success" && (
+              {!bookingAttempt && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("matchDetails.booking.attempting")}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleRetryBooking}
+                    disabled={retryingBooking}
+                  >
+                    {retryingBooking
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <RefreshCw className="h-3.5 w-3.5" />
+                    }
+                    {t("matchDetails.booking.retryBooking")}
+                  </Button>
+                </div>
+              )}
+              {bookingAttempt?.status === "success" && (
                 <div className="space-y-3">
                   {bookingAttempt.courtName && (
                     <div className="flex items-center gap-2 text-sm">
@@ -464,12 +499,12 @@ export default function MatchDetailPage() {
                   )}
                 </div>
               )}
-              {bookingAttempt.status === "failed" && (
+              {bookingAttempt?.status === "failed" && (
                 <div className="space-y-3">
                   <div className="flex items-start gap-2 text-sm">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                     <span className="text-destructive">
-                      {bookingAttempt.errorMessage ?? t("matchDetails.booking.bookingFailed")}
+                      {getBookingErrorMessage(bookingAttempt.errorCode, t)}
                     </span>
                   </div>
                   <Button
@@ -487,7 +522,7 @@ export default function MatchDetailPage() {
                   </Button>
                 </div>
               )}
-              {bookingAttempt.status === "pending" && (() => {
+              {bookingAttempt?.status === "pending" && (() => {
                 const stale = Date.now() - new Date(bookingAttempt.attemptedAt).getTime() > 10 * 60 * 1000
                 return stale ? (
                   <div className="space-y-3">

@@ -4,28 +4,6 @@
 
 ---
 
-## SocioNumber no se persiste en el join-via-link
-
-**Prioridad:** Alta
-**Módulo:** `scheduling`
-
-Cuando un usuario acepta una invite via web (`POST /scheduling/join/:token/accept`) y el request tiene `bookingEnabled=true`, el campo `socioNumber` del formulario se recibe pero solo se loguea (`logger.info('SocioNumberReceived', ...)`). No se crea ni actualiza ningún registro de `ClubMembership`.
-
-**Propuesta:**
-
-1. En `schedulingService.acceptViaLink`, tras crear/encontrar el usuario, hacer upsert de `ClubMembership`:
-   ```ts
-   await prisma.clubMembership.upsert({
-     where: { userId_clubSlug: { userId, clubSlug: request.clubSlug } },
-     create: { userId, clubSlug: request.clubSlug, adapterType: '...', socioNumber, status: 'unverified' },
-     update: { socioNumber },
-   });
-   ```
-2. Agregar `clubSlug` al modelo `SchedulingRequest` (o derivarlo del `locationText`/venue).
-3. Con `ClubMembership` creada, el booking automático puede ejecutarse post-join igual que para el host.
-
----
-
 ## Competitive / Practice – Reintroducir en la UI
 
 **Prioridad:** Media
@@ -43,26 +21,6 @@ La distinción Competitive/Practice existe en el schema (`MatchType`, `Schedulin
 
 ---
 
-## WhatsApp Webhook – Verificación de firma
-
-**Prioridad:** Media
-**Módulo:** `whatsapp`
-
-El webhook (`POST /whatsapp/webhook`) acepta cualquier request sin validar que provenga realmente de Wasender/Whapi. Cualquiera que conozca la URL podría enviar POSTs falsos y simular respuestas YES/NO de candidatos.
-
-**Propuesta:**
-
-1. Guardar el secret del provider en env:
-   ```
-   WASENDER_WEBHOOK_SECRET=...
-   WHAPI_WEBHOOK_SECRET=...
-   ```
-2. Implementar verificación de firma en `WhatsappController.webhook`:
-   - Consultar la docs de cada provider para el header y algoritmo (HMAC-SHA256 habitual).
-   - Validar antes de procesar el body; devolver 401 si es inválido.
-3. Mantener el comportamiento actual cuando no se configure secret (desarrollo / mock provider).
-
----
 
 ## Rate limiting en endpoints públicos
 

@@ -11,7 +11,6 @@ import { useTranslation } from "@/lib/i18n/use-translation"
 interface AddToCalendarButtonProps {
   date: string // "2026-02-19"
   time: string // "18:00"
-  endTime?: string // "19:00" — if omitted, defaults to 1h after start
   location: string
   /** Participant names (2 for singles, 4 for doubles). Used in description. */
   participants: string[]
@@ -72,19 +71,13 @@ function buildCalendarParts(props: AddToCalendarButtonProps, t: TFn) {
 const EUROPE_MADRID_TZ = "Europe/Madrid"
 
 function buildDateTimeRange(props: AddToCalendarButtonProps) {
-  const { date, time, endTime } = props
+  const { date, time } = props
   const [year, month, day] = date.split("-").map((v) => parseInt(v, 10))
   const [hours, minutes] = time.split(":").map((v) => parseInt(v, 10))
 
   // Treat date/time as local wall-clock time in Europe/Madrid.
   const start = new Date(year, month - 1, day, hours, minutes, 0, 0)
-  let end: Date
-  if (endTime) {
-    const [endHours, endMinutes] = endTime.split(":").map((v) => parseInt(v, 10))
-    end = new Date(year, month - 1, day, endHours, endMinutes, 0, 0)
-  } else {
-    end = new Date(start.getTime() + 60 * 60 * 1000) // fallback: 60 minutes
-  }
+  const end = new Date(start.getTime() + 60 * 60 * 1000) // always 1 hour
 
   const fmt = (d: Date) => {
     const y = d.getFullYear().toString().padStart(4, "0")

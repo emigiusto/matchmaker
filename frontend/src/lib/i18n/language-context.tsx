@@ -13,8 +13,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 function detectLanguage(): Language {
   const saved = localStorage.getItem("language")
   if (saved === "en" || saved === "es") return saved
-  const browserLang = navigator.language?.toLowerCase() ?? ""
-  return browserLang.startsWith("en") ? "en" : "es"
+  return "es"
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
