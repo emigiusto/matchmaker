@@ -4,6 +4,7 @@ import { Phone, MapPin, Building2, Loader2, Swords, ArrowLeft, CheckCircle2 } fr
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { PhoneInput } from "@/components/phone-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth/AuthContext"
@@ -17,21 +18,36 @@ import { Link, useSearchParams } from "react-router-dom"
 const TOTAL_STEPS = 3
 
 // step 0 = welcome, steps 1-3 = data, step 4 = success
-function StepIndicator({ current }: { current: number }) {
+function StepIndicator({ current, onBack }: { current: number; onBack?: () => void }) {
+  const { t } = useTranslation()
   return (
-    <div className="flex items-center gap-2">
-      {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-        <div
-          key={i}
-          className={`h-2 rounded-full transition-all ${
-            i + 1 === current
-              ? "w-6 bg-primary"
-              : i + 1 < current
-              ? "w-2 bg-primary/40"
-              : "w-2 bg-muted-foreground/20"
-          }`}
-        />
-      ))}
+    <div className="flex items-center gap-3">
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center justify-center h-7 w-7 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+          aria-label={t("onboarding.back")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+      ) : (
+        <div className="w-7 shrink-0" />
+      )}
+      <div className="flex items-center gap-2">
+        {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+          <div
+            key={i}
+            className={`h-2 rounded-full transition-all ${
+              i + 1 === current
+                ? "w-6 bg-primary"
+                : i + 1 < current
+                ? "w-2 bg-primary/40"
+                : "w-2 bg-muted-foreground/20"
+            }`}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -77,14 +93,9 @@ export default function Onboarding() {
   }, [user])
 
   async function finish() {
-    if (!user) return
     setSaving(true)
     try {
-      await usersService.completeOnboarding(user.id)
-      await refreshUser()
       setStep(4)
-    } catch {
-      toast.error(t("error.somethingWentWrong"))
     } finally {
       setSaving(false)
     }
@@ -95,6 +106,8 @@ export default function Onboarding() {
     setSaving(true)
     try {
       await usersService.update(user.id, { phone: phone.trim() })
+      await usersService.completeOnboarding(user.id)
+      await refreshUser()
       setStep(2)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
@@ -175,9 +188,12 @@ export default function Onboarding() {
 
           {/* Step indicator — only for data steps 1–3 */}
           {step >= 1 && step <= 3 && (
-            <div className="space-y-2 text-center">
-              <StepIndicator current={step} />
-              <p className="text-xs text-muted-foreground">
+            <div className="space-y-1">
+              <StepIndicator
+                current={step}
+                onBack={step > 1 ? () => setStep(step - 1) : undefined}
+              />
+              <p className="text-xs text-muted-foreground pl-10">
                 {t("onboarding.stepOf", { current: step, total: TOTAL_STEPS })}
               </p>
             </div>
@@ -202,7 +218,6 @@ export default function Onboarding() {
               icon={<Phone className="h-5 w-5 text-primary" />}
               title={t("onboarding.step1.title")}
               description={t("onboarding.step1.description")}
-              onBack={() => setStep(0)}
             >
               <div className="space-y-1.5">
                 <Label>{t("onboarding.step1.phoneLabel")}</Label>
@@ -227,7 +242,6 @@ export default function Onboarding() {
               icon={<MapPin className="h-5 w-5 text-primary" />}
               title={t("onboarding.step2.title")}
               description={t("onboarding.step2.description")}
-              onBack={() => setStep(1)}
             >
               <div className="space-y-1.5">
                 <Label>{t("onboarding.step2.clubLabel")}</Label>
@@ -262,7 +276,7 @@ export default function Onboarding() {
               icon={<Building2 className="h-5 w-5 text-primary" />}
               title={t("onboarding.step3.title")}
               description={t("onboarding.step3.description")}
-              onBack={() => setStep(2)}
+              optional
             >
               <div className="space-y-1.5">
                 <Label>{t("onboarding.step3.clubLabel")}</Label>
@@ -305,6 +319,7 @@ export default function Onboarding() {
                 continueLabel={t("onboarding.step3.connect")}
                 skipLabel={t("onboarding.step3.skipLabel")}
                 continueDisabled={!socioNumber.trim()}
+                skipProminent
               />
             </StepCard>
           )}
@@ -337,34 +352,31 @@ function StepCard({
   icon,
   title,
   description,
-  onBack,
+  optional,
   children,
 }: {
   icon: React.ReactNode
   title: string
   description: string
-  onBack?: () => void
+  optional?: boolean
   children: React.ReactNode
 }) {
   const { t } = useTranslation()
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
       <div className="space-y-1">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            {t("onboarding.back")}
-          </button>
-        )}
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
             {icon}
           </div>
-          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+            {optional && (
+              <Badge variant="secondary" className="text-xs font-normal">
+                {t("onboarding.optional")}
+              </Badge>
+            )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground pl-11">{description}</p>
       </div>
@@ -380,6 +392,7 @@ function StepActions({
   continueLabel,
   skipLabel,
   continueDisabled,
+  skipProminent,
 }: {
   onContinue: () => void
   onSkip: () => void
@@ -387,6 +400,7 @@ function StepActions({
   continueLabel: string
   skipLabel: string
   continueDisabled: boolean
+  skipProminent?: boolean
 }) {
   return (
     <div className="flex flex-col items-center gap-3 pt-2">
@@ -398,14 +412,26 @@ function StepActions({
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {continueLabel}
       </Button>
-      <button
-        type="button"
-        onClick={onSkip}
-        disabled={loading}
-        className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-      >
-        {skipLabel}
-      </button>
+      {skipProminent ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={onSkip}
+          disabled={loading}
+        >
+          {skipLabel}
+        </Button>
+      ) : (
+        <button
+          type="button"
+          onClick={onSkip}
+          disabled={loading}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          {skipLabel}
+        </button>
+      )}
     </div>
   )
 }

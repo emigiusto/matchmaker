@@ -21,6 +21,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,7 @@ export function AppSidebar() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { setOpenMobile } = useSidebar()
   const [wizardOpen, setWizardOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(user?.name ?? null)
   const { t } = useTranslation()
@@ -89,7 +91,7 @@ export function AppSidebar() {
     <>
       <Sidebar>
         <SidebarHeader className="px-5 py-5">
-          <Link to="/dashboard" className="flex items-center gap-3">
+          <Link to="/dashboard" onClick={() => setOpenMobile(false)} className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary">
               <Swords className="h-5 w-5 text-primary-foreground" />
             </div>
@@ -125,7 +127,7 @@ export function AppSidebar() {
                       asChild
                       isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                     >
-                      <Link to={item.href}>
+                      <Link to={item.href} onClick={() => setOpenMobile(false)}>
                         <item.icon className="h-5 w-5" />
                         <span className="text-base">{item.title}</span>
                       </Link>
@@ -147,7 +149,7 @@ export function AppSidebar() {
                       asChild
                       isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                     >
-                      <Link to={item.href}>
+                      <Link to={item.href} onClick={() => setOpenMobile(false)}>
                         <item.icon className="h-5 w-5" />
                         <span className="text-base">{item.title}</span>
                       </Link>
@@ -163,6 +165,7 @@ export function AppSidebar() {
             <div className="flex items-center justify-between gap-2">
               <Link
                 to="/profile"
+                onClick={() => setOpenMobile(false)}
                 className="flex flex-1 items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-sidebar-accent min-w-0"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">

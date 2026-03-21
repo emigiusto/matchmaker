@@ -903,6 +903,7 @@
     "continue": "Continue",
     "skip": "Skip for now",
     "back": "Back",
+    "optional": "Optional",
     "welcome": {
       "title": "Welcome to Matchmaker!",
       "description": "Let's get your account set up in just a few steps so you can start playing.",
