@@ -118,6 +118,7 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, Notification["type"]> = {
   "booking.success": "booking_success",
   "result_pending": "result_pending",
   "rating_change": "rating_change",
+  "match.rescheduled": "invite_accepted",
 }
 
 function deriveNotificationTitle(type: string, payload: Record<string, unknown>): string {
@@ -147,6 +148,10 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
       return "Court booking cancellation failed"
     case "booking.success":
       return "Court booked"
+    case "match.rescheduled": {
+      const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
+      return opponents ? `Match vs ${opponents} rescheduled` : "Match rescheduled"
+    }
     default:
       return type.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   }
@@ -218,6 +223,15 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
       return "The court booking for your cancelled match has been successfully cancelled."
     case "booking.cancel_failed":
       return "The court booking for your cancelled match could not be cancelled automatically. Please cancel it manually at the club."
+    case "match.rescheduled": {
+      const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
+      const parts: string[] = []
+      if (opponents) parts.push(`vs ${opponents}`)
+      if (dateStr) parts.push(dateStr)
+      if (timeStr) parts.push(`at ${timeStr}`)
+      if (location) parts.push(`· ${location}`)
+      return parts.length > 0 ? `New time: ${parts.join(" ")}.` : "The match has been rescheduled."
+    }
     case "booking.success": {
       const courtName = payload.courtName && typeof payload.courtName === "string" ? payload.courtName : null
       return courtName ? `${courtName} has been booked for your match.` : "Your court has been booked."

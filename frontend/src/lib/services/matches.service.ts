@@ -29,8 +29,8 @@ export const matchesService = {
     return adaptMatch(dto)
   },
 
-  async reschedule(matchId: string, userId: string, scheduledAt: string): Promise<Match> {
-    const dto = await apiClient.post<BackendMatchDTO>(`/matches/${matchId}/reschedule`, { userId, scheduledAt })
+  async reschedule(matchId: string, userId: string, scheduledAt: string, cancelBooking?: boolean): Promise<Match> {
+    const dto = await apiClient.post<BackendMatchDTO>(`/matches/${matchId}/reschedule`, { userId, scheduledAt, cancelBooking })
     return adaptMatch(dto)
   },
 

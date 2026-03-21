@@ -707,7 +707,7 @@
     "rescheduleMatch": {
       "button": "Cambiar horario",
       "title": "Cambiar fecha/hora",
-      "description": "Elige una nueva fecha y hora para el partido. Si la reserva automática está activa, se cancelará la reserva actual e intentará una nueva.",
+      "description": "Elige una nueva fecha y hora para el partido.",
       "newDate": "Nueva fecha",
       "newTime": "Nueva hora",
       "pickDate": "Elige una fecha",
@@ -718,7 +718,13 @@
       "courtAvailability": "Disponibilidad de pistas",
       "courtAvailabilityHint": "Selecciona una fecha para ver las pistas disponibles",
       "checkingCourts": "Comprobando pistas disponibles…",
-      "noAvailabilityData": "Sin datos de disponibilidad"
+      "noAvailabilityData": "Sin datos de disponibilidad",
+      "cancelBookingPrompt": {
+        "title": "¿Cancelar la reserva de pista?",
+        "description": "El partido ha sido reprogramado. ¿Quieres cancelar la reserva de pista existente?",
+        "yes": "Sí, cancelar reserva",
+        "no": "Mantener reserva"
+      }
     }
   },
   "matchesUpcoming": {
@@ -759,7 +765,9 @@
       "noPlayersFound": "No se encontraron jugadores",
       "courtBooked": "Pista reservada",
       "bookingCancelled": "Reserva de pista cancelada",
-      "bookingCancelFailed": "No se pudo cancelar la reserva de pista"
+      "bookingCancelFailed": "No se pudo cancelar la reserva de pista",
+      "matchRescheduled": "Partido reprogramado",
+      "matchRescheduledVs": "Partido vs {{opponents}} reprogramado"
     },
     "messages": {
       "scheduledForDate": "Se programó un partido para el {{date}}.",
@@ -778,7 +786,9 @@
       "courtBooked": "{{court}} ha sido reservada para tu partido.",
       "courtBookedGeneric": "Tu pista ha sido reservada.",
       "bookingCancelled": "La reserva de pista para tu partido cancelado ha sido cancelada correctamente.",
-      "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club."
+      "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club.",
+      "matchRescheduled": "El partido ha sido reprogramado.",
+      "matchRescheduledParts": "Nuevo horario: {{parts}}."
     }
   },
   "contactsPage": {

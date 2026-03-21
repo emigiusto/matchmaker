@@ -707,7 +707,7 @@
     "rescheduleMatch": {
       "button": "Reschedule",
       "title": "Reschedule Match",
-      "description": "Choose a new date and time for the match. If auto-booking is enabled, the existing court reservation will be cancelled and a new one will be attempted.",
+      "description": "Choose a new date and time for the match.",
       "newDate": "New date",
       "newTime": "New time",
       "pickDate": "Pick a date",
@@ -718,7 +718,13 @@
       "courtAvailability": "Court availability",
       "courtAvailabilityHint": "Select a date to see available courts",
       "checkingCourts": "Checking available courts…",
-      "noAvailabilityData": "No availability data"
+      "noAvailabilityData": "No availability data",
+      "cancelBookingPrompt": {
+        "title": "Cancel court booking?",
+        "description": "The match has been rescheduled. Do you want to cancel the existing court booking?",
+        "yes": "Yes, cancel booking",
+        "no": "Keep booking"
+      }
     }
   },
   "matchesUpcoming": {
@@ -759,7 +765,9 @@
       "noPlayersFound": "No players found",
       "courtBooked": "Court booked",
       "bookingCancelled": "Court booking cancelled",
-      "bookingCancelFailed": "Court booking cancellation failed"
+      "bookingCancelFailed": "Court booking cancellation failed",
+      "matchRescheduled": "Match rescheduled",
+      "matchRescheduledVs": "Match vs {{opponents}} rescheduled"
     },
     "messages": {
       "scheduledForDate": "A match was scheduled for {{date}}.",
@@ -778,7 +786,9 @@
       "courtBooked": "{{court}} has been booked for your match.",
       "courtBookedGeneric": "Your court has been booked.",
       "bookingCancelled": "The court booking for your cancelled match has been successfully cancelled.",
-      "bookingCancelFailed": "The court booking could not be cancelled automatically. Please cancel it manually at the club."
+      "bookingCancelFailed": "The court booking could not be cancelled automatically. Please cancel it manually at the club.",
+      "matchRescheduled": "The match has been rescheduled.",
+      "matchRescheduledParts": "New time: {{parts}}."
     }
   },
   "contactsPage": {

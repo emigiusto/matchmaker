@@ -398,7 +398,7 @@ async function cancelBookingOnMatchCancel(matchId: string, hostUserId: string): 
  * Only participants can reschedule; only scheduled matches can be rescheduled.
  * Fires-and-forgets a booking reset (cancel old + rebook) if auto-booking is active.
  */
-export async function rescheduleMatch(matchId: string, userId: string, scheduledAt: string): Promise<MatchDTO> {
+export async function rescheduleMatch(matchId: string, userId: string, scheduledAt: string, cancelBooking?: boolean): Promise<MatchDTO> {
   const newTime = new Date(scheduledAt)
   if (isNaN(newTime.getTime())) throw new AppError('Invalid scheduledAt value', 400)
   if (newTime <= new Date()) throw new AppError('New scheduled time must be in the future', 400)
@@ -447,10 +447,12 @@ export async function rescheduleMatch(matchId: string, userId: string, scheduled
     return toMatchDTO(updated as EnrichedMatch)
   })
 
-  // Fire-and-forget: reset court booking with new time
-  resetBookingForReschedule(matchId).catch((err) => {
-    logger.error('Failed to reset booking on reschedule', { matchId, error: err instanceof Error ? err.message : String(err) })
-  })
+  // Fire-and-forget: cancel old booking and rebook for new time — only if user opted in
+  if (cancelBooking) {
+    resetBookingForReschedule(matchId).catch((err) => {
+      logger.error('Failed to reset booking on reschedule', { matchId, error: err instanceof Error ? err.message : String(err) })
+    })
+  }
 
   // Notify all participants + send WhatsApp message + rename group
   notifyMatchParticipantsOnReschedule(matchId, dto, timezone).catch((err) => {
@@ -463,6 +465,11 @@ export async function rescheduleMatch(matchId: string, userId: string, scheduled
 async function notifyMatchParticipantsOnReschedule(matchId: string, match: MatchDTO, timezone: string): Promise<void> {
   const participants = match.participants ?? []
   for (const p of participants) {
+    const opponentNames = participants
+      .filter((o) => o.userId !== p.userId)
+      .map((o) => o.userName ?? 'Opponent')
+      .filter(Boolean)
+      .join(', ')
     try {
       await createNotification(p.userId, 'match.rescheduled', {
         matchId: match.id,
@@ -470,6 +477,7 @@ async function notifyMatchParticipantsOnReschedule(matchId: string, match: Match
         date: match.date,
         time: match.time,
         location: match.location,
+        opponentNames: opponentNames || undefined,
       })
     } catch (err) {
       logger.error('Failed to create match.rescheduled notification', {

@@ -153,7 +153,7 @@ function getInviteButtons(locale: string | null | undefined, slots: string[]): {
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
-function formatGroupInviteFallbackMessage(input: {
+function formatGroupInviteMessage(input: {
   sportType: string;
   format: string;
   whenStr: string;
@@ -178,11 +178,8 @@ function formatGroupInviteFallbackMessage(input: {
     '',
     ...(matchUrl ? [`🔗 *${isEs ? 'Ver partido' : 'View match'}:* ${matchUrl}`, ''] : []),
     isEs
-      ? '⚠️ No pudimos añadirte directamente al grupo de WhatsApp (configuración de privacidad).'
-      : "⚠️ We couldn't add you directly to the WhatsApp group (privacy settings).",
-    isEs
-      ? 'Usa el enlace de abajo para unirte y chatear con los otros jugadores:'
-      : 'Use the link below to join and chat with the other players:',
+      ? 'Únete al grupo de WhatsApp del partido:'
+      : 'Join the match WhatsApp group:',
   ].join('\n');
 }
 
@@ -995,7 +992,7 @@ export const schedulingService = {
                   ? others.join(', ')
                   : undefined;
 
-            return formatGroupInviteFallbackMessage({
+            return formatGroupInviteMessage({
               sportType: request.sportType,
               format,
               whenStr,

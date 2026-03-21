@@ -183,11 +183,11 @@ export class MatchesController {
   static async rescheduleMatch(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { userId, scheduledAt } = req.body;
+      const { userId, scheduledAt, cancelBooking } = req.body;
       if (!id || typeof id !== 'string') return res.status(400).json({ error: 'Missing or invalid match id' });
       if (!userId || typeof userId !== 'string') return res.status(400).json({ error: 'Missing or invalid userId' });
       if (!scheduledAt || typeof scheduledAt !== 'string') return res.status(400).json({ error: 'Missing or invalid scheduledAt' });
-      const match = await MatchesService.rescheduleMatch(id, userId, scheduledAt);
+      const match = await MatchesService.rescheduleMatch(id, userId, scheduledAt, cancelBooking === true);
       res.json(match);
     } catch (err) {
       next(err);
