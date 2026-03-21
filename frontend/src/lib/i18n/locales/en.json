@@ -940,6 +940,13 @@
       "skipLabel": "I'll set this up later"
     }
   },
+  "notFound": {
+    "title": "Match not found",
+    "description": "This page is out of bounds. The court you're looking for doesn't exist.",
+    "backToDashboard": "Back to dashboard",
+    "backToLogin": "Back to login",
+    "goHome": "Go home"
+  },
   "publicMatch": {
     "title": "Match details",
     "subtitle": "Here are the details for this upcoming match.",

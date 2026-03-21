@@ -940,6 +940,13 @@
       "skipLabel": "Lo configuraré más adelante"
     }
   },
+  "notFound": {
+    "title": "Partido no encontrado",
+    "description": "Esta página está fuera de los límites. La pista que buscas no existe.",
+    "backToDashboard": "Volver al panel",
+    "backToLogin": "Volver al inicio de sesión",
+    "goHome": "Ir al inicio"
+  },
   "publicMatch": {
     "title": "Detalles del partido",
     "subtitle": "Aquí tienes los detalles de este próximo partido.",

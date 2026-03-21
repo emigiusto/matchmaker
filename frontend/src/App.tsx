@@ -25,6 +25,7 @@ import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
 import ProfileView from '@/pages/ProfileView/ProfileView'
 import Contacts from '@/pages/Contacts/Contacts'
+import NotFound from '@/pages/NotFound/NotFound'
 // import Reminders from '@/pages/Reminders/Reminders'
 // import AiCoachCompanion from '@/pages/AiCoachCompanion/AiCoachCompanion'
 // import AiCoachInsights from '@/pages/AiCoachInsights/AiCoachInsights'
@@ -106,6 +107,8 @@ function App() {
                 <Route path="/profile/:userId" element={<ProfileView />} />
                 <Route path="/contacts" element={<Contacts />} />
               </Route>
+              {/* 404 catch-all */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
         </AuthProvider>
