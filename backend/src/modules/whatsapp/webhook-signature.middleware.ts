@@ -6,17 +6,18 @@ import { logger } from '../../config/logger';
  * Incoming webhook signature header per provider.
  *
  * Whapi:    https://whapi.cloud/docs — header: x-whapi-signature
- * Wasender: https://wasenderapi.com/api-docs — header: x-hub-signature-256
+ *           Verification: HMAC-SHA256 of raw body, hex-encoded, prefixed with "sha256=".
  *
- * Both use HMAC-SHA256 of the raw request body, hex-encoded, prefixed with "sha256=".
+ * Wasender: header: x-webhook-signature
+ *           Verification: raw secret compared directly against the header value.
  */
 const SIGNATURE_HEADER: Record<string, string> = {
   whapi: 'x-whapi-signature',
-  wasender: 'x-hub-signature-256',
+  wasender: 'x-webhook-signature',
 };
 
 /**
- * Middleware that verifies the HMAC-SHA256 signature on incoming WhatsApp webhook requests.
+ * Middleware that verifies incoming WhatsApp webhook requests.
  *
  * Configure via env:
  *   WHAPI_WEBHOOK_SECRET=...    (when WHATSAPP_PROVIDER=whapi)
@@ -50,10 +51,22 @@ export function verifyWebhookSignature(req: Request, res: Response, next: NextFu
 
   const signature = req.headers[headerName] as string | undefined;
   if (!signature) {
-    logger.info(`[webhook] Missing ${headerName} header — skipping signature verification`);
+    logger.warn(`[webhook] Missing ${headerName} header`);
+    res.status(401).json({ error: 'Missing webhook signature' });
+    return;
+  }
+
+  // Wasender compares the header value directly against the secret (no HMAC).
+  if (provider === 'wasender') {
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(secret))) {
+      logger.warn('[webhook] Invalid signature from wasender');
+      res.status(401).json({ error: 'Invalid webhook signature' });
+      return;
+    }
     return next();
   }
 
+  // Whapi (and future providers): HMAC-SHA256 of raw body, prefixed with "sha256=".
   const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
   if (!rawBody) {
     logger.error('[webhook] rawBody unavailable — express.json verify callback may be missing');
