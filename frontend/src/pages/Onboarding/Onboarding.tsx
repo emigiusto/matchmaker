@@ -12,7 +12,7 @@ import { usersService } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
 import { bookingService, SUPPORTED_CLUBS } from "@/lib/services/booking.service"
 import { toast } from "sonner"
-import { Link } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 
 const TOTAL_STEPS = 3
 
@@ -40,6 +40,8 @@ export default function Onboarding() {
   const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
+  const redirectAfter = searchParams.get("redirect") ?? "/dashboard"
 
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -144,6 +146,7 @@ export default function Onboarding() {
       await finish()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
+    } finally {
       setSaving(false)
     }
   }
@@ -318,7 +321,7 @@ export default function Onboarding() {
                 <h2 className="text-xl font-semibold tracking-tight">{t("onboarding.done.title")}</h2>
                 <p className="text-sm text-muted-foreground">{t("onboarding.done.description")}</p>
               </div>
-              <Button className="w-full" onClick={() => navigate("/dashboard", { replace: true })}>
+              <Button className="w-full" onClick={() => navigate(redirectAfter, { replace: true })}>
                 {t("onboarding.done.button")}
               </Button>
             </div>

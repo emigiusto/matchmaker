@@ -32,7 +32,10 @@ export default function SignupPage() {
     setSubmitting(true)
     try {
       await signup(name, email, password)
-      navigate("/onboarding", { replace: true })
+      const onboardingUrl = redirect !== "/dashboard"
+        ? `/onboarding?redirect=${encodeURIComponent(redirect)}`
+        : "/onboarding"
+      navigate(onboardingUrl, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed")
     } finally {
