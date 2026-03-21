@@ -17,10 +17,11 @@ model User {
   email        String?  @unique
   phone        String?  @unique
   passwordHash String?
-  isGuest      Boolean  @default(true)
-  locale       String   @default("es")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isGuest             Boolean  @default(true)
+  locale              String   @default("es")
+  onboardingCompleted Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   player         Player?
   availabilities Availability[]

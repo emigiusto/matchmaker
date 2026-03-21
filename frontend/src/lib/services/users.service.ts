@@ -35,4 +35,8 @@ export const usersService = {
   async update(userId: string, data: UpdateUserInput): Promise<User> {
     return apiClient.put<User>(`/users/${userId}`, data)
   },
+
+  async completeOnboarding(userId: string): Promise<void> {
+    await apiClient.post(`/users/${userId}/complete-onboarding`, {})
+  },
 }

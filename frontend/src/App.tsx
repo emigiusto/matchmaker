@@ -18,6 +18,9 @@ import Signup from '@/pages/Signup/Signup'
 // Disabled for v1 - components kept for future use
 // import Suggested from '@/pages/Suggested/Suggested'
 // import MatchesPast from '@/pages/MatchesPast/MatchesPast'
+import MatchDetails from '@/pages/MatchDetails/MatchDetails'
+import PublicMatchDetails from '@/pages/MatchDetails/PublicMatchDetails'
+import Onboarding from '@/pages/Onboarding/Onboarding'
 import MatchDetailsGate from '@/pages/MatchDetails/MatchDetailsGate'
 import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 // import Rankings from '@/pages/Rankings/Rankings'
@@ -70,6 +73,16 @@ function App() {
               <Route path="/join/:token" element={<JoinRequest />} />
               {/* Match details: public view if not logged in, full view if logged in */}
               <Route path="/matches/:id" element={<MatchDetailsGate />} />
+
+              {/* Onboarding — requires auth but no sidebar, skips the onboarding check */}
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute skipOnboardingCheck>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected: Dashboard layout (with sidebar) */}
               <Route

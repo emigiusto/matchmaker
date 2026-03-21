@@ -898,6 +898,47 @@
       "removeFailed": "Failed to remove connection"
     }
   },
+  "onboarding": {
+    "stepOf": "Step {{current}} of {{total}}",
+    "continue": "Continue",
+    "skip": "Skip for now",
+    "back": "Back",
+    "welcome": {
+      "title": "Welcome to Matchmaker!",
+      "description": "Let's get your account set up in just a few steps so you can start playing.",
+      "getStarted": "Get started"
+    },
+    "done": {
+      "title": "You're all set!",
+      "description": "Your profile is ready. Time to find your first match.",
+      "button": "Go to dashboard"
+    },
+    "step1": {
+      "title": "Your phone number",
+      "description": "Required for WhatsApp invites and match reminders.",
+      "phoneLabel": "Phone"
+    },
+    "step2": {
+      "title": "Where do you play?",
+      "description": "Set your default club and city. You can change these at any time.",
+      "clubLabel": "Preferred club or court",
+      "clubPlaceholder": "e.g. Club Tennis Barcelona",
+      "cityLabel": "City",
+      "cityPlaceholder": "e.g. Barcelona"
+    },
+    "step3": {
+      "title": "Connect your club",
+      "description": "Enable automatic court booking when a match is confirmed. You can set this up later in your profile.",
+      "clubLabel": "Club",
+      "socioLabel": "Socio number",
+      "socioPlaceholder": "e.g. 12345",
+      "passwordLabel": "Portal password",
+      "passwordPlaceholder": "Your club portal password",
+      "passwordNote": "Stored encrypted. Only used to log in to the club portal on your behalf.",
+      "connect": "Connect club",
+      "skipLabel": "I'll set this up later"
+    }
+  },
   "publicMatch": {
     "title": "Match details",
     "subtitle": "Here are the details for this upcoming match.",

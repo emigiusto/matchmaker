@@ -20,6 +20,7 @@ export async function findAllUsers(): Promise<UserDTO[]> {
       email: true,
       phone: true,
       isGuest: true,
+      onboardingCompleted: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -244,15 +245,27 @@ export async function findProfileByUserId(userId: string): Promise<{
 }
 
 /**
+ * Mark onboarding as completed for a user.
+ */
+export async function completeOnboarding(userId: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { onboardingCompleted: true },
+  });
+  await cacheDel(`userdto:${userId}`);
+}
+
+/**
  * Convert Prisma user object to API UserDTO type
  */
-function toDTO(user: Pick<PrismaUser, 'id' | 'name' | 'email' | 'phone' | 'isGuest' | 'createdAt' | 'updatedAt'>): UserDTO {
+function toDTO(user: Pick<PrismaUser, 'id' | 'name' | 'email' | 'phone' | 'isGuest' | 'onboardingCompleted' | 'createdAt' | 'updatedAt'>): UserDTO {
   return {
     id: user.id,
     name: user.name ?? undefined,
     email: user.email ?? undefined,
     phone: user.phone ?? undefined,
     isGuest: user.isGuest,
+    onboardingCompleted: user.onboardingCompleted,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

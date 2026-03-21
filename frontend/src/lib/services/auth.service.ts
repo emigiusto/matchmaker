@@ -6,6 +6,7 @@ export interface AuthUser {
   email?: string
   phone?: string
   isGuest: boolean
+  onboardingCompleted: boolean
 }
 
 export interface AuthResponse {

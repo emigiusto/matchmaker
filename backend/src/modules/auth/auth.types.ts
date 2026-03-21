@@ -17,7 +17,9 @@ export interface AuthResponse {
     id: string;
     name?: string;
     email?: string;
+    phone?: string;
     isGuest: boolean;
+    onboardingCompleted: boolean;
   };
   token: string;
 }

@@ -37,7 +37,7 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
   });
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
   return {
-    user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, isGuest: user.isGuest },
+    user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, isGuest: user.isGuest, onboardingCompleted: user.onboardingCompleted },
     token,
   };
 }
@@ -62,7 +62,7 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   }
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
   return {
-    user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, isGuest: user.isGuest },
+    user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, isGuest: user.isGuest, onboardingCompleted: user.onboardingCompleted },
     token,
   };
 }
