@@ -755,13 +755,6 @@ export const schedulingService = {
     });
     if (!candidate || candidate.status !== 'waiting_reply') return;
 
-    const phone = candidate.contactUser?.phone;
-    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
-    if (phone && pollMessageId) {
-      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
-      if (!result.success) logger.warn('FailedToReactInviteExpired', { candidateId, phone });
-    }
-
     await schedulingRepository.updateCandidateStatus(candidateId, 'expired');
     logger.info('InviteExpired', { requestId: candidate.schedulingRequestId, candidateId });
     void recordEvent({ schedulingRequestId: candidate.schedulingRequestId, action: 'invite_expired', candidateId });
@@ -903,16 +896,8 @@ export const schedulingService = {
 
     logger.info('MatchCreated', { matchId: match.id, requestId });
 
-    // React to all open poll messages with 🔒 to signal the match has been scheduled
+    // Notify contacted candidates who were not selected for the match
     for (const candidate of request.candidates) {
-      const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
-      const phone = (candidate.contactUser as { phone?: string | null } | null)?.phone;
-      if (pollMessageId && phone) {
-        void whatsappService.sendReaction(phone, pollMessageId, '🔒').catch((err) => {
-          logger.warn('FailedToReactToPoll', { candidateId: candidate.id, error: err instanceof Error ? err.message : err });
-        });
-      }
-      // Notify contacted candidates who were not selected for the match
       if (['contacted', 'waiting_reply'].includes(candidate.status)) {
         void sendInviteNoLongerAvailable(request, candidate);
       }
@@ -1156,13 +1141,6 @@ export const schedulingService = {
       throw new AppError('Only contacted candidates can be cancelled this way', 400);
     }
 
-    const phone = candidate.contactUser?.phone;
-    const pollMessageId = (candidate as { pollMessageId?: string | null }).pollMessageId;
-    if (phone && pollMessageId) {
-      const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
-      if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId, phone });
-    }
-
     await schedulingRepository.updateCandidateStatus(candidateId, 'cancelled');
     void recordEvent({ schedulingRequestId: requestId, action: 'candidate_cancelled', candidateId, actorUserId: userId });
     logger.info('ContactedCandidateCancelled', { requestId, candidateId, userId });
@@ -1249,16 +1227,6 @@ export const schedulingService = {
     );
 
     for (const c of toNotify) {
-      const phone = c.contactUser?.phone;
-      const pollMessageId = (c as { pollMessageId?: string | null }).pollMessageId;
-      if (phone && pollMessageId) {
-        try {
-          const result = await whatsappService.sendReaction(phone, pollMessageId, '❌');
-          if (!result.success) logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, phone });
-        } catch (e) {
-          logger.warn('FailedToReactInviteCancelled', { candidateId: c.id, error: e });
-        }
-      }
       void sendInviteNoLongerAvailable(request, c);
       await schedulingRepository.updateCandidateStatus(c.id, 'cancelled');
     }
