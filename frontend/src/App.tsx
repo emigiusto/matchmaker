@@ -18,8 +18,6 @@ import Signup from '@/pages/Signup/Signup'
 // Disabled for v1 - components kept for future use
 // import Suggested from '@/pages/Suggested/Suggested'
 // import MatchesPast from '@/pages/MatchesPast/MatchesPast'
-import MatchDetails from '@/pages/MatchDetails/MatchDetails'
-import PublicMatchDetails from '@/pages/MatchDetails/PublicMatchDetails'
 import Onboarding from '@/pages/Onboarding/Onboarding'
 import MatchDetailsGate from '@/pages/MatchDetails/MatchDetailsGate'
 import InviteDetails from '@/pages/InviteDetails/InviteDetails'
