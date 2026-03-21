@@ -14,7 +14,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
-  const redirect = searchParams.get("redirect") ?? "/dashboard"
+  const redirect = searchParams.get("redirect") ?? "/"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -28,7 +28,7 @@ export default function LoginPage() {
     try {
       const user = await login(email, password)
       if (!user.onboardingCompleted) {
-        const onboardingUrl = redirect !== "/dashboard"
+        const onboardingUrl = redirect !== "/"
           ? `/onboarding?redirect=${encodeURIComponent(redirect)}`
           : "/onboarding"
         navigate(onboardingUrl, { replace: true })
@@ -102,7 +102,7 @@ export default function LoginPage() {
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             {t("login.noAccount")}{" "}
-            <Link to={`/signup${redirect !== "/dashboard" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="font-medium text-primary hover:underline">
+            <Link to={`/signup${redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="font-medium text-primary hover:underline">
               {t("login.signUp")}
             </Link>
           </p>

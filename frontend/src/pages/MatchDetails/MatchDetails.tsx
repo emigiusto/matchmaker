@@ -206,7 +206,7 @@ export default function MatchDetailPage() {
           <div className="text-center">
             <p className="text-sm text-muted-foreground">{t("matchDetails.notFound")}</p>
             <Button variant="ghost" className="mt-4" asChild>
-              <Link to="/dashboard">{t("common.back")}</Link>
+              <Link to="/">{t("common.back")}</Link>
             </Button>
           </div>
         </div>
@@ -232,7 +232,7 @@ export default function MatchDetailPage() {
     <>
       <PageHeader title={t("matchDetails.title")}>
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/dashboard">
+          <Link to="/">
             <ArrowLeft className="mr-1.5 h-4 w-4" /> {t("common.back")}
           </Link>
         </Button>

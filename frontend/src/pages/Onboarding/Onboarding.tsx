@@ -57,7 +57,7 @@ export default function Onboarding() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
-  const redirectAfter = searchParams.get("redirect") ?? "/dashboard"
+  const redirectAfter = searchParams.get("redirect") ?? "/"
 
   // If onboarding is already completed (e.g. done on another device), skip to destination
   useEffect(() => {

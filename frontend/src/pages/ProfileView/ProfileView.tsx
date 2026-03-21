@@ -87,7 +87,7 @@ export default function PlayerProfilePage() {
     <>
       <PageHeader title={t("profileView.title")}>
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/dashboard">
+          <Link to="/">
             <ArrowLeft className="mr-1.5 h-4 w-4" /> {t("common.back")}
           </Link>
         </Button>

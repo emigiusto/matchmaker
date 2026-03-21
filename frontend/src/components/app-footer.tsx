@@ -9,7 +9,7 @@ export function AppFooter() {
     <footer className="mt-auto shrink-0 border-t border-border/60 bg-muted/30 px-5 py-3 lg:px-8">
       <div className="flex flex-col items-center justify-between gap-2 sm:flex-row sm:gap-4">
         <Link
-          to="/dashboard"
+          to="/"
           className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <Swords className="h-3.5 w-3.5 text-primary" />

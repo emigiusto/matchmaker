@@ -65,7 +65,7 @@ export function AppSidebar() {
   }, [currentUserId])
 
   const mainNav = [
-    { title: t("navigation.dashboard"), href: "/dashboard", icon: LayoutDashboard },
+    { title: t("navigation.dashboard"), href: "/", icon: LayoutDashboard },
     { title: t("navigation.myInvites"), href: "/play", icon: CirclePlay },
     { title: t("navigation.matches"), href: "/matches", icon: Swords },
     { title: t("navigation.contacts"), href: "/contacts", icon: BookUser },
@@ -91,7 +91,7 @@ export function AppSidebar() {
     <>
       <Sidebar>
         <SidebarHeader className="px-5 py-5">
-          <Link to="/dashboard" onClick={() => setOpenMobile(false)} className="flex items-center gap-3">
+          <Link to="/" onClick={() => setOpenMobile(false)} className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary">
               <Swords className="h-5 w-5 text-primary-foreground" />
             </div>

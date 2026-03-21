@@ -14,7 +14,7 @@ export default function SignupPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
-  const redirect = searchParams.get("redirect") ?? "/dashboard"
+  const redirect = searchParams.get("redirect") ?? "/"
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -32,7 +32,7 @@ export default function SignupPage() {
     setSubmitting(true)
     try {
       await signup(name, email, password)
-      const onboardingUrl = redirect !== "/dashboard"
+      const onboardingUrl = redirect !== "/"
         ? `/onboarding?redirect=${encodeURIComponent(redirect)}`
         : "/onboarding"
       navigate(onboardingUrl, { replace: true })
@@ -116,7 +116,7 @@ export default function SignupPage() {
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link to={`/login${redirect !== "/dashboard" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="font-medium text-primary hover:underline">
+            <Link to={`/login${redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="font-medium text-primary hover:underline">
               Log in
             </Link>
           </p>

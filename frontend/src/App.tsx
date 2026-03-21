@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/lib/auth/AuthContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/lib/i18n/language-context'
 import { Toaster } from '@/components/ui/sonner'
@@ -42,12 +41,6 @@ function ServiceUnavailable() {
   )
 }
 
-function RootRedirect() {
-  const { user, loading } = useAuth()
-  if (loading) return null
-  return <Navigate to={user ? "/dashboard" : "/login"} replace />
-}
-
 function App() {
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
 
@@ -68,9 +61,6 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              {/* Root: redirect to dashboard if authenticated, login otherwise */}
-              <Route path="/" element={<RootRedirect />} />
-
               {/* Public: Login and Signup */}
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
@@ -98,7 +88,8 @@ function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route index element={<Dashboard />} />
+                <Route path="/dashboard" element={<Navigate to="/" replace />} />
                 <Route path="/play" element={<Play />} />
                 <Route path="/play/:requestId" element={<InviteDetails />} />
                 <Route path="/profile" element={<Profile />} />

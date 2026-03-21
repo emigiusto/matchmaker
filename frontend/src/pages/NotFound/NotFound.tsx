@@ -39,7 +39,7 @@ export default function NotFound() {
           <div className="flex flex-col gap-3 w-full">
             {!loading && user ? (
               <Button asChild className="w-full">
-                <Link to="/dashboard">{t("notFound.backToDashboard")}</Link>
+                <Link to="/">{t("notFound.backToDashboard")}</Link>
               </Button>
             ) : (
               <Button asChild className="w-full">
