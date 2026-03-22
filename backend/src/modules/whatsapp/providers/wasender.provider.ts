@@ -51,7 +51,7 @@ export class WasenderProvider implements IWhatsAppProvider {
 
       if (buttons && buttons.length >= 2) {
         body.poll = {
-          question: message,
+          question: message.slice(0, 255),
           options: buttons.map((b) => b.title.slice(0, 25)),
           multiSelect: true,
         };
