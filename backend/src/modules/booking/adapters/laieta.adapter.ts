@@ -112,12 +112,12 @@ export class LaietaAdapter implements BookingAdapter {
    * A cell is considered available when it can hold 4 players and has free slots:
    *   - 2 empty + 2 occupied (class4), or
    *   - 1 empty + 3 occupied (class4)
-   * Optionally filters to a specific hour (2-char string, e.g. "09").
+   * Optionally filters to a specific time (4-char HHMM string, e.g. "0900").
    */
-  private async scrapeAvailableSlots(page: Page, targetHour?: string): Promise<ScrapedCourt[]> {
+  private async scrapeAvailableSlots(page: Page, targetHourMin?: string): Promise<ScrapedCourt[]> {
     await page.waitForSelector('#edit-gpa-piw-pistas', { timeout: 10000 })
 
-    return page.evaluate((hour: string | undefined) => {
+    return page.evaluate((hhmm: string | undefined) => {
       const results: { courtName: string; hour: string }[] = []
       const fieldset = document.querySelector('#edit-gpa-piw-pistas')
       if (!fieldset) return results
@@ -128,7 +128,7 @@ export class LaietaAdapter implements BookingAdapter {
         row.querySelectorAll('td').forEach((cell) => {
           const emptySlots: string[] = []
           const occupiedSlots: string[] = []
-          let cellHour = ''
+          let cellHourMin = ''
           let courtName = ''
 
           cell.querySelectorAll('a.a_pistas_hora').forEach((el) => {
@@ -137,7 +137,7 @@ export class LaietaAdapter implements BookingAdapter {
             const slotClass = parts[2]?.trim()
             const namePart = parts[3]?.trim().split('_')[1]
             if (namePart) {
-              cellHour = namePart.slice(0, 2)
+              cellHourMin = namePart.slice(0, 4)  // full HHMM, e.g. "0930"
               courtName = a.id.split(':')[1] ?? ''
             }
             if (slotClass === 'classempty') emptySlots.push(a.className)
@@ -148,14 +148,14 @@ export class LaietaAdapter implements BookingAdapter {
             (emptySlots.length === 2 && occupiedSlots.length === 2) ||
             (emptySlots.length === 1 && occupiedSlots.length === 3)
 
-          if (isAvailable && (!hour || cellHour === hour)) {
-            results.push({ courtName, hour: cellHour })
+          if (isAvailable && (!hhmm || cellHourMin === hhmm)) {
+            results.push({ courtName, hour: cellHourMin })
           }
         })
       })
 
       return results
-    }, targetHour)
+    }, targetHourMin)
   }
 
   /**
@@ -284,7 +284,7 @@ export class LaietaAdapter implements BookingAdapter {
   ): Promise<CourtAvailabilityResult> {
     const sport = options?.sport ?? 'tennis'
     const sportId = SPORT_IDS[sport] ?? SPORT_IDS.tennis
-    const targetHour = time?.slice(0, 2)  // undefined → return all hours
+    const targetHourMin = time ? time.replace(':', '') : undefined  // "09:00" → "0900", undefined → return all
 
     let browser: Browser | null = null
     try {
@@ -293,7 +293,7 @@ export class LaietaAdapter implements BookingAdapter {
       const url = `${BASE_URL}/infopistas/${sportId}/${this.toUrlDate(date)}`
 
       const page = await this.openWithSession(browser, url, sessionValue)
-      const courts = await this.scrapeAvailableSlots(page, targetHour)
+      const courts = await this.scrapeAvailableSlots(page, targetHourMin)
 
       return {
         date,
@@ -301,7 +301,7 @@ export class LaietaAdapter implements BookingAdapter {
         availableCourts: courts.map((c) => ({
           courtId: c.courtName,
           courtName: c.courtName,
-          time: `${c.hour}:00`,
+          time: `${c.hour.slice(0, 2)}:${c.hour.slice(2, 4)}`,  // "0930" → "09:30"
         })),
       }
     } finally {
@@ -319,7 +319,8 @@ export class LaietaAdapter implements BookingAdapter {
   ): Promise<BookingResult> {
     const sport = options?.sport ?? 'tennis'
     const sportId = SPORT_IDS[sport] ?? SPORT_IDS.tennis
-    const targetHour = time.slice(0, 2)
+    const targetHour = time.slice(0, 2)          // "09" — used for /reservas page matching
+    const targetHourMin = time.replace(':', '')   // "0900" — used for exact slot click
     const allSocioNumbers = [creds.socioNumber, ...participantSocioNumbers]
 
     let browser: Browser | null = null
@@ -346,24 +347,24 @@ export class LaietaAdapter implements BookingAdapter {
       // attribute selector so Puppeteer simulates a real mouse event sequence
       // (mousedown/mouseup/click). A synthetic DOM .click() inside page.evaluate()
       // does not fire the full event sequence and the portal's popup never appears.
-      const slotId = await page.evaluate((targetCourtId: string, hour: string) => {
+      const slotId = await page.evaluate((targetCourtId: string, targetHHMM: string) => {
         const links = document.querySelectorAll('a.a_pistas_hora')
         for (const link of links) {
           const a = link as HTMLAnchorElement
           const parts = a.className.split(' ')
           const slotClass = parts[2]?.trim()
           const namePart = parts[3]?.trim().split('_')[1]
-          const slotHour = namePart?.slice(0, 2)
+          const slotHourMin = namePart?.slice(0, 4)  // full HHMM for exact match
           const courtName = a.id.split(':')[1]
-          if (courtName === targetCourtId && slotHour === hour && slotClass === 'classempty') {
+          if (courtName === targetCourtId && slotHourMin === targetHHMM && slotClass === 'classempty') {
             return a.id
           }
         }
         return null
-      }, courtId, targetHour)
+      }, courtId, targetHourMin)
 
       if (!slotId) {
-        throw new AppError(`Slot no longer available: court=${courtId} at ${targetHour}:00`, 409, 'SLOT_NOT_FOUND')
+        throw new AppError(`Slot no longer available: court=${courtId} at ${time}`, 409, 'SLOT_NOT_FOUND')
       }
       await page.click(`[id="${slotId}"]`)
 
@@ -395,8 +396,25 @@ export class LaietaAdapter implements BookingAdapter {
         await page.click('#edit-add', { clickCount: 3 })
         await page.type('#edit-add', socioNumber)
         await page.click('.btn-add-participant')
-        await new Promise((r) => setTimeout(r, 2000))
+        // Wait for the AJAX to resolve: either a new participant row appears or an error block
+        await Promise.race([
+          page.waitForFunction(
+            (before: number) => {
+              const rows = document.querySelectorAll('.participant-row, [id^="edit-participant"]')
+              return rows.length > before
+            },
+            { timeout: 5000 },
+            // pass current participant count as baseline
+            participantSocioNumbers.indexOf(socioNumber),
+          ).catch(() => null),
+          new Promise((r) => setTimeout(r, 3000)),
+        ])
         await this.checkForPageError(page)
+        const participantState = await page.evaluate(() => {
+          const rows = document.querySelectorAll('.participant-row, [id^="edit-participant"]')
+          return `participant rows found: ${rows.length}`
+        }).catch(() => '?')
+        logger.info(`[laieta] After adding ${socioNumber}: ${participantState}`)
       }
 
       // Log page state before waiting for submit — diagnoses silent failures
