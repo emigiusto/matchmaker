@@ -141,16 +141,15 @@ export default function MatchDetailPage() {
     return stopBookingPoll
   }, [id])
 
-  // Load host memberships and contacts to enable booking for any match + socio editing.
-  // When the current user is an admin (but not the host), load the host's data instead.
+  // Load host memberships and contacts to enable booking + socio editing.
+  // Always use the host's (player1) data — memberships for credentials, contacts for socio numbers.
   useEffect(() => {
     if (!match || !currentUserId || (match.player1.userId !== currentUserId && !isAdmin)) return
-    const hostUserId = match.player1.userId
-    bookingService.listMemberships(hostUserId).then((m) => {
+    bookingService.listMemberships(match.player1.userId).then((m) => {
       setHostMemberships(m)
       setSelectedMembershipId((prev) => prev ?? m[0]?.id ?? null)
     }).catch(() => {})
-    contactsService.list(hostUserId).then(setContacts).catch(() => {})
+    contactsService.list(match.player1.userId).then(setContacts).catch(() => {})
   }, [match?.id, currentUserId, isAdmin])
 
   async function handleRetryBooking() {
@@ -482,7 +481,7 @@ export default function MatchDetailPage() {
         </Card>
 
         {/* Court Booking Status */}
-        {(isHost || isAdmin) && hostMemberships.length > 0 && (
+        {(isHost || isAdmin) && (
           <Card className={`border-border/50 ${
             bookingAttempt?.status === "success" ? "border-green-500/30 bg-green-500/5" :
             bookingAttempt?.status === "failed" ? "border-destructive/30 bg-destructive/5" :
@@ -530,13 +529,20 @@ export default function MatchDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!allParticipantsHaveSocio && (
+              {hostMemberships.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {isHost
+                    ? t("matchDetails.booking.noMembership")
+                    : t("matchDetails.booking.hostNoMembership")}
+                </p>
+              )}
+              {hostMemberships.length > 0 && !allParticipantsHaveSocio && (
                 <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 text-sm text-amber-700 dark:text-amber-400">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{t("matchDetails.booking.missingSocioNumbers")}</span>
                 </div>
               )}
-              {!bookingAttempt && (
+              {hostMemberships.length > 0 && !bookingAttempt && (
                 <div className="space-y-3">
                   {match.bookingEnabled && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">

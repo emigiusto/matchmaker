@@ -630,6 +630,8 @@
         "cancelFailed": "Error al cancelar la reserva"
       },
       "bookCourt": "Reservar pista",
+      "noMembership": "No hay credenciales de club configuradas. Ve a tu perfil para conectar una cuenta de club.",
+      "hostNoMembership": "El anfitrión aún no ha configurado sus credenciales de club.",
       "missingSocioNumbers": "A algunos participantes les falta el número de socio. Añádelos abajo antes de reintentar la reserva.",
       "participantSocios": "Números de socio de los participantes ({{club}})",
       "socioPlaceholder": "Número de socio",

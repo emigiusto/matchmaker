@@ -630,6 +630,8 @@
         "cancelFailed": "Failed to cancel booking"
       },
       "bookCourt": "Book court",
+      "noMembership": "No club credentials configured. Go to your profile to connect a club account.",
+      "hostNoMembership": "The host hasn't configured club credentials yet.",
       "missingSocioNumbers": "Some participants are missing a socio number. Add them below before retrying the booking.",
       "participantSocios": "Participant socio numbers ({{club}})",
       "socioPlaceholder": "Socio number",
