@@ -615,6 +615,7 @@
       "bookingFailed": "Booking failed",
       "retryBooking": "Retry booking",
       "attempting": "Attempting to reserve a court…",
+      "attemptingNote": "This may take a few seconds. The page will update automatically.",
       "timedOut": "Booking timed out — the process took too long. You can retry below.",
       "errors": {
         "missingSocioNumber": "A participant is missing their socio number",

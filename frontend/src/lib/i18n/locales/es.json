@@ -615,6 +615,7 @@
       "bookingFailed": "Reserva fallida",
       "retryBooking": "Reintentar reserva",
       "attempting": "Intentando reservar una pista…",
+      "attemptingNote": "Esto puede tardar unos segundos. La página se actualizará automáticamente.",
       "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación.",
       "errors": {
         "missingSocioNumber": "Falta el número de socio de un participante",
