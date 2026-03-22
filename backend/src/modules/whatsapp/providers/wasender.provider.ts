@@ -72,14 +72,13 @@ export class WasenderProvider implements IWhatsAppProvider {
       const sendWithRetry = async (body: Record<string, unknown>) => {
         let { ok, res, data } = await sendOnce(body);
         // Handle Wasender "Account Protection" rate limiting with a single retry.
+        const retryAfter = typeof data?.retry_after === 'number' ? data.retry_after : 0;
         if (
           !ok &&
-          data &&
-          typeof data.retry_after === 'number' &&
-          data.retry_after > 0 &&
-          (data.message || data.error || '').includes('You have account protection enabled')
+          retryAfter > 0 &&
+          (data?.message || data?.error || '').includes('You have account protection enabled')
         ) {
-          await new Promise((r) => setTimeout(r, data.retry_after * 1000));
+          await new Promise((r) => setTimeout(r, retryAfter * 1000));
           ({ ok, res, data } = await sendOnce(body));
         }
         return { ok, res, data };
