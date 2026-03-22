@@ -402,13 +402,31 @@ export class LaietaAdapter implements BookingAdapter {
       }
 
       // ── Step 4: Submit booking ──────────────────────────────────────
-      await page.waitForFunction(
-        () => {
+      try {
+        await page.waitForFunction(
+          () => {
+            const btn = document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement | null
+            return btn !== null && !btn.disabled
+          },
+          { timeout: 15000 },
+        )
+      } catch (err) {
+        const pageUrl = page.url()
+        const btnState = await page.evaluate(() => {
           const btn = document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement | null
-          return btn !== null && !btn.disabled
-        },
-        { timeout: 15000 },
-      )
+          if (!btn) return 'button not found'
+          return `found, disabled=${btn.disabled}, text="${btn.textContent?.trim()}"`
+        }).catch(() => '?')
+        const bodySnippet = await page.evaluate(() =>
+          document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 800)
+        ).catch(() => '?')
+        const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+        const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'submit-btn-wait') : null
+        logger.error(`[laieta] Submit button wait timed out. url=${pageUrl}, btn: ${btnState}`)
+        logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
+        if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
+        throw err
+      }
 
       if (process.env.BOOKING_SUBMIT_ENABLED !== 'true') {
         const externalId = `[TEST-MODE]::${courtId}::${date}::${targetHour}`
