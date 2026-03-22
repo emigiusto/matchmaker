@@ -950,6 +950,17 @@
       "passwordNote": "Stored encrypted. Only used to log in to the club portal on your behalf.",
       "connect": "Connect club",
       "skipLabel": "I'll set this up later"
+    },
+    "step4": {
+      "title": "Add your contacts",
+      "description": "Add the players you usually play with. You can add more any time from the Contacts section.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Contact name",
+      "phonePlaceholder": "Phone number",
+      "addButton": "Add",
+      "added": "Added {{count}} contact(s)",
+      "continue": "Save contacts",
+      "skipLabel": "I'll add contacts later"
     }
   },
   "notFound": {

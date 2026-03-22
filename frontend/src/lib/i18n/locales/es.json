@@ -950,6 +950,17 @@
       "passwordNote": "Almacenado cifrado. Solo se usa para iniciar sesión en el portal del club en tu nombre.",
       "connect": "Conectar club",
       "skipLabel": "Lo configuraré más adelante"
+    },
+    "step4": {
+      "title": "Añade tus contactos",
+      "description": "Añade los jugadores con los que sueles jugar. Puedes añadir más en cualquier momento desde la sección Contactos.",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "Nombre del contacto",
+      "phonePlaceholder": "Número de teléfono",
+      "addButton": "Añadir",
+      "added": "{{count}} contacto(s) añadido(s)",
+      "continue": "Guardar contactos",
+      "skipLabel": "Añadiré contactos más adelante"
     }
   },
   "notFound": {

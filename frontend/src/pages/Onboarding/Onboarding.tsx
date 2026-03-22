@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Phone, MapPin, Building2, Loader2, Swords, ArrowLeft, CheckCircle2 } from "lucide-react"
+import { Phone, MapPin, Building2, Users, X, Loader2, Swords, ArrowLeft, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,12 +12,13 @@ import { useTranslation } from "@/lib/i18n"
 import { usersService } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
 import { bookingService, SUPPORTED_CLUBS } from "@/lib/services/booking.service"
+import { contactsService } from "@/lib/services/contacts.service"
 import { toast } from "sonner"
 import { Link, useSearchParams } from "react-router-dom"
 
-const TOTAL_STEPS = 3
+const TOTAL_STEPS = 4
 
-// step 0 = welcome, steps 1-3 = data, step 4 = success
+// step 0 = welcome, steps 1-4 = data, step 5 = success
 function StepIndicator({ current, onBack }: { current: number; onBack?: () => void }) {
   const { t } = useTranslation()
   return (
@@ -83,6 +84,11 @@ export default function Onboarding() {
   const [socioNumber, setSocioNumber] = useState("")
   const [password, setPassword] = useState("")
 
+  // Step 4: Contacts
+  const [contactDrafts, setContactDrafts] = useState<Array<{ name: string; phone: string }>>([])
+  const [draftName, setDraftName] = useState("")
+  const [draftPhone, setDraftPhone] = useState("")
+
   // Pre-fill with existing data in case the user returns to onboarding
   useEffect(() => {
     if (!user) return
@@ -102,7 +108,7 @@ export default function Onboarding() {
   async function finish() {
     setSaving(true)
     try {
-      setStep(4)
+      setStep(5)
     } finally {
       setSaving(false)
     }
@@ -162,6 +168,30 @@ export default function Onboarding() {
           password: password.trim() || undefined,
         })
       }
+      setStep(4)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function addContactDraft() {
+    if (!draftName.trim() || !draftPhone.trim()) return
+    setContactDrafts((prev) => [...prev, { name: draftName.trim(), phone: draftPhone.trim() }])
+    setDraftName("")
+    setDraftPhone("")
+  }
+
+  async function handleStep4(skip = false) {
+    if (!user) return
+    setSaving(true)
+    try {
+      if (!skip && contactDrafts.length > 0) {
+        await Promise.allSettled(
+          contactDrafts.map((c) => contactsService.create(user.id, c.name, c.phone))
+        )
+      }
       await finish()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
@@ -192,8 +222,8 @@ export default function Onboarding() {
       <main className="flex flex-1 items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8">
 
-          {/* Step indicator — only for data steps 1–3 */}
-          {step >= 1 && step <= 3 && (
+          {/* Step indicator — only for data steps 1–4 */}
+          {step >= 1 && step <= 4 && (
             <div className="space-y-1">
               <StepIndicator
                 current={step}
@@ -330,8 +360,75 @@ export default function Onboarding() {
             </StepCard>
           )}
 
-          {/* Step 4: Success */}
+          {/* Step 4: Contacts */}
           {step === 4 && (
+            <StepCard
+              icon={<Users className="h-5 w-5 text-primary" />}
+              title={t("onboarding.step4.title")}
+              description={t("onboarding.step4.description")}
+              optional
+            >
+              {/* Add contact form */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder={t("onboarding.step4.namePlaceholder")}
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  className="flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addContactDraft() } }}
+                />
+                <Input
+                  placeholder={t("onboarding.step4.phonePlaceholder")}
+                  value={draftPhone}
+                  onChange={(e) => setDraftPhone(e.target.value)}
+                  className="flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addContactDraft() } }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={addContactDraft}
+                  disabled={!draftName.trim() || !draftPhone.trim()}
+                >
+                  {t("onboarding.step4.addButton")}
+                </Button>
+              </div>
+
+              {/* Added contacts list */}
+              {contactDrafts.length > 0 && (
+                <div className="space-y-1.5">
+                  {contactDrafts.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                      <span className="font-medium">{c.name}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-muted-foreground">{c.phone}</span>
+                        <button
+                          type="button"
+                          onClick={() => setContactDrafts((prev) => prev.filter((_, j) => j !== i))}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <StepActions
+                onContinue={() => handleStep4(false)}
+                onSkip={() => handleStep4(true)}
+                loading={saving}
+                continueLabel={contactDrafts.length > 0 ? t("onboarding.step4.continue") : t("onboarding.skip")}
+                skipLabel={t("onboarding.step4.skipLabel")}
+                continueDisabled={false}
+                skipProminent={contactDrafts.length === 0}
+              />
+            </StepCard>
+          )}
+
+          {/* Step 5: Success */}
+          {step === 5 && (
             <div className="rounded-2xl border border-border/60 bg-card p-8 shadow-sm text-center space-y-6">
               <div className="flex justify-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
