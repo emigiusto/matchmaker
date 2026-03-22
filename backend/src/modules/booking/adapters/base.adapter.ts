@@ -25,14 +25,14 @@ export interface BookingAdapter {
 
   /**
    * Book a court. Returns booking confirmation details.
-   * participantSocioNumbers: socio numbers of OTHER participants (not the host)
+   * participants: OTHER participants (not the host) with their socio number and display name.
    */
   book(
     creds: ClubCredentials,
     date: string,
     time: string,
     courtId: string,
-    participantSocioNumbers: string[],
+    participants: Array<{ socioNumber: string; name: string }>,
     options?: { sport?: string },
   ): Promise<BookingResult>
 

@@ -325,14 +325,14 @@ export class LaietaAdapter implements BookingAdapter {
     date: string,
     time: string,
     courtId: string,
-    participantSocioNumbers: string[],
+    participants: Array<{ socioNumber: string; name: string }>,
     options?: { sport?: string },
   ): Promise<BookingResult> {
     const sport = options?.sport ?? 'tennis'
     const sportId = SPORT_IDS[sport] ?? SPORT_IDS.tennis
     const targetHour = time.slice(0, 2)          // "09" — used for /reservas page matching
     const targetHourMin = time.replace(':', '')   // "0900" — used for exact slot click
-    const allSocioNumbers = [creds.socioNumber, ...participantSocioNumbers]
+    const allSocioNumbers = [creds.socioNumber, ...participants.map((p) => p.socioNumber)]
 
     let browser: Browser | null = null
     try {
@@ -420,7 +420,8 @@ export class LaietaAdapter implements BookingAdapter {
       const timeHHMM = urlSegments[4] ?? targetHourMin  // e.g. "0900"
 
       const registeredSocios = [creds.socioNumber]
-      for (const socioNumber of participantSocioNumbers) {
+      for (const participant of participants) {
+        const { socioNumber, name } = participant
         const playerPos = registeredSocios.length + 1  // host occupies pos 1
         const body = new URLSearchParams({
           newparticipant: socioNumber,
@@ -453,7 +454,8 @@ export class LaietaAdapter implements BookingAdapter {
         const json = await resp.json() as { error: boolean; message: string; newparticipant: string }
         logger.info(`[laieta] Participant ${socioNumber}: error=${json.error}, result="${json.newparticipant}", msg="${json.message}"`)
         if (json.error) {
-          throw new AppError(json.message || 'Participant could not be added to the booking', 409, 'BOOKING_PAGE_ERROR')
+          const reason = json.message || 'Could not be added to the booking'
+          throw new AppError(`${name}: ${reason}`, 409, 'BOOKING_PAGE_ERROR')
         }
         registeredSocios.push(socioNumber)
       }
@@ -469,7 +471,7 @@ export class LaietaAdapter implements BookingAdapter {
       if (process.env.BOOKING_SUBMIT_ENABLED !== 'true') {
         const externalId = `[TEST-MODE]::${courtId}::${date}::${targetHour}`
         logger.info(`[laieta][TEST MODE] Submit skipped (BOOKING_SUBMIT_ENABLED != true)`)
-        logger.info(`[laieta][TEST MODE] Would book: court=${courtId}, date=${date}, time=${targetHour}:00, sport=${sport}, participants=${participantSocioNumbers.join(', ')}`)
+        logger.info(`[laieta][TEST MODE] Would book: court=${courtId}, date=${date}, time=${targetHour}:00, sport=${sport}, participants=${participants.map((p) => `${p.name}(${p.socioNumber})`).join(', ')}`)
         return { externalId, courtName: courtId }
       }
 

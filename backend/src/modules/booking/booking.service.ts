@@ -366,10 +366,11 @@ async function runBookingJob(
     const otherParticipants = match.participants.filter((p) => p.userId !== hostUserId)
     logger.info(`[booking] Participants: total=${match.participants.length}, other=${otherParticipants.length}, ids=${otherParticipants.map(p => `${p.userId}(${p.user?.name})`).join(', ')}`)
 
-    // Collect socio numbers for other participants
-    const participantSocioNumbers: string[] = []
+    // Collect socio numbers + names for other participants
+    const bookingParticipants: Array<{ socioNumber: string; name: string }> = []
     for (const participant of otherParticipants) {
-      logger.info(`[booking] Looking up socio for participant ${participant.user?.name} (userId=${participant.userId}, phone=${participant.user?.phone ?? 'none'})`)
+      const participantName = participant.user?.name ?? participant.userId
+      logger.info(`[booking] Looking up socio for participant ${participantName} (userId=${participant.userId}, phone=${participant.user?.phone ?? 'none'})`)
 
       // 1. Check ClubMembership (registered user with their own club account)
       const participantMembership = await prisma.clubMembership.findFirst({
@@ -377,7 +378,7 @@ async function runBookingJob(
       })
       logger.info(`[booking] ClubMembership lookup: found=${!!participantMembership}, socioNumber=${participantMembership?.socioNumber ?? 'none'}`)
       if (participantMembership?.socioNumber) {
-        participantSocioNumbers.push(participantMembership.socioNumber)
+        bookingParticipants.push({ socioNumber: participantMembership.socioNumber, name: participantName })
         continue
       }
 
@@ -390,14 +391,14 @@ async function runBookingJob(
         const socioNumber = (contact?.socioNumbers as Record<string, string> | null)?.[membership.clubSlug]
         logger.info(`[booking] Contact lookup: participantPhone=${phone}, found=${!!contact}, socioNumber=${socioNumber ?? 'none'}`)
         if (socioNumber) {
-          participantSocioNumbers.push(socioNumber)
+          bookingParticipants.push({ socioNumber, name: participantName })
           continue
         }
       } else {
         logger.info(`[booking] Participant has no phone — skipping Contact lookup`)
       }
 
-      const reason = `Missing socio number for participant ${participant.user?.name ?? participant.userId}`
+      const reason = `Missing socio number for participant ${participantName}`
       await failAttempt(attemptId, reason, 'MISSING_SOCIO_NUMBER')
       logBookingEvent(matchId, 'booking_failed', { errorMessage: reason }).catch(() => {})
       notifyBookingFailed(match, hostUserId, date, time, tz, reason)
@@ -410,7 +411,7 @@ async function runBookingJob(
       password: decrypt(membership.encryptedPassword),
     }
     
-    logger.info(`[booking] Booking job parameters: date=${date}, time=${time}, tz=${tz}, participantSocioNumbers=${participantSocioNumbers.join(', ')}`)
+    logger.info(`[booking] Booking job parameters: date=${date}, time=${time}, tz=${tz}, participants=${bookingParticipants.map((p) => `${p.name}(${p.socioNumber})`).join(', ')}`)
 
     const sport = schedulingRequest?.sportType ?? 'tennis'
     const sportOptions = { sport }
@@ -457,7 +458,7 @@ async function runBookingJob(
           return
         }
 
-        const result = await adapter.book(creds, date, time, court.courtId, participantSocioNumbers, sportOptions)
+        const result = await adapter.book(creds, date, time, court.courtId, bookingParticipants, sportOptions)
 
         // Conditionally update to success only if still pending (not cancelled mid-flight).
         const updated = await prisma.bookingAttempt.updateMany({
