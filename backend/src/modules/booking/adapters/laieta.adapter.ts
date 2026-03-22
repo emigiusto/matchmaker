@@ -2,6 +2,9 @@
 // Booking adapter for Club Tennis Laieta via miclubonline.net (Drupal/Puppeteer).
 // Availability scraping logic adapted from existing aceUp implementation.
 
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import puppeteer, { type Browser, type Page } from 'puppeteer'
 import type { BookingAdapter } from './base.adapter'
 import type { ClubCredentials, CourtAvailabilityResult, BookingResult } from '../booking.types'
@@ -153,6 +156,20 @@ export class LaietaAdapter implements BookingAdapter {
 
       return results
     }, targetHour)
+  }
+
+  /**
+   * Save a base64 screenshot to a temp file and return the path for logging.
+   * Avoids dumping thousands of characters inline into log output.
+   */
+  private saveScreenshot(b64: string, label: string): string {
+    try {
+      const file = path.join(os.tmpdir(), `laieta-debug-${label}-${Date.now()}.png`)
+      fs.writeFileSync(file, Buffer.from(b64, 'base64'))
+      return file
+    } catch {
+      return '(screenshot save failed)'
+    }
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────
@@ -325,40 +342,45 @@ export class LaietaAdapter implements BookingAdapter {
       const page = await this.openWithSession(browser, url, sessionValue)
       await page.waitForSelector('#edit-gpa-piw-pistas', { timeout: 10000 })
 
-      const slotClicked = await page.evaluate((targetCourtId: string, hour: string) => {
+      // Use evaluateHandle to get a real ElementHandle so Puppeteer can simulate
+      // a proper mouse click (mousedown/mouseup/click), which is required to trigger
+      // the portal's JS popup. A synthetic DOM .click() inside page.evaluate() does
+      // not fire the full event sequence and the popup never appears.
+      const slotHandle = await page.evaluateHandle((targetCourtId: string, hour: string) => {
         const links = document.querySelectorAll('a.a_pistas_hora')
         for (const link of links) {
           const a = link as HTMLAnchorElement
           const parts = a.className.split(' ')
+          const slotClass = parts[2]?.trim()
           const namePart = parts[3]?.trim().split('_')[1]
           const slotHour = namePart?.slice(0, 2)
           const courtName = a.id.split(':')[1]
-          if (courtName === targetCourtId && slotHour === hour) {
-            const container = a.closest('.div_pistas_hora') ?? a.parentElement
-            const firstAnchor = container?.querySelector('a') as HTMLAnchorElement | null
-            if (firstAnchor) {
-              firstAnchor.click()
-              return true
-            }
+          if (courtName === targetCourtId && slotHour === hour && slotClass === 'classempty') {
+            return a
           }
         }
-        return false
+        return null
       }, courtId, targetHour)
 
-      if (!slotClicked) {
+      const slotElement = slotHandle.asElement()
+      if (!slotElement) {
         throw new AppError(`Slot no longer available: court=${courtId} at ${targetHour}:00`, 409, 'SLOT_NOT_FOUND')
       }
+      await slotElement.click()
 
       // ── Step 2: Popup → click "Continua" ───────────────────────────
       try {
         await page.waitForSelector('.a_button_popup_fix.a_pistas_hora_sel', { timeout: 10000 })
       } catch (err) {
         const pageUrl = page.url()
-        const bodySnippet = await page.evaluate(() => document.body.innerText?.slice(0, 1000)).catch(() => '?')
+        const bodySnippet = await page.evaluate(() =>
+          document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 500)
+        ).catch(() => '?')
         const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+        const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'popup-missing') : null
         logger.error(`[laieta] Popup selector not found after slot click. url=${pageUrl}`)
-        logger.error(`[laieta] Page text: ${bodySnippet}`)
-        if (screenshotB64) logger.error(`[laieta] Screenshot: data:image/png;base64,${screenshotB64}`)
+        logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
+        if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
         throw err
       }
       const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
@@ -431,11 +453,14 @@ export class LaietaAdapter implements BookingAdapter {
       // Booking not found — capture diagnostics and fail
       const pageTitle = await page.title().catch(() => '?')
       const pageUrl = page.url()
-      const bodySnippet = await page.evaluate(() => document.body.innerText?.slice(0, 500)).catch(() => '?')
+      const bodySnippet = await page.evaluate(() =>
+        document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 500)
+      ).catch(() => '?')
       const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+      const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'no-confirmation') : null
       logger.error(`[laieta] Booking not confirmed on /reservas. url=${pageUrl}, title="${pageTitle}"`)
       logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
-      if (screenshotB64) logger.error(`[laieta] Screenshot (base64): data:image/png;base64,${screenshotB64}`)
+      if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
       throw new AppError('Booking submit did not produce a confirmed reservation on /reservas', 502, 'BOOKING_NO_CONFIRMATION')
     } finally {
       if (browser) await browser.close()

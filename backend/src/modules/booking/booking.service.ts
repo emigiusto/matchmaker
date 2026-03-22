@@ -512,7 +512,11 @@ async function runBookingJob(
           await failAttempt(attemptId, message, errorCode)
           logBookingEvent(matchId, 'booking_failed', { errorMessage: message, attempts: attempt + 1 }).catch(() => {})
           logger.error(`[booking] Booking failed for match ${matchId} after ${attempt + 1} attempt(s): ${message}`)
-          notifyBookingFailed(match, hostUserId, date, time, tz, message)
+          // Only expose AppError messages (from the booking page itself) to users — raw Puppeteer errors are internal
+          const userMessage = offline
+            ? 'Club booking system is offline or unreachable'
+            : (err instanceof AppError ? message : 'An error occurred during court booking')
+          notifyBookingFailed(match, hostUserId, date, time, tz, userMessage)
         }
       }
     }
@@ -531,7 +535,7 @@ async function runBookingJob(
       const d = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
       const t = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
       const hId = sr?.hostUserId ?? m.availability?.userId ?? ''
-      notifyBookingFailed(m, hId, d, t, tz, message)
+      notifyBookingFailed(m, hId, d, t, tz, 'An unexpected error occurred during court booking')
     }
   }
 }
@@ -544,8 +548,8 @@ function notifyBookingFailed(
   tz: string,
   reason: string,
 ): void {
-  createNotification(hostUserId, 'booking.cancel_failed', { matchId: match.id }).catch((err) => {
-    logger.warn(`[booking] Failed to send booking.cancel_failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
+  createNotification(hostUserId, 'booking.failed', { matchId: match.id }).catch((err) => {
+    logger.warn(`[booking] Failed to send booking.failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
   })
 
   if (match.whatsappGroupId) {
