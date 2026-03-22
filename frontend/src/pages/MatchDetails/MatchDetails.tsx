@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Link, useParams } from "react-router-dom"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { es as esLocale, enUS } from "date-fns/locale"
 import {
   ArrowLeft,
@@ -141,8 +141,8 @@ export default function MatchDetailPage() {
     return stopBookingPoll
   }, [id])
 
-  // Load host memberships and contacts to enable booking + socio editing.
-  // Always use the host's (player1) data — memberships for credentials, contacts for socio numbers.
+  // Load memberships and contacts to enable booking + socio editing.
+  // Both memberships and contacts come from the host (player1).
   useEffect(() => {
     if (!match || !currentUserId || (match.player1.userId !== currentUserId && !isAdmin)) return
     bookingService.listMemberships(match.player1.userId).then((m) => {
@@ -424,7 +424,7 @@ export default function MatchDetailPage() {
             <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {format(new Date(match.date), "MMM d, yyyy", { locale: dateLocale })}
+                {format(parseISO(match.date), "MMM d, yyyy", { locale: dateLocale })}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" />
