@@ -627,9 +627,12 @@ export default function MatchDetailPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("matchDetails.booking.attempting")}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t("matchDetails.booking.attempting")}
+                    </div>
+                    <p className="pl-6 text-xs text-muted-foreground">{t("matchDetails.booking.attemptingNote")}</p>
                   </div>
                 )
               })()}
