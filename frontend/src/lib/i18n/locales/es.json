@@ -206,6 +206,18 @@
     "signUp": "Regístrate",
     "failed": "Error al iniciar sesión"
   },
+  "signup": {
+    "title": "Crear una cuenta",
+    "subtitle": "Introduce tus datos para comenzar",
+    "fullName": "Nombre completo",
+    "fullNamePlaceholder": "Tu nombre",
+    "passwordPlaceholder": "Mínimo 6 caracteres",
+    "passwordMinLength": "La contraseña debe tener al menos 6 caracteres",
+    "submit": "Crear cuenta",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+    "logIn": "Iniciar sesión",
+    "failed": "Error al registrarse"
+  },
   "play": {
     "pageTitle": "Mis Invitaciones",
     "pageDescription": "Crea partidos y consulta invitaciones abiertas"

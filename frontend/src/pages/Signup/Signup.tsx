@@ -26,7 +26,7 @@ export default function SignupPage() {
     e.preventDefault()
     setError("")
     if (password.length < 6) {
-      setError("Password must be at least 6 characters")
+      setError(t("signup.passwordMinLength"))
       return
     }
     setSubmitting(true)
@@ -37,7 +37,7 @@ export default function SignupPage() {
         : "/onboarding"
       navigate(onboardingUrl, { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed")
+      setError(err instanceof Error ? err.message : t("signup.failed"))
     } finally {
       setSubmitting(false)
     }
@@ -56,8 +56,8 @@ export default function SignupPage() {
       <div className="flex flex-1 items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
-          <CardDescription>Enter your details to get started</CardDescription>
+          <CardTitle className="text-2xl font-bold">{t("signup.title")}</CardTitle>
+          <CardDescription>{t("signup.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -67,11 +67,11 @@ export default function SignupPage() {
               </div>
             )}
             <div>
-              <Label htmlFor="name">Full name</Label>
+              <Label htmlFor="name">{t("signup.fullName")}</Label>
               <Input
                 id="name"
                 type="text"
-                placeholder="Your name"
+                placeholder={t("signup.fullNamePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="mt-1.5"
@@ -79,11 +79,11 @@ export default function SignupPage() {
               />
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("form.email")}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t("login.emailPlaceholder")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -92,11 +92,11 @@ export default function SignupPage() {
               />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("form.password")}</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="At least 6 characters"
+                placeholder={t("signup.passwordPlaceholder")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -111,13 +111,13 @@ export default function SignupPage() {
               ) : (
                 <UserPlus className="h-4 w-4" />
               )}
-              Create account
+              {t("signup.submit")}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("signup.alreadyHaveAccount")}{" "}
             <Link to={`/login${redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="font-medium text-primary hover:underline">
-              Log in
+              {t("signup.logIn")}
             </Link>
           </p>
         </CardContent>

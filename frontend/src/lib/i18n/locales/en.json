@@ -206,6 +206,18 @@
     "signUp": "Sign up",
     "failed": "Login failed"
   },
+  "signup": {
+    "title": "Create an account",
+    "subtitle": "Enter your details to get started",
+    "fullName": "Full name",
+    "fullNamePlaceholder": "Your name",
+    "passwordPlaceholder": "At least 6 characters",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "submit": "Create account",
+    "alreadyHaveAccount": "Already have an account?",
+    "logIn": "Log in",
+    "failed": "Sign up failed"
+  },
   "play": {
     "pageTitle": "My Invites",
     "pageDescription": "Create matches and browse open invites"
