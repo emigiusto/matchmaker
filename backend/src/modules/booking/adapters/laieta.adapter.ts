@@ -342,11 +342,11 @@ export class LaietaAdapter implements BookingAdapter {
       const page = await this.openWithSession(browser, url, sessionValue)
       await page.waitForSelector('#edit-gpa-piw-pistas', { timeout: 10000 })
 
-      // Use evaluateHandle to get a real ElementHandle so Puppeteer can simulate
-      // a proper mouse click (mousedown/mouseup/click), which is required to trigger
-      // the portal's JS popup. A synthetic DOM .click() inside page.evaluate() does
-      // not fire the full event sequence and the popup never appears.
-      const slotHandle = await page.evaluateHandle((targetCourtId: string, hour: string) => {
+      // Return the element's id string from evaluate, then use page.click() with an
+      // attribute selector so Puppeteer simulates a real mouse event sequence
+      // (mousedown/mouseup/click). A synthetic DOM .click() inside page.evaluate()
+      // does not fire the full event sequence and the portal's popup never appears.
+      const slotId = await page.evaluate((targetCourtId: string, hour: string) => {
         const links = document.querySelectorAll('a.a_pistas_hora')
         for (const link of links) {
           const a = link as HTMLAnchorElement
@@ -356,17 +356,16 @@ export class LaietaAdapter implements BookingAdapter {
           const slotHour = namePart?.slice(0, 2)
           const courtName = a.id.split(':')[1]
           if (courtName === targetCourtId && slotHour === hour && slotClass === 'classempty') {
-            return a
+            return a.id
           }
         }
         return null
       }, courtId, targetHour)
 
-      const slotElement = slotHandle.asElement()
-      if (!slotElement) {
+      if (!slotId) {
         throw new AppError(`Slot no longer available: court=${courtId} at ${targetHour}:00`, 409, 'SLOT_NOT_FOUND')
       }
-      await slotElement.click()
+      await page.click(`[id="${slotId}"]`)
 
       // ── Step 2: Popup → click "Continua" ───────────────────────────
       try {
