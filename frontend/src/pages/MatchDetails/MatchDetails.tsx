@@ -425,7 +425,9 @@ export default function MatchDetailPage() {
             <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {format(parseISO(match.date), "MMM d, yyyy", { locale: dateLocale })}
+                {language === "es"
+                  ? format(parseISO(match.date), "d 'de' MMMM, yyyy", { locale: dateLocale })
+                  : format(parseISO(match.date), "MMM d, yyyy", { locale: dateLocale })}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" />
