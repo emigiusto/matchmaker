@@ -465,7 +465,12 @@ export default function ProfilePage() {
                         <>
                           <p className="mt-0.5 text-sm text-muted-foreground">{t("profilePage.clubConnections.socio", { number: membership.socioNumber })}</p>
                           <div className="mt-1.5 flex items-center gap-1.5">
-                            {membership.status === "active" ? (
+                            {testingClub === club.clubSlug ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">{t("profilePage.clubConnections.testing")}</span>
+                              </>
+                            ) : membership.status === "active" ? (
                               <>
                                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                 <span className="text-xs text-green-600 dark:text-green-400">{t("profilePage.clubConnections.verified")}</span>
@@ -481,9 +486,10 @@ export default function ProfilePage() {
                                 <span className="text-xs text-muted-foreground">{t("profilePage.clubConnections.notVerified")}</span>
                               </>
                             )}
-                            {membership.lastVerifiedAt && (
+                            {membership.lastVerifiedAt && testingClub !== club.clubSlug && (
                               <span className="text-xs text-muted-foreground/60">
-                                · {new Date(membership.lastVerifiedAt).toLocaleDateString()}
+                                · {new Date(membership.lastVerifiedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}{" "}
+                                {new Date(membership.lastVerifiedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                               </span>
                             )}
                           </div>
@@ -507,7 +513,7 @@ export default function ProfilePage() {
                           ) : (
                             <Wifi className="h-3.5 w-3.5" />
                           )}
-                          {t("profilePage.clubConnections.test")}
+                          {testingClub === club.clubSlug ? t("profilePage.clubConnections.testing") : t("profilePage.clubConnections.test")}
                         </Button>
                         <Button
                           variant="outline"
