@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { es as esLocale, enUS, type Locale } from "date-fns/locale"
 import { Calendar, Clock, History, MapPin, Loader2, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,7 @@ function safeFormatDate(
   fallback = "-"
 ): string {
   if (!value) return fallback
-  const d = new Date(value)
+  const d = parseISO(value)
   const s = Number.isNaN(d.getTime()) ? fallback : format(d, formatStr, { locale })
   return s.charAt(0).toUpperCase() + s.slice(1)
 }

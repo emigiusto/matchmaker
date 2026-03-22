@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { es as esLocale } from "date-fns/locale"
 import { Link } from "react-router-dom"
 import {
@@ -440,7 +440,7 @@ export function InviteRequestsSection({
 
   function handleShareWhatsApp(request: InviteRequest) {
     const message = encodeURIComponent(
-      `Want to play ${request.sport} on ${format(new Date(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || t("common.tbd")}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
+      `Want to play ${request.sport} on ${format(parseISO(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || t("common.tbd")}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
     )
     window.open(`https://wa.me/?text=${message}`, "_blank")
   }
@@ -641,7 +641,7 @@ export function InviteRequestsSection({
                       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-foreground">
                         <span className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-primary" />
-                          {format(new Date(request.date), "EEE, MMM d", { locale: dateLocale })}
+                          {format(parseISO(request.date), "EEE, MMM d", { locale: dateLocale })}
                         </span>
                         <span className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-primary" />

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { es as esLocale } from "date-fns/locale"
 import { Bell, Calendar as CalendarIcon, Clock, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -209,7 +209,7 @@ export function AddReminderDialog({
             vs {opponent}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {format(new Date(matchDate), "EEEE, MMM d", { locale: dateLocale })} at {matchTime} &middot; {location}
+            {format(parseISO(matchDate), "EEEE, MMM d", { locale: dateLocale })} at {matchTime} &middot; {location}
           </p>
         </div>
 

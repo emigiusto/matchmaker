@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Link, useParams } from "react-router-dom"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { es as esLocale } from "date-fns/locale"
 import {
   ArrowLeft,
@@ -408,7 +408,7 @@ export default function InviteDetailsPage() {
           <CardContent className="grid gap-3 p-5 sm:grid-cols-2">
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 shrink-0 text-primary" />
-              <span>{format(new Date(request.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}</span>
+              <span>{format(parseISO(request.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 shrink-0 text-primary" />
