@@ -1,7 +1,8 @@
 // availability-cache.job.ts
-// Proactively warms the Redis court availability cache for all active club memberships.
-// Runs every 15 minutes, pre-fetching the next 15 days for each sport.
-// Requests are sequential per membership to avoid hammering the club portal.
+// Proactively warms the Redis court availability cache for all active clubs.
+// Runs every 30 minutes, pre-fetching the next 10 days for each sport.
+// Deduplicated by club — one fetch per (adapterType, clubSlug) regardless of how many members share it.
+// Requests are sequential per club to avoid hammering the club portal.
 
 import cron from 'node-cron'
 import { prisma } from '../../prisma'
@@ -32,14 +33,23 @@ async function warmAvailabilityCache(): Promise<void> {
     return
   }
 
-  const memberships = await prisma.clubMembership.findMany({
+  const allMemberships = await prisma.clubMembership.findMany({
     where: { status: 'active', encryptedPassword: { not: null } },
+  })
+
+  // Deduplicate by club — cache is shared per (adapterType, clubSlug), so one membership per club is enough
+  const seen = new Set<string>()
+  const memberships = allMemberships.filter(m => {
+    const key = `${m.adapterType}:${m.clubSlug}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
   })
 
   if (memberships.length === 0) return
 
   const dates = nextNDays(DAYS_AHEAD)
-  logger.info(`[availability-cache-job] Warming cache: ${memberships.length} membership(s), ${dates.length} days, sports=${SPORTS.join('/')}`)
+  logger.info(`[availability-cache-job] Warming cache: ${memberships.length} club(s), ${dates.length} days, sports=${SPORTS.join('/')}`)
 
   for (const membership of memberships) {
     const adapter = getAdapter(membership.adapterType)
