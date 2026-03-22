@@ -629,6 +629,7 @@
         "cancelSuccess": "Reserva cancelada",
         "cancelFailed": "Error al cancelar la reserva"
       },
+      "bookCourt": "Reservar pista",
       "missingSocioNumbers": "A algunos participantes les falta el número de socio. Añádelos abajo antes de reintentar la reserva.",
       "participantSocios": "Números de socio de los participantes ({{club}})",
       "socioPlaceholder": "Número de socio",

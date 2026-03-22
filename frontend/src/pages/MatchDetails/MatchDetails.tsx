@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/status-badge"
 import { SportFormatBadge } from "@/components/sport-format-badge"
@@ -43,7 +44,7 @@ import { isMatchInPast, getBookingErrorMessage } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
-import { bookingService, type BookingAttemptDTO, type ClubMembershipDTO } from "@/lib/services/booking.service"
+import { bookingService, type BookingAttemptDTO, type ClubMembershipDTO, SUPPORTED_CLUBS } from "@/lib/services/booking.service"
 import { contactsService, type ContactDTO } from "@/lib/services/contacts.service"
 import { Input } from "@/components/ui/input"
 import type { Match } from "@/lib/types"
@@ -67,6 +68,7 @@ export default function MatchDetailPage() {
   const [cancelBookingError, setCancelBookingError] = useState<string | null>(null)
   const [fetchingGroupLink, setFetchingGroupLink] = useState(false)
   const [hostMemberships, setHostMemberships] = useState<ClubMembershipDTO[]>([])
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
   const [contacts, setContacts] = useState<ContactDTO[]>([])
   const [socioEdits, setSocioEdits] = useState<Record<string, string>>({})
   const [savingSocioFor, setSavingSocioFor] = useState<string | null>(null)
@@ -140,16 +142,21 @@ export default function MatchDetailPage() {
   // Load host memberships and contacts to enable booking for any match + socio editing
   useEffect(() => {
     if (!match || !currentUserId || match.player1.userId !== currentUserId) return
-    bookingService.listMemberships(currentUserId).then(setHostMemberships).catch(() => {})
+    bookingService.listMemberships(currentUserId).then((m) => {
+      setHostMemberships(m)
+      setSelectedMembershipId((prev) => prev ?? m[0]?.id ?? null)
+    }).catch(() => {})
     contactsService.list(currentUserId).then(setContacts).catch(() => {})
   }, [match?.id, currentUserId])
 
   async function handleRetryBooking() {
-    if (!id) return
+    if (!id || !selectedMembershipId) return
     setRetryingBooking(true)
     try {
-      await bookingService.retryBooking(id)
-      setBookingAttempt((prev) => prev ? { ...prev, status: "pending" } : prev)
+      await bookingService.retryBooking(id, selectedMembershipId)
+      // Re-fetch so we get the real attempt record (handles both fresh start and retry)
+      const attempt = await bookingService.getAttempt(id)
+      setBookingAttempt(attempt)
       toast.success(t("matchDetails.booking.toast.retryQueued"))
       startBookingPoll(id)
     } catch (err) {
@@ -481,7 +488,7 @@ export default function MatchDetailPage() {
                 <Building2 className="h-4 w-4" />
                 {t("matchDetails.booking.title")}
                 {bookingAttempt && (
-                  <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     bookingAttempt.status === "success"
                       ? "bg-green-500/10 text-green-700 dark:text-green-400"
                       : bookingAttempt.status === "failed"
@@ -494,6 +501,27 @@ export default function MatchDetailPage() {
                      bookingAttempt.status === "cancelled" ? t("matchDetails.booking.cancelled") : bookingAttempt.status}
                   </span>
                 )}
+                {/* Club selector — right-aligned */}
+                <div className="ml-auto">
+                  {hostMemberships.length > 1 ? (
+                    <Select value={selectedMembershipId ?? undefined} onValueChange={setSelectedMembershipId}>
+                      <SelectTrigger className="h-7 text-xs w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hostMemberships.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {SUPPORTED_CLUBS.find((c) => c.clubSlug === m.clubSlug)?.label ?? m.clubSlug}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : hostMemberships.length === 1 ? (
+                    <span className="text-xs text-muted-foreground font-normal">
+                      {SUPPORTED_CLUBS.find((c) => c.clubSlug === hostMemberships[0].clubSlug)?.label ?? hostMemberships[0].clubSlug}
+                    </span>
+                  ) : null}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -505,22 +533,24 @@ export default function MatchDetailPage() {
               )}
               {!bookingAttempt && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("matchDetails.booking.attempting")}
-                  </div>
+                  {match.bookingEnabled && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t("matchDetails.booking.attempting")}
+                    </div>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     className="gap-2"
                     onClick={handleRetryBooking}
-                    disabled={retryingBooking || !allParticipantsHaveSocio}
+                    disabled={retryingBooking || !allParticipantsHaveSocio || !selectedMembershipId}
                   >
                     {retryingBooking
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       : <RefreshCw className="h-3.5 w-3.5" />
                     }
-                    {t("matchDetails.booking.retryBooking")}
+                    {match.bookingEnabled ? t("matchDetails.booking.retryBooking") : t("matchDetails.booking.bookCourt")}
                   </Button>
                 </div>
               )}

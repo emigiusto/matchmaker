@@ -574,22 +574,43 @@ async function failAttempt(attemptId: string, errorMessage: string, errorCode?: 
  * Retry a failed booking. Resets the existing attempt and re-runs the booking job.
  * Only allowed when the current attempt status is 'failed'.
  */
-export async function retryBookingForMatch(matchId: string): Promise<void> {
+export async function retryBookingForMatch(matchId: string, membershipId?: string): Promise<void> {
   const existing = await prisma.bookingAttempt.findUnique({ where: { matchId } })
-  if (!existing) throw new AppError('No booking attempt found for this match', 404)
-  if (existing.status !== 'failed') {
+
+  if (!existing) {
+    // No attempt yet — start a fresh booking (membershipId required)
+    if (!membershipId) throw new AppError('membershipId is required to start a new booking attempt', 400)
+    const attempt = await prisma.bookingAttempt.create({
+      data: { matchId, clubMembershipId: membershipId, status: 'pending', attemptedAt: new Date() },
+    })
+    logBookingEvent(matchId, 'booking_pending', { fresh: true }).catch(() => {})
+    runBookingJob(attempt.id, matchId, membershipId).catch((err) => {
+      logger.error(`[booking] Unhandled error in booking job for match ${matchId}:`, err)
+    })
+    return
+  }
+
+  if (existing.status !== 'failed' && existing.status !== 'cancelled') {
     throw new AppError(`Cannot retry — booking status is "${existing.status}"`, 409)
   }
 
-  // Reset attempt to pending
+  const effectiveMembershipId = membershipId ?? existing.clubMembershipId
+
   await prisma.bookingAttempt.update({
     where: { id: existing.id },
-    data: { status: 'pending', errorMessage: null, errorCode: null, completedAt: null, attemptedAt: new Date() },
+    data: {
+      status: 'pending',
+      errorMessage: null,
+      errorCode: null,
+      completedAt: null,
+      attemptedAt: new Date(),
+      clubMembershipId: effectiveMembershipId,
+    },
   })
 
   logBookingEvent(matchId, 'booking_pending', { retry: true }).catch(() => {})
 
-  runBookingJob(existing.id, matchId, existing.clubMembershipId).catch((err) => {
+  runBookingJob(existing.id, matchId, effectiveMembershipId).catch((err) => {
     logger.error(`[booking] Unhandled error in retry booking job for match ${matchId}:`, err)
   })
 }

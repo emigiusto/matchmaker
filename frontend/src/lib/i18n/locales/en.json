@@ -629,6 +629,7 @@
         "cancelSuccess": "Booking cancelled",
         "cancelFailed": "Failed to cancel booking"
       },
+      "bookCourt": "Book court",
       "missingSocioNumbers": "Some participants are missing a socio number. Add them below before retrying the booking.",
       "participantSocios": "Participant socio numbers ({{club}})",
       "socioPlaceholder": "Socio number",

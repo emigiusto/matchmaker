@@ -92,7 +92,8 @@ export class BookingController {
   static async retryAttempt(req: Request, res: Response, next: NextFunction) {
     try {
       const matchId = String(req.params.matchId)
-      await retryBookingForMatch(matchId)
+      const membershipId = typeof req.body?.membershipId === 'string' ? req.body.membershipId : undefined
+      await retryBookingForMatch(matchId, membershipId)
       res.json({ queued: true })
     } catch (err) { next(err) }
   }
