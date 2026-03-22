@@ -233,13 +233,15 @@
       "whenWhere": "When & Where",
       "formatSport": "Format & Sport",
       "whoToInvite": "Who to Invite",
-      "startScheduling": "Start Scheduling"
+      "startScheduling": "Start Scheduling",
+      "allSet": "You're all set"
     },
     "stepDesc": {
       "whenWhere": "Set the date, time, and location for your match",
       "formatSport": "Choose sport and format",
       "whoToInvite": "Select and prioritize contacts to invite",
-      "startScheduling": "Review and start the automated invite sequence"
+      "startScheduling": "Review and start the automated invite sequence",
+      "allSet": "Your match is being organized"
     },
     "pickDate": "Pick a date",
     "courtPlaceholder": "Court, club, or venue (e.g. Club Tennis Barcelona)",
@@ -330,6 +332,16 @@
     "copyLink": "Copy Link",
     "copied": "Copied",
     "startSchedulingButton": "Start Scheduling",
+    "allSetIntro": "AceUp is organizing your match in the background. You don't need to do anything — we'll notify you when a match is confirmed.",
+    "allSetContacting": "Contacting {{name}} right now · {{window}} to respond",
+    "allSetContactingMultiple": "Contacting {{n}} people right now · {{window}} to respond",
+    "allSetOnDeck": "on deck",
+    "allSetBookingNote": "We'll also book a court once a match is confirmed",
+    "allSetViewStatus": "View status",
+    "allSetDone": "Done",
+    "previewLabel": "Preview invite message",
+    "previewNote": "Sent via WhatsApp as a poll",
+    "previewNone": "None of these",
     "toast": {
       "loadContactsFailed": "Could not load contacts",
       "allMembersAdded": "All members from this list are already added or don't have a phone number",
@@ -615,6 +627,7 @@
       "bookingFailed": "Booking failed",
       "retryBooking": "Retry booking",
       "attempting": "Attempting to reserve a court…",
+      "attemptingNote": "This page updates automatically. You'll also receive a message in the match group.",
       "timedOut": "Booking timed out — the process took too long. You can retry below.",
       "errors": {
         "missingSocioNumber": "A participant is missing their socio number",
@@ -782,6 +795,7 @@
       "ratingUpdated": "Rating updated",
       "noPlayersFound": "No players found",
       "courtBooked": "Court booked",
+      "bookingFailed": "Court booking failed",
       "bookingCancelled": "Court booking cancelled",
       "bookingCancelFailed": "Court booking cancellation failed",
       "matchRescheduled": "Match rescheduled",
@@ -803,6 +817,7 @@
       "noMatchFoundSport": "Your {{sport}} invite didn't find a match.",
       "courtBooked": "{{court}} has been booked for your match.",
       "courtBookedGeneric": "Your court has been booked.",
+      "bookingFailed": "The court could not be booked. You can retry from the match details page.",
       "bookingCancelled": "The court booking for your cancelled match has been successfully cancelled.",
       "bookingCancelFailed": "The court booking could not be cancelled automatically. Please cancel it manually at the club.",
       "matchRescheduled": "The match has been rescheduled.",

@@ -85,7 +85,7 @@ interface WizardProps {
   onSuccess?: () => void
 }
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3 | 4 | 5
 
 // Generate time slots at :00 only (06:00 – 22:00)
 const TIME_SLOTS: string[] = []
@@ -218,6 +218,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [socioEdits, setSocioEdits] = useState<Record<string, string>>({})
   const [savingSocio, setSavingSocio] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [createdRequestId, setCreatedRequestId] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [manualName, setManualName] = useState("")
   const [manualPhone, setManualPhone] = useState("")
   const [manualSocio, setManualSocio] = useState("")
@@ -247,6 +249,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setCourtAvailabilityLoading(false)
     setCourtAvailabilityError(null)
     setShowManualAdd(false)
+    setCreatedRequestId(null)
+    setPreviewOpen(false)
   }
 
   // Fetch player preferences (preferredClub, defaultCity) for location defaults
@@ -566,12 +570,9 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
       await schedulingService.start(req.id)
-      toast.success(t("wizard.toast.schedulingStarted"), {
-        description: `First contacting ${priorityList[0]?.name}...`
-      })
       onSuccess?.()
-      handleClose(false)
-      navigate(`/play/${req.id}`)
+      setCreatedRequestId(req.id)
+      setStep(5)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("wizard.toast.schedulingFailed"))
     } finally {
@@ -588,12 +589,14 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
             {step === 2 && t("wizard.steps.formatSport")}
             {step === 3 && t("wizard.steps.whoToInvite")}
             {step === 4 && t("wizard.steps.startScheduling")}
+            {step === 5 && t("wizard.steps.allSet")}
           </DialogTitle>
           <DialogDescription className="sr-only">
             {step === 1 && t("wizard.stepDesc.whenWhere")}
             {step === 2 && t("wizard.stepDesc.formatSport")}
             {step === 3 && t("wizard.stepDesc.whoToInvite")}
             {step === 4 && t("wizard.stepDesc.startScheduling")}
+            {step === 5 && t("wizard.stepDesc.allSet")}
           </DialogDescription>
           {/* Step indicator */}
           <div className="flex items-center gap-2 pt-2">
@@ -1313,6 +1316,50 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               </div>
             </div>
 
+            {/* WhatsApp invite message preview */}
+            {priorityList.length > 0 && (
+              <div className="rounded-xl border border-border/40 bg-muted/20">
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen((v) => !v)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-base">💬</span>
+                    {t("wizard.previewLabel")}
+                  </span>
+                  <ChevronRight className={cn("h-4 w-4 transition-transform", previewOpen && "rotate-90")} />
+                </button>
+                {previewOpen && (
+                  <div className="border-t border-border/40 px-4 pb-4 pt-3 space-y-2">
+                    <div className="rounded-xl bg-[#25D366]/10 border border-[#25D366]/20 px-4 py-3 space-y-2 text-sm font-mono">
+                      <p className="font-sans text-sm text-foreground/80">
+                        {date
+                          ? `📅 ${format(date, "EEEE d MMM", { locale: dateLocale })} · ${displayTime} · ${displayLocation}`
+                          : displayLocation}
+                      </p>
+                      <p className="font-sans text-sm">
+                        {sport === "tennis" ? "🎾" : "🏓"} {sport.charAt(0).toUpperCase() + sport.slice(1)} · {matchFormat}
+                      </p>
+                      <div className="border-t border-border/30 pt-2 space-y-1">
+                        {slotsInRange(startTime, endTime).map((slot) => (
+                          <div key={slot} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="inline-block h-4 w-4 rounded border border-border/50 bg-background" />
+                            <span>{slot}</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="inline-block h-4 w-4 rounded border border-border/50 bg-background" />
+                          <span>❌ {t("wizard.previewNone")}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("wizard.previewNote")}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(2)}>
                 <ChevronLeft className="mr-1 h-5 w-5" />
@@ -1467,6 +1514,85 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <Zap className="mr-2 h-5 w-5" />
                 )}
                 {t("wizard.startSchedulingButton")}
+              </Button>
+            </div>
+          </div>
+        )}
+        {/* Step 5: Confirmation */}
+        {step === 5 && (
+          <div className="space-y-5 pt-2">
+            {/* Intro */}
+            <p className="text-sm text-muted-foreground">{t("wizard.allSetIntro")}</p>
+
+            {/* Contact queue */}
+            <div className="rounded-xl border border-border/40 bg-muted/30 px-4 py-3 space-y-2">
+              {priorityList.slice(0, maxParallelCandidates).map((contact, i) => {
+                const windowLabel = responseWindow < 1
+                  ? t("wizard.responseWindowSec", { n: Math.round(responseWindow * 60) })
+                  : responseWindow < 60
+                  ? t("wizard.responseWindowMinutes", { n: responseWindow })
+                  : responseWindow === 60
+                  ? t("wizard.responseWindowOneHour")
+                  : t("wizard.responseWindowHours", { n: responseWindow / 60 })
+                return (
+                  <div key={contact.id} className="flex items-center gap-3 text-sm">
+                    <span className="text-base">✉️</span>
+                    <span>
+                      {maxParallelCandidates === 1
+                        ? t("wizard.allSetContacting", { name: contact.name, window: windowLabel })
+                        : i === 0
+                        ? t("wizard.allSetContactingMultiple", { n: maxParallelCandidates, window: windowLabel })
+                        : null}
+                    </span>
+                  </div>
+                )
+              })}
+              {priorityList.slice(maxParallelCandidates).map((contact) => (
+                <div key={contact.id} className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <span className="text-base">○</span>
+                  <span>{contact.name} · <span className="italic">{t("wizard.allSetOnDeck")}</span></span>
+                </div>
+              ))}
+            </div>
+
+            {/* Match summary */}
+            <div className="rounded-xl border border-border/40 bg-muted/10 px-4 py-3 space-y-2">
+              {date && (
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarIcon className="h-4 w-4 shrink-0 text-primary" />
+                  <span>{format(date, "EEEE, MMMM d", { locale: dateLocale })} · {displayTime}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4 shrink-0 text-primary" />
+                <span>{displayLocation}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <SportFormatBadge sport={sport} format={matchFormat} />
+              </div>
+              {bookingEnabled && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground border-t border-border/30 pt-2 mt-1">
+                  <Building2 className="h-4 w-4 shrink-0" />
+                  <span>{t("wizard.allSetBookingNote")}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" size="lg" className="flex-1" onClick={() => handleClose(false)}>
+                {t("wizard.allSetDone")}
+              </Button>
+              <Button
+                size="lg"
+                className="flex-1"
+                onClick={() => {
+                  handleClose(false)
+                  if (createdRequestId) navigate(`/play/${createdRequestId}`)
+                }}
+              >
+                {t("wizard.allSetViewStatus")}
+                <ChevronRight className="ml-1 h-5 w-5" />
               </Button>
             </div>
           </div>

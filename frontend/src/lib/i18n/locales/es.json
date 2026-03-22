@@ -233,13 +233,15 @@
       "whenWhere": "Cuándo y Dónde",
       "formatSport": "Formato y Deporte",
       "whoToInvite": "A Quién Invitar",
-      "startScheduling": "Iniciar Planificación"
+      "startScheduling": "Iniciar Planificación",
+      "allSet": "Todo listo"
     },
     "stepDesc": {
       "whenWhere": "Establece la fecha, hora y lugar de tu partido",
       "formatSport": "Elige deporte y formato",
       "whoToInvite": "Selecciona y prioriza los contactos a invitar",
-      "startScheduling": "Revisa e inicia la secuencia automática de invitaciones"
+      "startScheduling": "Revisa e inicia la secuencia automática de invitaciones",
+      "allSet": "Tu partido está siendo organizado"
     },
     "pickDate": "Elige una fecha",
     "courtPlaceholder": "Pista o club (ej. Club Tennis Barcelona)",
@@ -330,6 +332,16 @@
     "copyLink": "Copiar enlace",
     "copied": "Copiado",
     "startSchedulingButton": "Iniciar Planificación",
+    "allSetIntro": "AceUp está organizando tu partido en segundo plano. No necesitas hacer nada — te avisaremos cuando se confirme el partido.",
+    "allSetContacting": "Contactando a {{name}} ahora · {{window}} para responder",
+    "allSetContactingMultiple": "Contactando a {{n}} personas ahora · {{window}} para responder",
+    "allSetOnDeck": "en espera",
+    "allSetBookingNote": "También reservaremos una pista cuando se confirme el partido",
+    "allSetViewStatus": "Ver estado",
+    "allSetDone": "Listo",
+    "previewLabel": "Ver mensaje de invitación",
+    "previewNote": "Enviado por WhatsApp como encuesta",
+    "previewNone": "Ninguna de estas",
     "toast": {
       "loadContactsFailed": "No se pudieron cargar los contactos",
       "allMembersAdded": "Todos los miembros de esta lista ya están añadidos o no tienen número de teléfono",
@@ -615,6 +627,7 @@
       "bookingFailed": "Reserva fallida",
       "retryBooking": "Reintentar reserva",
       "attempting": "Intentando reservar una pista…",
+      "attemptingNote": "Esta página se actualiza automáticamente. También recibirás un mensaje en el grupo del partido.",
       "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación.",
       "errors": {
         "missingSocioNumber": "Falta el número de socio de un participante",
@@ -782,6 +795,7 @@
       "ratingUpdated": "Clasificación actualizada",
       "noPlayersFound": "No se encontraron jugadores",
       "courtBooked": "Pista reservada",
+      "bookingFailed": "No se pudo reservar la pista",
       "bookingCancelled": "Reserva de pista cancelada",
       "bookingCancelFailed": "No se pudo cancelar la reserva de pista",
       "matchRescheduled": "Partido reprogramado",
@@ -803,6 +817,7 @@
       "noMatchFoundSport": "Tu invitación de {{sport}} no encontró partido.",
       "courtBooked": "{{court}} ha sido reservada para tu partido.",
       "courtBookedGeneric": "Tu pista ha sido reservada.",
+      "bookingFailed": "No se pudo reservar la pista. Puedes reintentarlo desde los detalles del partido.",
       "bookingCancelled": "La reserva de pista para tu partido cancelado ha sido cancelada correctamente.",
       "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club.",
       "matchRescheduled": "El partido ha sido reprogramado.",

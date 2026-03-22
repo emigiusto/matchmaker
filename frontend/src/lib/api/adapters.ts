@@ -115,6 +115,7 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, Notification["type"]> = {
   "scheduling.no_match": "scheduling_no_match",
   "booking.cancelled": "booking_cancelled",
   "booking.cancel_failed": "booking_cancel_failed",
+  "booking.failed": "booking_failed",
   "booking.success": "booking_success",
   "result_pending": "result_pending",
   "rating_change": "rating_change",
@@ -146,6 +147,8 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
       return "Court booking cancelled"
     case "booking.cancel_failed":
       return "Court booking cancellation failed"
+    case "booking.failed":
+      return "Court booking failed"
     case "booking.success":
       return "Court booked"
     case "match.rescheduled": {
@@ -223,6 +226,8 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
       return "The court booking for your cancelled match has been successfully cancelled."
     case "booking.cancel_failed":
       return "The court booking for your cancelled match could not be cancelled automatically. Please cancel it manually at the club."
+    case "booking.failed":
+      return "The court could not be booked. You can retry from the match details page."
     case "match.rescheduled": {
       const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
       const parts: string[] = []

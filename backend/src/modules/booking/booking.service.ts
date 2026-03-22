@@ -544,8 +544,8 @@ function notifyBookingFailed(
   tz: string,
   reason: string,
 ): void {
-  createNotification(hostUserId, 'booking.cancel_failed', { matchId: match.id }).catch((err) => {
-    logger.warn(`[booking] Failed to send booking.cancel_failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
+  createNotification(hostUserId, 'booking.failed', { matchId: match.id }).catch((err) => {
+    logger.warn(`[booking] Failed to send booking.failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
   })
 
   if (match.whatsappGroupId) {
