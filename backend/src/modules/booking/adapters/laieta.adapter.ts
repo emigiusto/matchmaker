@@ -383,9 +383,7 @@ export class LaietaAdapter implements BookingAdapter {
         throw err
       }
       const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
-      await page.evaluate(() => {
-        (document.querySelector('.a_button_popup_fix.a_pistas_hora_sel') as HTMLElement)?.click()
-      })
+      await page.click('.a_button_popup_fix.a_pistas_hora_sel')
       await navigationPromise
       await this.checkForPageError(page)
 
@@ -400,6 +398,16 @@ export class LaietaAdapter implements BookingAdapter {
         await new Promise((r) => setTimeout(r, 2000))
         await this.checkForPageError(page)
       }
+
+      // Log page state before waiting for submit — diagnoses silent failures
+      const preSubmitState = await page.evaluate(() => {
+        const btn = document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement | null
+        const url = window.location.href
+        const bodySnippet = document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 600)
+        if (!btn) return `url=${url}, btn=NOT FOUND | ${bodySnippet}`
+        return `url=${url}, btn=found disabled=${btn.disabled} | ${bodySnippet}`
+      }).catch(() => '?')
+      logger.info(`[laieta] Pre-submit state: ${preSubmitState}`)
 
       // ── Step 4: Submit booking ──────────────────────────────────────
       try {
