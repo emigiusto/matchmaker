@@ -71,6 +71,8 @@ export interface Match {
   publicToken?: string | null
   /** Whether automatic court booking was enabled on the scheduling request */
   bookingEnabled?: boolean
+  /** The userId who owns the availability — the actual host */
+  hostUserId?: string | null
 }
 
 export interface PostMatchQuestionnaire {

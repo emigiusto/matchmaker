@@ -142,15 +142,16 @@ export default function MatchDetailPage() {
   }, [id])
 
   // Load memberships and contacts to enable booking + socio editing.
-  // Both memberships and contacts come from the host (player1).
+  // Both come from the actual host (availability owner), not just participants[0].
   useEffect(() => {
-    if (!match || !currentUserId || (match.player1.userId !== currentUserId && !isAdmin)) return
-    bookingService.listMemberships(match.player1.userId).then((m) => {
+    const hostId = match?.hostUserId ?? match?.player1.userId
+    if (!match || !currentUserId || !hostId || (hostId !== currentUserId && !isAdmin)) return
+    bookingService.listMemberships(hostId).then((m) => {
       setHostMemberships(m)
       setSelectedMembershipId((prev) => prev ?? m[0]?.id ?? null)
     }).catch(() => {})
-    contactsService.list(match.player1.userId).then(setContacts).catch(() => {})
-  }, [match?.id, currentUserId, isAdmin])
+    contactsService.list(hostId).then(setContacts).catch(() => {})
+  }, [match?.id, match?.hostUserId, currentUserId, isAdmin])
 
   async function handleRetryBooking() {
     if (!id || !selectedMembershipId) return
@@ -189,7 +190,7 @@ export default function MatchDetailPage() {
     if (value === undefined) return
     setSavingSocioFor(contact.id)
     try {
-      await contactsService.updateSocioNumber(contact.id, match!.player1.userId, contact.socioNumbers, clubSlug, value.trim())
+      await contactsService.updateSocioNumber(contact.id, match!.hostUserId ?? match!.player1.userId, contact.socioNumbers, clubSlug, value.trim())
       setContacts((prev) =>
         prev.map((c) =>
           c.id === contact.id
@@ -260,12 +261,12 @@ export default function MatchDetailPage() {
   }
 
   const isPlayer1 = match.player1.userId === currentUserId
-  const isHost = isPlayer1
+  const hostUserId = match.hostUserId ?? match.player1.userId
+  const isHost = hostUserId === currentUserId
   const opponent = isPlayer1 ? match.player2 : match.player1
   const currentPlayer = isPlayer1 ? match.player1 : match.player2
 
   // Non-host participants for socio number editing (always exclude the host, not the viewer)
-  const hostUserId = match.player1.userId
   const otherParticipants: Array<{ userId: string; name: string }> =
     match.participants && match.participants.length > 0
       ? match.participants

@@ -30,6 +30,7 @@ export interface BackendMatchDTO {
   format?: "singles" | "doubles"
   whatsappGroupId?: string | null
   publicToken?: string | null
+  hostUserId?: string | null
 }
 
 // Backend InviteDTO shape (from /invites endpoints)
@@ -347,5 +348,6 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
     format,
     whatsappGroupId: dto.whatsappGroupId ?? null,
     publicToken: dto.publicToken ?? null,
+    hostUserId: dto.hostUserId ?? null,
   }
 }

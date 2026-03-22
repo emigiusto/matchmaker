@@ -54,6 +54,8 @@ export interface MatchDTO {
   publicToken?: string | null;
   /** Whether automatic court booking was enabled on the scheduling request */
   bookingEnabled?: boolean;
+  /** The userId who owns the availability — the actual host of the match */
+  hostUserId?: string | null;
 }
 
 export interface CreateMatchInput {

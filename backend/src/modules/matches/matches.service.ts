@@ -724,6 +724,7 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     whatsappGroupId: match.whatsappGroupId ?? null,
     publicToken: (match as any).publicToken ?? null,
     bookingEnabled: sr?.bookingEnabled ?? false,
+    hostUserId: av?.userId ?? null,
     ...(av && {
       location: av.locationText,
       date: scheduled.toLocaleDateString('en-CA', { timeZone: tz }),
