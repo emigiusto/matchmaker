@@ -40,6 +40,7 @@ import { CancelMatchButton } from "@/components/cancel-match-button"
 import { RescheduleMatchDialog } from "@/components/reschedule-match-dialog"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
+import { useAuth } from "@/lib/auth/AuthContext"
 import { isMatchInPast, getBookingErrorMessage } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
@@ -53,6 +54,7 @@ import { Loader2 } from "lucide-react"
 export default function MatchDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { t, language } = useTranslation()
+  const { isAdmin } = useAuth()
   const dateLocale = language === "es" ? esLocale : enUS
   const currentUserId = getCurrentUserId()
   const [match, setMatch] = useState<Match | null>(null)
@@ -141,13 +143,13 @@ export default function MatchDetailPage() {
 
   // Load host memberships and contacts to enable booking for any match + socio editing
   useEffect(() => {
-    if (!match || !currentUserId || match.player1.userId !== currentUserId) return
+    if (!match || !currentUserId || (match.player1.userId !== currentUserId && !isAdmin)) return
     bookingService.listMemberships(currentUserId).then((m) => {
       setHostMemberships(m)
       setSelectedMembershipId((prev) => prev ?? m[0]?.id ?? null)
     }).catch(() => {})
     contactsService.list(currentUserId).then(setContacts).catch(() => {})
-  }, [match?.id, currentUserId])
+  }, [match?.id, currentUserId, isAdmin])
 
   async function handleRetryBooking() {
     if (!id || !selectedMembershipId) return
@@ -477,7 +479,7 @@ export default function MatchDetailPage() {
         </Card>
 
         {/* Court Booking Status */}
-        {isHost && hostMemberships.length > 0 && (
+        {(isHost || isAdmin) && hostMemberships.length > 0 && (
           <Card className={`border-border/50 ${
             bookingAttempt?.status === "success" ? "border-green-500/30 bg-green-500/5" :
             bookingAttempt?.status === "failed" ? "border-destructive/30 bg-destructive/5" :
