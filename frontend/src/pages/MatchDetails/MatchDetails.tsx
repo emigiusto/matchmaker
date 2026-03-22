@@ -141,14 +141,16 @@ export default function MatchDetailPage() {
     return stopBookingPoll
   }, [id])
 
-  // Load host memberships and contacts to enable booking for any match + socio editing
+  // Load host memberships and contacts to enable booking for any match + socio editing.
+  // When the current user is an admin (but not the host), load the host's data instead.
   useEffect(() => {
     if (!match || !currentUserId || (match.player1.userId !== currentUserId && !isAdmin)) return
-    bookingService.listMemberships(currentUserId).then((m) => {
+    const hostUserId = match.player1.userId
+    bookingService.listMemberships(hostUserId).then((m) => {
       setHostMemberships(m)
       setSelectedMembershipId((prev) => prev ?? m[0]?.id ?? null)
     }).catch(() => {})
-    contactsService.list(currentUserId).then(setContacts).catch(() => {})
+    contactsService.list(hostUserId).then(setContacts).catch(() => {})
   }, [match?.id, currentUserId, isAdmin])
 
   async function handleRetryBooking() {
@@ -188,7 +190,7 @@ export default function MatchDetailPage() {
     if (value === undefined) return
     setSavingSocioFor(contact.id)
     try {
-      await contactsService.updateSocioNumber(contact.id, currentUserId, contact.socioNumbers, clubSlug, value.trim())
+      await contactsService.updateSocioNumber(contact.id, match!.player1.userId, contact.socioNumbers, clubSlug, value.trim())
       setContacts((prev) =>
         prev.map((c) =>
           c.id === contact.id
@@ -263,11 +265,12 @@ export default function MatchDetailPage() {
   const opponent = isPlayer1 ? match.player2 : match.player1
   const currentPlayer = isPlayer1 ? match.player1 : match.player2
 
-  // Non-host participants for socio number editing
+  // Non-host participants for socio number editing (always exclude the host, not the viewer)
+  const hostUserId = match.player1.userId
   const otherParticipants: Array<{ userId: string; name: string }> =
     match.participants && match.participants.length > 0
       ? match.participants
-          .filter((p) => p.userId !== currentUserId)
+          .filter((p) => p.userId !== hostUserId)
           .map((p) => ({ userId: p.userId, name: p.userName ?? "" }))
       : [{ userId: opponent.userId, name: opponent.name }]
 
@@ -637,8 +640,8 @@ export default function MatchDetailPage() {
                 )
               })()}
 
-              {/* Participant socio numbers — only visible to the host */}
-              {isHost && primaryClubSlug && otherParticipants.length > 0 && (
+              {/* Participant socio numbers — only visible to the host or admin */}
+              {(isHost || isAdmin) && primaryClubSlug && otherParticipants.length > 0 && (
                 <div className="border-t border-border/40 pt-3 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">
                     {t("matchDetails.booking.participantSocios", { club: primaryClubSlug })}
