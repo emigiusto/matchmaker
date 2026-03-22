@@ -234,24 +234,35 @@ export class LaietaAdapter implements BookingAdapter {
     }
   }
 
-  /** Throws if the page contains a .alert.alert-block.alert-danger block. */
+  /**
+   * Throws if the page contains a visible error block.
+   * Checks both the standard Drupal danger alert and the Bootstrap
+   * tooltip/popover used by miclubonline for participant AJAX errors.
+   */
   private async checkForPageError(page: Page): Promise<void> {
     const errorText = await page.evaluate(() => {
-      const el = document.querySelector('.alert.alert-block.alert-danger')
-      if (!el) return null
-      // Clone and remove invisible heading nodes (e.g. "Missatge d'error") before reading text
-      const clone = el.cloneNode(true) as HTMLElement
-      clone.querySelectorAll('.element-invisible, .close').forEach((n) => n.remove())
-      return clone.textContent?.trim() ?? null
+      // Standard Drupal full-width danger alert
+      const alertEl = document.querySelector('.alert.alert-block.alert-danger')
+      if (alertEl) {
+        const clone = alertEl.cloneNode(true) as HTMLElement
+        clone.querySelectorAll('.element-invisible, .close').forEach((n) => n.remove())
+        const text = clone.textContent?.trim()
+        if (text) return text
+      }
+      // Bootstrap tooltip / popover used for participant AJAX errors
+      const tooltipEl = document.querySelector('.popover-content, .tooltip-inner, .popover .popover-body')
+      if (tooltipEl) {
+        const text = tooltipEl.textContent?.trim()
+        if (text) return text
+      }
+      return null
     })
     if (!errorText) return
 
-    // Quota / already-booked error — court is taken, likely by a previous attempt
     const isQuotaError = /nombre m.xim de reserves|quota|límit de reserves/i.test(errorText)
     if (isQuotaError) {
       throw new AppError(errorText, 409, 'BOOKING_QUOTA_EXCEEDED')
     }
-
     throw new AppError(errorText, 409, 'BOOKING_PAGE_ERROR')
   }
 
@@ -385,74 +396,75 @@ export class LaietaAdapter implements BookingAdapter {
       }
       const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
       await page.click('.a_button_popup_fix.a_pistas_hora_sel')
-      await navigationPromise
+      await navigationPromise.catch((err: Error) => {
+        // "Navigating frame was detached" / "LifecycleWatcher terminated" can fire when
+        // navigation completes so fast the frame is already gone — treat as success.
+        if (err.message.includes('detached') || err.message.includes('LifecycleWatcher')) {
+          logger.warn('[laieta] waitForNavigation: frame detached — navigation likely already completed')
+          return
+        }
+        throw err
+      })
       await this.checkForPageError(page)
 
-      // ── Step 3: Participant entry form ──────────────────────────────
-      await page.waitForSelector('#edit-add', { timeout: 10000 })
+      // ── Step 3: Register participants via AJAX API ──────────────────
+      // The portal exposes /ajax/infopistas/participantes which validates and
+      // registers each participant server-side in the PHP session. Using it
+      // directly (with the same session cookie) is more reliable than driving
+      // the DOM form, and returns structured JSON errors.
+      //
+      // URL after "Continua": /infopistas/{sportId}/{date}/{place}/{time}
+      const bookingPageUrl = page.url()
+      const urlSegments = new URL(bookingPageUrl).pathname.split('/').filter(Boolean)
+      const place = urlSegments[3] ?? ''       // e.g. "09"
+      const timeHHMM = urlSegments[4] ?? targetHourMin  // e.g. "0900"
 
+      const registeredSocios = [creds.socioNumber]
       for (const socioNumber of participantSocioNumbers) {
-        logger.info(`[laieta] Adding participant: ${socioNumber}`)
-        await page.click('#edit-add', { clickCount: 3 })
-        await page.type('#edit-add', socioNumber)
-        await page.click('.btn-add-participant')
-        // Wait for the AJAX to resolve: either a new participant row appears or an error block
-        await Promise.race([
-          page.waitForFunction(
-            (before: number) => {
-              const rows = document.querySelectorAll('.participant-row, [id^="edit-participant"]')
-              return rows.length > before
-            },
-            { timeout: 5000 },
-            // pass current participant count as baseline
-            participantSocioNumbers.indexOf(socioNumber),
-          ).catch(() => null),
-          new Promise((r) => setTimeout(r, 3000)),
-        ])
-        await this.checkForPageError(page)
-        const participantState = await page.evaluate(() => {
-          const rows = document.querySelectorAll('.participant-row, [id^="edit-participant"]')
-          return `participant rows found: ${rows.length}`
-        }).catch(() => '?')
-        logger.info(`[laieta] After adding ${socioNumber}: ${participantState}`)
+        const playerPos = registeredSocios.length + 1  // host occupies pos 1
+        const body = new URLSearchParams({
+          newparticipant: socioNumber,
+          playerpos: String(playerPos),
+          place,
+          date: this.toUrlDate(date),
+          time: timeHHMM,
+          amount: '4',
+          fromlevel: '',
+          tolevel: '',
+          mixed: 'N',
+        })
+        for (const p of registeredSocios) body.append('participants[]', p)
+        body.append('participants[]', socioNumber)
+
+        logger.info(`[laieta] Registering participant via API: ${socioNumber} (pos=${playerPos}, place=${place}, time=${timeHHMM})`)
+        const resp = await fetch(`${BASE_URL}/ajax/infopistas/participantes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Cookie': `${SESSION_COOKIE_NAME}=${sessionValue}`,
+            'Referer': bookingPageUrl,
+          },
+          body: body.toString(),
+        })
+        if (!resp.ok) {
+          throw new AppError(`Participant API returned HTTP ${resp.status}`, 502, 'BOOKING_PAGE_ERROR')
+        }
+        const json = await resp.json() as { error: boolean; message: string; newparticipant: string }
+        logger.info(`[laieta] Participant ${socioNumber}: error=${json.error}, result="${json.newparticipant}", msg="${json.message}"`)
+        if (json.error) {
+          throw new AppError(json.message || 'Participant could not be added to the booking', 409, 'BOOKING_PAGE_ERROR')
+        }
+        registeredSocios.push(socioNumber)
       }
 
-      // Log page state before waiting for submit — diagnoses silent failures
-      const preSubmitState = await page.evaluate(() => {
+      // All participants registered server-side — force-enable submit and proceed
+      await page.evaluate(() => {
         const btn = document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement | null
-        const url = window.location.href
-        const bodySnippet = document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 600)
-        if (!btn) return `url=${url}, btn=NOT FOUND | ${bodySnippet}`
-        return `url=${url}, btn=found disabled=${btn.disabled} | ${bodySnippet}`
-      }).catch(() => '?')
-      logger.info(`[laieta] Pre-submit state: ${preSubmitState}`)
+        if (btn) btn.disabled = false
+      })
 
       // ── Step 4: Submit booking ──────────────────────────────────────
-      try {
-        await page.waitForFunction(
-          () => {
-            const btn = document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement | null
-            return btn !== null && !btn.disabled
-          },
-          { timeout: 15000 },
-        )
-      } catch (err) {
-        const pageUrl = page.url()
-        const btnState = await page.evaluate(() => {
-          const btn = document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement | null
-          if (!btn) return 'button not found'
-          return `found, disabled=${btn.disabled}, text="${btn.textContent?.trim()}"`
-        }).catch(() => '?')
-        const bodySnippet = await page.evaluate(() =>
-          document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 800)
-        ).catch(() => '?')
-        const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
-        const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'submit-btn-wait') : null
-        logger.error(`[laieta] Submit button wait timed out. url=${pageUrl}, btn: ${btnState}`)
-        logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
-        if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
-        throw err
-      }
 
       if (process.env.BOOKING_SUBMIT_ENABLED !== 'true') {
         const externalId = `[TEST-MODE]::${courtId}::${date}::${targetHour}`
