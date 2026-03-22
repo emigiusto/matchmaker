@@ -43,7 +43,9 @@ import { isMatchInPast, getBookingErrorMessage } from "@/lib/utils"
 import { getCurrentUserId } from "@/lib/current-user"
 import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
-import { bookingService, type BookingAttemptDTO } from "@/lib/services/booking.service"
+import { bookingService, type BookingAttemptDTO, type ClubMembershipDTO } from "@/lib/services/booking.service"
+import { contactsService, type ContactDTO } from "@/lib/services/contacts.service"
+import { Input } from "@/components/ui/input"
 import type { Match } from "@/lib/types"
 import { Loader2 } from "lucide-react"
 
@@ -64,6 +66,10 @@ export default function MatchDetailPage() {
   const [cancellingBooking, setCancellingBooking] = useState(false)
   const [cancelBookingError, setCancelBookingError] = useState<string | null>(null)
   const [fetchingGroupLink, setFetchingGroupLink] = useState(false)
+  const [hostMemberships, setHostMemberships] = useState<ClubMembershipDTO[]>([])
+  const [contacts, setContacts] = useState<ContactDTO[]>([])
+  const [socioEdits, setSocioEdits] = useState<Record<string, string>>({})
+  const [savingSocioFor, setSavingSocioFor] = useState<string | null>(null)
   const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function fetchReminders() {
@@ -131,6 +137,13 @@ export default function MatchDetailPage() {
     return stopBookingPoll
   }, [id])
 
+  // Load host memberships and contacts to enable booking for any match + socio editing
+  useEffect(() => {
+    if (!match || !currentUserId || match.player1.userId !== currentUserId) return
+    bookingService.listMemberships(currentUserId).then(setHostMemberships).catch(() => {})
+    contactsService.list(currentUserId).then(setContacts).catch(() => {})
+  }, [match?.id, currentUserId])
+
   async function handleRetryBooking() {
     if (!id) return
     setRetryingBooking(true)
@@ -158,6 +171,28 @@ export default function MatchDetailPage() {
       setCancelBookingError(err instanceof Error ? err.message : t("matchDetails.booking.toast.cancelFailed"))
     } finally {
       setCancellingBooking(false)
+    }
+  }
+
+  async function handleSaveSocio(contact: ContactDTO, clubSlug: string) {
+    const value = socioEdits[contact.id]
+    if (value === undefined) return
+    setSavingSocioFor(contact.id)
+    try {
+      await contactsService.updateSocioNumber(contact.id, currentUserId, contact.socioNumbers, clubSlug, value.trim())
+      setContacts((prev) =>
+        prev.map((c) =>
+          c.id === contact.id
+            ? { ...c, socioNumbers: { ...c.socioNumbers, [clubSlug]: value.trim() } }
+            : c
+        )
+      )
+      setSocioEdits((prev) => { const next = { ...prev }; delete next[contact.id]; return next })
+      toast.success(t("matchDetails.booking.socioSaved"))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
+    } finally {
+      setSavingSocioFor(null)
     }
   }
 
@@ -215,8 +250,26 @@ export default function MatchDetailPage() {
   }
 
   const isPlayer1 = match.player1.userId === currentUserId
+  const isHost = isPlayer1
   const opponent = isPlayer1 ? match.player2 : match.player1
   const currentPlayer = isPlayer1 ? match.player1 : match.player2
+
+  // Non-host participants for socio number editing
+  const otherParticipants: Array<{ userId: string; name: string }> =
+    match.participants && match.participants.length > 0
+      ? match.participants
+          .filter((p) => p.userId !== currentUserId)
+          .map((p) => ({ userId: p.userId, name: p.userName ?? "" }))
+      : [{ userId: opponent.userId, name: opponent.name }]
+
+  const primaryClubSlug = hostMemberships[0]?.clubSlug ?? null
+
+  const allParticipantsHaveSocio =
+    !primaryClubSlug ||
+    otherParticipants.every((p) => {
+      const contact = contacts.find((c) => c.linkedUserId === p.userId)
+      return !!contact?.socioNumbers?.[primaryClubSlug]
+    })
 
   function handleConfirmResult() {
     toast.success("Result confirmed!")
@@ -417,7 +470,7 @@ export default function MatchDetailPage() {
         </Card>
 
         {/* Court Booking Status */}
-        {(match.bookingEnabled || bookingAttempt) && (
+        {isHost && hostMemberships.length > 0 && (
           <Card className={`border-border/50 ${
             bookingAttempt?.status === "success" ? "border-green-500/30 bg-green-500/5" :
             bookingAttempt?.status === "failed" ? "border-destructive/30 bg-destructive/5" :
@@ -444,6 +497,12 @@ export default function MatchDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {!allParticipantsHaveSocio && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 text-sm text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{t("matchDetails.booking.missingSocioNumbers")}</span>
+                </div>
+              )}
               {!bookingAttempt && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -455,7 +514,7 @@ export default function MatchDetailPage() {
                     size="sm"
                     className="gap-2"
                     onClick={handleRetryBooking}
-                    disabled={retryingBooking}
+                    disabled={retryingBooking || !allParticipantsHaveSocio}
                   >
                     {retryingBooking
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -512,7 +571,7 @@ export default function MatchDetailPage() {
                     size="sm"
                     className="gap-2"
                     onClick={handleRetryBooking}
-                    disabled={retryingBooking}
+                    disabled={retryingBooking || !allParticipantsHaveSocio}
                   >
                     {retryingBooking
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -542,6 +601,56 @@ export default function MatchDetailPage() {
                   </div>
                 )
               })()}
+
+              {/* Participant socio numbers — only visible to the host */}
+              {isHost && primaryClubSlug && otherParticipants.length > 0 && (
+                <div className="border-t border-border/40 pt-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {t("matchDetails.booking.participantSocios", { club: primaryClubSlug })}
+                  </p>
+                  {otherParticipants.map((p) => {
+                    const contact = contacts.find((c) => c.linkedUserId === p.userId)
+                    const current = contact?.socioNumbers?.[primaryClubSlug] ?? ""
+                    const draft = socioEdits[contact?.id ?? ""]
+                    const displayValue = draft !== undefined ? draft : current
+                    const isDirty = draft !== undefined && draft !== current
+                    return (
+                      <div key={p.userId} className="flex items-center gap-2">
+                        <span className="w-28 shrink-0 truncate text-sm">{p.name}</span>
+                        {contact ? (
+                          <>
+                            <Input
+                              className="h-7 text-sm"
+                              placeholder={t("matchDetails.booking.socioPlaceholder")}
+                              value={displayValue}
+                              onChange={(e) =>
+                                setSocioEdits((prev) => ({ ...prev, [contact.id]: e.target.value }))
+                              }
+                            />
+                            {isDirty && (
+                              <Button
+                                size="sm"
+                                className="h-7 px-2.5 text-xs"
+                                onClick={() => handleSaveSocio(contact, primaryClubSlug)}
+                                disabled={savingSocioFor === contact.id}
+                              >
+                                {savingSocioFor === contact.id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : t("form.save")
+                                }
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">
+                            {t("matchDetails.booking.notInContacts")}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

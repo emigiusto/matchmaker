@@ -628,7 +628,12 @@
         "retryFailed": "Failed to retry booking",
         "cancelSuccess": "Booking cancelled",
         "cancelFailed": "Failed to cancel booking"
-      }
+      },
+      "missingSocioNumbers": "Some participants are missing a socio number. Add them below before retrying the booking.",
+      "participantSocios": "Participant socio numbers ({{club}})",
+      "socioPlaceholder": "Socio number",
+      "socioSaved": "Socio number saved",
+      "notInContacts": "Not in your contacts"
     },
     "openWhatsappGroup": "Open WhatsApp Group",
     "reminders": {
