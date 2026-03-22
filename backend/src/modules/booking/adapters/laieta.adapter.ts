@@ -277,12 +277,9 @@ export class LaietaAdapter implements BookingAdapter {
       const sessionValue = await this.login(browser, creds)
       const url = `${BASE_URL}/infopistas/${sportId}/${this.toUrlDate(date)}`
 
-      const hourLabel = targetHour ? `hour=${targetHour}` : 'all hours'
-      logger.info(`[laieta] Checking availability: ${url} (sport=${sport}, ${hourLabel})`)
       const page = await this.openWithSession(browser, url, sessionValue)
       const courts = await this.scrapeAvailableSlots(page, targetHour)
 
-      logger.info(`[laieta] Found ${courts.length} available courts at ${date} (${hourLabel})`)
       return {
         date,
         sport,

@@ -54,7 +54,6 @@ async function warmAvailabilityCache(): Promise<void> {
         try {
           const result: CourtAvailabilityResult = await adapter.checkAvailability(creds, date, undefined, { sport })
           await cacheSet(cacheKey, JSON.stringify(result), CACHE_TTL_SECONDS)
-          logger.info(`[availability-cache-job] Cached ${membership.clubSlug}/${sport}/${date}: ${result.availableCourts.length} courts`)
         } catch (err) {
           logger.warn(`[availability-cache-job] Failed ${membership.clubSlug}/${sport}/${date}: ${err instanceof Error ? err.message : err}`)
         }
@@ -62,7 +61,6 @@ async function warmAvailabilityCache(): Promise<void> {
     }
   }
 
-  logger.info('[availability-cache-job] Cache warm complete')
 }
 
 export function scheduleAvailabilityCacheJob() {
