@@ -47,17 +47,6 @@ export class WasenderProvider implements IWhatsAppProvider {
     try {
       const to = `+${normalizePhone(phoneNumber)}`;
       const buttons = options?.buttons?.slice(0, 12);
-      const body: Record<string, unknown> = { to };
-
-      if (buttons && buttons.length >= 2) {
-        body.poll = {
-          question: message.slice(0, 255),
-          options: buttons.map((b) => b.title.slice(0, 25)),
-          multiSelect: true,
-        };
-      } else {
-        body.text = message;
-      }
 
       type WasenderResponse = {
         success?: boolean;
@@ -67,7 +56,7 @@ export class WasenderProvider implements IWhatsAppProvider {
         retry_after?: number;
       };
 
-      const sendOnce = async (): Promise<{ ok: boolean; res: Response; data: WasenderResponse }> => {
+      const sendOnce = async (body: Record<string, unknown>): Promise<{ ok: boolean; res: Response; data: WasenderResponse }> => {
         const res = await fetch(`${WASENDER_BASE}/api/send-message`, {
           method: 'POST',
           headers: {
@@ -80,20 +69,41 @@ export class WasenderProvider implements IWhatsAppProvider {
         return { ok: res.ok, res, data };
       };
 
-      let { ok, res, data } = await sendOnce();
+      const sendWithRetry = async (body: Record<string, unknown>) => {
+        let { ok, res, data } = await sendOnce(body);
+        // Handle Wasender "Account Protection" rate limiting with a single retry.
+        if (
+          !ok &&
+          data &&
+          typeof data.retry_after === 'number' &&
+          data.retry_after > 0 &&
+          (data.message || data.error || '').includes('You have account protection enabled')
+        ) {
+          await new Promise((r) => setTimeout(r, data.retry_after * 1000));
+          ({ ok, res, data } = await sendOnce(body));
+        }
+        return { ok, res, data };
+      };
 
-      // Handle Wasender "Account Protection" rate limiting with a single retry after the suggested delay.
-      if (
-        !ok &&
-        data &&
-        typeof data.retry_after === 'number' &&
-        data.retry_after > 0 &&
-        (data.message || data.error || '').includes('You have account protection enabled')
-      ) {
-        const delayMs = data.retry_after * 1000;
-        await new Promise((r) => setTimeout(r, delayMs));
-        ({ ok, res, data } = await sendOnce());
+      let pollBody: Record<string, unknown>;
+
+      if (buttons && buttons.length >= 2) {
+        if (message.length > 255) {
+          // Message is too long to fit in a poll question — send it as plain text first
+          // so the recipient has full context, then send the poll with a short question.
+          await sendWithRetry({ to, text: message });
+          // Use the last two paragraphs (the voting prompt + timer) as the short question.
+          const paragraphs = message.split('\n\n');
+          const shortQuestion = paragraphs.slice(-2).join('\n\n');
+          pollBody = { to, poll: { question: shortQuestion, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
+        } else {
+          pollBody = { to, poll: { question: message, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
+        }
+      } else {
+        pollBody = { to, text: message };
       }
+
+      const { ok, res, data } = await sendWithRetry(pollBody);
 
       if (!ok) {
         const errMsg = data.error || data.message || res.statusText;
