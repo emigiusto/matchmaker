@@ -396,10 +396,10 @@ describe('triggerBookingForMatch', () => {
 // ─── retryBookingForMatch ─────────────────────────────────────────
 
 describe('retryBookingForMatch', () => {
-  it('throws 404 when no booking attempt exists', async () => {
+  it('throws 400 when no booking attempt exists and no membershipId provided', async () => {
     mockPrisma.bookingAttempt.findUnique.mockResolvedValue(null);
 
-    await expect(retryBookingForMatch('match1')).rejects.toThrow('No booking attempt found');
+    await expect(retryBookingForMatch('match1')).rejects.toThrow('membershipId is required to start a new booking attempt');
   });
 
   it('throws 409 when attempt is not in failed status', async () => {
