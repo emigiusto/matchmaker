@@ -350,7 +350,17 @@ export class LaietaAdapter implements BookingAdapter {
       }
 
       // ── Step 2: Popup → click "Continua" ───────────────────────────
-      await page.waitForSelector('.a_button_popup_fix.a_pistas_hora_sel', { timeout: 10000 })
+      try {
+        await page.waitForSelector('.a_button_popup_fix.a_pistas_hora_sel', { timeout: 10000 })
+      } catch (err) {
+        const pageUrl = page.url()
+        const bodySnippet = await page.evaluate(() => document.body.innerText?.slice(0, 1000)).catch(() => '?')
+        const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+        logger.error(`[laieta] Popup selector not found after slot click. url=${pageUrl}`)
+        logger.error(`[laieta] Page text: ${bodySnippet}`)
+        if (screenshotB64) logger.error(`[laieta] Screenshot: data:image/png;base64,${screenshotB64}`)
+        throw err
+      }
       const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
       await page.evaluate(() => {
         (document.querySelector('.a_button_popup_fix.a_pistas_hora_sel') as HTMLElement)?.click()
