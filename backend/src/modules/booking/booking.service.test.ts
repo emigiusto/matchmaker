@@ -409,10 +409,18 @@ describe('retryBookingForMatch', () => {
     await expect(retryBookingForMatch('match1')).rejects.toThrow(/Cannot retry/);
   });
 
-  it('throws 409 for pending status', async () => {
-    mockPrisma.bookingAttempt.findUnique.mockResolvedValue({ ...baseAttempt, status: 'pending' });
+  it('force-cancels a stuck pending attempt and re-queues', async () => {
+    const pendingAttempt = { ...baseAttempt, status: 'pending' };
+    mockPrisma.bookingAttempt.findUnique.mockResolvedValue(pendingAttempt);
+    mockPrisma.bookingAttempt.update.mockResolvedValue({ ...pendingAttempt, status: 'pending' });
+    mockPrisma.schedulingRequest.findUnique.mockResolvedValue(null);
 
-    await expect(retryBookingForMatch('match1')).rejects.toThrow(/Cannot retry/);
+    await retryBookingForMatch('match1');
+
+    // First update cancels the stuck attempt, second resets it to pending for the new job
+    expect(mockPrisma.bookingAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+    );
   });
 
   it('resets attempt to pending and fires job when status is failed', async () => {

@@ -600,8 +600,18 @@ export async function retryBookingForMatch(matchId: string, membershipId?: strin
     return
   }
 
-  if (existing.status !== 'failed' && existing.status !== 'cancelled') {
-    throw new AppError(`Cannot retry — booking status is "${existing.status}"`, 409)
+  if (existing.status === 'success') {
+    throw new AppError(`Cannot retry — booking already succeeded`, 409)
+  }
+
+  // If the attempt is stuck in 'pending' (job crashed / timed out without marking it failed),
+  // cancel it first so any still-running job's updateMany becomes a safe no-op.
+  if (existing.status === 'pending') {
+    await prisma.bookingAttempt.update({
+      where: { id: existing.id },
+      data: { status: 'cancelled', completedAt: new Date() },
+    })
+    logger.info(`[booking] Force-cancelled stuck pending attempt ${existing.id} to allow retry`)
   }
 
   const effectiveMembershipId = membershipId ?? existing.clubMembershipId

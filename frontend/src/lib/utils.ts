@@ -17,6 +17,7 @@ export function isMatchInPast(date: string, time: string): boolean {
 export function getBookingErrorMessage(
   errorCode: string | null,
   t: (key: string, params?: Record<string, string | number>) => string,
+  errorMessage?: string | null,
 ): string {
   switch (errorCode) {
     case 'MISSING_SOCIO_NUMBER':
@@ -27,6 +28,8 @@ export function getBookingErrorMessage(
       return t("matchDetails.booking.errors.systemOffline")
     case 'SLOT_NOT_FOUND':
       return t("matchDetails.booking.errors.slotNoLongerAvailable")
+    case 'BOOKING_PAGE_ERROR':
+      return errorMessage ?? t("matchDetails.booking.errors.unknown")
     default:
       return t("matchDetails.booking.errors.unknown")
   }

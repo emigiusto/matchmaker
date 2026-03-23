@@ -322,7 +322,7 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
                     <div className="flex items-start gap-2 text-sm">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                       <span className="text-destructive">
-                        {getBookingErrorMessage(bookingAttempt.errorCode, t)}
+                        {getBookingErrorMessage(bookingAttempt.errorCode, t, bookingAttempt.errorMessage)}
                       </span>
                     </div>
                   )}
