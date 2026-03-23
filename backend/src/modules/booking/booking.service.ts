@@ -507,7 +507,11 @@ async function runBookingJob(
           ? 'ADAPTER_OFFLINE'
           : (err instanceof AppError ? err.errorCode : undefined)
 
-        if (attempt < MAX_RETRIES) {
+        // BOOKING_PAGE_ERROR = error from the club portal (wrong participant, quota, etc.)
+        // These are user-data problems — retrying won't help. Fail immediately.
+        const isTerminal = err instanceof AppError && err.errorCode === 'BOOKING_PAGE_ERROR'
+
+        if (!isTerminal && attempt < MAX_RETRIES) {
           logger.warn(`[booking] Attempt ${attempt + 1} failed for match ${matchId}, will retry: ${message}`)
         } else {
           await failAttempt(attemptId, message, errorCode)
@@ -518,6 +522,7 @@ async function runBookingJob(
             ? 'Club booking system is offline or unreachable'
             : (err instanceof AppError ? message : 'An error occurred during court booking')
           notifyBookingFailed(match, hostUserId, date, time, tz, userMessage)
+          break
         }
       }
     }

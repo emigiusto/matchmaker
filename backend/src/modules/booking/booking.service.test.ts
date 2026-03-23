@@ -596,7 +596,7 @@ describe('runBookingJob date/time derivation', () => {
       '2026-03-23',  // date in Europe/Madrid (correct — same calendar day at 18:00)
       '18:00',       // time in Europe/Madrid from scheduledAt (17:00 UTC + 1h), NOT '16:00' from availability.startTime
       'c1',
-      ['67890'],
+      [{ socioNumber: '67890', name: 'Guest' }],
       expect.objectContaining({ sport: 'tennis' }),
     );
   });
