@@ -1013,5 +1013,8 @@
     "winRate": "Porcentaje de Victorias",
     "record": "Récord",
     "notFound": "Jugador no encontrado"
+  },
+  "contacts": {
+    "searchContacts": "Buscar contactos..."
   }
 }

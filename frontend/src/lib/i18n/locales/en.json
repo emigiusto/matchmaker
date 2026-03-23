@@ -1013,5 +1013,8 @@
     "winRate": "Win Rate",
     "record": "Record",
     "notFound": "Player not found"
+  },
+  "contacts": {
+    "searchContacts": "Search contacts..."
   }
 }
