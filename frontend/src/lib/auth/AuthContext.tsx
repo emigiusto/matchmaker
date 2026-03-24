@@ -1,9 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { authService, type AuthUser } from "@/lib/services/auth.service"
 
-const ADMIN_USER_IDS = new Set(
-  (import.meta.env.VITE_ADMIN_USER_IDS ?? "").split(",").map((s: string) => s.trim()).filter(Boolean)
-)
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -54,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextValue = {
     user,
-    isAdmin: !!user && ADMIN_USER_IDS.has(user.id),
+    isAdmin: !!user?.isAdmin,
     loading,
     login,
     signup,

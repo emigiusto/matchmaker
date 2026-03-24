@@ -6,6 +6,7 @@ import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import type { SignupInput, LoginInput, AuthResponse } from './auth.types';
 import { resolveLocale } from '../../lib/whatsapp-messages';
+import { logServerEvent } from '../analytics/analytics.service';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const SALT_ROUNDS = 10;
@@ -36,6 +37,7 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
     },
   });
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+  void logServerEvent(user.id, 'auth.signup');
   return {
     user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, isGuest: user.isGuest, onboardingCompleted: user.onboardingCompleted },
     token,
@@ -61,6 +63,7 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
     throw new AppError('Invalid email or password', 401);
   }
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+  void logServerEvent(user.id, 'auth.login');
   return {
     user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, isGuest: user.isGuest, onboardingCompleted: user.onboardingCompleted },
     token,

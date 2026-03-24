@@ -13,6 +13,7 @@ import { Match, MatchStatus, Prisma } from '@prisma/client';
 import { RatingService } from '../rating/rating.service';
 import { createNotification } from '../notifications/notifications.service';
 import { validateResultMatchConsistency } from '../results/results.service';
+import { logServerEvent } from '../analytics/analytics.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
 import { cancelBookingForMatch, resetBookingForReschedule } from '../booking/booking.service';
@@ -310,6 +311,7 @@ export async function completeMatch(matchId: string, currentUserId: string, isAd
   });
 
   // No rating update or notifications here; handled by mainstream flow (confirmResult)
+  void logServerEvent(currentUserId, 'match.completed', { matchId: updatedMatch.id })
   return toMatchDTO(updatedMatch);
 }
 
@@ -354,6 +356,7 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
       include: matchInclude,
     });
     const dto = toMatchDTO(updated);
+    void logServerEvent(userId, 'match.cancelled', { matchId: match.id })
     // Notify participants and WhatsApp group (outside tx; failures logged, don't affect cancel)
     notifyMatchParticipantsOnCancel(updated as EnrichedMatch & { whatsappGroupId?: string | null }).catch((err) => {
       logger.error('Failed to notify on match cancel', { matchId: updated.id, error: err instanceof Error ? err.message : String(err) });
@@ -576,6 +579,10 @@ export async function createMatch(
     data,
     include: { participants: { include: { user: { select: { id: true, name: true } } } }, availability: true },
   });
+  // Log for each participant
+  for (const p of uniqueIds) {
+    void logServerEvent(p, 'match.created', { matchId: match.id })
+  }
   return toMatchDTO(match);
 }
 

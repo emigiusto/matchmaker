@@ -18,6 +18,7 @@ model User {
   phone        String?  @unique
   passwordHash String?
   isGuest             Boolean  @default(true)
+  isAdmin             Boolean  @default(false)
   locale              String   @default("es")
   onboardingCompleted Boolean  @default(false)
   createdAt           DateTime @default(now())
@@ -43,6 +44,8 @@ model User {
   clubMemberships ClubMembership[]
 
   resultsWon Result[] @relation("WinnerUser")
+
+  events UserEvent[]
 
   schedulingRequestsAsHost        SchedulingRequest[]   @relation("SchedulingHost")
   schedulingRequestsAsHostPartner SchedulingRequest[]   @relation("SchedulingHostPartner")
@@ -623,4 +626,25 @@ enum BookingStatus {
   success
   failed
   cancelled
+}
+
+////////////////////////////////////////////////////////////
+// USER EVENT — activity tracking
+////////////////////////////////////////////////////////////
+
+model UserEvent {
+  id        String   @id @default(uuid())
+  userId    String?  // null for pre-auth page views
+  eventType String   // e.g. "match.created", "page.view"
+  metadata  Json?    // arbitrary payload (path, courtName, errorCode, etc.)
+  sessionId String?  // client-generated session token per page load
+  source    String   @default("client") // "client" | "server"
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventType, createdAt])
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }
