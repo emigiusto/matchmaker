@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { initAnalytics } from '@/lib/analytics/analytics'
+import { usePageTracking } from '@/lib/analytics/usePageTracking'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/lib/i18n/language-context'
 import { Toaster } from '@/components/ui/sonner'
@@ -25,9 +27,15 @@ import InviteDetails from '@/pages/InviteDetails/InviteDetails'
 import ProfileView from '@/pages/ProfileView/ProfileView'
 import Contacts from '@/pages/Contacts/Contacts'
 import NotFound from '@/pages/NotFound/NotFound'
+import AdminDashboard from '@/pages/Admin/AdminDashboard'
 // import Reminders from '@/pages/Reminders/Reminders'
 // import AiCoachCompanion from '@/pages/AiCoachCompanion/AiCoachCompanion'
 // import AiCoachInsights from '@/pages/AiCoachInsights/AiCoachInsights'
+
+function AnalyticsInit() {
+  usePageTracking()
+  return null
+}
 
 function ServiceUnavailable() {
   return (
@@ -45,6 +53,10 @@ function App() {
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
 
   useEffect(() => {
+    initAnalytics()
+  }, [])
+
+  useEffect(() => {
     const handler = (e: Event) => {
       const available = (e as CustomEvent<{ available: boolean }>).detail.available
       setApiAvailable(available)
@@ -60,6 +72,7 @@ function App() {
       <LanguageProvider>
         <AuthProvider>
           <BrowserRouter>
+            <AnalyticsInit />
             <Routes>
               {/* Public: Login and Signup */}
               <Route path="/login" element={<Login />} />
@@ -98,6 +111,9 @@ function App() {
                 <Route path="/profile/:userId" element={<ProfileView />} />
                 <Route path="/contacts" element={<Contacts />} />
               </Route>
+              {/* Admin dashboard */}
+              <Route path="/admin" element={<AdminDashboard />} />
+
               {/* 404 catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>

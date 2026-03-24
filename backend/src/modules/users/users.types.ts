@@ -6,6 +6,7 @@ export type UserDTO = {
   name?: string;
   phone?: string;
   isGuest: boolean;
+  isAdmin: boolean;
   onboardingCompleted: boolean;
   createdAt: string;
   updatedAt: string;

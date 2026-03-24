@@ -13,6 +13,7 @@ import { usersService } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
 import { bookingService, SUPPORTED_CLUBS } from "@/lib/services/booking.service"
 import { contactsService } from "@/lib/services/contacts.service"
+import { track } from "@/lib/analytics/analytics"
 import { toast } from "sonner"
 import { Link, useSearchParams } from "react-router-dom"
 
@@ -108,6 +109,7 @@ export default function Onboarding() {
   async function finish() {
     setSaving(true)
     try {
+      track('onboarding.completed')
       setStep(5)
     } finally {
       setSaving(false)

@@ -40,6 +40,7 @@ export async function meController(req: Request, res: Response, next: NextFuncti
       email: user.email,
       phone: user.phone,
       isGuest: user.isGuest,
+      isAdmin: user.isAdmin,
       onboardingCompleted: user.onboardingCompleted,
     });
   } catch (err) {

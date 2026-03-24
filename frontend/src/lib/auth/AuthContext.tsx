@@ -1,9 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { authService, type AuthUser } from "@/lib/services/auth.service"
+import { track, flush } from "@/lib/analytics/analytics"
 
-const ADMIN_USER_IDS = new Set(
-  (import.meta.env.VITE_ADMIN_USER_IDS ?? "").split(",").map((s: string) => s.trim()).filter(Boolean)
-)
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -48,13 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    track('auth.logout')
+    void flush()
     authService.logout()
     setUser(null)
   }, [])
 
   const value: AuthContextValue = {
     user,
-    isAdmin: !!user && ADMIN_USER_IDS.has(user.id),
+    isAdmin: !!user?.isAdmin,
     loading,
     login,
     signup,

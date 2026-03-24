@@ -11,6 +11,7 @@ import { whatsappService } from '../whatsapp/whatsapp.service'
 import { getMessages } from '../../lib/whatsapp-messages'
 import { cacheGet, cacheSet } from '../../shared/cache/redis'
 import { createNotification } from '../notifications/notifications.service'
+import { logServerEvent } from '../analytics/analytics.service'
 import type {
   UpsertClubMembershipInput,
   ClubMembershipDTO,
@@ -277,6 +278,8 @@ export async function triggerBookingForMatch(matchId: string): Promise<void> {
     return
   }
 
+  void logServerEvent(hostUserId, 'booking.started', { matchId, clubSlug: hostMembership.clubSlug })
+
   // Create pending BookingAttempt
   const attempt = await prisma.bookingAttempt.create({
     data: {
@@ -482,6 +485,7 @@ async function runBookingJob(
         }
 
         logBookingEvent(matchId, 'booking_success', { courtName: result.courtName, externalId: result.externalId }).catch(() => {})
+        void logServerEvent(hostUserId, 'booking.success', { matchId, courtName: result.courtName, clubSlug: membership.clubSlug })
         logger.info(`[booking] Court booked for match ${matchId}: ${result.courtName} (${result.externalId})`)
 
         createNotification(hostUserId, 'booking.success', { matchId, courtName: result.courtName }).catch((err) => {
@@ -516,6 +520,7 @@ async function runBookingJob(
         } else {
           await failAttempt(attemptId, message, errorCode)
           logBookingEvent(matchId, 'booking_failed', { errorMessage: message, attempts: attempt + 1 }).catch(() => {})
+          void logServerEvent(hostUserId, 'booking.failed', { matchId, errorCode, clubSlug: membership.clubSlug })
           logger.error(`[booking] Booking failed for match ${matchId} after ${attempt + 1} attempt(s): ${message}`)
           // Only expose AppError messages (from the booking page itself) to users — raw Puppeteer errors are internal
           const userMessage = offline

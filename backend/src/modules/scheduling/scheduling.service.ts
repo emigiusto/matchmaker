@@ -10,6 +10,7 @@ import { whatsappService } from '../whatsapp/whatsapp.service';
 import { createMatch, cancelMatch, notifyMatchParticipantsOnCreate } from '../matches/matches.service';
 import { triggerBookingForMatch, pickBestSlotInRange, getCachedCourtsPerSlot } from '../booking/booking.service';
 import { createNotification } from '../notifications/notifications.service';
+import { logServerEvent } from '../analytics/analytics.service';
 import type {
   CreateSchedulingRequestInput,
   SchedulingRequestDTO,
@@ -419,6 +420,7 @@ export const schedulingService = {
     });
 
     logger.info('SchedulingRequest created', { requestId: request.id, hostUserId: input.hostUserId, format });
+    void logServerEvent(input.hostUserId, 'scheduling.request_created', { requestId: request.id, sportType: input.sportType, format });
     const full = await schedulingRepository.findRequestById(request.id);
     return full ? toRequestDTOWithCandidates(full) : toRequestDTO(request);
   },
@@ -774,6 +776,7 @@ export const schedulingService = {
       void recordEvent({ schedulingRequestId: r.id, action: 'request_expired', metadata: { reason: 'scheduled_time_passed' } });
       const fullRequest = await schedulingRepository.findRequestById(r.id);
       if (fullRequest) {
+        void logServerEvent(fullRequest.hostUserId, 'scheduling.no_match', { requestId: r.id });
         await notifyHostSchedulingNoMatch(fullRequest, 'scheduled_time_passed');
       }
     }
@@ -1021,6 +1024,7 @@ export const schedulingService = {
     }
 
     void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { matchId: match.id } });
+    void logServerEvent(request.hostUserId, 'scheduling.invite_accepted', { requestId, matchId: match.id });
     logger.info('SchedulingCompleted', { requestId, matchId: match.id });
   },
 
@@ -1238,6 +1242,7 @@ export const schedulingService = {
     await schedulingRepository.updateRequestStatus(requestId, 'cancelled');
     void recordEvent({ schedulingRequestId: requestId, action: 'request_cancelled', actorUserId: userId });
     logger.info('SchedulingCancelled', { requestId, userId });
+    void logServerEvent(userId, 'scheduling.request_cancelled', { requestId });
     const updated = await schedulingRepository.findRequestById(requestId);
     return updated ? toRequestDTOWithCandidates(updated) : toRequestDTO(request);
   },

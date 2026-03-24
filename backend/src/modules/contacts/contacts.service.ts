@@ -4,6 +4,7 @@
 
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
+import { logServerEvent } from '../analytics/analytics.service';
 import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { findUserByNormalizedPhone } from '../users/users.service';
 import type { Contact, Prisma } from '@prisma/client';
@@ -92,6 +93,7 @@ export async function createContact(input: CreateContactInput): Promise<CreateCo
     include: { linkedUser: { select: { id: true, name: true } } },
   });
 
+  void logServerEvent(input.ownerUserId, 'contact.added', { contactId: contact.id });
   return { contact: toContactDTO(contact), user: resolvedUser };
 }
 

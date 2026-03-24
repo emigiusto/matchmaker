@@ -18,6 +18,7 @@ import schedulingRoutes from './modules/scheduling/scheduling.routes';
 import whatsappRoutes from './modules/whatsapp/whatsapp.routes';
 import remindersRoutes from './modules/reminders/reminders.routes';
 import bookingRoutes from './modules/booking/booking.routes';
+import analyticsRoutes from './modules/analytics/analytics.routes';
 
 const router = Router();
 
@@ -38,5 +39,6 @@ router.use('/scheduling', schedulingRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/reminders', remindersRoutes);
 router.use('/booking', bookingRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;
