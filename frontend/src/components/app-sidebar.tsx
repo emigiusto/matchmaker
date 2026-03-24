@@ -160,31 +160,26 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          {isAdmin && (
+            <SidebarGroup>
+              <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+                Admin
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === '/admin'}>
+                      <Link to="/admin" onClick={() => setOpenMobile(false)}>
+                        <ShieldCheck className="h-5 w-5" />
+                        <span className="text-base">Dashboard</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
-        {isAdmin && (
-          <>
-            <Separator className="mx-4 w-auto" />
-            <SidebarContent className="px-3 py-2">
-              <SidebarGroup>
-                <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-                  Admin
-                </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname === '/admin'}>
-                        <Link to="/admin" onClick={() => setOpenMobile(false)}>
-                          <ShieldCheck className="h-5 w-5" />
-                          <span className="text-base">Dashboard</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </SidebarContent>
-          </>
-        )}
         <SidebarFooter className="border-t border-sidebar-border p-4">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
