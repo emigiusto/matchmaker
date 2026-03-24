@@ -1,7 +1,13 @@
 import type { Request, Response, NextFunction } from 'express'
 import { ingestBatch, getAdminStats, clearAdminStatsCache, clearAvailabilityCache } from './analytics.service'
 import { verifyToken } from '../auth/auth.service'
+import { prisma } from '../../prisma'
+import { AppError } from '../../shared/errors/AppError'
+import { logServerEvent } from './analytics.service'
+import jwt from 'jsonwebtoken'
 import type { ClientEventInput } from './analytics.types'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
 
 export class AnalyticsController {
   /**
@@ -51,6 +57,27 @@ export class AnalyticsController {
     try {
       await clearAvailabilityCache()
       res.json({ ok: true })
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  static async impersonate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.params.userId as string
+      const adminId = (req as any).userId as string
+
+      const target = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, email: true, isGuest: true, isAdmin: true, onboardingCompleted: true },
+      })
+      if (!target) throw new AppError('User not found', 404)
+      if (target.isAdmin) throw new AppError('Cannot impersonate another admin', 403)
+
+      const token = jwt.sign({ userId: target.id, impersonatedBy: adminId }, JWT_SECRET, { expiresIn: '1h' })
+      void logServerEvent(adminId, 'admin.impersonate', { targetUserId: target.id })
+
+      res.json({ token, user: target })
     } catch (err) {
       next(err)
     }

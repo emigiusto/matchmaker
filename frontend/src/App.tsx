@@ -1,7 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { initAnalytics } from '@/lib/analytics/analytics'
 import { usePageTracking } from '@/lib/analytics/usePageTracking'
+import { getImpersonationState, stopImpersonation } from '@/lib/auth/impersonation'
+import { useAuth } from '@/lib/auth/AuthContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/lib/i18n/language-context'
 import { Toaster } from '@/components/ui/sonner'
@@ -35,6 +37,32 @@ import AdminDashboard from '@/pages/Admin/AdminDashboard'
 function AnalyticsInit() {
   usePageTracking()
   return null
+}
+
+function ImpersonationBanner() {
+  const state = getImpersonationState()
+  const { refreshUser } = useAuth()
+  const navigate = useNavigate()
+
+  if (!state.active) return null
+
+  async function handleStop() {
+    stopImpersonation()
+    await refreshUser()
+    navigate('/admin')
+  }
+
+  return (
+    <div className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-between gap-4 bg-amber-500 px-4 py-2 text-sm font-medium text-amber-950 shadow-lg">
+      <span>👤 Viewing as <strong>{state.targetName}</strong></span>
+      <button
+        onClick={handleStop}
+        className="rounded-md bg-amber-950/15 px-3 py-1 hover:bg-amber-950/25 transition-colors whitespace-nowrap"
+      >
+        Return to admin
+      </button>
+    </div>
+  )
 }
 
 function ServiceUnavailable() {
@@ -73,6 +101,7 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <AnalyticsInit />
+            <ImpersonationBanner />
             <Routes>
               {/* Public: Login and Signup */}
               <Route path="/login" element={<Login />} />

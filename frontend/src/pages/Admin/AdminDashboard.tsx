@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { analyticsService } from '@/lib/services/analytics.service'
+import { startImpersonation } from '@/lib/auth/impersonation'
 import type { AdminStatsDTO } from '@/lib/analytics/analytics.types'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
@@ -140,6 +141,8 @@ export default function AdminDashboard() {
 }
 
 function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Period }) {
+  const { refreshUser } = useAuth()
+  const navigate = useNavigate()
   // Merge active + new users into one chart dataset
   const combinedDaily = useMemo(() => {
     const map = new Map<string, { date: string; active: number; new: number }>()
@@ -258,7 +261,12 @@ function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Per
 
       {/* ── USERS ── */}
       <TabsContent value="users">
-        <UsersTab topUsers={stats.topUsers} period={period} />
+        <UsersTab topUsers={stats.topUsers} period={period} onImpersonate={async (u) => {
+          const res = await analyticsService.impersonate(u.userId)
+          startImpersonation(res.token, res.user.name ?? res.user.email ?? u.userId)
+          await refreshUser()
+          navigate('/')
+        }} />
       </TabsContent>
 
       {/* ── EVENTS ── */}
@@ -355,8 +363,9 @@ function PagesTab({
 
 type TopUser = AdminStatsDTO['topUsers'][number]
 
-function UsersTab({ topUsers, period }: { topUsers: TopUser[]; period: Period }) {
+function UsersTab({ topUsers, period, onImpersonate }: { topUsers: TopUser[]; period: Period; onImpersonate: (u: TopUser) => Promise<void> }) {
   const [search, setSearch] = useState('')
+  const [impersonating, setImpersonating] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -395,6 +404,7 @@ function UsersTab({ topUsers, period }: { topUsers: TopUser[]; period: Period })
                 <th className="px-4 py-3 font-medium text-right">Events</th>
                 <th className="px-4 py-3 font-medium text-right">Last seen</th>
                 <th className="px-4 py-3 font-medium">Activity</th>
+                <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
             <tbody>
@@ -420,11 +430,23 @@ function UsersTab({ topUsers, period }: { topUsers: TopUser[]; period: Period })
                       />
                     </div>
                   </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={async () => {
+                        setImpersonating(u.userId)
+                        try { await onImpersonate(u) } finally { setImpersonating(null) }
+                      }}
+                      disabled={impersonating === u.userId}
+                      className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap"
+                    >
+                      {impersonating === u.userId ? '…' : 'Login as'}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">
                     No users match your search.
                   </td>
                 </tr>

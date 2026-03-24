@@ -17,4 +17,8 @@ export const analyticsService = {
   clearAvailabilityCache(): Promise<{ ok: boolean }> {
     return apiClient.post('/analytics/admin/cache/clear-availability', {})
   },
+
+  impersonate(userId: string): Promise<{ token: string; user: { id: string; name: string | null; email: string | null } }> {
+    return apiClient.post(`/analytics/admin/impersonate/${userId}`, {})
+  },
 }

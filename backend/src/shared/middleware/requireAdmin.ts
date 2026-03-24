@@ -10,6 +10,7 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     const { userId } = verifyToken(authHeader.slice(7))
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } })
     if (!user?.isAdmin) throw new AppError('Forbidden', 403)
+    ;(req as any).userId = userId
     next()
   } catch (err) {
     next(err)
