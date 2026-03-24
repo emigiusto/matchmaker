@@ -146,6 +146,8 @@ export async function createGuestUser(name?: string, email?: string, phone?: str
 /**
  * Update an existing user by ID.
  * Email is not updatable (managed by auth provider).
+ * If a phone is being set, any existing guest user with that phone is merged
+ * into this user first (preserving their match history).
  * @param id User ID
  * @param name Optional new name
  * @param phone Optional new phone number
@@ -153,6 +155,15 @@ export async function createGuestUser(name?: string, email?: string, phone?: str
  * @throws AppError if user not found, phone/email exists, or update fails
  */
 export async function updateUser(id: string, name?: string, phone?: string | null): Promise<UserDTO> {
+  // When a phone is being claimed, check for a ghost guest user with that number
+  // and absorb their history into this account before setting the phone.
+  if (phone) {
+    const ghost = await findUserByNormalizedPhone(phone);
+    if (ghost && ghost.id !== id && ghost.isGuest) {
+      await mergeGuestIntoUser(ghost.id, id);
+    }
+  }
+
   try {
     const data: { name?: string; phone?: string | null } = {};
     if (name !== undefined) data.name = name;
@@ -169,11 +180,88 @@ export async function updateUser(id: string, name?: string, phone?: string | nul
         throw new AppError('User not found', 404);
       }
       if ((err as { code?: string }).code === 'P2002') {
-        throw new AppError('Phone or email already exists', 409);
+        throw new AppError('Phone number already in use', 409);
       }
     }
     throw new AppError('Failed to update user', 500);
   }
+}
+
+/**
+ * Merge a guest user's history into a real user, then delete the ghost.
+ * Transfers: MatchParticipants, SchedulingCandidates, Contact links,
+ * UserEvents, Notifications, Reminders, Messages, ClubMemberships,
+ * Results, Availabilities, SchedulingRequests, Player (if target has none).
+ */
+export async function mergeGuestIntoUser(guestId: string, targetId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    // ── MatchParticipant ─────────────────────────────────────────────
+    // Drop duplicates where target is already a participant in the same match
+    const targetMatchIds = (
+      await tx.matchParticipant.findMany({ where: { userId: targetId }, select: { matchId: true } })
+    ).map((p) => p.matchId);
+    if (targetMatchIds.length > 0) {
+      await tx.matchParticipant.deleteMany({ where: { userId: guestId, matchId: { in: targetMatchIds } } });
+    }
+    await tx.matchParticipant.updateMany({ where: { userId: guestId }, data: { userId: targetId } });
+
+    // ── SchedulingCandidate ──────────────────────────────────────────
+    await tx.schedulingCandidate.updateMany({ where: { contactUserId: guestId }, data: { contactUserId: targetId } });
+
+    // ── SchedulingRequest (host / host partner) ──────────────────────
+    await tx.schedulingRequest.updateMany({ where: { hostUserId: guestId }, data: { hostUserId: targetId } });
+    await tx.schedulingRequest.updateMany({ where: { hostPartnerUserId: guestId }, data: { hostPartnerUserId: targetId } });
+
+    // ── Contact.linkedUserId ─────────────────────────────────────────
+    await tx.contact.updateMany({ where: { linkedUserId: guestId }, data: { linkedUserId: targetId } });
+
+    // ── Contact / ContactList owned by guest ─────────────────────────
+    await tx.contact.updateMany({ where: { ownerUserId: guestId }, data: { ownerUserId: targetId } });
+    await tx.contactList.updateMany({ where: { ownerUserId: guestId }, data: { ownerUserId: targetId } });
+
+    // ── UserEvent ────────────────────────────────────────────────────
+    await tx.userEvent.updateMany({ where: { userId: guestId }, data: { userId: targetId } });
+
+    // ── Notification ─────────────────────────────────────────────────
+    await tx.notification.updateMany({ where: { userId: guestId }, data: { userId: targetId } });
+
+    // ── Reminder ─────────────────────────────────────────────────────
+    await tx.reminder.updateMany({ where: { userId: guestId }, data: { userId: targetId } });
+
+    // ── Message ──────────────────────────────────────────────────────
+    await tx.message.updateMany({ where: { senderUserId: guestId }, data: { senderUserId: targetId } });
+
+    // ── Availability ─────────────────────────────────────────────────
+    await tx.availability.updateMany({ where: { userId: guestId }, data: { userId: targetId } });
+
+    // ── Result (winner) ──────────────────────────────────────────────
+    await tx.result.updateMany({ where: { winnerUserId: guestId }, data: { winnerUserId: targetId } });
+
+    // ── ClubMembership — skip clubs where target already has one ─────
+    const targetClubs = (
+      await tx.clubMembership.findMany({ where: { userId: targetId }, select: { clubSlug: true } })
+    ).map((m) => m.clubSlug);
+    if (targetClubs.length > 0) {
+      await tx.clubMembership.deleteMany({ where: { userId: guestId, clubSlug: { in: targetClubs } } });
+    }
+    await tx.clubMembership.updateMany({ where: { userId: guestId }, data: { userId: targetId } });
+
+    // ── Player — move only if target has none ────────────────────────
+    const targetPlayer = await tx.player.findUnique({ where: { userId: targetId } });
+    const guestPlayer = await tx.player.findUnique({ where: { userId: guestId } });
+    if (guestPlayer) {
+      if (!targetPlayer) {
+        await tx.player.update({ where: { id: guestPlayer.id }, data: { userId: targetId } });
+      } else {
+        // Guest's player record is empty (no real data) — just drop it
+        await tx.playerSurface.deleteMany({ where: { playerId: guestPlayer.id } });
+        await tx.player.delete({ where: { id: guestPlayer.id } });
+      }
+    }
+
+    // ── Delete the ghost ─────────────────────────────────────────────
+    await tx.user.delete({ where: { id: guestId } });
+  });
 }
 
 /**
@@ -268,8 +356,13 @@ export async function findProfileByUserId(userId: string): Promise<{
 
 /**
  * Mark onboarding as completed for a user.
+ * Requires the user to have a phone number set — phone is the unifying
+ * identifier that links signup accounts to prior match history.
  */
 export async function completeOnboarding(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+  if (!user) throw new AppError('User not found', 404);
+  if (!user.phone) throw new AppError('A phone number is required to complete onboarding', 400);
   await prisma.user.update({
     where: { id: userId },
     data: { onboardingCompleted: true },
