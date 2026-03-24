@@ -525,7 +525,7 @@ function EventsTab({ recentEvents, eventTypes }: { recentEvents: RecentEvent[]; 
               </thead>
               <tbody>
                 {filtered.map((e) => {
-                  const hasMetadata = e.metadata && typeof e.metadata === 'object' && Object.keys(e.metadata as object).length > 0
+                  const hasMetadata = Boolean(e.metadata && typeof e.metadata === 'object' && Object.keys(e.metadata as object).length > 0)
                   const isOpen = expanded === e.id
                   return (
                     <React.Fragment key={e.id}>
@@ -566,7 +566,7 @@ function EventsTab({ recentEvents, eventTypes }: { recentEvents: RecentEvent[]; 
                         <tr className="border-b bg-muted/20">
                           <td colSpan={5} className="px-6 py-2 pb-3">
                             <pre className="text-xs text-muted-foreground overflow-x-auto">
-                              {JSON.stringify(e.metadata, null, 2)}
+                              {JSON.stringify(e.metadata as Record<string, unknown>, null, 2)}
                             </pre>
                           </td>
                         </tr>

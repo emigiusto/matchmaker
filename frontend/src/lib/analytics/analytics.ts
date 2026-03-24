@@ -14,7 +14,6 @@ interface ClientEvent {
 const SESSION_ID = typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36)
 
 let queue: ClientEvent[] = []
-let flushTimer: ReturnType<typeof setInterval> | null = null
 let initialized = false
 
 export function track(eventType: string, metadata?: Record<string, unknown>): void {
@@ -58,7 +57,7 @@ export function initAnalytics(): void {
   if (initialized) return
   initialized = true
 
-  flushTimer = setInterval(() => void flush(), FLUSH_INTERVAL_MS)
+  setInterval(() => void flush(), FLUSH_INTERVAL_MS)
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') beaconFlush()
