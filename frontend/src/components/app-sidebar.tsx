@@ -9,6 +9,7 @@ import {
   Zap,
   LogOut,
   BookUser,
+  ShieldCheck,
 } from "lucide-react"
 import {
   Sidebar,
@@ -46,7 +47,7 @@ function getInitials(name: string | undefined): string {
 export function AppSidebar() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const { setOpenMobile } = useSidebar()
   const [wizardOpen, setWizardOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(user?.name ?? null)
@@ -160,6 +161,30 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        {isAdmin && (
+          <>
+            <Separator className="mx-4 w-auto" />
+            <SidebarContent className="px-3 py-2">
+              <SidebarGroup>
+                <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+                  Admin
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname === '/admin'}>
+                        <Link to="/admin" onClick={() => setOpenMobile(false)}>
+                          <ShieldCheck className="h-5 w-5" />
+                          <span className="text-base">Dashboard</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+          </>
+        )}
         <SidebarFooter className="border-t border-sidebar-border p-4">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
