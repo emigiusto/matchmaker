@@ -136,8 +136,11 @@ export class LaietaAdapter implements BookingAdapter {
             const parts = a.className.split(' ')
             const slotClass = parts[2]?.trim()
             const namePart = parts[3]?.trim().split('_')[1]
-            if (namePart) {
-              cellHourMin = namePart.slice(0, 4)  // full HHMM, e.g. "0930"
+            // Take only the FIRST sub-slot's time — cells contain multiple anchors
+            // (e.g. 09:00, 09:15, 09:30, 09:45) and the last one would otherwise win,
+            // causing all times to appear as :45.
+            if (namePart && !cellHourMin) {
+              cellHourMin = namePart.slice(0, 4)  // full HHMM from first sub-slot, e.g. "0900"
               courtName = a.id.split(':')[1] ?? ''
             }
             if (slotClass === 'classempty') emptySlots.push(a.className)
