@@ -278,6 +278,8 @@ export async function triggerBookingForMatch(matchId: string): Promise<void> {
     return
   }
 
+  void logServerEvent(hostUserId, 'booking.started', { matchId, clubSlug: hostMembership.clubSlug })
+
   // Create pending BookingAttempt
   const attempt = await prisma.bookingAttempt.create({
     data: {

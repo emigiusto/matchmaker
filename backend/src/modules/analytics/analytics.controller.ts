@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
-import { ingestBatch, getAdminStats } from './analytics.service'
+import { ingestBatch, getAdminStats, clearAdminStatsCache, clearAvailabilityCache } from './analytics.service'
 import { verifyToken } from '../auth/auth.service'
 import type { ClientEventInput } from './analytics.types'
 
@@ -38,9 +38,30 @@ export class AnalyticsController {
    * GET /analytics/admin/stats
    * Returns aggregated stats. Requires isAdmin.
    */
+  static async clearCache(req: Request, res: Response, next: NextFunction) {
+    try {
+      await clearAdminStatsCache()
+      res.json({ ok: true })
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  static async clearAvailabilityCache(req: Request, res: Response, next: NextFunction) {
+    try {
+      await clearAvailabilityCache()
+      res.json({ ok: true })
+    } catch (err) {
+      next(err)
+    }
+  }
+
   static async stats(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await getAdminStats()
+      const rawDays = parseInt(req.query.days as string, 10)
+      const days = [7, 14, 30, 90].includes(rawDays) ? rawDays : 30
+      const eventTypeFilter = typeof req.query.eventType === 'string' && req.query.eventType ? req.query.eventType : undefined
+      const data = await getAdminStats(days, eventTypeFilter)
       res.json(data)
     } catch (err) {
       next(err)
