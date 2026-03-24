@@ -593,8 +593,9 @@ export async function createMatch(
  */
 async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsappGroupId?: string | null }): Promise<void> {
   const av = match.availability;
+  const tz = (match as any).schedulingRequest?.timezone ?? 'UTC';
   const dateStr = av?.date ? new Date(av.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }) : 'TBD';
-  const timeStr = av?.startTime ? new Date(av.startTime).toTimeString().slice(0, 5) : '';
+  const timeStr = av?.startTime ? formatTimeInTz(av.startTime instanceof Date ? av.startTime : new Date(av.startTime), tz) : '';
   const location = av?.locationText ?? 'TBD';
   const participants = (match as any).participants ?? [];
 
