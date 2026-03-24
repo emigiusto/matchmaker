@@ -15,14 +15,22 @@ const SESSION_ID = typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.ra
 
 let queue: ClientEvent[] = []
 let initialized = false
+let analyticsEnabled = true
+
+/** Call with false when the current user is an admin (or impersonating) to suppress tracking. */
+export function setAnalyticsEnabled(enabled: boolean): void {
+  analyticsEnabled = enabled
+  if (!enabled) queue = [] // discard any queued events
+}
 
 export function track(eventType: string, metadata?: Record<string, unknown>): void {
+  if (!analyticsEnabled) return
   queue.push({ eventType, metadata, sessionId: SESSION_ID })
   if (queue.length >= MAX_BATCH) void flush()
 }
 
 export async function flush(): Promise<void> {
-  if (!queue.length) return
+  if (!analyticsEnabled || !queue.length) return
   const batch = queue.splice(0, MAX_BATCH)
   const token = localStorage.getItem(AUTH_TOKEN_KEY)
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }

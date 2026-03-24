@@ -4,6 +4,7 @@ import { verifyToken } from '../auth/auth.service'
 import { prisma } from '../../prisma'
 import { AppError } from '../../shared/errors/AppError'
 import { logServerEvent } from './analytics.service'
+import { searchUsers } from '../users/users.service'
 import jwt from 'jsonwebtoken'
 import type { ClientEventInput } from './analytics.types'
 
@@ -57,6 +58,17 @@ export class AnalyticsController {
     try {
       await clearAvailabilityCache()
       res.json({ ok: true })
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  static async searchUsers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+      if (q.length < 2) return res.json([])
+      const users = await searchUsers(q)
+      res.json(users)
     } catch (err) {
       next(err)
     }

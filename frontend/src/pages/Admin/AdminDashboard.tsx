@@ -261,9 +261,9 @@ function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Per
 
       {/* ── USERS ── */}
       <TabsContent value="users">
-        <UsersTab topUsers={stats.topUsers} period={period} onImpersonate={async (u) => {
-          const res = await analyticsService.impersonate(u.userId)
-          startImpersonation(res.token, res.user.name ?? res.user.email ?? u.userId)
+        <UsersTab topUsers={stats.topUsers} period={period} onImpersonate={async (userId, displayName) => {
+          const res = await analyticsService.impersonate(userId)
+          startImpersonation(res.token, displayName)
           await refreshUser()
           navigate('/')
         }} />
@@ -362,13 +362,45 @@ function PagesTab({
 // ── Users tab ──────────────────────────────────────────────────────────────
 
 type TopUser = AdminStatsDTO['topUsers'][number]
+type SearchedUser = { id: string; name?: string; email?: string; phone?: string; isGuest: boolean }
 
-function UsersTab({ topUsers, period, onImpersonate }: { topUsers: TopUser[]; period: Period; onImpersonate: (u: TopUser) => Promise<void> }) {
-  const [search, setSearch] = useState('')
-  const [impersonating, setImpersonating] = useState<string | null>(null)
+function ImpersonateButton({ userId, displayName, onImpersonate }: { userId: string; displayName: string; onImpersonate: (userId: string, displayName: string) => Promise<void> }) {
+  const [loading, setLoading] = useState(false)
+  return (
+    <button
+      onClick={async () => {
+        setLoading(true)
+        try { await onImpersonate(userId, displayName) } finally { setLoading(false) }
+      }}
+      disabled={loading}
+      className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap"
+    >
+      {loading ? '…' : 'Login as'}
+    </button>
+  )
+}
+
+function UsersTab({ topUsers, period, onImpersonate }: { topUsers: TopUser[]; period: Period; onImpersonate: (userId: string, displayName: string) => Promise<void> }) {
+  const [activitySearch, setActivitySearch] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchedUser[] | null>(null)
+  const [searching, setSearching] = useState(false)
+
+  useEffect(() => {
+    const q = userSearch.trim()
+    if (q.length < 2) { setSearchResults(null); return }
+    const timer = setTimeout(() => {
+      setSearching(true)
+      analyticsService.searchUsers(q)
+        .then(setSearchResults)
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [userSearch])
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
+    const q = activitySearch.toLowerCase()
     if (!q) return topUsers
     return topUsers.filter(
       (u) =>
@@ -376,85 +408,130 @@ function UsersTab({ topUsers, period, onImpersonate }: { topUsers: TopUser[]; pe
         u.email?.toLowerCase().includes(q) ||
         u.userId.includes(q),
     )
-  }, [topUsers, search])
+  }, [topUsers, activitySearch])
 
   const max = topUsers[0]?.eventCount ?? 1
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Input
-          placeholder="Search by name or email…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-        <span className="text-sm text-muted-foreground">
-          {filtered.length} of {topUsers.length} users · {period}d window
-        </span>
-      </div>
-
+    <div className="space-y-6">
+      {/* ── Find any user ── */}
       <Card>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">#</th>
-                <th className="px-4 py-3 font-medium">User</th>
-                <th className="px-4 py-3 font-medium text-right">Events</th>
-                <th className="px-4 py-3 font-medium text-right">Last seen</th>
-                <th className="px-4 py-3 font-medium">Activity</th>
-                <th className="px-4 py-3 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((u, i) => (
-                <tr key={u.userId} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
-                  <td className="px-4 py-3 text-muted-foreground text-xs w-8">{i + 1}</td>
-                  <td className="px-4 py-3">
-                    {u.name && <p className="font-medium">{u.name}</p>}
-                    {u.email
-                      ? <p className="text-xs text-muted-foreground">{u.email}</p>
-                      : <p className="text-xs text-muted-foreground font-mono">{u.userId.slice(0, 12)}…</p>
-                    }
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums font-semibold">{u.eventCount}</td>
-                  <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap">
-                    {fmtRelative(u.lastSeenAt)}
-                  </td>
-                  <td className="px-4 py-3 w-32">
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary/70 rounded-full"
-                        style={{ width: `${Math.round((u.eventCount / max) * 100)}%` }}
-                      />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={async () => {
-                        setImpersonating(u.userId)
-                        try { await onImpersonate(u) } finally { setImpersonating(null) }
-                      }}
-                      disabled={impersonating === u.userId}
-                      className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap"
-                    >
-                      {impersonating === u.userId ? '…' : 'Login as'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">
-                    No users match your search.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Find any user</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            placeholder="Search by name, email or phone…"
+            value={userSearch}
+            onChange={(e) => setUserSearch(e.target.value)}
+            className="max-w-sm"
+          />
+          {userSearch.length >= 2 && (
+            searching ? (
+              <p className="text-sm text-muted-foreground">Searching…</p>
+            ) : searchResults && searchResults.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No users found.</p>
+            ) : searchResults && searchResults.length > 0 ? (
+              <table className="w-full text-sm">
+                <tbody>
+                  {searchResults.map((u) => (
+                    <tr key={u.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                      <td className="py-2.5 pr-4">
+                        {u.name && <p className="font-medium">{u.name}</p>}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
+                          {u.phone && <p className="text-xs text-muted-foreground font-mono">{u.phone}</p>}
+                          {!u.email && !u.phone && <p className="text-xs text-muted-foreground font-mono">{u.id.slice(0, 12)}…</p>}
+                          {u.isGuest && <Badge variant="outline" className="text-xs py-0 h-4">guest</Badge>}
+                        </div>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <ImpersonateButton
+                          userId={u.id}
+                          displayName={u.name ?? u.email ?? u.id}
+                          onImpersonate={onImpersonate}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null
+          )}
         </CardContent>
       </Card>
+
+      {/* ── Top active users ── */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder="Filter by name or email…"
+            value={activitySearch}
+            onChange={(e) => setActivitySearch(e.target.value)}
+            className="max-w-sm"
+          />
+          <span className="text-sm text-muted-foreground">
+            {filtered.length} of {topUsers.length} · top active ({period}d)
+          </span>
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">#</th>
+                  <th className="px-4 py-3 font-medium">User</th>
+                  <th className="px-4 py-3 font-medium text-right">Events</th>
+                  <th className="px-4 py-3 font-medium text-right">Last seen</th>
+                  <th className="px-4 py-3 font-medium">Activity</th>
+                  <th className="px-4 py-3 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((u, i) => (
+                  <tr key={u.userId} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                    <td className="px-4 py-3 text-muted-foreground text-xs w-8">{i + 1}</td>
+                    <td className="px-4 py-3">
+                      {u.name && <p className="font-medium">{u.name}</p>}
+                      {u.email
+                        ? <p className="text-xs text-muted-foreground">{u.email}</p>
+                        : <p className="text-xs text-muted-foreground font-mono">{u.userId.slice(0, 12)}…</p>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold">{u.eventCount}</td>
+                    <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap">
+                      {fmtRelative(u.lastSeenAt)}
+                    </td>
+                    <td className="px-4 py-3 w-32">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary/70 rounded-full"
+                          style={{ width: `${Math.round((u.eventCount / max) * 100)}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ImpersonateButton
+                        userId={u.userId}
+                        displayName={u.name ?? u.email ?? u.userId}
+                        onImpersonate={onImpersonate}
+                      />
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                      No users match your filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

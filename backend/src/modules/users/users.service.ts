@@ -12,6 +12,27 @@ import type { User as PrismaUser } from '@prisma/client';
  * Retrieve all users from the database.
  * @returns Array of UserDTO objects
  */
+export async function searchUsers(q: string, limit = 20): Promise<UserDTO[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      isAdmin: false,
+      OR: [
+        { name: { contains: q } },
+        { email: { contains: q } },
+        { phone: { contains: q } },
+      ],
+    },
+    select: {
+      id: true, name: true, email: true, phone: true,
+      isGuest: true, isAdmin: true, onboardingCompleted: true,
+      createdAt: true, updatedAt: true,
+    },
+    orderBy: { name: 'asc' },
+    take: limit,
+  });
+  return users.map(toDTO);
+}
+
 export async function findAllUsers(): Promise<UserDTO[]> {
   const users = await prisma.user.findMany({
     select: {

@@ -5,6 +5,7 @@ import routes from './routes';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger';
 import { errorHandler } from './shared/errors/errorHandler';
+import { requestContextMiddleware } from './shared/middleware/requestContextMiddleware';
 import { configureRatingSystem } from './modules/rating/rating.bootstrap';
 
 const app = express();
@@ -18,6 +19,9 @@ const corsOrigin = process.env.CORS_ORIGIN;
 app.use(cors(isDev
   ? { origin: true } // allow any origin in development
   : corsOrigin ? { origin: corsOrigin.split(',').map((o) => o.trim()) } : {}));
+
+// Set per-request context (e.g. isImpersonated) for use deeper in the call stack
+app.use(requestContextMiddleware);
 
 // Parse JSON bodies — capture raw buffer for webhook HMAC verification
 app.use(express.json({

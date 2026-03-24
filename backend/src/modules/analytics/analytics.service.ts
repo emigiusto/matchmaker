@@ -3,6 +3,7 @@ import { logger } from '../../config/logger'
 import { cacheGet, cacheSet, deleteKeysByPattern } from '../../shared/cache/redis'
 import type { ClientEventInput, AdminStatsDTO } from './analytics.types'
 import type { Prisma } from '@prisma/client'
+import { requestContext } from '../../shared/context/requestContext'
 
 const ADMIN_STATS_CACHE_KEY = 'analytics:admin:stats'
 const ADMIN_STATS_CACHE_TTL = 300 // 5 minutes
@@ -15,7 +16,7 @@ export async function ingestBatch(
   userId: string | null,
   events: ClientEventInput[],
 ): Promise<void> {
-  if (!events.length) return
+  if (!events.length || requestContext.getStore()?.isImpersonated) return
   try {
     await prisma.userEvent.createMany({
       data: events.map((e) => ({
@@ -33,12 +34,14 @@ export async function ingestBatch(
 
 /**
  * Log a single server-side event. Fire-and-forget — callers should `void` this.
+ * Skipped automatically when the request is an admin impersonation session.
  */
 export async function logServerEvent(
   userId: string,
   eventType: string,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
+  if (requestContext.getStore()?.isImpersonated) return
   try {
     await prisma.userEvent.create({
       data: { userId, eventType, metadata: (metadata ?? undefined) as Prisma.InputJsonValue | undefined, source: 'server' },

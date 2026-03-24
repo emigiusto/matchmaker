@@ -21,4 +21,8 @@ export const analyticsService = {
   impersonate(userId: string): Promise<{ token: string; user: { id: string; name: string | null; email: string | null } }> {
     return apiClient.post(`/analytics/admin/impersonate/${userId}`, {})
   },
+
+  searchUsers(q: string): Promise<Array<{ id: string; name?: string; email?: string; phone?: string; isGuest: boolean }>> {
+    return apiClient.get(`/analytics/admin/users/search?q=${encodeURIComponent(q)}`)
+  },
 }
