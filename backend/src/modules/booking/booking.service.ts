@@ -403,7 +403,7 @@ async function runBookingJob(
       const reason = `Missing socio number for participant ${participantName}`
       await failAttempt(attemptId, reason, 'MISSING_SOCIO_NUMBER')
       logBookingEvent(matchId, 'booking_failed', { errorMessage: reason }).catch(() => {})
-      notifyBookingFailed(match, hostUserId, date, time, tz, reason)
+      notifyBookingFailed(match, hostUserId, date, time,reason)
       return
     }
 
@@ -487,7 +487,17 @@ async function runBookingJob(
         void logServerEvent(hostUserId, 'booking.success', { matchId, courtName: result.courtName, clubSlug: membership.clubSlug })
         logger.info(`[booking] Court booked for match ${matchId}: ${result.courtName} (${result.externalId})`)
 
-        createNotification(hostUserId, 'booking.success', { matchId, courtName: result.courtName }).catch((err) => {
+        const opponentNames = match.participants
+          .filter((p) => p.userId !== hostUserId)
+          .map((p) => p.user?.name ?? '')
+          .filter(Boolean)
+          .join(', ')
+
+        createNotification(hostUserId, 'booking.success', {
+          matchId,
+          courtName: result.courtName,
+          ...(opponentNames && { opponentNames }),
+        }).catch((err) => {
           logger.warn(`[booking] Failed to send booking.success notification for match ${matchId}:`, err instanceof Error ? err.message : err)
         })
 
@@ -495,7 +505,7 @@ async function runBookingJob(
         if (match.whatsappGroupId) {
           const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).catch(() => null)
           const hostLocale = hostUser?.locale ?? 'es'
-          const message = getMessages(hostLocale).courtBooked(result.courtName, `${date} · ${time}`, match.availability?.locationText ?? '')
+          const message = getMessages(hostLocale).courtBooked(result.courtName, `${date} · ${time}`, match.availability?.locationText ?? '', result.confirmationUrl)
           whatsappService.sendGroupMessage(match.whatsappGroupId, message).catch((err) => {
             logger.warn(`[booking] Failed to send WhatsApp group notification for match ${matchId}:`, err)
           })
@@ -525,7 +535,7 @@ async function runBookingJob(
           const userMessage = offline
             ? 'Club booking system is offline or unreachable'
             : (err instanceof AppError ? message : 'An error occurred during court booking')
-          notifyBookingFailed(match, hostUserId, date, time, tz, userMessage)
+          notifyBookingFailed(match, hostUserId, date, time,userMessage)
           break
         }
       }
@@ -545,7 +555,7 @@ async function runBookingJob(
       const d = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
       const t = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
       const hId = sr?.hostUserId ?? m.availability?.userId ?? ''
-      notifyBookingFailed(m, hId, d, t, tz, 'An unexpected error occurred during court booking')
+      notifyBookingFailed(m, hId, d, t, 'An unexpected error occurred during court booking')
     }
   }
 }
@@ -555,10 +565,9 @@ function notifyBookingFailed(
   hostUserId: string,
   date: string,
   time: string,
-  tz: string,
   reason: string,
 ): void {
-  createNotification(hostUserId, 'booking.failed', { matchId: match.id }).catch((err) => {
+  createNotification(hostUserId, 'booking.failed', { matchId: match.id, errorMessage: reason }).catch((err) => {
     logger.warn(`[booking] Failed to send booking.failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
   })
 

@@ -128,7 +128,7 @@ export interface SuggestedOpponent {
 export interface Notification {
   id: string
   userId: string
-  type: "invite_received" | "result_pending" | "match_completed" | "rating_change" | "invite_accepted" | "match_cancelled" | "scheduling_no_match" | "booking_cancelled" | "booking_cancel_failed" | "booking_success" | "result_disputed"
+  type: "invite_received" | "result_pending" | "match_completed" | "rating_change" | "invite_accepted" | "match_cancelled" | "scheduling_no_match" | "booking_cancelled" | "booking_cancel_failed" | "booking_success" | "booking_failed" | "result_disputed"
   title: string
   message: string
   read: boolean

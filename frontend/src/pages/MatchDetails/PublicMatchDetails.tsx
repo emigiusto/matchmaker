@@ -313,7 +313,17 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
                       </span>
                       {bookingAttempt.externalBookingId && (
                         <span className="text-xs text-muted-foreground">
-                          · {t("matchDetails.booking.ref")} {bookingAttempt.externalBookingId}
+                          · {t("matchDetails.booking.ref")}{" "}
+                          {/^\d+$/.test(bookingAttempt.externalBookingId) ? (
+                            <a
+                              href={`https://laieta.miclubonline.net/reservas/${bookingAttempt.externalBookingId}/pistas`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline hover:text-foreground"
+                            >
+                              {bookingAttempt.externalBookingId}
+                            </a>
+                          ) : bookingAttempt.externalBookingId}
                         </span>
                       )}
                     </div>

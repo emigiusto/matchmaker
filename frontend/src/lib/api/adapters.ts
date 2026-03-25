@@ -117,6 +117,7 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, Notification["type"]> = {
   "booking.cancelled": "booking_cancelled",
   "booking.cancel_failed": "booking_cancel_failed",
   "booking.success": "booking_success",
+  "booking.failed": "booking_failed",
   "result_pending": "result_pending",
   "rating_change": "rating_change",
   "match.rescheduled": "invite_accepted",
@@ -151,6 +152,8 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
       return "Court booking cancellation failed"
     case "booking.success":
       return "Court booked"
+    case "booking.failed":
+      return "Booking failed"
     case "match.rescheduled": {
       const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
       return opponents ? `Match vs ${opponents} rescheduled` : "Match rescheduled"
@@ -238,8 +241,14 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
       return parts.length > 0 ? `New time: ${parts.join(" ")}.` : "The match has been rescheduled."
     }
     case "booking.success": {
+      const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
       const courtName = payload.courtName && typeof payload.courtName === "string" ? payload.courtName : null
+      if (opponents) return `Court booked for your match vs ${opponents}.`
       return courtName ? `${courtName} has been booked for your match.` : "Your court has been booked."
+    }
+    case "booking.failed": {
+      const errorMessage = payload.errorMessage && typeof payload.errorMessage === "string" ? payload.errorMessage : null
+      return errorMessage ?? "The court could not be booked automatically."
     }
     case "result.disputed":       return "A result for one of your matches has been disputed."
     case "result.disputed.admin": return "A match result has been disputed and requires your review."

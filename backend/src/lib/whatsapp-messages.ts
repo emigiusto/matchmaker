@@ -18,7 +18,7 @@ interface MessageTemplates {
   matchCancelled(sport: string, format: string, when: string, loc: string, participants: string, url: string): string;
   matchRescheduled(when: string, loc: string, url: string): string;
   reminder(opponentName: string, sport: string, format: string, when: string, loc: string, url?: string): string;
-  courtBooked(courtName: string, when: string, loc: string): string;
+  courtBooked(courtName: string, when: string, loc: string, bookingUrl?: string): string;
   courtBookingFailed(when: string, loc: string, reason: string): string;
 }
 
@@ -172,14 +172,16 @@ const templates: Record<Locale, MessageTemplates> = {
       return lines.join('\n');
     },
 
-    courtBooked(courtName, when, loc) {
-      return [
+    courtBooked(courtName, when, loc, bookingUrl) {
+      const lines = [
         '✅ *¡Pista reservada!*',
         '',
         `🏟️ ${courtName}`,
         `📅 ${when}`,
         `📍 ${loc || 'TBD'}`,
-      ].join('\n');
+      ];
+      if (bookingUrl) lines.push('', `🔗 ${bookingUrl}`);
+      return lines.join('\n');
     },
 
     courtBookingFailed(when, loc, reason) {
@@ -309,14 +311,16 @@ const templates: Record<Locale, MessageTemplates> = {
       return lines.join('\n');
     },
 
-    courtBooked(courtName, when, loc) {
-      return [
+    courtBooked(courtName, when, loc, bookingUrl) {
+      const lines = [
         '✅ *Court booked!*',
         '',
         `🏟️ ${courtName}`,
         `📅 ${when}`,
         `📍 ${loc || 'TBD'}`,
-      ].join('\n');
+      ];
+      if (bookingUrl) lines.push('', `🔗 ${bookingUrl}`);
+      return lines.join('\n');
     },
 
     courtBookingFailed(when, loc, reason) {

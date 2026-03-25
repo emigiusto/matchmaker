@@ -27,6 +27,7 @@ export function useNotificationText() {
       case "result_pending":       return t("notifications.titles.resultPending")
       case "rating_change":        return t("notifications.titles.ratingUpdated")
       case "booking.success":       return t("notifications.titles.courtBooked")
+      case "booking.failed":        return t("notifications.titles.bookingFailed")
       case "booking.cancelled":     return t("notifications.titles.bookingCancelled")
       case "booking.cancel_failed": return t("notifications.titles.bookingCancelFailed")
       case "match.rescheduled":    return opponents
@@ -91,10 +92,14 @@ export function useNotificationText() {
       case "result_pending":   return t("notifications.messages.resultPending")
       case "rating_change":    return t("notifications.messages.ratingUpdated")
       case "booking.success": {
-        const courtName = m.courtName ?? null
-        return courtName
-          ? t("notifications.messages.courtBooked", { court: courtName })
+        const opponents = m.opponentNames ?? null
+        return opponents
+          ? t("notifications.messages.courtBookedVs", { opponents })
           : t("notifications.messages.courtBookedGeneric")
+      }
+      case "booking.failed": {
+        const errorMessage = m.errorMessage ?? null
+        return errorMessage ?? t("notifications.messages.bookingFailed")
       }
       case "booking.cancelled":     return t("notifications.messages.bookingCancelled")
       case "booking.cancel_failed": return t("notifications.messages.bookingCancelFailed")
