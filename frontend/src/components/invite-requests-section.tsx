@@ -646,7 +646,9 @@ export function InviteRequestsSection({
                       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-foreground">
                         <span className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-primary" />
-                          {format(parseISO(request.date), "EEE, MMM d", { locale: dateLocale })}
+                          {language === "es"
+                            ? format(parseISO(request.date), "EEEE d 'de' MMMM", { locale: dateLocale })
+                            : format(parseISO(request.date), "EEE, MMM d", { locale: dateLocale })}
                         </span>
                         <span className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-primary" />
