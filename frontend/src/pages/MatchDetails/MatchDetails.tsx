@@ -359,8 +359,8 @@ export default function MatchDetailPage() {
     try {
       const setsPayload = filledSets.map((s, i) => ({
         setNumber: i + 1,
-        playerAScore: parseInt(s.player1Score),
-        playerBScore: parseInt(s.player2Score),
+        player1Score: parseInt(s.player1Score),
+        player2Score: parseInt(s.player2Score),
       }))
       const updated = await resultsService.resolveDispute(result.id, setsPayload)
       setResult(updated as unknown as MatchResult)

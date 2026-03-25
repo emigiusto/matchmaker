@@ -66,7 +66,7 @@ export default function PastMatchesPage() {
             {pastMatches.map((match) => {
               const opponent =
                 match.player1.userId === currentUserId ? match.player2 : match.player1
-              const isWinner = match.result?.winnerId === currentUserId
+              const isWinner = match.result?.winnerUserId === currentUserId
               return (
                 <Link key={match.id} to={`/matches/${match.id}`}>
                   <Card className="transition-all hover:shadow-lg">

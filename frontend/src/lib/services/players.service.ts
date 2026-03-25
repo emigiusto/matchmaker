@@ -6,6 +6,8 @@ export interface PlayerPreferences {
   userId: string
   defaultCity?: string
   preferredClub?: string
+  levelValue?: number
+  levelConfidence?: number
 }
 
 export const playersService = {
