@@ -216,7 +216,9 @@
     "submit": "Crear cuenta",
     "alreadyHaveAccount": "¿Ya tienes una cuenta?",
     "logIn": "Iniciar sesión",
-    "failed": "Error al registrarse"
+    "failed": "Error al registrarse",
+    "phoneLabel": "Número de teléfono",
+    "phoneHint": "Opcional — nos ayuda a vincular tu historial de partidos si fuiste invitado antes de registrarte"
   },
   "play": {
     "pageTitle": "Mis Invitaciones",
@@ -934,7 +936,10 @@
     "done": {
       "title": "¡Todo listo!",
       "description": "Tu perfil está listo. Es hora de encontrar tu primer partido.",
-      "button": "Ir al panel"
+      "button": "Ir al panel",
+      "matchesFound_one": "Hemos vinculado 1 partido de antes de crear tu cuenta.",
+      "matchesFound_other": "Hemos vinculado {{count}} partidos de antes de crear tu cuenta.",
+      "viewMatches": "Ver historial de partidos"
     },
     "step1": {
       "title": "Tu número de teléfono",

@@ -9,7 +9,7 @@ interface AuthContextValue {
   isAdmin: boolean
   loading: boolean
   login: (email: string, password: string) => Promise<AuthUser>
-  signup: (name: string, email: string, password: string) => Promise<AuthUser>
+  signup: (name: string, email: string, password: string, phone?: string) => Promise<AuthUser>
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.user
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const signup = useCallback(async (name: string, email: string, password: string): Promise<AuthUser> => {
-    const res = await authService.signup(name, email, password)
+  const signup = useCallback(async (name: string, email: string, password: string, phone?: string): Promise<AuthUser> => {
+    const res = await authService.signup(name, email, password, phone)
     applyUser(res.user)
     return res.user
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

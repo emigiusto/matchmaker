@@ -71,6 +71,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [loadingProfile, setLoadingProfile] = useState(true)
+  const [mergedMatchCount, setMergedMatchCount] = useState(0)
 
   // Step 1: Phone
   const [phone, setPhone] = useState("")
@@ -120,7 +121,8 @@ export default function Onboarding() {
     if (!user) return
     setSaving(true)
     try {
-      await usersService.update(user.id, { phone: phone.trim() })
+      const result = await usersService.update(user.id, { phone: phone.trim() })
+      if (result.mergedMatchCount) setMergedMatchCount(result.mergedMatchCount)
       await usersService.completeOnboarding(user.id)
       setStep(2)
     } catch (err) {
@@ -441,6 +443,18 @@ export default function Onboarding() {
                 <h2 className="text-xl font-semibold tracking-tight">{t("onboarding.done.title")}</h2>
                 <p className="text-sm text-muted-foreground">{t("onboarding.done.description")}</p>
               </div>
+              {mergedMatchCount > 0 && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm space-y-1">
+                  <p className="font-medium text-primary">
+                    {mergedMatchCount === 1
+                      ? t("onboarding.done.matchesFound_one")
+                      : t("onboarding.done.matchesFound_other", { count: mergedMatchCount })}
+                  </p>
+                  <Link to="/matches/past" className="text-primary underline underline-offset-2">
+                    {t("onboarding.done.viewMatches")}
+                  </Link>
+                </div>
+              )}
               <Button className="w-full" onClick={() => navigate(redirectAfter, { replace: true })}>
                 {t("onboarding.done.button")}
               </Button>

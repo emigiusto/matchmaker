@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PhoneInput } from "@/components/phone-input"
 import { useAuth } from "@/lib/auth/AuthContext"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -19,6 +20,7 @@ export default function SignupPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [phone, setPhone] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
@@ -31,7 +33,7 @@ export default function SignupPage() {
     }
     setSubmitting(true)
     try {
-      await signup(name, email, password)
+      await signup(name, email, password, phone.trim() || undefined)
       const onboardingUrl = redirect !== "/"
         ? `/onboarding?redirect=${encodeURIComponent(redirect)}`
         : "/onboarding"
@@ -104,6 +106,11 @@ export default function SignupPage() {
                 className="mt-1.5"
                 autoComplete="new-password"
               />
+            </div>
+            <div>
+              <Label>{t("signup.phoneLabel")}</Label>
+              <PhoneInput value={phone} onChange={setPhone} className="mt-1.5" />
+              <p className="mt-1 text-xs text-muted-foreground">{t("signup.phoneHint")}</p>
             </div>
             <Button type="submit" className="w-full gap-2" disabled={submitting}>
               {submitting ? (

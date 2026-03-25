@@ -154,13 +154,15 @@ export async function createGuestUser(name?: string, email?: string, phone?: str
  * @returns Updated UserDTO object
  * @throws AppError if user not found, phone/email exists, or update fails
  */
-export async function updateUser(id: string, name?: string, phone?: string | null): Promise<UserDTO> {
+export async function updateUser(id: string, name?: string, phone?: string | null): Promise<UserDTO & { mergedMatchCount?: number }> {
   // When a phone is being claimed, check for a ghost guest user with that number
   // and absorb their history into this account before setting the phone.
+  let mergedMatchCount: number | undefined;
   if (phone) {
     const ghost = await findUserByNormalizedPhone(phone);
     if (ghost && ghost.id !== id && ghost.isGuest) {
-      await mergeGuestIntoUser(ghost.id, id);
+      const result = await mergeGuestIntoUser(ghost.id, id);
+      mergedMatchCount = result.matchCount;
     }
   }
 
@@ -173,7 +175,7 @@ export async function updateUser(id: string, name?: string, phone?: string | nul
       where: { id },
       data,
     });
-    return toDTO(user);
+    return { ...toDTO(user), mergedMatchCount };
   } catch (err: unknown) {
     if (typeof err === 'object' && err !== null && 'code' in err) {
       if ((err as { code?: string }).code === 'P2025') {
@@ -192,9 +194,13 @@ export async function updateUser(id: string, name?: string, phone?: string | nul
  * Transfers: MatchParticipants, SchedulingCandidates, Contact links,
  * UserEvents, Notifications, Reminders, Messages, ClubMemberships,
  * Results, Availabilities, SchedulingRequests, Player (if target has none).
+ * Returns the number of matches recovered.
  */
-export async function mergeGuestIntoUser(guestId: string, targetId: string): Promise<void> {
+export async function mergeGuestIntoUser(guestId: string, targetId: string): Promise<{ matchCount: number }> {
+  let matchCount = 0;
   await prisma.$transaction(async (tx) => {
+    // Count before any deletes so we can report it to the user
+    matchCount = await tx.matchParticipant.count({ where: { userId: guestId } });
     // ── MatchParticipant ─────────────────────────────────────────────
     // Drop duplicates where target is already a participant in the same match
     const targetMatchIds = (
@@ -259,9 +265,13 @@ export async function mergeGuestIntoUser(guestId: string, targetId: string): Pro
       }
     }
 
+    // ── Ensure target is a real (non-guest) account ──────────────────
+    await tx.user.update({ where: { id: targetId }, data: { isGuest: false } });
+
     // ── Delete the ghost ─────────────────────────────────────────────
     await tx.user.delete({ where: { id: guestId } });
   });
+  return { matchCount };
 }
 
 /**

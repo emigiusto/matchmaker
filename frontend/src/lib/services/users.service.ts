@@ -32,8 +32,8 @@ export const usersService = {
     return apiClient.get<ProfileResponse>(`/users/${userId}/profile`)
   },
 
-  async update(userId: string, data: UpdateUserInput): Promise<User> {
-    return apiClient.put<User>(`/users/${userId}`, data)
+  async update(userId: string, data: UpdateUserInput): Promise<User & { mergedMatchCount?: number }> {
+    return apiClient.put<User & { mergedMatchCount?: number }>(`/users/${userId}`, data)
   },
 
   async completeOnboarding(userId: string): Promise<void> {

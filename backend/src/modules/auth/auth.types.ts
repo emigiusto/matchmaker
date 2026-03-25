@@ -5,6 +5,7 @@ export interface SignupInput {
   email: string;
   password: string;
   locale?: string;
+  phone?: string;
 }
 
 export interface LoginInput {
