@@ -191,17 +191,6 @@ export const schedulingRepository = {
       }
     }
 
-    logger.info('FindCandidateByPhoneNoMatch', {
-      senderPhone: phone,
-      senderDigits,
-      candidateCount: candidates.length,
-      samplePhones: candidates.slice(0, 5).map((c) => ({
-        candidateId: c.id,
-        contactPhone: c.contactUser?.phone ?? null,
-        contactDigits: normalizePhoneToCanonical(c.contactUser?.phone),
-        status: c.status,
-      })),
-    });
     return null;
   },
 

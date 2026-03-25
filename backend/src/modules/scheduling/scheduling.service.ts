@@ -557,7 +557,6 @@ export const schedulingService = {
   async handleCandidateResponse(senderPhoneNumber: string, messageText: string, votedOptions?: string[]): Promise<{ processed: boolean }> {
     const candidate = await schedulingRepository.findCandidateToRecordResponseByPhone(senderPhoneNumber);
     if (!candidate) {
-      logger.info('InviteResponseIgnored', { reason: 'no_waiting_candidate', phone: senderPhoneNumber });
       return { processed: false };
     }
 
