@@ -635,7 +635,7 @@ export default function MatchDetailPage() {
                   <span>{t("matchDetails.booking.missingSocioNumbers")}</span>
                 </div>
               )}
-              {hostMemberships.length > 0 && !bookingAttempt && (
+              {hostMemberships.length > 0 && !bookingAttempt && !isMatchInPast(match.date, match.time) && (
                 <div className="space-y-3">
                   {match.bookingEnabled && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -702,19 +702,21 @@ export default function MatchDetailPage() {
                       {getBookingErrorMessage(bookingAttempt.errorCode, t, bookingAttempt.errorMessage)}
                     </span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={handleRetryBooking}
-                    disabled={retryingBooking || !allParticipantsHaveSocio}
-                  >
-                    {retryingBooking
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <RefreshCw className="h-3.5 w-3.5" />
-                    }
-                    {t("matchDetails.booking.retryBooking")}
-                  </Button>
+                  {!isMatchInPast(match.date, match.time) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={handleRetryBooking}
+                      disabled={retryingBooking || !allParticipantsHaveSocio}
+                    >
+                      {retryingBooking
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <RefreshCw className="h-3.5 w-3.5" />
+                      }
+                      {t("matchDetails.booking.retryBooking")}
+                    </Button>
+                  )}
                 </div>
               )}
               {bookingAttempt?.status === "pending" && (() => {
@@ -725,10 +727,12 @@ export default function MatchDetailPage() {
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                       <span className="text-destructive">{t("matchDetails.booking.timedOut")}</span>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={handleRetryBooking} disabled={retryingBooking}>
-                      {retryingBooking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                      {t("matchDetails.booking.retryBooking")}
-                    </Button>
+                    {!isMatchInPast(match.date, match.time) && (
+                      <Button variant="outline" size="sm" className="gap-2" onClick={handleRetryBooking} disabled={retryingBooking}>
+                        {retryingBooking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        {t("matchDetails.booking.retryBooking")}
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-1">
