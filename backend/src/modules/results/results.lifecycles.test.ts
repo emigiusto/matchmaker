@@ -8,7 +8,7 @@ import { AppError } from '../../shared/errors/AppError';
 
 vi.mock('../../prisma', () => {
   const mockTx = {
-    result: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
+    result: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), create: vi.fn() },
     match: { findUnique: vi.fn(), update: vi.fn() },
     setResult: { findMany: vi.fn(), create: vi.fn() },
     ratingHistory: { findMany: vi.fn() },
@@ -401,5 +401,292 @@ describe('Result confirmation lifecycle', () => {
     await expect(completeMatch()).rejects.toThrow(
       'Cannot complete match: result not confirmed'
     );
+  });
+});
+
+// ------------------------------------------------------
+// Self-confirmation guard
+// ------------------------------------------------------
+
+describe('confirmResult() — self-confirmation guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(mockTx).forEach(group =>
+      Object.values(group as Record<string, any>).forEach((fn: any) => fn.mockReset?.())
+    );
+    updateRatingsForCompletedMatch.mockReset();
+  });
+
+  it('Submitter cannot self-confirm their own result', async () => {
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+    mockTx.result.findUnique.mockResolvedValueOnce({
+      ...baseResult,
+      status: 'submitted',
+      submittedByUserId: 'userA',
+      match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
+    });
+
+    await expect(
+      ResultsService.confirmResult('result-1', 'userA')
+    ).rejects.toThrow('submitter cannot provide the second confirmation');
+    expect(updateRatingsForCompletedMatch).not.toHaveBeenCalled();
+  });
+
+  it('Opponent (non-submitter) can confirm', async () => {
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+    mockTx.result.findUnique
+      .mockResolvedValueOnce({
+        ...baseResult,
+        status: 'submitted',
+        submittedByUserId: 'userA',
+        match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
+        confirmedByHostAt: null,
+        confirmedByOpponentAt: null,
+      })
+      .mockResolvedValueOnce({
+        ...baseResult,
+        status: 'submitted',
+        submittedByUserId: 'userA',
+        confirmedByOpponentAt: new Date(),
+        confirmedByHostAt: null,
+        match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
+      })
+      .mockResolvedValue({
+        ...baseResult,
+        status: 'submitted',
+        submittedByUserId: 'userA',
+        confirmedByOpponentAt: new Date(),
+        confirmedByHostAt: null,
+        match: baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
+      });
+
+    mockTx.result.update.mockResolvedValue({});
+    mockTx.setResult.findMany.mockResolvedValue([]);
+
+    const res = await ResultsService.confirmResult('result-1', 'userB');
+    expect(res.status).toBe('submitted'); // only one side confirmed
+  });
+});
+
+// ------------------------------------------------------
+// disputeResult()
+// ------------------------------------------------------
+
+describe('disputeResult()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(mockTx).forEach(group =>
+      Object.values(group as Record<string, any>).forEach((fn: any) => fn.mockReset?.())
+    );
+    updateRatingsForCompletedMatch.mockReset();
+  });
+
+  const submittedResultWithParticipants = () => ({
+    ...baseResult,
+    status: 'submitted',
+    disputeNote: null,
+    sets: [],
+    match: {
+      ...baseMatchWithParticipants({ status: 'awaiting_confirmation' }),
+      participants: [
+        { userId: 'userA', team: 'A' as const },
+        { userId: 'userB', team: 'B' as const },
+      ],
+    },
+  });
+
+  it('Participant can dispute a submitted result and note is stored', async () => {
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+    mockTx.result.findUnique
+      .mockResolvedValueOnce(submittedResultWithParticipants())
+      .mockResolvedValueOnce({ ...baseResult, status: 'disputed', disputeNote: 'wrong score', sets: [] });
+
+    mockTx.result.update.mockResolvedValueOnce({});
+    mockTx.match.update.mockResolvedValueOnce({});
+
+    const res = await ResultsService.disputeResult({
+      resultId: 'result-1',
+      userId: 'userA',
+      isAdmin: false,
+      disputeNote: 'wrong score',
+    });
+
+    expect(mockTx.result.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'disputed', disputeNote: 'wrong score' }) })
+    );
+    expect(mockTx.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'disputed' } })
+    );
+    expect(res.status).toBe('disputed');
+    expect(res.disputeNote).toBe('wrong score');
+  });
+
+  it('Non-participant cannot dispute', async () => {
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+    mockTx.result.findUnique.mockResolvedValueOnce(submittedResultWithParticipants());
+
+    await expect(
+      ResultsService.disputeResult({ resultId: 'result-1', userId: 'outsider', isAdmin: false })
+    ).rejects.toThrow('Only match participants or admins can dispute a result');
+  });
+
+  it('Admin can dispute even as non-participant', async () => {
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+    mockTx.result.findUnique
+      .mockResolvedValueOnce(submittedResultWithParticipants())
+      .mockResolvedValueOnce({ ...baseResult, status: 'disputed', disputeNote: null, sets: [] });
+
+    mockTx.result.update.mockResolvedValueOnce({});
+    mockTx.match.update.mockResolvedValueOnce({});
+
+    const res = await ResultsService.disputeResult({
+      resultId: 'result-1',
+      userId: 'adminUser',
+      isAdmin: true,
+    });
+
+    expect(res.status).toBe('disputed');
+  });
+
+  it('Cannot dispute an already-confirmed result', async () => {
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+    mockTx.result.findUnique.mockResolvedValueOnce({
+      ...baseResult,
+      status: 'confirmed',
+      sets: [],
+      match: baseMatchWithParticipants({ status: 'completed' }),
+    });
+
+    await expect(
+      ResultsService.disputeResult({ resultId: 'result-1', userId: 'userA', isAdmin: false })
+    ).rejects.toThrow('Cannot dispute a confirmed result');
+  });
+
+  it('disputeNote defaults to null when not provided', async () => {
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+
+    mockTx.result.findUnique
+      .mockResolvedValueOnce(submittedResultWithParticipants())
+      .mockResolvedValueOnce({ ...baseResult, status: 'disputed', disputeNote: null, sets: [] });
+
+    mockTx.result.update.mockResolvedValueOnce({});
+    mockTx.match.update.mockResolvedValueOnce({});
+
+    await ResultsService.disputeResult({ resultId: 'result-1', userId: 'userA', isAdmin: false });
+
+    expect(mockTx.result.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ disputeNote: null }) })
+    );
+  });
+});
+
+// ------------------------------------------------------
+// autoConfirmResults()
+// ------------------------------------------------------
+
+describe('autoConfirmResults()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(mockTx).forEach(group =>
+      Object.values(group as Record<string, any>).forEach((fn: any) => fn.mockReset?.())
+    );
+    updateRatingsForCompletedMatch.mockReset();
+  });
+
+  const oldSubmittedResult = (id: string, matchType = 'competitive') => ({
+    id,
+    matchId: `match-${id}`,
+    status: 'submitted',
+    winnerUserId: 'userA',
+    submittedByUserId: 'userA',
+    createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), // 8 days old
+    confirmedByHostAt: null,
+    confirmedByOpponentAt: null,
+    disputedByHostAt: null,
+    disputedByOpponentAt: null,
+    disputeNote: null,
+    match: { ...baseMatch, id: `match-${id}`, type: matchType, participants: [] },
+  });
+
+  it('Returns count of auto-confirmed results', async () => {
+    mockPrisma.result.findMany.mockResolvedValueOnce([
+      oldSubmittedResult('r1'),
+      oldSubmittedResult('r2'),
+    ]);
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+    mockTx.result.update.mockResolvedValue({});
+    mockTx.match.update.mockResolvedValue({});
+    updateRatingsForCompletedMatch.mockResolvedValue(undefined);
+
+    const count = await ResultsService.autoConfirmResults();
+    expect(count).toBe(2);
+  });
+
+  it('Sets confirmed status and match to completed', async () => {
+    mockPrisma.result.findMany.mockResolvedValueOnce([oldSubmittedResult('r1')]);
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+    mockTx.result.update.mockResolvedValueOnce({});
+    mockTx.match.update.mockResolvedValueOnce({});
+    updateRatingsForCompletedMatch.mockResolvedValue(undefined);
+
+    await ResultsService.autoConfirmResults();
+
+    expect(mockTx.result.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'confirmed' }) })
+    );
+    expect(mockTx.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'completed' } })
+    );
+  });
+
+  it('Calls updateRatingsForCompletedMatch for competitive matches', async () => {
+    mockPrisma.result.findMany.mockResolvedValueOnce([oldSubmittedResult('r1', 'competitive')]);
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+    mockTx.result.update.mockResolvedValue({});
+    mockTx.match.update.mockResolvedValue({});
+    updateRatingsForCompletedMatch.mockResolvedValue(undefined);
+
+    await ResultsService.autoConfirmResults();
+    expect(updateRatingsForCompletedMatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('Does not call updateRatingsForCompletedMatch for practice matches', async () => {
+    mockPrisma.result.findMany.mockResolvedValueOnce([oldSubmittedResult('r1', 'practice')]);
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+    mockTx.result.update.mockResolvedValue({});
+    mockTx.match.update.mockResolvedValue({});
+
+    await ResultsService.autoConfirmResults();
+    expect(updateRatingsForCompletedMatch).not.toHaveBeenCalled();
+  });
+
+  it('Returns 0 when no results are old enough', async () => {
+    mockPrisma.result.findMany.mockResolvedValueOnce([]);
+
+    const count = await ResultsService.autoConfirmResults();
+    expect(count).toBe(0);
+    expect(updateRatingsForCompletedMatch).not.toHaveBeenCalled();
+  });
+
+  it('Continues processing remaining results if one fails', async () => {
+    mockPrisma.result.findMany.mockResolvedValueOnce([
+      oldSubmittedResult('r1'),
+      oldSubmittedResult('r2'),
+    ]);
+    mockPrisma.$transaction
+      .mockRejectedValueOnce(new Error('DB error on r1'))
+      .mockImplementationOnce(async (fn: any) => fn(mockTx));
+    mockTx.result.update.mockResolvedValue({});
+    mockTx.match.update.mockResolvedValue({});
+    updateRatingsForCompletedMatch.mockResolvedValue(undefined);
+
+    const count = await ResultsService.autoConfirmResults();
+    expect(count).toBe(1); // r1 failed, r2 succeeded
   });
 });
