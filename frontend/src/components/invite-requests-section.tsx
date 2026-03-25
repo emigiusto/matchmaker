@@ -80,12 +80,12 @@ const MAX_ACTIVE_REQUESTS = 5
 const SCHEDULING_POLL_INTERVAL_MS = 5000
 
 function formatResponseWindow(minutes: number, t: (key: string, vars?: Record<string, string | number>) => string): string {
-  if (minutes < 60) return t("invites.responseWindowMin", { n: Math.round(minutes) })
+  if (minutes < 60) return t("inviteDetails.responseWindowMin", { n: Math.round(minutes) })
   const hours = minutes / 60
-  if (hours < 24) return t("invites.responseWindowH", { n: Math.round(hours) })
+  if (hours < 24) return t("inviteDetails.responseWindowH", { n: Math.round(hours) })
   const days = hours / 24
   const d = Math.round(days)
-  return d === 1 ? t("invites.responseWindowDay", { n: d }) : t("invites.responseWindowDays", { n: d })
+  return d === 1 ? t("inviteDetails.responseWindowDay", { n: d }) : t("inviteDetails.responseWindowDays", { n: d })
 }
 
 function formatTimeLeft(contactedAt: string, responseWindowMinutes: number): string {
