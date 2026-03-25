@@ -321,6 +321,127 @@ export default function ProfilePage() {
           </div>
         </Card>
 
+        {/* ── Player Analytics ── */}
+        {player && (
+          <>
+            {/* Stat tiles */}
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+              <Card>
+                <CardContent className="pt-5 pb-4 text-center">
+                  <p className="text-2xl font-bold">{stats?.totalMatches ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Matches played</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-5 pb-4 text-center">
+                  <p className="text-2xl font-bold">
+                    {stats ? `${Math.round(stats.winRate * 100)}%` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Win rate</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-5 pb-4 text-center">
+                  <p className="text-2xl font-bold">
+                    {stats ? `${stats.wins}W · ${stats.losses}L` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Competitive W/L</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-5 pb-4 text-center flex flex-col items-center justify-center gap-1">
+                  {stats && stats.currentStreak > 0 ? (
+                    <>
+                      <div className="flex items-center gap-1">
+                        {stats.streakType === "win" ? (
+                          <TrendingUp className="h-5 w-5 text-green-500" />
+                        ) : stats.streakType === "loss" ? (
+                          <TrendingDown className="h-5 w-5 text-red-500" />
+                        ) : (
+                          <Minus className="h-5 w-5 text-muted-foreground" />
+                        )}
+                        <span className="text-2xl font-bold">{stats.currentStreak}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {stats.streakType === "win" ? "Win streak" : "Loss streak"}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold">—</p>
+                      <p className="text-xs text-muted-foreground">Streak</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Rating trend chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold tracking-tight">Rating history</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats && stats.ratingHistory.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={stats.ratingHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(d) => format(parseISO(d), "MMM d")}
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        minTickGap={40}
+                      />
+                      <YAxis
+                        domain={["auto", "auto"]}
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        formatter={(value: number, _name: string, props: any) => {
+                          const delta = props?.payload?.delta
+                          const sign = delta >= 0 ? "+" : ""
+                          return [`${value.toFixed(2)} (${sign}${delta?.toFixed(2)})`, "Rating"]
+                        }}
+                        labelFormatter={(d) => format(parseISO(d as string), "PPP")}
+                      />
+                      <ReferenceLine
+                        y={stats.ratingHistory[0]?.rating}
+                        stroke="hsl(var(--border))"
+                        strokeDasharray="4 4"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="rating"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">
+                    No rating history yet — complete a competitive match to start tracking.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Avg opponent level */}
+            {stats && stats.averageOpponentLevel !== null && (
+              <Card>
+                <CardContent className="pt-5 pb-4 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Average opponent level</span>
+                  <span className="font-semibold">{stats.averageOpponentLevel.toFixed(2)}</span>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+
         {/* Personal settings - for scheduling service */}
         <Card>
           <CardHeader>
@@ -626,126 +747,6 @@ export default function ProfilePage() {
         </Card>
 
 
-        {/* ── Player Analytics ── */}
-        {player && (
-          <>
-            {/* Stat tiles */}
-            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-              <Card>
-                <CardContent className="pt-5 pb-4 text-center">
-                  <p className="text-2xl font-bold">{stats?.totalMatches ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Matches played</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-5 pb-4 text-center">
-                  <p className="text-2xl font-bold">
-                    {stats ? `${Math.round(stats.winRate * 100)}%` : "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Win rate</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-5 pb-4 text-center">
-                  <p className="text-2xl font-bold">
-                    {stats ? `${stats.wins}W · ${stats.losses}L` : "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Competitive W/L</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-5 pb-4 text-center flex flex-col items-center justify-center gap-1">
-                  {stats && stats.currentStreak > 0 ? (
-                    <>
-                      <div className="flex items-center gap-1">
-                        {stats.streakType === "win" ? (
-                          <TrendingUp className="h-5 w-5 text-green-500" />
-                        ) : stats.streakType === "loss" ? (
-                          <TrendingDown className="h-5 w-5 text-red-500" />
-                        ) : (
-                          <Minus className="h-5 w-5 text-muted-foreground" />
-                        )}
-                        <span className="text-2xl font-bold">{stats.currentStreak}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {stats.streakType === "win" ? "Win streak" : "Loss streak"}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold">—</p>
-                      <p className="text-xs text-muted-foreground">Streak</p>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Rating trend chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold tracking-tight">Rating history</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats && stats.ratingHistory.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={180}>
-                    <LineChart data={stats.ratingHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(d) => format(parseISO(d), "MMM d")}
-                        tick={{ fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                        minTickGap={40}
-                      />
-                      <YAxis
-                        domain={["auto", "auto"]}
-                        tick={{ fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <Tooltip
-                        formatter={(value: number, _name: string, props: any) => {
-                          const delta = props?.payload?.delta
-                          const sign = delta >= 0 ? "+" : ""
-                          return [`${value.toFixed(2)} (${sign}${delta?.toFixed(2)})`, "Rating"]
-                        }}
-                        labelFormatter={(d) => format(parseISO(d as string), "PPP")}
-                      />
-                      <ReferenceLine
-                        y={stats.ratingHistory[0]?.rating}
-                        stroke="hsl(var(--border))"
-                        strokeDasharray="4 4"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="rating"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-8 text-center">
-                    No rating history yet — complete a competitive match to start tracking.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Avg opponent level */}
-            {stats && stats.averageOpponentLevel !== null && (
-              <Card>
-                <CardContent className="pt-5 pb-4 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Average opponent level</span>
-                  <span className="font-semibold">{stats.averageOpponentLevel.toFixed(2)}</span>
-                </CardContent>
-              </Card>
-            )}
-          </>
-        )}
       </div>
     </>
   )
