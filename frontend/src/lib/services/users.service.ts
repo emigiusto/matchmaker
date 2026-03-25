@@ -16,7 +16,7 @@ export interface UpdateUserInput {
 
 export interface ProfileResponse {
   user: User
-  player: { id: string; defaultCity?: string; preferredClub?: string } | null
+  player: { id: string; defaultCity?: string; preferredClub?: string; levelValue?: number; levelConfidence?: number } | null
 }
 
 export const usersService = {
