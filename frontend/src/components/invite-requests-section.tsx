@@ -79,12 +79,13 @@ export interface InviteRequest {
 const MAX_ACTIVE_REQUESTS = 5
 const SCHEDULING_POLL_INTERVAL_MS = 5000
 
-function formatResponseWindow(minutes: number): string {
-  if (minutes < 60) return `${Math.round(minutes)} min`
+function formatResponseWindow(minutes: number, t: (key: string, vars?: Record<string, unknown>) => string): string {
+  if (minutes < 60) return t("invites.responseWindowMin", { n: Math.round(minutes) })
   const hours = minutes / 60
-  if (hours < 24) return `${Math.round(hours)}h`
+  if (hours < 24) return t("invites.responseWindowH", { n: Math.round(hours) })
   const days = hours / 24
-  return `${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"}`
+  const d = Math.round(days)
+  return d === 1 ? t("invites.responseWindowDay", { n: d }) : t("invites.responseWindowDays", { n: d })
 }
 
 function formatTimeLeft(contactedAt: string, responseWindowMinutes: number): string {
@@ -658,7 +659,7 @@ export function InviteRequestsSection({
                         {displayStatus === "scheduling" && (
                           <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
                             <Hourglass className="h-3.5 w-3.5" />
-                            {t("inviteDetails.replyWithin", { window: formatResponseWindow(request.responseWindowMinutes) })}
+                            {t("inviteDetails.replyWithin", { window: formatResponseWindow(request.responseWindowMinutes, t) })}
                           </span>
                         )}
                       </div>
