@@ -68,6 +68,7 @@ export interface InviteRequest {
     id: string
     contactUserId: string
     name: string
+    phone: string | null
     status: "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled" | "send_failed"
     contactedAt: string | null
   }[]
@@ -162,6 +163,7 @@ function mapSchedulingToInviteRequest(
     id: c.id,
     contactUserId: c.contactUserId,
     name: c.contactUserName ?? t("common.unknown"),
+    phone: c.contactPhone ?? null,
     status: contactStatusMap[c.status] ?? "pending",
     contactedAt: c.contactedAt ?? null,
   }))
@@ -717,6 +719,11 @@ export function InviteRequestsSection({
                                 className={`flex-1 ${contact.status === "declined" || contact.status === "no_response" || contact.status === "cancelled" || contact.status === "send_failed" ? "text-muted-foreground line-through" : "text-foreground"}`}
                               >
                                 {contact.name}
+                                {contact.phone && (
+                                  <span className="ml-2 text-xs text-muted-foreground font-normal">
+                                    {contact.phone}
+                                  </span>
+                                )}
                               </span>
                               {contact.status === "contacted" &&
                                 contact.contactedAt &&
