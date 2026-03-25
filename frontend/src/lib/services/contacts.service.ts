@@ -11,6 +11,7 @@ export interface ContactDTO {
   socioNumbers: Record<string, string> // clubSlug → socioNumber
   linkedUserId: string | null
   linkedUserName: string | null
+  linkedUserIsGuest: boolean | null
   importSource: string | null
   createdAt: string
   updatedAt: string

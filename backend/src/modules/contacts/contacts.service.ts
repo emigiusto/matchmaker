@@ -26,7 +26,7 @@ function toStoredPhone(phone: string): string {
 // ─── DTO mappers ────────────────────────────────────────────
 
 function toContactDTO(
-  c: Contact & { linkedUser?: { id: string; name: string | null } | null },
+  c: Contact & { linkedUser?: { id: string; name: string | null; isGuest: boolean } | null },
 ): ContactDTO {
   return {
     id: c.id,
@@ -36,6 +36,7 @@ function toContactDTO(
     socioNumbers: (c.socioNumbers as Record<string, string>) ?? {},
     linkedUserId: c.linkedUserId ?? null,
     linkedUserName: c.linkedUser?.name ?? null,
+    linkedUserIsGuest: c.linkedUser?.isGuest ?? null,
     importSource: c.importSource ?? null,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
@@ -90,7 +91,7 @@ export async function createContact(input: CreateContactInput): Promise<CreateCo
       externalId: input.externalId ?? null,
       socioNumbers: {},
     },
-    include: { linkedUser: { select: { id: true, name: true } } },
+    include: { linkedUser: { select: { id: true, name: true, isGuest: true } } },
   });
 
   void logServerEvent(input.ownerUserId, 'contact.added', { contactId: contact.id });
@@ -100,7 +101,7 @@ export async function createContact(input: CreateContactInput): Promise<CreateCo
 export async function listContacts(ownerUserId: string): Promise<ContactDTO[]> {
   const contacts = await prisma.contact.findMany({
     where: { ownerUserId },
-    include: { linkedUser: { select: { id: true, name: true } } },
+    include: { linkedUser: { select: { id: true, name: true, isGuest: true } } },
     orderBy: { name: 'asc' },
   });
   return contacts.map(toContactDTO);
@@ -122,7 +123,7 @@ export async function updateContact(
   const updated = await prisma.contact.update({
     where: { id },
     data,
-    include: { linkedUser: { select: { id: true, name: true } } },
+    include: { linkedUser: { select: { id: true, name: true, isGuest: true } } },
   });
   return toContactDTO(updated);
 }
@@ -170,7 +171,7 @@ export async function createContactList(ownerUserId: string, name: string): Prom
 
   const list = await prisma.contactList.create({
     data: { ownerUserId, name: name.trim() },
-    include: { members: { include: { contact: { include: { linkedUser: { select: { id: true, name: true } } } } } } },
+    include: { members: { include: { contact: { include: { linkedUser: { select: { id: true, name: true, isGuest: true } } } } } } },
   });
   return toListDTO(list);
 }
@@ -180,7 +181,7 @@ export async function listContactLists(ownerUserId: string): Promise<ContactList
     where: { ownerUserId },
     include: {
       members: {
-        include: { contact: { include: { linkedUser: { select: { id: true, name: true } } } } },
+        include: { contact: { include: { linkedUser: { select: { id: true, name: true, isGuest: true } } } } },
         orderBy: { addedAt: 'asc' },
       },
     },
@@ -201,7 +202,7 @@ export async function renameContactList(
   const updated = await prisma.contactList.update({
     where: { id },
     data: { name: name.trim() },
-    include: { members: { include: { contact: { include: { linkedUser: { select: { id: true, name: true } } } } } } },
+    include: { members: { include: { contact: { include: { linkedUser: { select: { id: true, name: true, isGuest: true } } } } } } },
   });
   return toListDTO(updated);
 }
@@ -254,7 +255,7 @@ async function listContactListById(id: string): Promise<ContactListDTO> {
     where: { id },
     include: {
       members: {
-        include: { contact: { include: { linkedUser: { select: { id: true, name: true } } } } },
+        include: { contact: { include: { linkedUser: { select: { id: true, name: true, isGuest: true } } } } },
         orderBy: { addedAt: 'asc' },
       },
     },

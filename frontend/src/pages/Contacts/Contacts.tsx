@@ -365,9 +365,9 @@ export default function Contacts() {
                             <p className="truncate text-sm font-medium">{c.name}</p>
                             <p className="text-xs text-muted-foreground">{c.phone}</p>
 
-                            {(c.linkedUserId || socioEntries.length > 0 || memberOfLists.length > 0) && (
+                            {((c.linkedUserId && !c.linkedUserIsGuest) || socioEntries.length > 0 || memberOfLists.length > 0) && (
                               <div className="mt-1.5 flex flex-wrap gap-1">
-                                {c.linkedUserId && (
+                                {c.linkedUserId && !c.linkedUserIsGuest && (
                                   <Badge
                                     variant="outline"
                                     className="h-5 px-1.5 py-0 text-[10px] font-medium border-green-300 text-green-700 dark:border-green-800 dark:text-green-400"
