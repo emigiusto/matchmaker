@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Phone, MapPin, Building2, Users, X, Loader2, Swords, ArrowLeft, CheckCircle2 } from "lucide-react"
+import { Phone, MapPin, Building2, Users, X, Loader2, Swords, ArrowLeft, CheckCircle2, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,6 +18,15 @@ import { toast } from "sonner"
 import { Link, useSearchParams } from "react-router-dom"
 
 const TOTAL_STEPS = 4
+
+const LEVEL_OPTIONS = [
+  { key: "beginner",     value: 1.0, confidence: 0.15 },
+  { key: "learning",     value: 2.0, confidence: 0.18 },
+  { key: "intermediate", value: 3.0, confidence: 0.20 },
+  { key: "advanced",     value: 4.5, confidence: 0.20 },
+  { key: "competitive",  value: 5.5, confidence: 0.25 },
+] as const
+type LevelOption = typeof LEVEL_OPTIONS[number]
 
 // step 0 = welcome, steps 1-4 = data, step 5 = success
 function StepIndicator({ current, onBack }: { current: number; onBack?: () => void }) {
@@ -76,7 +85,8 @@ export default function Onboarding() {
   // Step 1: Phone
   const [phone, setPhone] = useState("")
 
-  // Step 2: Location
+  // Step 2: Level + Location
+  const [selectedLevel, setSelectedLevel] = useState<LevelOption | null>(null)
   const [preferredClub, setPreferredClub] = useState("")
   const [defaultCity, setDefaultCity] = useState("")
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -101,6 +111,12 @@ export default function Onboarding() {
           setPlayerId(player.id)
           if (player.preferredClub) setPreferredClub(player.preferredClub)
           if (player.defaultCity) setDefaultCity(player.defaultCity)
+          if (player.levelValue) {
+            const closest = LEVEL_OPTIONS.reduce((prev, curr) =>
+              Math.abs(curr.value - player.levelValue!) < Math.abs(prev.value - player.levelValue!) ? curr : prev
+            )
+            setSelectedLevel(closest)
+          }
         }
       })
       .catch(() => {})
@@ -136,14 +152,19 @@ export default function Onboarding() {
     if (!user) return
     setSaving(true)
     try {
-      if (!skip && (preferredClub.trim() || defaultCity.trim())) {
+      const levelData = selectedLevel
+        ? { levelValue: selectedLevel.value, levelConfidence: selectedLevel.confidence }
+        : {}
+      if (!skip && (selectedLevel || preferredClub.trim() || defaultCity.trim())) {
         if (playerId) {
           await playersService.update(playerId, {
+            ...levelData,
             preferredClub: preferredClub.trim() || undefined,
             defaultCity: defaultCity.trim() || undefined,
           })
         } else {
           const p = await playersService.create(user.id, {
+            ...levelData,
             preferredClub: preferredClub.trim() || undefined,
             defaultCity: defaultCity.trim() || undefined,
           })
@@ -276,13 +297,45 @@ export default function Onboarding() {
             </StepCard>
           )}
 
-          {/* Step 2: Location */}
+          {/* Step 2: Level + Location */}
           {step === 2 && (
             <StepCard
               icon={<MapPin className="h-5 w-5 text-primary" />}
               title={t("onboarding.step2.title")}
               description={t("onboarding.step2.description")}
             >
+              {/* Level picker */}
+              <div className="space-y-2">
+                <Label>{t("onboarding.step2.levelLabel")}</Label>
+                <div className="space-y-1.5">
+                  {LEVEL_OPTIONS.map((level) => {
+                    const isSelected = selectedLevel?.key === level.key
+                    return (
+                      <button
+                        key={level.key}
+                        type="button"
+                        onClick={() => setSelectedLevel(isSelected ? null : level)}
+                        className={`w-full flex items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5"
+                            : "border-border/50 hover:border-primary/30"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium leading-none">{t(`onboarding.step2.levels.${level.key}.label`)}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{t(`onboarding.step2.levels.${level.key}.desc`)}</p>
+                        </div>
+                        {isSelected
+                          ? <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                          : <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                        }
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Location */}
               <div className="space-y-1.5">
                 <Label>{t("onboarding.step2.clubLabel")}</Label>
                 <Input
@@ -305,7 +358,7 @@ export default function Onboarding() {
                 loading={saving}
                 continueLabel={t("onboarding.continue")}
                 skipLabel={t("onboarding.skip")}
-                continueDisabled={!preferredClub.trim() && !defaultCity.trim()}
+                continueDisabled={false}
               />
             </StepCard>
           )}

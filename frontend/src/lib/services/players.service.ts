@@ -27,14 +27,14 @@ export const playersService = {
 
   async create(
     userId: string,
-    data: { preferredClub?: string; defaultCity?: string }
+    data: { preferredClub?: string; defaultCity?: string; levelValue?: number; levelConfidence?: number }
   ): Promise<PlayerPreferences> {
     return apiClient.post<PlayerPreferences>("/players", { userId, ...data })
   },
 
   async update(
     playerId: string,
-    data: { preferredClub?: string; defaultCity?: string }
+    data: { preferredClub?: string; defaultCity?: string; levelValue?: number; levelConfidence?: number }
   ): Promise<PlayerPreferences> {
     return apiClient.patch<PlayerPreferences>(`/players/${playerId}`, data)
   },

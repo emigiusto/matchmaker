@@ -108,7 +108,8 @@
     "netApproach": "Net approach",
     "tacticAdjustment": "Tactic adjustment",
     "targetedSide": "Targeted side",
-    "mainMistake": "Main mistake"
+    "mainMistake": "Main mistake",
+    "questionnaireDisclaimer": "Your answers are saved and will be used to power personalised AI match insights in a future update."
   },
   "profile": {
     "myProfile": "My Profile",
@@ -954,8 +955,16 @@
       "phoneLabel": "Phone"
     },
     "step2": {
-      "title": "Where do you play?",
-      "description": "Set your default club and city. You can change these at any time.",
+      "title": "Your level & location",
+      "description": "Help us find you the right opponents from your very first match.",
+      "levelLabel": "What's your current level?",
+      "levels": {
+        "beginner":     { "label": "Just starting out",       "desc": "New to the sport, still learning the basics" },
+        "learning":     { "label": "Getting the hang of it",  "desc": "Playing regularly, working on consistency" },
+        "intermediate": { "label": "Regular club player",     "desc": "Solid game, comfortable in match play" },
+        "advanced":     { "label": "Advanced",                "desc": "Strong competitive club player" },
+        "competitive":  { "label": "Tournament level",        "desc": "Regional or national competition experience" }
+      },
       "clubLabel": "Preferred club or court",
       "clubPlaceholder": "e.g. Club Tennis Barcelona",
       "cityLabel": "City",

@@ -108,7 +108,8 @@
     "netApproach": "Acercamiento a la red",
     "tacticAdjustment": "Ajuste táctico",
     "targetedSide": "Lado atacado",
-    "mainMistake": "Error principal"
+    "mainMistake": "Error principal",
+    "questionnaireDisclaimer": "Tus respuestas se guardan y se usarán para impulsar perspectivas de partido personalizadas con IA en una futura actualización."
   },
   "profile": {
     "myProfile": "Mi Perfil",
@@ -954,8 +955,16 @@
       "phoneLabel": "Teléfono"
     },
     "step2": {
-      "title": "¿Dónde juegas?",
-      "description": "Establece tu club y ciudad por defecto. Puedes cambiarlos en cualquier momento.",
+      "title": "Tu nivel y ubicación",
+      "description": "Ayúdanos a encontrarte los rivales adecuados desde el primer partido.",
+      "levelLabel": "¿Cuál es tu nivel actual?",
+      "levels": {
+        "beginner":     { "label": "Empezando",                  "desc": "Nuevo en el deporte, aprendiendo lo básico" },
+        "learning":     { "label": "Cogiendo el ritmo",          "desc": "Jugando regularmente, mejorando la consistencia" },
+        "intermediate": { "label": "Jugador de club habitual",   "desc": "Buen juego, cómodo en partidos" },
+        "advanced":     { "label": "Avanzado",                   "desc": "Jugador de club competitivo de alto nivel" },
+        "competitive":  { "label": "Nivel de competición",       "desc": "Experiencia en torneos regionales o nacionales" }
+      },
       "clubLabel": "Club o pista preferida",
       "clubPlaceholder": "ej. Club Tennis Barcelona",
       "cityLabel": "Ciudad",
