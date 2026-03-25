@@ -7,6 +7,8 @@ import { AppError } from '../../shared/errors/AppError';
 import type { SignupInput, LoginInput, AuthResponse } from './auth.types';
 import { resolveLocale } from '../../lib/whatsapp-messages';
 import { logServerEvent } from '../analytics/analytics.service';
+import { findUserByNormalizedPhone, mergeGuestIntoUser } from '../users/users.service';
+import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const SALT_ROUNDS = 10;
@@ -16,7 +18,7 @@ const SALT_ROUNDS = 10;
  * Creates a non-guest user with hashed password.
  */
 export async function signup(input: SignupInput): Promise<AuthResponse> {
-  const { name, email, password, locale } = input;
+  const { name, email, password, locale, phone } = input;
   const trimmedEmail = email.trim().toLowerCase();
   const trimmedPassword = password.trim();
   if (!trimmedEmail || !trimmedPassword || trimmedPassword.length < 6) {
@@ -36,10 +38,24 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
       locale: resolveLocale(locale),
     },
   });
+
+  // If a phone was provided at signup, merge any ghost guest and set the phone immediately —
+  // this lets users who were previously invited see their match history right away.
+  let resolvedPhone: string | undefined;
+  if (phone?.trim()) {
+    const canonical = normalizePhoneToCanonical(phone.trim());
+    resolvedPhone = canonical ?? phone.trim();
+    const ghost = await findUserByNormalizedPhone(phone.trim());
+    if (ghost && ghost.isGuest) {
+      await mergeGuestIntoUser(ghost.id, user.id);
+    }
+    await prisma.user.update({ where: { id: user.id }, data: { phone: resolvedPhone } });
+  }
+
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
   void logServerEvent(user.id, 'auth.signup');
   return {
-    user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, isGuest: user.isGuest, onboardingCompleted: user.onboardingCompleted },
+    user: { id: user.id, name: user.name ?? undefined, email: user.email ?? undefined, phone: resolvedPhone, isGuest: false, onboardingCompleted: user.onboardingCompleted },
     token,
   };
 }

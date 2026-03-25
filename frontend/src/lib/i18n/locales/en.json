@@ -216,7 +216,9 @@
     "submit": "Create account",
     "alreadyHaveAccount": "Already have an account?",
     "logIn": "Log in",
-    "failed": "Sign up failed"
+    "failed": "Sign up failed",
+    "phoneLabel": "Phone number",
+    "phoneHint": "Optional — helps us link your match history if you were invited before signing up"
   },
   "play": {
     "pageTitle": "My Invites",
@@ -934,7 +936,10 @@
     "done": {
       "title": "You're all set!",
       "description": "Your profile is ready. Time to find your first match.",
-      "button": "Go to dashboard"
+      "button": "Go to dashboard",
+      "matchesFound_one": "We linked 1 match from before you created your account.",
+      "matchesFound_other": "We linked {{count}} matches from before you created your account.",
+      "viewMatches": "View match history"
     },
     "step1": {
       "title": "Your phone number",
