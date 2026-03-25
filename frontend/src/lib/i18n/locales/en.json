@@ -115,6 +115,24 @@
   },
   "profile": {
     "myProfile": "My Profile",
+    "stats": {
+      "matchesPlayed": "Matches played",
+      "winRate": "Win rate",
+      "winsLosses": "Competitive W/L",
+      "winStreak": "Win streak",
+      "lossStreak": "Loss streak",
+      "streak": "Streak",
+      "ratingHistory": "Rating history",
+      "noRatingHistory": "No rating history yet — complete a competitive match to start tracking.",
+      "averageOpponentLevel": "Average opponent level"
+    },
+    "rating": {
+      "title": "Current Rating",
+      "vsLastWeek": "vs last week",
+      "confidence": "Confidence",
+      "noData": "No rating data yet",
+      "noDataHint": "Complete a competitive match to start tracking your rating."
+    },
     "personalProgress": "Personal Progress",
     "matchesThisMonth": "Matches this month",
     "winRateOverall": "Win rate overall",

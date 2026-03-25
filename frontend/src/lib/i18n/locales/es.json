@@ -115,6 +115,24 @@
   },
   "profile": {
     "myProfile": "Mi Perfil",
+    "stats": {
+      "matchesPlayed": "Partidos jugados",
+      "winRate": "% de victorias",
+      "winsLosses": "V/D Competitivo",
+      "winStreak": "Racha ganadora",
+      "lossStreak": "Racha perdedora",
+      "streak": "Racha",
+      "ratingHistory": "Historial de puntuación",
+      "noRatingHistory": "Sin historial de puntuación aún — completa un partido competitivo para empezar.",
+      "averageOpponentLevel": "Nivel medio del oponente"
+    },
+    "rating": {
+      "title": "Puntuación Actual",
+      "vsLastWeek": "vs semana pasada",
+      "confidence": "Confianza",
+      "noData": "Sin datos de puntuación",
+      "noDataHint": "Completa un partido competitivo para empezar a rastrear tu puntuación."
+    },
     "personalProgress": "Progreso Personal",
     "matchesThisMonth": "Partidos este mes",
     "winRateOverall": "Porcentaje de victorias general",

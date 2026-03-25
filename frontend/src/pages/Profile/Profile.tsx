@@ -57,7 +57,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [form, setForm] = useState({ name: "", phone: "" })
-  const [player, setPlayer] = useState<{ id: string; preferredClub?: string; defaultCity?: string } | null>(null)
+  const [player, setPlayer] = useState<{ id: string; preferredClub?: string; defaultCity?: string; levelValue?: number; levelConfidence?: number } | null>(null)
   const [locationForm, setLocationForm] = useState({ preferredClub: "", defaultCity: "" })
   const [savingLocation, setSavingLocation] = useState(false)
 
@@ -324,12 +324,77 @@ export default function ProfilePage() {
         {/* ── Player Analytics ── */}
         {player && (
           <>
+            {/* Rating card */}
+            {(() => {
+              const currentRating = player.levelValue
+              const confidence = player.levelConfidence
+              const history = stats?.ratingHistory ?? []
+              const weeklyDelta = (() => {
+                if (history.length < 2) return null
+                const now = new Date()
+                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+                // Find entry closest to 7 days ago
+                let closest: { date: string; rating: number; delta: number } | null = null
+                let minDiff = Infinity
+                for (const entry of history) {
+                  const diff = Math.abs(parseISO(entry.date).getTime() - sevenDaysAgo.getTime())
+                  if (diff < minDiff) { minDiff = diff; closest = entry }
+                }
+                if (!closest) return null
+                const latest = history[history.length - 1]
+                return latest.rating - (closest as { date: string; rating: number; delta: number }).rating
+              })()
+
+              return (
+                <Card>
+                  <CardContent className="pt-5 pb-5">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                      {t("profile.rating.title")}
+                    </p>
+                    {currentRating != null ? (
+                      <div className="flex items-end gap-4 flex-wrap">
+                        <div>
+                          <span className="text-4xl font-bold tracking-tight">{currentRating.toFixed(2)}</span>
+                        </div>
+                        {weeklyDelta !== null && (
+                          <div className="flex items-center gap-1 mb-1">
+                            {weeklyDelta > 0 ? (
+                              <TrendingUp className="h-4 w-4 text-green-500" />
+                            ) : weeklyDelta < 0 ? (
+                              <TrendingDown className="h-4 w-4 text-red-500" />
+                            ) : (
+                              <Minus className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className={`text-sm font-semibold ${weeklyDelta > 0 ? "text-green-600 dark:text-green-400" : weeklyDelta < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                              {weeklyDelta > 0 ? "+" : ""}{weeklyDelta.toFixed(2)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{t("profile.rating.vsLastWeek")}</span>
+                          </div>
+                        )}
+                        {confidence != null && (
+                          <div className="ml-auto flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">{t("profile.rating.confidence")}</span>
+                            <span className="text-sm font-semibold">{Math.round(confidence * 100)}%</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-2">
+                        <p className="text-sm text-muted-foreground">{t("profile.rating.noData")}</p>
+                        <p className="text-xs text-muted-foreground/70 mt-0.5">{t("profile.rating.noDataHint")}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })()}
+
             {/* Stat tiles */}
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
               <Card>
                 <CardContent className="pt-5 pb-4 text-center">
                   <p className="text-2xl font-bold">{stats?.totalMatches ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Matches played</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("profile.stats.matchesPlayed")}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -337,7 +402,7 @@ export default function ProfilePage() {
                   <p className="text-2xl font-bold">
                     {stats ? `${Math.round(stats.winRate * 100)}%` : "—"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Win rate</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("profile.stats.winRate")}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -345,7 +410,7 @@ export default function ProfilePage() {
                   <p className="text-2xl font-bold">
                     {stats ? `${stats.wins}W · ${stats.losses}L` : "—"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Competitive W/L</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("profile.stats.winsLosses")}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -363,13 +428,13 @@ export default function ProfilePage() {
                         <span className="text-2xl font-bold">{stats.currentStreak}</span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {stats.streakType === "win" ? "Win streak" : "Loss streak"}
+                        {stats.streakType === "win" ? t("profile.stats.winStreak") : t("profile.stats.lossStreak")}
                       </p>
                     </>
                   ) : (
                     <>
                       <p className="text-2xl font-bold">—</p>
-                      <p className="text-xs text-muted-foreground">Streak</p>
+                      <p className="text-xs text-muted-foreground">{t("profile.stats.streak")}</p>
                     </>
                   )}
                 </CardContent>
@@ -379,7 +444,7 @@ export default function ProfilePage() {
             {/* Rating trend chart */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-semibold tracking-tight">Rating history</CardTitle>
+                <CardTitle className="text-base font-semibold tracking-tight">{t("profile.stats.ratingHistory")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {stats && stats.ratingHistory.length > 0 ? (
@@ -424,7 +489,7 @@ export default function ProfilePage() {
                   </ResponsiveContainer>
                 ) : (
                   <p className="text-sm text-muted-foreground py-8 text-center">
-                    No rating history yet — complete a competitive match to start tracking.
+                    {t("profile.stats.noRatingHistory")}
                   </p>
                 )}
               </CardContent>
@@ -434,7 +499,7 @@ export default function ProfilePage() {
             {stats && stats.averageOpponentLevel !== null && (
               <Card>
                 <CardContent className="pt-5 pb-4 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Average opponent level</span>
+                  <span className="text-sm text-muted-foreground">{t("profile.stats.averageOpponentLevel")}</span>
                   <span className="font-semibold">{stats.averageOpponentLevel.toFixed(2)}</span>
                 </CardContent>
               </Card>

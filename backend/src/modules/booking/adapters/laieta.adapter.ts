@@ -380,22 +380,46 @@ export class LaietaAdapter implements BookingAdapter {
       if (!slotId) {
         throw new AppError(`Slot no longer available: court=${courtId} at ${time}`, 409, 'SLOT_NOT_FOUND')
       }
+
+      // Scroll the target slot into the viewport before clicking.
+      // The timetable spans 6h–23h; a 17:00 slot is far down and may be outside
+      // the initial viewport, causing page.click() to mis-fire on some Puppeteer builds.
+      await page.evaluate((id: string) => {
+        document.querySelector(`[id="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'instant' })
+      }, slotId)
+      await new Promise(r => setTimeout(r, 400))
+
+      // hover() first so the portal's mouseenter handlers fire before the click
+      await page.hover(`[id="${slotId}"]`).catch(() => { /* non-fatal */ })
+      await new Promise(r => setTimeout(r, 150))
       await page.click(`[id="${slotId}"]`)
 
       // ── Step 2: Popup → click "Continua" ───────────────────────────
-      try {
-        await page.waitForSelector('.a_button_popup_fix.a_pistas_hora_sel', { timeout: 10000 })
-      } catch (err) {
-        const pageUrl = page.url()
-        const bodySnippet = await page.evaluate(() =>
-          document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 500)
-        ).catch(() => '?')
-        const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
-        const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'popup-missing') : null
-        logger.error(`[laieta] Popup selector not found after slot click. url=${pageUrl}`)
-        logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
-        if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
-        throw err
+      const popupSelector = '.a_button_popup_fix.a_pistas_hora_sel'
+      const popupFound = await page.waitForSelector(popupSelector, { timeout: 10000 }).then(() => true).catch(() => false)
+
+      if (!popupFound) {
+        // Native click did not trigger the popup — retry via jQuery, which the portal
+        // uses internally and is more reliably bound at this point.
+        logger.warn(`[laieta] Popup not found after native click — retrying with jQuery trigger`)
+        await page.evaluate((id: string) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ;(window as any).$?.(`[id="${CSS.escape(id)}"]`).trigger('click')
+        }, slotId)
+        const popupFoundAfterJq = await page.waitForSelector(popupSelector, { timeout: 8000 }).then(() => true).catch(() => false)
+
+        if (!popupFoundAfterJq) {
+          const pageUrl = page.url()
+          const bodySnippet = await page.evaluate(() =>
+            document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 500)
+          ).catch(() => '?')
+          const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+          const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'popup-missing') : null
+          logger.error(`[laieta] Popup selector not found after slot click. url=${pageUrl}`)
+          logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
+          if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
+          throw new AppError(`Popup did not appear after clicking slot ${slotId}`, 502, 'BOOKING_POPUP_MISSING')
+        }
       }
       const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
       await page.click('.a_button_popup_fix.a_pistas_hora_sel')
