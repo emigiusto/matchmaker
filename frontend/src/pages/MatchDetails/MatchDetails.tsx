@@ -40,6 +40,7 @@ import { MatchTypeBadge } from "@/components/match-type-badge"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
+import { ResultUploadDialog } from "@/components/result-upload-dialog"
 import { RescheduleMatchDialog } from "@/components/reschedule-match-dialog"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
@@ -66,7 +67,7 @@ export default function MatchDetailPage() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [remindersLoading, setRemindersLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [resultSubmitted, _setResultSubmitted] = useState(false)
+
   const [result, setResult] = useState<MatchResult | null>(null)
   const [confirmingResult, setConfirmingResult] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
@@ -664,19 +665,21 @@ export default function MatchDetailPage() {
                       )}
                     </div>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-destructive hover:text-destructive"
-                    onClick={handleCancelBooking}
-                    disabled={cancellingBooking}
-                  >
-                    {cancellingBooking
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Ban className="h-3.5 w-3.5" />
-                    }
-                    {cancellingBooking ? t("matchDetails.booking.cancellingBooking") : t("matchDetails.booking.cancelBooking")}
-                  </Button>
+                  {!isMatchInPast(match.date, match.time) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={handleCancelBooking}
+                      disabled={cancellingBooking}
+                    >
+                      {cancellingBooking
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Ban className="h-3.5 w-3.5" />
+                      }
+                      {cancellingBooking ? t("matchDetails.booking.cancellingBooking") : t("matchDetails.booking.cancelBooking")}
+                    </Button>
+                  )}
                   {cancelBookingError && (
                     <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-sm text-destructive">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1271,7 +1274,7 @@ export default function MatchDetailPage() {
                 </Card>
               )}
             </>
-          ) : match.status === "scheduled" && !resultSubmitted ? (
+          ) : match.status === "scheduled" || match.status === "awaiting_confirmation" ? (
             <Card className="border-border/50">
               <CardHeader>
                 <CardTitle className="text-base font-semibold tracking-tight">
@@ -1279,12 +1282,15 @@ export default function MatchDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center justify-center py-8">
-                <p className="mb-4 text-center text-sm text-muted-foreground">
-                  {t("matchDetails.submit.disabled")}
-                </p>
-                <Button size="lg" className="gap-2" disabled>
-                  {t("matchDetails.submit.button")}
-                </Button>
+                <ResultUploadDialog
+                  match={match}
+                  onResultSubmitted={() => setMatch((m) => m ? { ...m, status: "awaiting_confirmation" } : m)}
+                  trigger={
+                    <Button size="lg" className="gap-2">
+                      {t("matchDetails.submit.button")}
+                    </Button>
+                  }
+                />
               </CardContent>
             </Card>
           ) : (
