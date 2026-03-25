@@ -100,13 +100,14 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
 }
 
 function toRequestDTOWithCandidates(
-  r: RequestRow & { candidates?: Array<{ id: string; schedulingRequestId: string; contactUserId: string; contactUser?: { name: string | null } | null; priorityOrder: number; retryOrder?: number | null; status: string; contactedAt: Date | null; responseAt: Date | null; createdAt: Date; updatedAt: Date }> }
+  r: RequestRow & { candidates?: Array<{ id: string; schedulingRequestId: string; contactUserId: string; contactUser?: { name: string | null; phone: string | null } | null; priorityOrder: number; retryOrder?: number | null; status: string; contactedAt: Date | null; responseAt: Date | null; createdAt: Date; updatedAt: Date }> }
 ): SchedulingRequestDTO {
   const dto = toRequestDTO(r);
   if (r.candidates) {
     dto.candidates = r.candidates.map((c) => ({
       ...toCandidateDTO(c),
       contactUserName: c.contactUser?.name ?? null,
+      contactPhone: c.contactUser?.phone ?? null,
     }));
   }
   return dto;

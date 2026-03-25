@@ -71,6 +71,7 @@ export interface SchedulingCandidateDTO {
   schedulingRequestId: string;
   contactUserId: string;
   contactUserName?: string | null;
+  contactPhone?: string | null;
   priorityOrder: number;
   retryOrder?: number | null;
   status: SchedulingCandidateStatus;

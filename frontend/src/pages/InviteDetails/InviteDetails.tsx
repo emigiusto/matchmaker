@@ -548,6 +548,11 @@ export default function InviteDetailsPage() {
                     }`}
                   >
                     {contactName}
+                    {candidate.contactPhone && (
+                      <span className="ml-1.5 text-xs text-muted-foreground font-normal">
+                        {candidate.contactPhone}
+                      </span>
+                    )}
                   </span>
                   <span className="text-xs text-muted-foreground">{t(`invites.candidateStatus.${uiStatus}`)}</span>
                   {/* Actions */}

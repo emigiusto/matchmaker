@@ -30,6 +30,7 @@ export interface SchedulingCandidateDTO {
   schedulingRequestId: string
   contactUserId: string
   contactUserName?: string | null
+  contactPhone?: string | null
   priorityOrder: number
   status: SchedulingCandidateStatus
   contactedAt: string | null
