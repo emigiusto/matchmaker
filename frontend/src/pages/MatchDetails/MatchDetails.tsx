@@ -404,7 +404,13 @@ export default function MatchDetailPage() {
                 format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
               />
               <MatchTypeBadge type={match.matchType} />
-              <StatusBadge status={match.status} />
+              <StatusBadge
+                status={
+                  match.status === "scheduled" && isMatchInPast(match.date, match.time)
+                    ? "awaiting_result"
+                    : match.status
+                }
+              />
             </div>
           </div>
           <CardContent className={`p-6 ${match.status === "cancelled" ? "opacity-75" : ""}`}>

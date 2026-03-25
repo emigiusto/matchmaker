@@ -27,6 +27,7 @@
     "reminderPending": "Pendiente",
     "reminderFailed": "Fallido",
     "matchCancelledBanner": "Este partido ha sido cancelado y no tendrá lugar",
+    "statusAwaitingResult": "Pendiente de resultado",
     "all": "Todos"
   },
   "navigation": {

@@ -3,6 +3,7 @@ import { useTranslation } from "@/lib/i18n/use-translation"
 
 const statusClassNames: Record<string, string> = {
   scheduled:             "border-0 bg-primary/10 text-primary text-sm",
+  awaiting_result:       "border-0 bg-chart-4/15 text-chart-4 text-sm",
   awaiting_confirmation: "border-0 bg-chart-4/15 text-chart-4 text-sm",
   completed:             "border-0 bg-primary/10 text-primary text-sm",
   cancelled:             "border-0 bg-destructive/10 text-destructive text-sm font-semibold",
@@ -16,6 +17,7 @@ const statusClassNames: Record<string, string> = {
 
 const statusI18nKeys: Record<string, string> = {
   scheduled:             "common.statusScheduled",
+  awaiting_result:       "common.statusAwaitingResult",
   awaiting_confirmation: "common.statusAwaiting",
   completed:             "common.statusCompleted",
   cancelled:             "common.cancelled",
