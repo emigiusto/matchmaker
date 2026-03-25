@@ -88,13 +88,16 @@ export class WasenderProvider implements IWhatsAppProvider {
 
       if (buttons && buttons.length >= 2) {
         if (message.length > 255) {
-          // Message is too long to fit in a poll question — send it as plain text first
-          // so the recipient has full context, then send the poll with a short question.
-          await sendWithRetry({ to, text: message });
-          // Use the last two paragraphs (the voting prompt + timer) as the short question.
-          const paragraphs = message.split('\n\n');
-          const shortQuestion = paragraphs.slice(-2).join('\n\n');
-          pollBody = { to, poll: { question: shortQuestion, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
+          // The full message (with court availability note) exceeds the poll question limit.
+          // Send only the intro line first as a short plain-text message — it's tiny and
+          // guaranteed to arrive before the poll (long text messages can be delivered out of order).
+          const intro = message.split('\n\n')[0];
+          await sendWithRetry({ to, text: intro });
+          // Use the base message (without the appended court availability note) as the poll
+          // question — it contains date/location/sport/prompt/timer and fits within 255 chars.
+          const noteStart = message.indexOf('\n\n🏟️');
+          const baseMessage = noteStart >= 0 ? message.slice(0, noteStart) : message;
+          pollBody = { to, poll: { question: baseMessage, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
         } else {
           pollBody = { to, poll: { question: message, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
         }
