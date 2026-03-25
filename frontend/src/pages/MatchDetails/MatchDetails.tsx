@@ -74,6 +74,11 @@ export default function MatchDetailPage() {
     { player1Score: "", player2Score: "" },
   ])
   const [submittingDispute, setSubmittingDispute] = useState(false)
+  const [resolveOpen, setResolveOpen] = useState(false)
+  const [resolveSets, setResolveSets] = useState<{ player1Score: string; player2Score: string }[]>([
+    { player1Score: "", player2Score: "" },
+  ])
+  const [submittingResolve, setSubmittingResolve] = useState(false)
   const [bookingAttempt, setBookingAttempt] = useState<BookingAttemptDTO | null>(null)
   const [retryingBooking, setRetryingBooking] = useState(false)
   const [cancellingBooking, setCancellingBooking] = useState(false)
@@ -341,6 +346,31 @@ export default function MatchDetailPage() {
       toast.error(t("matchDetails.result.disputeError"))
     } finally {
       setSubmittingDispute(false)
+    }
+  }
+
+  async function handleResolveDispute(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!result) return
+    const filledSets = resolveSets.filter((s) => s.player1Score !== "" && s.player2Score !== "")
+    if (filledSets.length === 0) { toast.error("Enter at least one set score"); return }
+    setSubmittingResolve(true)
+    try {
+      const setsPayload = filledSets.map((s, i) => ({
+        setNumber: i + 1,
+        playerAScore: parseInt(s.player1Score),
+        playerBScore: parseInt(s.player2Score),
+      }))
+      const updated = await resultsService.resolveDispute(result.id, setsPayload)
+      setResult(updated as unknown as MatchResult)
+      setMatch((m) => m ? { ...m, status: "awaiting_confirmation" } : m)
+      setResolveOpen(false)
+      setResolveSets([{ player1Score: "", player2Score: "" }])
+      toast.success("Dispute resolved — result reset for confirmation")
+    } catch {
+      toast.error("Failed to resolve dispute")
+    } finally {
+      setSubmittingResolve(false)
     }
   }
 
@@ -1028,6 +1058,62 @@ export default function MatchDetailPage() {
                       </div>
                     )
                   })()}
+
+                  {/* Admin: resolve disputed result */}
+                  {isAdmin && match.status === "disputed" && result && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="outline" className="w-full">
+                            Resolve dispute (admin)
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Resolve dispute</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleResolveDispute} className="space-y-5">
+                            <p className="text-sm text-muted-foreground">
+                              Enter the correct set scores. The result will be reset to <em>awaiting confirmation</em> so both players can confirm.
+                            </p>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium">Corrected scores</Label>
+                              {resolveSets.map((set, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-10">Set {i + 1}</span>
+                                  <Input type="number" min={0} max={7} className="w-16"
+                                    value={set.player1Score}
+                                    onChange={(e) => setResolveSets((prev) => prev.map((s, j) => j === i ? { ...s, player1Score: e.target.value } : s))}
+                                    placeholder={match.player1.name.split(" ")[0]}
+                                  />
+                                  <span className="text-muted-foreground">–</span>
+                                  <Input type="number" min={0} max={7} className="w-16"
+                                    value={set.player2Score}
+                                    onChange={(e) => setResolveSets((prev) => prev.map((s, j) => j === i ? { ...s, player2Score: e.target.value } : s))}
+                                    placeholder={match.player2.name.split(" ")[0]}
+                                  />
+                                  {resolveSets.length > 1 && (
+                                    <Button type="button" size="icon" variant="ghost" onClick={() => setResolveSets((prev) => prev.filter((_, j) => j !== i))}>
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                              {resolveSets.length < 5 && (
+                                <Button type="button" size="sm" variant="outline" onClick={() => setResolveSets((prev) => [...prev, { player1Score: "", player2Score: "" }])}>
+                                  <Plus className="mr-1.5 h-4 w-4" /> Add set
+                                </Button>
+                              )}
+                            </div>
+                            <Button type="submit" className="w-full" disabled={submittingResolve}>
+                              {submittingResolve ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                              Confirm corrected result
+                            </Button>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

@@ -299,7 +299,7 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
 
     setIsSubmitting(true)
     try {
-      await resultsService.submitMatchResult(match.id, setsPayload)
+      await resultsService.submitMatchResult(match.id, setsPayload, Object.keys(questionnaire).length > 0 ? questionnaire : undefined)
       toast.success(
         match.matchType === "competitive"
           ? "Result submitted! Awaiting opponent confirmation."

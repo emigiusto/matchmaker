@@ -1,5 +1,5 @@
 import { apiClient } from "./api-client"
-import type { Player } from "../types"
+import type { Player, PlayerStats } from "../types"
 
 export interface PlayerPreferences {
   id: string
@@ -37,5 +37,9 @@ export const playersService = {
     data: { preferredClub?: string; defaultCity?: string }
   ): Promise<PlayerPreferences> {
     return apiClient.patch<PlayerPreferences>(`/players/${playerId}`, data)
+  },
+
+  async getStats(playerId: string): Promise<PlayerStats> {
+    return apiClient.get<PlayerStats>(`/players/${playerId}/stats`)
   },
 }

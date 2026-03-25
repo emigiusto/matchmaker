@@ -1,6 +1,6 @@
 # Result Upload & Rating Flow
 
-_Last updated: 2026-03-25_
+_Last updated: 2026-03-25 (rev 2)_
 
 ---
 
@@ -256,35 +256,21 @@ resultsService.dispute(resultId, reason)
 
 ---
 
-## 7. Missing Pieces
-
-### Critical (Blocking)
-
-| # | Issue | Location |
-|---|-------|----------|
-| 1 | **`handleSubmit` has no API call** — dialog validates scores and closes with a toast, but never calls the backend | `result-upload-dialog.tsx` lines 280–311 |
-| 2 | **`resultsService` methods are never called** from the UI | `frontend/src/lib/services/results.service.ts` |
-
-### Notable Gaps
+## 7. Open Gaps
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 3 | **Questionnaire answers not persisted** | 14 questions defined in UI, answers stored in local state, but no backend field or endpoint to save them |
-| 4 | **Backend tennis validation is incomplete** | `results.validators.ts` has a `TODO` — missing 2-game lead rule (no 6-5), tiebreak enforcement at 6-6, super-tiebreak |
-| 5 | **No rating read endpoints** | `RatingHistory` is written but never exposed — no `GET /players/:id/rating-history`, no leaderboard |
-| 6 | **Dispute resolution not designed** | `disputeResult()` sets the flag, but there is no admin override, appeal path, or timeout resolution |
-| 7 | **Confirmation by same player not blocked** | Nothing prevents the submitter from also providing the second confirmation |
-| 8 | **Practice match result behaviour is ambiguous** | Sets can be stored for practice matches, but no rating update happens — intended behaviour is not documented |
-| 9 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` never reads `lastMatchAt`, so inactivity has no effect on deterministic ratings |
-| 10 | **Match completion side effects are minimal** | On `completed`, only rating is updated — no win/loss counters, no leaderboard recalc, no achievement checks |
+| 1 | **Questionnaire answers not persisted** | UI collects answers into local state after result submission, but `Result` has no `questionnaire` column and there is no save endpoint. Either add a `Json?` column to `Result` in Prisma and a `PATCH /results/:id/questionnaire` endpoint, or remove the questionnaire from the UI entirely. |
+| 2 | **No rating history endpoint** | `RatingHistory` rows are written on every confirmed match but never exposed. `PlayerStats.ratingHistory` on the frontend is always empty. Needs `GET /players/:id/rating-history`. |
+| 3 | **No dispute resolution path** | `disputeResult()` sets the flag and stores a note, but there is no endpoint for an admin to override or resolve a dispute. Disputed matches stay stuck indefinitely. |
+| 4 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` ignores `lastMatchAt`, so inactivity has no effect on ratings in the default mode. Intentional or oversight — should be documented either way. |
+| 5 | **`Player.wins` / `Player.losses` / `Player.matchesPlayed` do not exist in the schema** | These fields appear in the frontend `Player` type and `PlayerStats` but are not Prisma columns and are never written by the backend. Win/loss counts are a pure derivation of confirmed `Result` records and should be computed at query time rather than cached as mutable state. The frontend should source these values from the `PlayerStats` endpoint, not from the player record. |
 
 ---
 
-## 8. Recommended Next Steps (Priority Order)
+## 8. Next Steps (Priority Order)
 
-1. **Wire the frontend** — in `handleSubmit`, call `resultsService.submitSets()` with the match ID and collected set scores
-2. **Complete server-side tennis validation** — add 2-game lead rule and tiebreak logic to `results.validators.ts`
-3. **Decide on questionnaire** — either add a JSON column to `Result` in Prisma or remove the questionnaire from the UI
-4. **Enforce confirmation by opposite player** — add a guard in `confirmResult()` that blocks the original submitter from providing the second confirmation
-5. **Expose rating history** — add `GET /players/:id/rating-history` and a leaderboard endpoint
-6. **Design dispute resolution** — define whether disputes go to admin review, auto-expire, or are handled differently
+1. **Persist questionnaire answers** — add `questionnaire Json?` to the `Result` model, create a migration, and add `PATCH /results/:id/questionnaire` (or include in the submit payload). Wire the frontend to call it after the dialog closes successfully.
+2. **Expose rating history** — add `GET /players/:id/rating-history` returning `RatingHistory` rows ordered by `createdAt` desc. Update `PlayerStats` on the frontend to populate `ratingHistory` from this endpoint.
+3. **Compute win/loss stats server-side** — add a `GET /players/:id/stats` endpoint (or extend the existing one) that derives `wins`, `losses`, `matchesPlayed`, `winRate`, and `currentStreak` directly from confirmed `Result` records. Remove the cached fields from the frontend `Player` type.
+4. **Dispute resolution for admins** — add `POST /results/:id/resolve-dispute` (admin only) that accepts corrected set scores, resets the result to `submitted` with the new sets, and resumes the normal confirmation flow.

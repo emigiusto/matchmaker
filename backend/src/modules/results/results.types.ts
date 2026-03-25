@@ -3,6 +3,22 @@
 //
 // Result is purely descriptive: it records the outcome of a match, but has no competitive or ranking meaning yet.
 
+export interface PostMatchQuestionnaire {
+  matchPlayedOut?: string[];
+  mainStrategy?: string[];
+  whatWorkedBest?: string[];
+  whatDidntWork?: string[];
+  generalSensation?: string[];
+  pointBuilding?: string[];
+  serveStrategy?: string[];
+  targetedSide?: string[];
+  tacticAdjustment?: string[];
+  importantPoints?: string[];
+  netApproach?: string[];
+  opponentStrength?: string[];
+  mainMistake?: string[];
+}
+
 /**
  * SetResultDTO represents a single set's result in a match.
  * - No ranking or statistics fields.
@@ -37,6 +53,13 @@ export interface ResultDTO {
   disputedByHostAt: string | null;
   disputedByOpponentAt: string | null;
   disputeNote: string | null;
+  questionnaire: PostMatchQuestionnaire | null;
+}
+
+export interface ResolveDisputeInput {
+  resultId: string;
+  adminUserId: string;
+  sets: AddSetResultInput[];
 }
 
 export interface DisputeResultInput {
@@ -71,6 +94,7 @@ export interface SubmitMatchResultInput {
   matchId: string;
   sets: AddSetResultInput[];
   currentUserId: string;
+  questionnaire?: PostMatchQuestionnaire | null;
   /** When participants have no teams yet, define who played on each side. Team A = playerAScore, Team B = playerBScore. */
   teamAssignment?: { teamAUserIds: string[]; teamBUserIds: string[] };
 }

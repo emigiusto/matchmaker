@@ -9,7 +9,7 @@ import { Player } from '@prisma/client';
 import { cacheGet, cacheSet, cacheDel } from '../../shared/cache/redis';
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
-import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO } from './players.types';
+import { CreatePlayerInput, UpdatePlayerInput, PlayerDTO, PlayerStatsDTO } from './players.types';
 import { computeDecayedConfidence } from '../rating/utils/confidence.utils';
 import { EloRatingAlgorithm } from '../rating/algorithms/elo.algorithm';
 
@@ -243,6 +243,103 @@ export class PlayersService {
     // Fetch current surfaces
     const surfaces = await prisma.playerSurface.findMany({ where: { playerId } });
     return PlayersService.toDTO(updatedPlayer, updatedPlayer.user.name ?? '', surfaces.map((s: { surface: string }) => s.surface));
+  }
+
+  /**
+   * Compute player statistics from confirmed Results and RatingHistory.
+   * Win/loss counts are derived from source records, never cached counters.
+   */
+  static async getPlayerStats(playerId: string): Promise<PlayerStatsDTO> {
+    const player = await prisma.player.findUnique({ where: { id: playerId } });
+    if (!player) throw new AppError('Player not found', 404);
+
+    // Fetch all confirmed competitive matches this player participated in
+    const competitiveResults = await prisma.result.findMany({
+      where: {
+        status: 'confirmed',
+        match: {
+          type: 'competitive',
+          participants: { some: { userId: player.userId } },
+        },
+      },
+      include: {
+        match: {
+          include: {
+            participants: {
+              include: { user: { include: { player: { select: { levelValue: true } } } } },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const practiceCount = await prisma.result.count({
+      where: {
+        status: 'confirmed',
+        match: {
+          type: 'practice',
+          participants: { some: { userId: player.userId } },
+        },
+      },
+    });
+
+    const wins = competitiveResults.filter(r => r.winnerUserId === player.userId).length;
+    const losses = competitiveResults.length - wins;
+
+    // Current streak: consecutive results from most recent
+    let currentStreak = 0;
+    let streakType: 'win' | 'loss' | 'none' = 'none';
+    for (const r of competitiveResults) {
+      const isWin = r.winnerUserId === player.userId;
+      if (currentStreak === 0) {
+        streakType = isWin ? 'win' : 'loss';
+        currentStreak = 1;
+      } else if ((streakType === 'win') === isWin) {
+        currentStreak++;
+      } else {
+        break;
+      }
+    }
+
+    // Average opponent level
+    const opponentLevels: number[] = [];
+    for (const r of competitiveResults) {
+      const participants: any[] = (r.match as any).participants ?? [];
+      for (const p of participants) {
+        if (p.userId !== player.userId) {
+          const lvl = p.user?.player?.levelValue;
+          if (typeof lvl === 'number') opponentLevels.push(lvl);
+        }
+      }
+    }
+    const averageOpponentLevel = opponentLevels.length > 0
+      ? opponentLevels.reduce((a, b) => a + b, 0) / opponentLevels.length
+      : null;
+
+    // Rating history from RatingHistory table (oldest first for chart)
+    const ratingRows = await prisma.ratingHistory.findMany({
+      where: { playerId },
+      orderBy: { createdAt: 'asc' },
+    });
+    const ratingHistory = ratingRows.map(row => ({
+      date: row.createdAt.toISOString(),
+      rating: row.newRating,
+      delta: row.delta,
+    }));
+
+    return {
+      totalMatches: competitiveResults.length + practiceCount,
+      competitiveMatches: competitiveResults.length,
+      practiceMatches: practiceCount,
+      wins,
+      losses,
+      winRate: competitiveResults.length > 0 ? wins / competitiveResults.length : 0,
+      currentStreak,
+      streakType,
+      averageOpponentLevel,
+      ratingHistory,
+    };
   }
 
   /**

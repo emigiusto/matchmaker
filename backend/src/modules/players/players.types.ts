@@ -74,3 +74,20 @@ export interface UpdatePlayerInput {
   latitude?: number;
   longitude?: number;
 }
+
+/**
+ * Player statistics derived from confirmed match Results and RatingHistory.
+ * These are never stored as mutable counters — always computed on read.
+ */
+export interface PlayerStatsDTO {
+  totalMatches: number;
+  competitiveMatches: number;
+  practiceMatches: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  currentStreak: number;
+  streakType: 'win' | 'loss' | 'none';
+  averageOpponentLevel: number | null;
+  ratingHistory: { date: string; rating: number; delta: number }[];
+}

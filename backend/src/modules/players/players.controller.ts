@@ -133,4 +133,18 @@ export class PlayersController {
       next(error);
     }
   }
+
+  /**
+   * GET /players/:id/stats
+   * Computed player statistics (wins, losses, rating history, etc.)
+   */
+  static async getPlayerStats(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { playerId } = playerIdParamSchema.parse({ playerId: req.params.id });
+      const stats = await PlayersService.getPlayerStats(playerId);
+      res.json(stats);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

@@ -155,8 +155,8 @@ export interface PlayerStats {
   wins: number
   losses: number
   winRate: number
-  averageOpponentLevel: number
+  averageOpponentLevel: number | null
   currentStreak: number
   streakType: "win" | "loss" | "none"
-  ratingHistory: { date: string; rating: number }[]
+  ratingHistory: { date: string; rating: number; delta: number }[]
 }

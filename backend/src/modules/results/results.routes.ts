@@ -98,6 +98,7 @@ router.post('/:id/confirm', ResultsController.confirmResult);
  *         description: Cannot dispute a confirmed result
  */
 router.post('/:id/dispute', ResultsController.disputeResult);
+router.post('/:id/resolve-dispute', ResultsController.resolveDispute);
 
 /**
  * @openapi
