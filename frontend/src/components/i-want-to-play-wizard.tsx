@@ -191,8 +191,8 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [specificPlace, setSpecificPlace] = useState("")
   const [cityValue, setCityValue] = useState("")
   
-  // Step 2: Match type + format + sport (v1: always practice; competitive/practice hidden)
-  const [matchType, setMatchType] = useState<"competitive" | "practice">("practice")
+  // Step 2: Match type + format + sport
+  const [matchType, setMatchType] = useState<"competitive" | "practice">("competitive")
   const [matchFormat, setMatchFormat] = useState<"singles" | "doubles">("singles")
   const [sport, setSport] = useState<"tennis" | "padel">("tennis")
   
@@ -983,10 +983,15 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all cursor-not-allowed border-border/30 opacity-40"
+                  onClick={() => setMatchType("competitive")}
+                  className={cn(
+                    "flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
+                    matchType === "competitive"
+                      ? "border-primary bg-primary/5"
+                      : "border-border/50 hover:border-primary/30"
+                  )}
                 >
-                  <Swords className="h-6 w-6 text-muted-foreground" />
+                  <Swords className={cn("h-6 w-6", matchType === "competitive" ? "text-primary" : "text-muted-foreground")} />
                   <div className="text-center">
                     <p className="text-sm font-semibold">{t("wizard.competitive")}</p>
                     <p className="text-xs text-muted-foreground">{t("wizard.competitiveDesc")}</p>
