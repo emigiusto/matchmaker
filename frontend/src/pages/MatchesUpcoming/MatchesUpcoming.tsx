@@ -148,7 +148,7 @@ export default function MatchesPage() {
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
                 >
-                  {type === "all" ? t("common.all") : type === "competitive" ? t("common.competitive") : t("common.practice")}
+                  {type === "all" ? t("common.all") : type === "competitive" ? t("matches.competitive") : t("matches.practice")}
                 </button>
               ))}
             </div>

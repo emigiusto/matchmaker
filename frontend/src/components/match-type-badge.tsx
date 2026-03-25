@@ -13,7 +13,7 @@ export function MatchTypeBadge({ type, className }: MatchTypeBadgeProps) {
       <Badge
         className={`border-0 bg-competitive/10 text-competitive text-sm hover:bg-competitive/15 ${className || ""}`}
       >
-        {t("common.competitive")}
+        {t("matches.competitive")}
       </Badge>
     )
   }
@@ -21,7 +21,7 @@ export function MatchTypeBadge({ type, className }: MatchTypeBadgeProps) {
     <Badge
       className={`border-0 bg-practice/10 text-practice text-sm hover:bg-practice/15 ${className || ""}`}
     >
-      {t("common.practice")}
+      {t("matches.practice")}
     </Badge>
   )
 }
