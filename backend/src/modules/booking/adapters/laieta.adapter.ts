@@ -369,17 +369,32 @@ export class LaietaAdapter implements BookingAdapter {
       // (mousedown/mouseup/click). A synthetic DOM .click() inside page.evaluate()
       // does not fire the full event sequence and the portal's popup never appears.
       const slotId = await page.evaluate((targetCourtId: string, targetHHMM: string) => {
-        const links = document.querySelectorAll('a.a_pistas_hora')
-        for (const link of links) {
+        // Group sub-slots by physical court number (id prefix, e.g. "07") so we can
+        // check that ALL four quarter-hour sub-slots are classempty or class4 before
+        // selecting a court. A cell with any classR sub-slot cannot be booked for a
+        // full hour ("El temps mínim és 1 hora") even if the :00 sub-slot is empty.
+        const courtMap: Record<string, { emptyId: string | null; valid: boolean }> = {}
+        document.querySelectorAll('a.a_pistas_hora').forEach((link) => {
           const a = link as HTMLAnchorElement
-          const parts = a.className.split(' ')
-          const slotClass = parts[2]?.trim()
-          const namePart = parts[3]?.trim().split('_')[1]
-          const slotHourMin = namePart?.slice(0, 4)  // full HHMM for exact match
-          const courtName = a.id.split(':')[1]
-          if (courtName === targetCourtId && slotHourMin === targetHHMM && slotClass === 'classempty') {
-            return a.id
+          const courtNum = a.id.split(':')[0]        // e.g. "07"
+          const courtName = a.id.split(':')[1]       // e.g. "TENNIS"
+          const classParts = a.className.split(' ')
+          const slotClass = classParts[2]?.trim()
+          const namePart = classParts[3]?.trim().split('_')[1]
+          if (!namePart || courtName !== targetCourtId) return
+          const slotHourMin = namePart.slice(0, 4)  // full HHMM, e.g. "1300"
+          if (slotHourMin !== targetHHMM) return
+
+          if (!courtMap[courtNum]) courtMap[courtNum] = { emptyId: null, valid: true }
+          if (slotClass === 'classempty' && !courtMap[courtNum].emptyId) {
+            courtMap[courtNum].emptyId = a.id
           }
+          if (slotClass !== 'classempty' && slotClass !== 'class4') {
+            courtMap[courtNum].valid = false  // classR or unknown — full hour not bookable
+          }
+        })
+        for (const { emptyId, valid } of Object.values(courtMap)) {
+          if (valid && emptyId) return emptyId
         }
         return null
       }, courtId, targetHourMin)
@@ -428,36 +443,61 @@ export class LaietaAdapter implements BookingAdapter {
           throw new AppError(`Popup did not appear after clicking slot ${slotId}`, 502, 'BOOKING_POPUP_MISSING')
         }
       }
+      // Attach .catch immediately — before await page.click() — so that if the navigation
+      // resolves/rejects while the click is still in progress, Node.js does not treat it as
+      // an unhandled rejection and crash (strict behaviour in Node.js v15+).
       const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 })
-      await page.click('.a_button_popup_fix.a_pistas_hora_sel')
-      await navigationPromise.catch((err: Error) => {
-        // "Navigating frame was detached" / "LifecycleWatcher terminated" can fire when
-        // navigation completes so fast the frame is already gone — treat as success.
-        if (err.message.includes('detached') || err.message.includes('LifecycleWatcher')) {
-          logger.warn('[laieta] waitForNavigation: frame detached — navigation likely already completed')
-          return
-        }
-        throw err
+        .catch((err: Error) => {
+          // "Navigating frame was detached" / "LifecycleWatcher terminated" fires when
+          // navigation completes so fast the frame is already gone — treat as success.
+          if (err.message.includes('detached') || err.message.includes('LifecycleWatcher')) {
+            logger.warn('[laieta] waitForNavigation: frame detached — navigation likely already completed')
+            return
+          }
+          throw err
+        })
+      await page.evaluate(() => {
+        document.querySelector('.a_button_popup_fix.a_pistas_hora_sel')?.scrollIntoView({ block: 'center', behavior: 'instant' })
       })
+      await new Promise(r => setTimeout(r, 200))
+      await page.click('.a_button_popup_fix.a_pistas_hora_sel').catch(() => {
+        // Fall back to DOM click if Puppeteer's pointer simulation fails (e.g. element off-screen)
+        logger.warn('[laieta] Native click on Continua failed — retrying via DOM click')
+        return page.evaluate(() => {
+          (document.querySelector('.a_button_popup_fix.a_pistas_hora_sel') as HTMLElement)?.click()
+        })
+      })
+      await navigationPromise
       await this.checkForPageError(page)
 
-      // ── Step 3: Register participants via AJAX API ──────────────────
-      // The portal exposes /ajax/infopistas/participantes which validates and
-      // registers each participant server-side in the PHP session. Using it
-      // directly (with the same session cookie) is more reliable than driving
-      // the DOM form, and returns structured JSON errors.
-      //
-      // URL after "Continua": /infopistas/{sportId}/{date}/{place}/{time}
+      // ── Step 3: Add participants via portal UI ──────────────────────
+      // We use the real form UI (#edit-add input + .btn-add-participant button) so the
+      // portal's own JavaScript runs, calls the AJAX endpoint, and populates the
+      // participant slots in the form. Bypassing the UI (direct AJAX fetch) left the
+      // DOM slots empty and the form submit excluded the participant.
+
+      // Dismiss the cookie consent banner if present — it can overlap the form inputs.
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll('button'))
+        const accept = btns.find((b) => /accepto/i.test(b.textContent ?? ''))
+        ;(accept as HTMLElement)?.click()
+      }).catch(() => {})
+      await new Promise(r => setTimeout(r, 300))
+
       const bookingPageUrl = page.url()
       const urlSegments = new URL(bookingPageUrl).pathname.split('/').filter(Boolean)
-      const place = urlSegments[3] ?? ''       // e.g. "09"
-      const timeHHMM = urlSegments[4] ?? targetHourMin  // e.g. "0900"
-
+      const place = urlSegments[3] ?? ''
+      const timeHHMM = urlSegments[4] ?? targetHourMin
       const registeredSocios = [creds.socioNumber]
+
       for (const participant of participants) {
         const { socioNumber, name } = participant
-        const playerPos = registeredSocios.length + 1  // host occupies pos 1
-        const body = new URLSearchParams({
+        const playerPos = registeredSocios.length + 1
+
+        // Pre-check eligibility via API before touching the UI — gives a clear error
+        // message (e.g. "no és soci", quota exceeded) without leaving the form in a
+        // broken state.
+        const checkBody = new URLSearchParams({
           newparticipant: socioNumber,
           playerpos: String(playerPos),
           place,
@@ -468,11 +508,11 @@ export class LaietaAdapter implements BookingAdapter {
           tolevel: '',
           mixed: 'N',
         })
-        for (const p of registeredSocios) body.append('participants[]', p)
-        body.append('participants[]', socioNumber)
+        for (const p of registeredSocios) checkBody.append('participants[]', p)
+        checkBody.append('participants[]', socioNumber)
 
-        logger.info(`[laieta] Registering participant via API: ${socioNumber} (pos=${playerPos}, place=${place}, time=${timeHHMM})`)
-        const resp = await fetch(`${BASE_URL}/ajax/infopistas/participantes`, {
+        logger.info(`[laieta] Pre-checking participant eligibility via API: ${socioNumber} (${name})`)
+        const checkResp = await fetch(`${BASE_URL}/ajax/infopistas/participantes`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -480,54 +520,63 @@ export class LaietaAdapter implements BookingAdapter {
             'Cookie': `${SESSION_COOKIE_NAME}=${sessionValue}`,
             'Referer': bookingPageUrl,
           },
-          body: body.toString(),
+          body: checkBody.toString(),
         })
-        if (!resp.ok) {
-          throw new AppError(`Participant API returned HTTP ${resp.status}`, 502, 'BOOKING_PAGE_ERROR')
+        if (!checkResp.ok) {
+          throw new AppError(`Participant eligibility check returned HTTP ${checkResp.status}`, 502, 'BOOKING_PAGE_ERROR')
         }
-        const json = await resp.json() as { error: boolean; message: string; newparticipant: string }
-        logger.info(`[laieta] Participant ${socioNumber}: error=${json.error}, result="${json.newparticipant}", msg="${json.message}"`)
-        if (json.error) {
-          const reason = json.message || 'Could not be added to the booking'
-          throw new AppError(`${name}: ${reason}`, 409, 'BOOKING_PAGE_ERROR')
+        const checkJson = await checkResp.json() as { error: boolean; message: string; newparticipant: string }
+        logger.info(`[laieta] Eligibility check ${socioNumber}: error=${checkJson.error}, result="${checkJson.newparticipant}", msg="${checkJson.message}"`)
+        if (checkJson.error) {
+          throw new AppError(`${name}: ${checkJson.message || 'Could not be added to the booking'}`, 409, 'BOOKING_PAGE_ERROR')
         }
 
-        // Inject participant into form DOM so the form submit POST body includes them.
-        // The AJAX call registers them server-side in the PHP session, but the portal's
-        // form handler reads participants from the POST body (participants[] fields added
-        // by the portal's own JS after a successful AJAX call). Since we bypass that JS,
-        // we must inject the hidden input ourselves.
-        await page.evaluate((socio: string) => {
-          const form = document.querySelector('form') as HTMLFormElement | null
-          if (!form) return
-          const input = document.createElement('input')
-          input.type = 'hidden'
-          input.name = 'participants[]'
-          input.value = socio
-          form.appendChild(input)
-        }, socioNumber)
-        logger.info(`[laieta] Participant ${socioNumber} injected into form DOM`)
+        // Participant is eligible — now add them via the real UI so the portal's JS
+        // populates the form slot (the AJAX call alone does not update the DOM).
+        await page.waitForSelector('#edit-add', { timeout: 5000 })
+        await page.click('#edit-add', { clickCount: 3 })
+        await page.type('#edit-add', socioNumber)
+
+        logger.info(`[laieta] Adding participant via UI: ${socioNumber} (${name})`)
+        await page.click('button.btn-add-participant')
 
         registeredSocios.push(socioNumber)
-      }
 
-      // Verify all participants are present in the form DOM before submitting.
-      // This is the final guard: if any participant is missing from the form, abort
-      // rather than proceeding with a booking that would silently exclude them.
-      for (const participant of participants) {
-        const inForm = await page.evaluate((socio: string) => {
-          const inputs = document.querySelectorAll('input[name="participants[]"]')
-          return Array.from(inputs).some((i) => (i as HTMLInputElement).value === socio)
-        }, participant.socioNumber)
-        if (!inForm) {
+        // Wait for the portal's AJAX to complete and the socio number to appear in
+        // the participants panel. The participant slots are <input> elements whose
+        // value is not included in innerText, so check input values as well.
+        const appeared = await page.waitForFunction(
+          (socio: string) => {
+            const needle = `[${socio}]`
+            if (document.body.innerText.includes(needle)) return true
+            return Array.from(document.querySelectorAll('input')).some(
+              (i) => (i as HTMLInputElement).value.includes(needle),
+            )
+          },
+          { timeout: 8000 },
+          socioNumber,
+        ).then(() => true).catch(() => false)
+
+        if (!appeared) {
+          // Capture state for debugging before throwing
+          const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+          if (screenshotB64) logger.error(`[laieta] Participant not added screenshot: ${this.saveScreenshot(screenshotB64 as string, 'participant-error')}`)
           throw new AppError(
-            `Participant ${participant.name} (${participant.socioNumber}) is not present in the booking form — aborting to avoid booking without them`,
+            `Participant ${name} (${socioNumber}) did not appear in the booking form after clicking Afegeix`,
             409,
             'BOOKING_PARTICIPANT_NOT_REGISTERED',
           )
         }
+        logger.info(`[laieta] Participant ${socioNumber} confirmed in booking form`)
       }
       logger.info(`[laieta] Pre-submit check passed: all ${participants.length} participant(s) present in form`)
+
+      // Capture the booking form page so we can visually verify participants are shown
+      const preSubmitB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+      if (preSubmitB64) {
+        const preSubmitPath = this.saveScreenshot(preSubmitB64 as string, 'pre-submit')
+        logger.info(`[laieta] Pre-submit screenshot saved: ${preSubmitPath}`)
+      }
 
       // All participants registered server-side — force-enable submit and proceed
       await page.evaluate(() => {
@@ -544,6 +593,21 @@ export class LaietaAdapter implements BookingAdapter {
         return { externalId, courtName: courtId }
       }
 
+      // Intercept the form submit request to log the exact POST body sent to the portal.
+      // This lets us confirm that participants[] values are present in the request.
+      // The intercepted request is immediately continued unchanged.
+      await page.setRequestInterception(true)
+      const submitInterceptHandler = (req: import('puppeteer').HTTPRequest) => {
+        if (req.method() === 'POST' && req.url().includes('/infopistas/')) {
+          const postData = req.postData() ?? ''
+          const params = new URLSearchParams(postData)
+          const participantsInPost = params.getAll('participants[]')
+          logger.info(`[laieta] Form POST body — participants[]: ${JSON.stringify(participantsInPost)}`)
+        }
+        req.continue().catch(() => { /* page may have already navigated */ })
+      }
+      page.on('request', submitInterceptHandler)
+
       await page.evaluate(() => {
         (document.querySelector('button#edit-submit[name="reserva"]') as HTMLButtonElement)?.click()
       })
@@ -555,6 +619,9 @@ export class LaietaAdapter implements BookingAdapter {
         page.waitForSelector('.alert.alert-block.alert-success', { timeout: 20000 })
           .then(() => logger.info('[laieta] Post-submit: success alert detected')),
       ]).catch(() => logger.warn('[laieta] Post-submit: neither navigation nor success alert fired within timeout'))
+
+      page.off('request', submitInterceptHandler)
+      await page.setRequestInterception(false).catch(() => { /* non-fatal if already disabled */ })
 
       // Check for explicit page errors; re-throw unless it's a quota error
       // (quota exceeded can still mean the booking went through — confirmed below)
@@ -573,6 +640,16 @@ export class LaietaAdapter implements BookingAdapter {
       const booked = await this.findExistingBookingOnReservas(browser, sessionValue, date, targetHour, sport, allSocioNumbers)
       if (booked) {
         logger.info(`[laieta] Booking confirmed via /reservas: ${booked.externalId}`)
+        if (booked.confirmationUrl) {
+          try {
+            const confirmPage = await this.openWithSession(browser, booked.confirmationUrl, sessionValue)
+            const screenshotB64 = await confirmPage.screenshot({ encoding: 'base64', fullPage: true })
+            const screenshotPath = this.saveScreenshot(screenshotB64 as string, 'confirmation')
+            logger.info(`[laieta] Confirmation screenshot saved: ${screenshotPath}`)
+          } catch (err) {
+            logger.warn('[laieta] Could not capture confirmation screenshot:', err instanceof Error ? err.message : err)
+          }
+        }
         return booked
       }
 
