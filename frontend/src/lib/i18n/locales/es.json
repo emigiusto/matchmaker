@@ -1039,5 +1039,47 @@
   },
   "contacts": {
     "searchContacts": "Buscar contactos..."
+  },
+  "results": {
+    "dialog": {
+      "title": "Subir Resultado",
+      "setResults": "Resultados por Set",
+      "addSet": "+ Añadir Set",
+      "set": "Set",
+      "tiebreak": "TB",
+      "winnerPreview": "Ganador:",
+      "submitButton": "Enviar Resultado",
+      "submitting": "Enviando…",
+      "submittedCompetitive": "¡Resultado enviado! Esperando confirmación del oponente.",
+      "submittedPractice": "¡Resultado enviado correctamente!",
+      "submitFailed": "Error al enviar el resultado. Por favor, inténtalo de nuevo.",
+      "validation": {
+        "required": "Se requiere al menos 1 set",
+        "invalidScores": "Todos los sets completados deben tener puntuaciones válidas",
+        "scoreRange": "Las puntuaciones deben estar entre 0 y 7",
+        "tied": "Los sets no pueden quedar empatados",
+        "minGames": "El ganador debe tener al menos 6 juegos",
+        "invalid6": "Puntuación inválida: si el ganador tiene 6, el perdedor debe tener 4 o menos",
+        "invalid7": "Puntuación inválida: 7-x sólo es válido como 7-5 o 7-6"
+      }
+    },
+    "questionnaire": {
+      "title": "Opcional: Mejora tus análisis de partido",
+      "subtitle": "5 preguntas rápidas (marca todas las que apliquen)",
+      "disclaimer": "Tus respuestas se guardan y se usarán para impulsar perspectivas de partido personalizadas con IA en una futura actualización.",
+      "matchPlayedOut": { "label": "¿Cómo fue el partido?", "dominated": "Dominé el partido", "balanced": "Equilibrado", "very_close": "Muy igualado", "struggled": "Tuve dificultades" },
+      "mainStrategy": { "label": "¿Estrategia principal?", "baseline": "Consistencia desde el fondo", "aggressive_forehand": "Derecha agresiva", "net_play": "Juego en la red", "defensive": "Juego defensivo y contraataque", "serve_focused": "Enfocado en el saque", "mixed": "Mixta" },
+      "whatWorkedBest": { "label": "¿Qué funcionó mejor?", "first_serve": "Primer saque", "return": "Resto", "forehand": "Derecha", "backhand": "Revés", "movement": "Movimiento", "mental": "Resiliencia mental" },
+      "whatDidntWork": { "label": "¿Qué no funcionó?", "unforced_errors": "Demasiados errores no forzados", "weak_second_serve": "Segundo saque débil", "positioning": "Mala posición", "focus": "Pérdida de concentración", "fatigue": "Fatiga física", "tactics": "Errores tácticos" },
+      "generalSensation": { "label": "¿Sensaciones generales?", "confident": "Alta confianza", "nervous": "Nervioso", "in_rhythm": "En ritmo", "out_of_sync": "Fuera de ritmo", "strong": "Físicamente fuerte", "tired": "Físicamente cansado" },
+      "pointBuilding": { "label": "¿Cómo construiste la mayoría de los puntos?", "long_rallies": "Peloteos largos (+5 golpes)", "short_aggressive": "Puntos cortos y agresivos", "serve_first_shot": "Saque + primer golpe", "counter_attacking": "Contraataque", "waiting_errors": "Esperando errores", "mixed": "Mixto" },
+      "serveStrategy": { "label": "¿Estrategia de saque?", "high_percentage": "Alto porcentaje", "aggressive": "Agresivo", "targeted_weakness": "Apuntando a debilidad", "body_serves": "Saques al cuerpo", "wide_serves": "Saques abiertos", "no_strategy": "Sin estrategia clara" },
+      "targetedSide": { "label": "¿Apuntaste a un lado específico?", "forehand": "Principalmente derecha", "backhand": "Principalmente revés", "mixed": "Mixto", "no_targeting": "Sin objetivo específico" },
+      "tacticAdjustment": { "label": "¿Ajustaste la táctica durante el partido?", "yes_successful": "Sí, con éxito", "yes_unsuccessful": "Sí, sin éxito", "no_adjustment": "Sin ajuste", "no_plan": "Sin plan claro" },
+      "importantPoints": { "label": "¿Cómo actuaste en los puntos importantes?", "very_strong": "Muy bien", "solid": "Sólido", "inconsistent": "Inconsistente", "struggled": "Con dificultades" },
+      "netApproach": { "label": "¿Con qué frecuencia subiste a la red?", "frequently": "Frecuentemente", "occasionally": "Ocasionalmente", "rarely": "Raramente", "never": "Nunca" },
+      "opponentStrength": { "label": "¿Cuál fue el mayor punto fuerte del rival?", "serve": "Saque", "forehand": "Derecha", "backhand": "Revés", "defense": "Defensa", "consistency": "Consistencia", "mental": "Fuerza mental", "endurance": "Resistencia" },
+      "mainMistake": { "label": "¿Principal error táctico?", "forced_errors": "Errores forzados", "unforced_errors": "Errores no forzados", "shot_selection": "Mala elección de golpe", "predictable": "Patrones predecibles", "positioning": "Posicionamiento", "second_serve": "Debilidad en segundo saque" }
+    }
   }
 }

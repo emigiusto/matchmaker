@@ -113,6 +113,8 @@ export interface SetScore {
   player1Score: number
   player2Score: number
   tiebreak?: boolean
+  tiebreakScore1?: number
+  tiebreakScore2?: number
 }
 
 export interface SuggestedOpponent {
