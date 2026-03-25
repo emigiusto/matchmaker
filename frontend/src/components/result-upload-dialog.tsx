@@ -422,6 +422,9 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
               </CollapsibleTrigger>
 
               <CollapsibleContent className="space-y-4 border-t border-border p-4">
+                <p className="text-xs text-muted-foreground">
+                  {t('results.questionnaireDisclaimer')}
+                </p>
                 {selectedQuestions.map((question) => (
                   <QuestionCheckboxGroup
                     key={question.key}

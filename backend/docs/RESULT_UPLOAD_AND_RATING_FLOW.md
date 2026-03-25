@@ -312,14 +312,11 @@ Fields returned: `totalMatches`, `competitiveMatches`, `practiceMatches`, `wins`
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 1 | **No rating history endpoint** | `RatingHistory` rows are written on every confirmed match but not yet exposed via `GET /players/:id/rating-history`. `PlayerStats.ratingHistory` on the frontend is always an empty array until this is added. |
-| 2 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` ignores `lastMatchAt`, so inactivity has no effect on ratings in the default mode. Intentional or oversight — should be documented either way. |
-| 3 | **Questionnaire data not yet surfaced** | Answers are persisted to `Result.questionnaire` but not rendered anywhere in the UI. Planned: AI-powered post-match insight panel on the match detail page. |
+| 1 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` ignores `lastMatchAt`, so inactivity has no effect on ratings in the default mode. Intentional or oversight — should be documented either way. |
+| 2 | **Questionnaire data not yet surfaced** | Answers are persisted to `Result.questionnaire` but not rendered anywhere in the UI. Planned: AI-powered post-match insight panel on the match detail page. |
 
 ---
 
 ## 9. Next Steps (Priority Order)
 
-1. **Expose rating history** — add `GET /players/:id/rating-history` returning `RatingHistory` rows ordered by `createdAt` desc. Update `PlayerStats` on the frontend to populate `ratingHistory` from this endpoint.
-2. **Profile UI and player analytics** — render rating chart, win rate, streak, and average opponent level on the player profile page using data from `GET /players/:id/stats`.
-3. **AI post-match insights** — use `Result.questionnaire` data to generate a short insight message after a match is confirmed. Display on the match detail page with a label like "Powered by AI".
+1. **AI post-match insights** — use `Result.questionnaire` data to generate a short insight message after a match is confirmed. Display on the match detail page with a label like "Powered by AI".
