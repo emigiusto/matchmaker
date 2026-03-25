@@ -99,6 +99,7 @@ router.post('/:id/confirm', ResultsController.confirmResult);
  */
 router.post('/:id/dispute', ResultsController.disputeResult);
 router.post('/:id/resolve-dispute', ResultsController.resolveDispute);
+router.get('/disputed', ResultsController.getDisputedResults);
 
 /**
  * @openapi

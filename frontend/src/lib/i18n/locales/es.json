@@ -718,6 +718,9 @@
       "disputeTitle": "Impugnar Resultado",
       "disputeReason": "Razón",
       "disputePlaceholder": "Explica por qué estás impugnando este resultado...",
+      "disputeProposedScore": "Puntuaciones correctas propuestas",
+      "disputeProposedScoreHint": "Opcional — introduce lo que crees que fueron las puntuaciones correctas.",
+      "disputeNoteTitle": "Motivo de impugnación",
       "submitDispute": "Enviar Impugnación"
     },
     "submit": {
@@ -790,7 +793,9 @@
       "bookingCancelled": "Reserva de pista cancelada",
       "bookingCancelFailed": "No se pudo cancelar la reserva de pista",
       "matchRescheduled": "Partido reprogramado",
-      "matchRescheduledVs": "Partido vs {{opponents}} reprogramado"
+      "matchRescheduledVs": "Partido vs {{opponents}} reprogramado",
+      "resultDisputed": "Resultado impugnado",
+      "resultDisputedAdmin": "Resultado impugnado — revisión necesaria"
     },
     "messages": {
       "scheduledForDate": "Se programó un partido para el {{date}}.",
@@ -811,7 +816,9 @@
       "bookingCancelled": "La reserva de pista para tu partido cancelado ha sido cancelada correctamente.",
       "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club.",
       "matchRescheduled": "El partido ha sido reprogramado.",
-      "matchRescheduledParts": "Nuevo horario: {{parts}}."
+      "matchRescheduledParts": "Nuevo horario: {{parts}}.",
+      "resultDisputed": "Un resultado de uno de tus partidos ha sido impugnado.",
+      "resultDisputedAdmin": "Un resultado de partido ha sido impugnado y requiere tu revisión."
     }
   },
   "contactsPage": {

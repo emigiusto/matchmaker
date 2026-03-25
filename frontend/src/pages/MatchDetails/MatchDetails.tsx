@@ -979,6 +979,28 @@ export default function MatchDetailPage() {
                     </div>
                   )}
 
+                  {result.status === "disputed" && result.disputeNote && (() => {
+                    let parsed: { reason?: string; proposedSets?: { setNumber: number; player1Score: number; player2Score: number }[] } = {}
+                    try { parsed = JSON.parse(result.disputeNote) } catch { parsed = { reason: result.disputeNote } }
+                    if (!parsed.reason && !parsed.proposedSets?.length) return null
+                    return (
+                      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1.5">
+                        <p className="text-xs font-semibold text-destructive">{t("matchDetails.result.disputeNoteTitle")}</p>
+                        {parsed.reason && (
+                          <p className="text-sm text-foreground">{parsed.reason}</p>
+                        )}
+                        {parsed.proposedSets && parsed.proposedSets.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {t("matchDetails.result.disputeProposedScore")}:{" "}
+                            <span className="font-mono font-medium">
+                              {parsed.proposedSets.map((s) => `${s.player1Score}–${s.player2Score}`).join("  ")}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+
                   {(() => {
                     // Show confirm/dispute only to the opposing participant or admins.
                     // The submitter already confirmed at submission time.

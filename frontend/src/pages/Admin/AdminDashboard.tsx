@@ -11,7 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Users, TrendingUp, Activity, UserPlus, RefreshCw } from 'lucide-react'
+import { Users, TrendingUp, Activity, UserPlus, RefreshCw, AlertTriangle } from 'lucide-react'
+import { resultsService } from '@/lib/services/results.service'
+import type { DisputedResult } from '@/lib/services/results.service'
 
 type Period = 7 | 14 | 30 | 90
 
@@ -146,6 +148,16 @@ export default function AdminDashboard() {
 function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Period }) {
   const { refreshUser } = useAuth()
   const navigate = useNavigate()
+  const [disputes, setDisputes] = useState<DisputedResult[]>([])
+  const [disputesLoading, setDisputesLoading] = useState(true)
+
+  useEffect(() => {
+    resultsService.getDisputedResults()
+      .then(setDisputes)
+      .catch(() => setDisputes([]))
+      .finally(() => setDisputesLoading(false))
+  }, [])
+
   // Merge active + new users into one chart dataset
   const combinedDaily = useMemo(() => {
     const map = new Map<string, { date: string; active: number; new: number }>()
@@ -167,6 +179,15 @@ function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Per
         <TabsTrigger value="pages">Pages</TabsTrigger>
         <TabsTrigger value="users">Users</TabsTrigger>
         <TabsTrigger value="events">Events</TabsTrigger>
+        <TabsTrigger value="disputes" className="flex items-center gap-1.5">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Disputes
+          {disputes.length > 0 && (
+            <Badge variant="destructive" className="h-4 min-w-4 px-1 text-[10px] rounded-full">
+              {disputes.length}
+            </Badge>
+          )}
+        </TabsTrigger>
       </TabsList>
 
       {/* ── OVERVIEW ── */}
@@ -275,6 +296,15 @@ function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Per
       {/* ── EVENTS ── */}
       <TabsContent value="events">
         <EventsTab recentEvents={stats.recentEvents} eventTypes={stats.topEvents.map((e) => e.eventType)} />
+      </TabsContent>
+
+      {/* ── DISPUTES ── */}
+      <TabsContent value="disputes">
+        <DisputesTab disputes={disputes} loading={disputesLoading} onResolve={(resultId, sets) =>
+          resultsService.resolveDispute(resultId, sets).then(() =>
+            resultsService.getDisputedResults().then(setDisputes)
+          )
+        } />
       </TabsContent>
     </Tabs>
   )
@@ -688,6 +718,184 @@ function EventsTab({ recentEvents, eventTypes }: { recentEvents: RecentEvent[]; 
           </div>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+// ── Disputes tab ────────────────────────────────────────────────────────────
+
+interface ParsedDisputeNote {
+  reason?: string
+  proposedSets?: { setNumber: number; playerAScore: number; playerBScore: number }[]
+}
+
+function parseDisputeNote(raw: string | null): ParsedDisputeNote {
+  if (!raw) return {}
+  try { return JSON.parse(raw) } catch { return { reason: raw } }
+}
+
+function ResolveDisputeForm({ result, onResolve }: {
+  result: DisputedResult
+  onResolve: (resultId: string, sets: { setNumber: number; player1Score: number; player2Score: number }[]) => Promise<void>
+}) {
+  const initialSets = result.sets.length > 0
+    ? result.sets.map((s) => ({ setNumber: s.setNumber, player1Score: s.playerAScore, player2Score: s.playerBScore }))
+    : [{ setNumber: 1, player1Score: 0, player2Score: 0 }]
+  const [sets, setSets] = useState(initialSets)
+  const [saving, setSaving] = useState(false)
+
+  function updateSet(idx: number, field: 'player1Score' | 'player2Score', val: number) {
+    setSets((prev) => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    try { await onResolve(result.id, sets) } finally { setSaving(false) }
+  }
+
+  const teamA = result.match.participants.filter((p) => p.team === 'A').map((p) => p.userName).join(' & ')
+    || result.match.participants[0]?.userName || 'Team A'
+  const teamB = result.match.participants.filter((p) => p.team === 'B').map((p) => p.userName).join(' & ')
+    || result.match.participants[1]?.userName || 'Team B'
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2 mt-3 pt-3 border-t">
+      <p className="text-xs font-medium text-muted-foreground">Set correct scores to resolve:</p>
+      {sets.map((s, idx) => (
+        <div key={idx} className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground w-10 shrink-0">Set {s.setNumber}</span>
+          <span className="text-xs truncate max-w-[80px]" title={teamA}>{teamA.split(' ')[0]}</span>
+          <input
+            type="number" min={0} max={99} value={s.player1Score}
+            onChange={(e) => updateSet(idx, 'player1Score', Number(e.target.value))}
+            className="w-12 rounded border border-input bg-background px-2 py-0.5 text-sm text-center"
+          />
+          <span className="text-muted-foreground">–</span>
+          <input
+            type="number" min={0} max={99} value={s.player2Score}
+            onChange={(e) => updateSet(idx, 'player2Score', Number(e.target.value))}
+            className="w-12 rounded border border-input bg-background px-2 py-0.5 text-sm text-center"
+          />
+          <span className="text-xs truncate max-w-[80px]" title={teamB}>{teamB.split(' ')[0]}</span>
+        </div>
+      ))}
+      <button
+        type="submit"
+        disabled={saving}
+        className="mt-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {saving ? 'Saving…' : 'Resolve dispute'}
+      </button>
+    </form>
+  )
+}
+
+function DisputesTab({ disputes, loading, onResolve }: {
+  disputes: DisputedResult[]
+  loading: boolean
+  onResolve: (resultId: string, sets: { setNumber: number; player1Score: number; player2Score: number }[]) => Promise<void>
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-muted-foreground">
+        <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+        Loading disputed results…
+      </div>
+    )
+  }
+
+  if (disputes.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+          <AlertTriangle className="h-8 w-8 opacity-30" />
+          <p className="text-sm">No disputed results.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {disputes.map((d) => {
+        const note = parseDisputeNote(d.disputeNote)
+        const participants = d.match.participants
+        const teamA = participants.filter((p) => p.team === 'A').map((p) => p.userName).join(' & ')
+          || participants[0]?.userName || '?'
+        const teamB = participants.filter((p) => p.team === 'B').map((p) => p.userName).join(' & ')
+          || participants[1]?.userName || '?'
+        const isOpen = expanded === d.id
+
+        return (
+          <Card key={d.id} className="overflow-hidden">
+            <CardContent className="p-4">
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-sm">{teamA} vs {teamB}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.match.date} · {d.match.time}
+                    {d.match.location && ` · ${d.match.location}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="destructive" className="text-xs">disputed</Badge>
+                  <a
+                    href={`/matches/${d.matchId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary underline hover:no-underline"
+                  >
+                    View match
+                  </a>
+                </div>
+              </div>
+
+              {/* Scores */}
+              {d.sets.length > 0 && (
+                <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
+                  {d.sets.map((s) => (
+                    <span key={s.setNumber} className="font-mono">
+                      {s.playerAScore}–{s.playerBScore}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Dispute note */}
+              {(note.reason || note.proposedSets) && (
+                <div className="mt-2 rounded-md bg-destructive/5 border border-destructive/20 px-3 py-2 text-xs space-y-1">
+                  {note.reason && <p><span className="font-medium">Reason:</span> {note.reason}</p>}
+                  {note.proposedSets && note.proposedSets.length > 0 && (
+                    <p>
+                      <span className="font-medium">Proposed scores:</span>{' '}
+                      {note.proposedSets.map((s) => `${s.playerAScore}–${s.playerBScore}`).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Resolve toggle */}
+              <button
+                onClick={() => setExpanded(isOpen ? null : d.id)}
+                className="mt-3 text-xs text-primary underline hover:no-underline"
+              >
+                {isOpen ? 'Cancel' : 'Resolve…'}
+              </button>
+
+              {isOpen && (
+                <ResolveDisputeForm result={d} onResolve={async (id, sets) => {
+                  await onResolve(id, sets)
+                  setExpanded(null)
+                }} />
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }

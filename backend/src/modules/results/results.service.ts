@@ -223,6 +223,57 @@ export async function getRecentResults(limit = 10): Promise<ResultDTO[]> {
 }
 
 /**
+ * Returns all results with status 'disputed', enriched with match + participant info.
+ * Intended for the admin disputes dashboard.
+ */
+export interface DisputedResultDTO extends ResultDTO {
+  match: {
+    id: string;
+    date: string;
+    time: string;
+    location: string;
+    type: string;
+    participants: { userId: string; userName: string; team: string | null }[];
+  };
+}
+
+export async function getDisputedResults(): Promise<DisputedResultDTO[]> {
+  const results = await prisma.result.findMany({
+    where: { status: 'disputed' },
+    include: {
+      sets: true,
+      match: {
+        include: {
+          participants: {
+            include: { user: { select: { id: true, name: true } } },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return results.map((r) => {
+    const match = r.match as any;
+    return {
+      ...toResultDTO(r),
+      match: {
+        id: match.id,
+        date: match.date ?? '',
+        time: match.time ?? '',
+        location: match.location ?? '',
+        type: match.type ?? '',
+        participants: (match.participants ?? []).map((p: any) => ({
+          userId: p.userId,
+          userName: p.user?.name ?? p.userId,
+          team: p.team ?? null,
+        })),
+      },
+    };
+  });
+}
+
+/**
  * submitMatchResult: First confirmation step for a match result.
  *
  * - Creates the Result (if not already present)
@@ -569,7 +620,30 @@ export async function disputeResult(input: DisputeResultInput): Promise<ResultDT
 
     const updated = await tx.result.findUnique({ where: { id: resultId }, include: { sets: true } });
     if (!updated) throw new AppError('Result not found after dispute', 500);
-    return toResultDTO(updated);
+    const dto = toResultDTO(updated);
+
+    // Fire notifications outside the transaction (non-blocking, best-effort)
+    const matchId = result.matchId;
+    const disputingUserId = userId;
+    const otherParticipantIds = participantIds.filter((id: string) => id !== disputingUserId);
+
+    setImmediate(async () => {
+      try {
+        // Notify other participant(s)
+        for (const pid of otherParticipantIds) {
+          await createNotification(pid, 'result.disputed', { matchId, _type: 'result.disputed' }).catch(() => {});
+        }
+        // Notify all admins
+        const admins = await prisma.user.findMany({ where: { isAdmin: true }, select: { id: true } });
+        for (const admin of admins) {
+          if (!participantIds.includes(admin.id)) {
+            await createNotification(admin.id, 'result.disputed.admin', { matchId, _type: 'result.disputed.admin' }).catch(() => {});
+          }
+        }
+      } catch { /* notifications are non-critical */ }
+    });
+
+    return dto;
   });
 }
 

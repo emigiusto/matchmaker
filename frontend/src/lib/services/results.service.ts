@@ -1,6 +1,27 @@
 import { apiClient } from "./api-client"
 import type { MatchResult, SetScore, PostMatchQuestionnaire } from "../types"
 
+export interface DisputedResult {
+  id: string
+  matchId: string
+  createdAt: string
+  sets: { id: string; setNumber: number; playerAScore: number; playerBScore: number }[]
+  winnerUserId: string | null
+  submittedByUserId: string | null
+  status: string
+  disputedByHostAt: string | null
+  disputedByOpponentAt: string | null
+  disputeNote: string | null
+  match: {
+    id: string
+    date: string
+    time: string
+    location: string
+    type: string
+    participants: { userId: string; userName: string; team: string | null }[]
+  }
+}
+
 export const resultsService = {
   async getByMatch(matchId: string): Promise<MatchResult> {
     return apiClient.get<MatchResult>(`/results/by-match/${matchId}`)
@@ -28,5 +49,9 @@ export const resultsService = {
 
   async resolveDispute(resultId: string, sets: SetScore[]): Promise<MatchResult> {
     return apiClient.post<MatchResult>(`/results/${resultId}/resolve-dispute`, { sets })
+  },
+
+  async getDisputedResults(): Promise<DisputedResult[]> {
+    return apiClient.get<DisputedResult[]>(`/results/disputed`)
   },
 }

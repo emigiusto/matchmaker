@@ -1,6 +1,6 @@
 # Result Upload & Rating Flow
 
-_Last updated: 2026-03-25 (rev 2)_
+_Last updated: 2026-03-25 (rev 3)_
 
 ---
 
@@ -44,7 +44,9 @@ Match status and Result status are kept in sync. The valid pairs are:
 | `POST` | `/results/:matchId/submit-result` | Main endpoint — creates Result + SetResults, sets match to `awaiting_confirmation` |
 | `POST` | `/results/:id/sets` | Add an individual set to an existing result |
 | `POST` | `/results/:id/confirm` | Second player confirms; when both confirmed, triggers rating update |
-| `POST` | `/results/:id/dispute` | Either player disputes the result |
+| `POST` | `/results/:id/dispute` | Either player disputes the result; fires notifications to other participant + all admins |
+| `POST` | `/results/:id/resolve-dispute` | **Admin only** — accepts corrected set scores, resets result to `submitted`, restarts confirmation flow |
+| `GET`  | `/results/disputed` | **Admin only** — returns all `disputed` results enriched with match and participant data |
 | `GET`  | `/results/by-match/:matchId` | Fetch result for a match |
 | `GET`  | `/results/by-user/:userId` | Fetch all results for a user |
 | `GET`  | `/results/recent` | Activity feed of recent results |
@@ -82,10 +84,21 @@ Match status and Result status are kept in sync. The valid pairs are:
    - Sends notifications
 3. Method is idempotent — calling it twice returns the same result
 
-**`disputeResult()`** — `results.service.ts` lines 535–564
+**`disputeResult()`** — `results.service.ts`
 
 - Marks result as `disputed`, blocking any further confirmation or rating update
-- No resolution mechanism currently exists (see Missing Pieces)
+- Stores `disputeNote` as a JSON string: `{ reason: string, proposedSets?: SetScore[] }`
+- After the transaction, fires best-effort notifications via `setImmediate`:
+  - `result.disputed` → all participants who did not submit the dispute
+  - `result.disputed.admin` → all admin users (excluding participants)
+
+**`resolveDispute()`** — `results.service.ts`
+
+- Admin-only: accepts corrected set scores, deletes existing `SetResult` rows, inserts new ones
+- Recomputes `winnerUserId` from the corrected sets
+- Resets `Result.status = submitted` and `Match.status = awaiting_confirmation`
+- Clears `disputedByHostAt`, `disputedByOpponentAt`, and `disputeNote`
+- Normal confirmation flow (second player confirms → `completed` → rating update) resumes from here
 
 ---
 
@@ -184,6 +197,8 @@ model Result {
   confirmedByOpponentAt DateTime?
   disputedByHostAt      DateTime?
   disputedByOpponentAt  DateTime?
+  disputeNote           String?      // JSON: { reason: string, proposedSets?: SetScore[] }
+  questionnaire         Json?        // PostMatchQuestionnaire answers
   createdAt             DateTime     @default(now())
 
   match      Match       @relation(...)
@@ -238,39 +253,73 @@ model RatingHistory {
 - Supports 1–5 sets with per-set score entry
 - Validates tennis rules client-side (winner needs ≥6 games, no ties, 7-5/7-6 allowed)
 - Computes winner from set count
-- Includes a post-match questionnaire (5 randomly selected from 14 questions)
+- Includes a post-match questionnaire (5 randomly selected from 14 questions); answers are persisted to `Result.questionnaire` on submission
+
+### Match Details
+
+**File:** `frontend/src/pages/MatchDetails/MatchDetails.tsx`
+
+- Shows current result sets and status
+- When `result.status === "disputed"` and `disputeNote` is present, parses the JSON and renders the dispute reason and proposed corrected scores
+- Participants who did not submit can confirm or dispute; admins have an additional "Resolve dispute" dialog
+
+### Admin Dashboard — Disputes Tab
+
+**File:** `frontend/src/pages/Admin/AdminDashboard.tsx`
+
+- Tab trigger shows a red badge with the count of open disputes
+- Fetches `GET /results/disputed` on mount
+- Each card shows: players, date/time/location, parsed dispute note (reason + proposed scores), current set scores
+- Inline "Resolve…" form lets admins enter corrected scores and call `POST /results/:id/resolve-dispute`
 
 ### Frontend API Service
 
 **File:** `frontend/src/lib/services/results.service.ts`
 
-Methods defined:
-
 ```typescript
 resultsService.getByMatch(matchId)
 resultsService.getByUser(userId)
+resultsService.submitMatchResult(matchId, sets, questionnaire?)
 resultsService.submitSets(resultId, sets)
 resultsService.confirm(resultId)
-resultsService.dispute(resultId, reason)
+resultsService.dispute(resultId, noteJson)
+resultsService.resolveDispute(resultId, sets)
+resultsService.getDisputedResults()   // admin only
 ```
+
+### Notifications
+
+**Files:** `frontend/src/lib/api/adapters.ts`, `frontend/src/lib/hooks/use-notification-text.ts`, `frontend/src/lib/i18n/locales/{en,es}.json`
+
+| Backend type | Frontend type | EN title | ES title |
+|---|---|---|---|
+| `result.disputed` | `result_disputed` | "Result disputed" | "Resultado impugnado" |
+| `result.disputed.admin` | `result_disputed` | "Result disputed — review needed" | "Resultado impugnado — revisión necesaria" |
 
 ---
 
-## 7. Open Gaps
+## 7. Player Stats
+
+**Endpoint:** `GET /players/:id/stats`
+
+Stats are **computed at read time** from confirmed `Result` and `RatingHistory` records — never cached as mutable counters on the `Player` row. This avoids permanent desync if a counter update fails mid-transaction.
+
+Fields returned: `totalMatches`, `competitiveMatches`, `practiceMatches`, `wins`, `losses`, `winRate`, `averageOpponentLevel`, `currentStreak`, `streakType`, `ratingHistory`.
+
+---
+
+## 8. Open Gaps
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 1 | **Questionnaire answers not persisted** | UI collects answers into local state after result submission, but `Result` has no `questionnaire` column and there is no save endpoint. Either add a `Json?` column to `Result` in Prisma and a `PATCH /results/:id/questionnaire` endpoint, or remove the questionnaire from the UI entirely. |
-| 2 | **No rating history endpoint** | `RatingHistory` rows are written on every confirmed match but never exposed. `PlayerStats.ratingHistory` on the frontend is always empty. Needs `GET /players/:id/rating-history`. |
-| 3 | **No dispute resolution path** | `disputeResult()` sets the flag and stores a note, but there is no endpoint for an admin to override or resolve a dispute. Disputed matches stay stuck indefinitely. |
-| 4 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` ignores `lastMatchAt`, so inactivity has no effect on ratings in the default mode. Intentional or oversight — should be documented either way. |
-| 5 | **`Player.wins` / `Player.losses` / `Player.matchesPlayed` do not exist in the schema** | These fields appear in the frontend `Player` type and `PlayerStats` but are not Prisma columns and are never written by the backend. Win/loss counts are a pure derivation of confirmed `Result` records and should be computed at query time rather than cached as mutable state. The frontend should source these values from the `PlayerStats` endpoint, not from the player record. |
+| 1 | **No rating history endpoint** | `RatingHistory` rows are written on every confirmed match but not yet exposed via `GET /players/:id/rating-history`. `PlayerStats.ratingHistory` on the frontend is always an empty array until this is added. |
+| 2 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` ignores `lastMatchAt`, so inactivity has no effect on ratings in the default mode. Intentional or oversight — should be documented either way. |
+| 3 | **Questionnaire data not yet surfaced** | Answers are persisted to `Result.questionnaire` but not rendered anywhere in the UI. Planned: AI-powered post-match insight panel on the match detail page. |
 
 ---
 
-## 8. Next Steps (Priority Order)
+## 9. Next Steps (Priority Order)
 
-1. **Persist questionnaire answers** — add `questionnaire Json?` to the `Result` model, create a migration, and add `PATCH /results/:id/questionnaire` (or include in the submit payload). Wire the frontend to call it after the dialog closes successfully.
-2. **Expose rating history** — add `GET /players/:id/rating-history` returning `RatingHistory` rows ordered by `createdAt` desc. Update `PlayerStats` on the frontend to populate `ratingHistory` from this endpoint.
-3. **Compute win/loss stats server-side** — add a `GET /players/:id/stats` endpoint (or extend the existing one) that derives `wins`, `losses`, `matchesPlayed`, `winRate`, and `currentStreak` directly from confirmed `Result` records. Remove the cached fields from the frontend `Player` type.
-4. **Dispute resolution for admins** — add `POST /results/:id/resolve-dispute` (admin only) that accepts corrected set scores, resets the result to `submitted` with the new sets, and resumes the normal confirmation flow.
+1. **Expose rating history** — add `GET /players/:id/rating-history` returning `RatingHistory` rows ordered by `createdAt` desc. Update `PlayerStats` on the frontend to populate `ratingHistory` from this endpoint.
+2. **Profile UI and player analytics** — render rating chart, win rate, streak, and average opponent level on the player profile page using data from `GET /players/:id/stats`.
+3. **AI post-match insights** — use `Result.questionnaire` data to generate a short insight message after a match is confirmed. Display on the match detail page with a label like "Powered by AI".

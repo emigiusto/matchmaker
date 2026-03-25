@@ -120,6 +120,21 @@ export class ResultsController {
   }
 
   /**
+   * GET /results/disputed
+   * Admin-only: fetch all disputed results with match context
+   */
+  static async getDisputedResults(req: Request, res: Response, next: NextFunction) {
+    try {
+      const isAdmin = !!(req.user as any)?.isAdmin;
+      if (!isAdmin) return res.status(403).json({ error: 'Admin only' });
+      const results = await ResultsService.getDisputedResults();
+      return res.status(200).json(results);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /results/recent?limit=10
    * Fetch recent results
    */
