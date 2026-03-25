@@ -53,7 +53,9 @@ export class ResultsController {
         if (!currentUserId) {
           return res.status(401).json({ error: 'Unauthorized: missing user id' });
         }
-        const result = await ResultsService.disputeResult(id, currentUserId);
+        const isAdmin = !!(req.user as any)?.isAdmin;
+        const disputeNote = typeof req.body?.disputeNote === 'string' ? req.body.disputeNote : null;
+        const result = await ResultsService.disputeResult({ resultId: id, userId: currentUserId, isAdmin, disputeNote });
         return res.status(200).json(result);
       } catch (error) {
         next(error);

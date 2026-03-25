@@ -18,6 +18,8 @@ import {
   Building2,
   RefreshCw,
   Ban,
+  X,
+  Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -47,8 +49,9 @@ import { matchesService } from "@/lib/services/matches.service"
 import { remindersService, type Reminder } from "@/lib/services/reminders.service"
 import { bookingService, type BookingAttemptDTO, type ClubMembershipDTO, SUPPORTED_CLUBS } from "@/lib/services/booking.service"
 import { contactsService, type ContactDTO } from "@/lib/services/contacts.service"
+import { resultsService } from "@/lib/services/results.service"
 import { Input } from "@/components/ui/input"
-import type { Match } from "@/lib/types"
+import type { Match, MatchResult, SetScore } from "@/lib/types"
 import { Loader2 } from "lucide-react"
 
 export default function MatchDetailPage() {
@@ -63,7 +66,14 @@ export default function MatchDetailPage() {
   const [remindersLoading, setRemindersLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [resultSubmitted, _setResultSubmitted] = useState(false)
+  const [result, setResult] = useState<MatchResult | null>(null)
+  const [confirmingResult, setConfirmingResult] = useState(false)
   const [disputeOpen, setDisputeOpen] = useState(false)
+  const [disputeReason, setDisputeReason] = useState("")
+  const [disputeProposedSets, setDisputeProposedSets] = useState<{ player1Score: string; player2Score: string }[]>([
+    { player1Score: "", player2Score: "" },
+  ])
+  const [submittingDispute, setSubmittingDispute] = useState(false)
   const [bookingAttempt, setBookingAttempt] = useState<BookingAttemptDTO | null>(null)
   const [retryingBooking, setRetryingBooking] = useState(false)
   const [cancellingBooking, setCancellingBooking] = useState(false)
@@ -95,7 +105,13 @@ export default function MatchDetailPage() {
     matchesService
       .getById(id)
       .then((m) => {
-        if (!cancelled) setMatch(m)
+        if (!cancelled) {
+          setMatch(m)
+          // Fetch result separately if the match has one
+          if (m.status === "awaiting_confirmation" || m.status === "completed" || m.status === "disputed") {
+            resultsService.getByMatch(m.id).then((r) => { if (!cancelled) setResult(r as unknown as MatchResult) }).catch(() => {})
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setMatch(null)
@@ -283,14 +299,49 @@ export default function MatchDetailPage() {
       return !!contact?.socioNumbers?.[primaryClubSlug]
     })
 
-  function handleConfirmResult() {
-    toast.success("Result confirmed!")
+  async function handleConfirmResult() {
+    if (!result) return
+    setConfirmingResult(true)
+    try {
+      const updated = await resultsService.confirm(result.id)
+      setResult(updated as unknown as MatchResult)
+      if (updated.status === "confirmed") {
+        setMatch((m) => m ? { ...m, status: "completed" } : m)
+        toast.success(t("matchDetails.result.confirmSuccess"))
+      } else {
+        toast.success(t("matchDetails.result.confirmRecorded"))
+      }
+    } catch {
+      toast.error(t("matchDetails.result.confirmError"))
+    } finally {
+      setConfirmingResult(false)
+    }
   }
 
-  function handleDisputeResult(e: React.FormEvent<HTMLFormElement>) {
+  async function handleDisputeResult(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setDisputeOpen(false)
-    toast.success("Dispute submitted")
+    if (!result) return
+    setSubmittingDispute(true)
+    try {
+      const filledSets = disputeProposedSets.filter((s) => s.player1Score !== "" || s.player2Score !== "")
+      const proposedSets: SetScore[] = filledSets.map((s, i) => ({
+        setNumber: i + 1,
+        player1Score: parseInt(s.player1Score) || 0,
+        player2Score: parseInt(s.player2Score) || 0,
+      }))
+      const notePayload = JSON.stringify({
+        reason: disputeReason,
+        ...(proposedSets.length > 0 && { proposedSets }),
+      })
+      await resultsService.dispute(result.id, notePayload)
+      setMatch((m) => m ? { ...m, status: "disputed" } : m)
+      setDisputeOpen(false)
+      toast.success(t("matchDetails.result.disputeSuccess"))
+    } catch {
+      toast.error(t("matchDetails.result.disputeError"))
+    } finally {
+      setSubmittingDispute(false)
+    }
   }
 
   return (
@@ -837,7 +888,7 @@ export default function MatchDetailPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Result Section */}
-          {match.result ? (
+          {result ? (
             <>
               <Card className="border-border/50">
                 <CardHeader>
@@ -847,7 +898,7 @@ export default function MatchDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    {match.result.sets.map((set) => (
+                    {result.sets.map((set) => (
                       <div
                         key={set.setNumber}
                         className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-2.5"
@@ -862,10 +913,10 @@ export default function MatchDetailPage() {
                     ))}
                   </div>
 
-                  {match.result.player1RatingChange !== undefined && (
+                  {result.player1RatingChange !== undefined && (
                     <div className="flex items-center gap-4 rounded-lg border border-border/50 p-3">
                       <div className="flex items-center gap-2">
-                        {match.result.player1RatingChange > 0 ? (
+                        {result.player1RatingChange! > 0 ? (
                           <TrendingUp className="h-4 w-4 text-primary" />
                         ) : (
                           <TrendingDown className="h-4 w-4 text-destructive" />
@@ -873,13 +924,11 @@ export default function MatchDetailPage() {
                         <span className="text-xs text-muted-foreground">{t("matchDetails.result.ratingChange")}</span>
                         <span
                           className={`font-mono text-sm font-semibold ${
-                            match.result.player1RatingChange > 0
-                              ? "text-primary"
-                              : "text-destructive"
+                            result.player1RatingChange! > 0 ? "text-primary" : "text-destructive"
                           }`}
                         >
-                          {match.result.player1RatingChange > 0 ? "+" : ""}
-                          {match.result.player1RatingChange}
+                          {result.player1RatingChange! > 0 ? "+" : ""}
+                          {result.player1RatingChange}
                         </span>
                       </div>
                     </div>
@@ -889,51 +938,101 @@ export default function MatchDetailPage() {
                     <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
                       <p className="text-xs font-medium text-muted-foreground">{t("matchDetails.result.status")}</p>
                       <p className="mt-1 text-sm font-semibold text-foreground">
-                        {match.status === "awaiting_confirmation"
+                        {result.status === "submitted"
                           ? t("matchDetails.result.awaitingConfirmation")
-                          : t("matchDetails.result.confirmed")}
+                          : result.status === "confirmed"
+                          ? t("matchDetails.result.confirmed")
+                          : result.status === "disputed"
+                          ? t("matchDetails.result.disputed")
+                          : result.status}
                       </p>
                     </div>
                   )}
 
-                  {match.status === "awaiting_confirmation" && (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={handleConfirmResult}>
-                        <CheckCircle className="mr-1.5 h-4 w-4" />
-                        {t("matchDetails.result.confirmResult")}
-                      </Button>
-                      <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            <AlertTriangle className="mr-1.5 h-4 w-4" />
-                            {t("matchDetails.result.dispute")}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>{t("matchDetails.result.disputeTitle")}</DialogTitle>
-                          </DialogHeader>
-                          <form onSubmit={handleDisputeResult} className="space-y-4">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-medium">{t("matchDetails.result.disputeReason")}</Label>
-                              <Textarea
-                                placeholder={t("matchDetails.result.disputePlaceholder")}
-                                required
-                              />
-                            </div>
-                            <Button type="submit" variant="destructive" className="w-full">
-                              {t("matchDetails.result.submitDispute")}
+                  {(() => {
+                    // Show confirm/dispute only to the opposing participant or admins.
+                    // The submitter already confirmed at submission time.
+                    const isParticipant = currentUserId === match.player1.userId || currentUserId === match.player2.userId ||
+                      (match.participants ?? []).some((p) => p.userId === currentUserId)
+                    const isSubmitter = result.submittedByUserId === currentUserId
+                    const canAct = (isParticipant && !isSubmitter) || isAdmin
+                    if (!canAct || match.status !== "awaiting_confirmation") return null
+                    return (
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleConfirmResult} disabled={confirmingResult}>
+                          {confirmingResult ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-1.5 h-4 w-4" />}
+                          {t("matchDetails.result.confirmResult")}
+                        </Button>
+                        <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline">
+                              <AlertTriangle className="mr-1.5 h-4 w-4" />
+                              {t("matchDetails.result.dispute")}
                             </Button>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  )}
+                          </DialogTrigger>
+                          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
+                            <DialogHeader>
+                              <DialogTitle>{t("matchDetails.result.disputeTitle")}</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleDisputeResult} className="space-y-5">
+                              <div className="space-y-2">
+                                <Label className="text-xs font-medium">{t("matchDetails.result.disputeReason")}</Label>
+                                <Textarea
+                                  placeholder={t("matchDetails.result.disputePlaceholder")}
+                                  value={disputeReason}
+                                  onChange={(e) => setDisputeReason(e.target.value)}
+                                  required
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs font-medium">{t("matchDetails.result.disputeProposedScore")}</Label>
+                                <p className="text-xs text-muted-foreground">{t("matchDetails.result.disputeProposedScoreHint")}</p>
+                                <div className="space-y-2">
+                                  {disputeProposedSets.map((set, i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                      <span className="w-12 text-xs text-muted-foreground">Set {i + 1}</span>
+                                      <Input
+                                        type="number" min={0} max={7} className="w-16"
+                                        value={set.player1Score}
+                                        onChange={(e) => setDisputeProposedSets((prev) => prev.map((s, j) => j === i ? { ...s, player1Score: e.target.value } : s))}
+                                        placeholder={match.player1.name.split(" ")[0]}
+                                      />
+                                      <span className="text-muted-foreground">-</span>
+                                      <Input
+                                        type="number" min={0} max={7} className="w-16"
+                                        value={set.player2Score}
+                                        onChange={(e) => setDisputeProposedSets((prev) => prev.map((s, j) => j === i ? { ...s, player2Score: e.target.value } : s))}
+                                        placeholder={match.player2.name.split(" ")[0]}
+                                      />
+                                      {disputeProposedSets.length > 1 && (
+                                        <Button type="button" size="icon" variant="ghost" onClick={() => setDisputeProposedSets((prev) => prev.filter((_, j) => j !== i))}>
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {disputeProposedSets.length < 5 && (
+                                    <Button type="button" size="sm" variant="outline" onClick={() => setDisputeProposedSets((prev) => [...prev, { player1Score: "", player2Score: "" }])}>
+                                      <Plus className="mr-1.5 h-4 w-4" /> Add set
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                              <Button type="submit" variant="destructive" className="w-full" disabled={submittingDispute}>
+                                {submittingDispute ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                                {t("matchDetails.result.submitDispute")}
+                              </Button>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    )
+                  })()}
                 </CardContent>
               </Card>
 
               {/* Show Questionnaire Answers if available */}
-              {match.result.questionnaire && Object.keys(match.result.questionnaire).length > 0 && (
+              {result?.questionnaire && Object.keys(result?.questionnaire).length > 0 && (
                 <Card className="border-border/50">
                   <CardHeader>
                     <CardTitle className="text-base font-semibold tracking-tight">
@@ -941,120 +1040,120 @@ export default function MatchDetailPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {match.result.questionnaire.matchPlayedOut &&
-                      match.result.questionnaire.matchPlayedOut.length > 0 && (
+                    {result?.questionnaire.matchPlayedOut &&
+                      result?.questionnaire.matchPlayedOut.length > 0 && (
                         <QuestionnaireItem
                           label="Match intensity"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.matchPlayedOut
+                            result?.questionnaire.matchPlayedOut
                           )}
                         />
                       )}
-                    {match.result.questionnaire.mainStrategy &&
-                      match.result.questionnaire.mainStrategy.length > 0 && (
+                    {result?.questionnaire.mainStrategy &&
+                      result?.questionnaire.mainStrategy.length > 0 && (
                         <QuestionnaireItem
                           label="Strategy"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.mainStrategy
+                            result?.questionnaire.mainStrategy
                           )}
                         />
                       )}
-                    {match.result.questionnaire.whatWorkedBest &&
-                      match.result.questionnaire.whatWorkedBest.length > 0 && (
+                    {result?.questionnaire.whatWorkedBest &&
+                      result?.questionnaire.whatWorkedBest.length > 0 && (
                         <QuestionnaireItem
                           label="Worked best"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.whatWorkedBest
+                            result?.questionnaire.whatWorkedBest
                           )}
                         />
                       )}
-                    {match.result.questionnaire.whatDidntWork &&
-                      match.result.questionnaire.whatDidntWork.length > 0 && (
+                    {result?.questionnaire.whatDidntWork &&
+                      result?.questionnaire.whatDidntWork.length > 0 && (
                         <QuestionnaireItem
                           label="Didn't work"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.whatDidntWork
+                            result?.questionnaire.whatDidntWork
                           )}
                         />
                       )}
-                    {match.result.questionnaire.generalSensation &&
-                      match.result.questionnaire.generalSensation.length > 0 && (
+                    {result?.questionnaire.generalSensation &&
+                      result?.questionnaire.generalSensation.length > 0 && (
                         <QuestionnaireItem
                           label="General feeling"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.generalSensation
+                            result?.questionnaire.generalSensation
                           )}
                         />
                       )}
-                    {match.result.questionnaire.opponentStrength &&
-                      match.result.questionnaire.opponentStrength.length > 0 && (
+                    {result?.questionnaire.opponentStrength &&
+                      result?.questionnaire.opponentStrength.length > 0 && (
                         <QuestionnaireItem
                           label="Opponent's strength"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.opponentStrength
+                            result?.questionnaire.opponentStrength
                           )}
                         />
                       )}
-                    {match.result.questionnaire.pointBuilding &&
-                      match.result.questionnaire.pointBuilding.length > 0 && (
+                    {result?.questionnaire.pointBuilding &&
+                      result?.questionnaire.pointBuilding.length > 0 && (
                         <QuestionnaireItem
                           label="Point building"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.pointBuilding
+                            result?.questionnaire.pointBuilding
                           )}
                         />
                       )}
-                    {match.result.questionnaire.serveStrategy &&
-                      match.result.questionnaire.serveStrategy.length > 0 && (
+                    {result?.questionnaire.serveStrategy &&
+                      result?.questionnaire.serveStrategy.length > 0 && (
                         <QuestionnaireItem
                           label="Serve strategy"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.serveStrategy
+                            result?.questionnaire.serveStrategy
                           )}
                         />
                       )}
-                    {match.result.questionnaire.importantPoints &&
-                      match.result.questionnaire.importantPoints.length > 0 && (
+                    {result?.questionnaire.importantPoints &&
+                      result?.questionnaire.importantPoints.length > 0 && (
                         <QuestionnaireItem
                           label="Important points"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.importantPoints
+                            result?.questionnaire.importantPoints
                           )}
                         />
                       )}
-                    {match.result.questionnaire.netApproach &&
-                      match.result.questionnaire.netApproach.length > 0 && (
+                    {result?.questionnaire.netApproach &&
+                      result?.questionnaire.netApproach.length > 0 && (
                         <QuestionnaireItem
                           label="Net approach"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.netApproach
+                            result?.questionnaire.netApproach
                           )}
                         />
                       )}
-                    {match.result.questionnaire.tacticAdjustment &&
-                      match.result.questionnaire.tacticAdjustment.length > 0 && (
+                    {result?.questionnaire.tacticAdjustment &&
+                      result?.questionnaire.tacticAdjustment.length > 0 && (
                         <QuestionnaireItem
                           label="Tactic adjustment"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.tacticAdjustment
+                            result?.questionnaire.tacticAdjustment
                           )}
                         />
                       )}
-                    {match.result.questionnaire.targetedSide &&
-                      match.result.questionnaire.targetedSide.length > 0 && (
+                    {result?.questionnaire.targetedSide &&
+                      result?.questionnaire.targetedSide.length > 0 && (
                         <QuestionnaireItem
                           label="Targeted side"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.targetedSide
+                            result?.questionnaire.targetedSide
                           )}
                         />
                       )}
-                    {match.result.questionnaire.mainMistake &&
-                      match.result.questionnaire.mainMistake.length > 0 && (
+                    {result?.questionnaire.mainMistake &&
+                      result?.questionnaire.mainMistake.length > 0 && (
                         <QuestionnaireItem
                           label="Main mistake"
                           value={formatQuestionnaireArrayValues(
-                            match.result.questionnaire.mainMistake
+                            result?.questionnaire.mainMistake
                           )}
                         />
                       )}

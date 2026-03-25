@@ -26,7 +26,7 @@
 import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { RatingService } from '../rating/rating.service';
-import { ResultDTO, SetResultDTO, AddSetResultInput, SubmitMatchResultInput } from './results.types';
+import { ResultDTO, SetResultDTO, AddSetResultInput, SubmitMatchResultInput, DisputeResultInput } from './results.types';
 import { MatchStatus, Result, SetResult } from '@prisma/client';
 import { createNotification } from '../notifications/notifications.service';
 
@@ -416,6 +416,10 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
 
     validateResultMatchConsistency(result, { status: match.status, type: match.type });
 
+    if (result.submittedByUserId && result.submittedByUserId === userId) {
+      throw new AppError('The submitter cannot provide the second confirmation', 403);
+    }
+
     if ((result.status as string) === 'disputed' || (match.status as string) === 'disputed') {
       throw new AppError('Cannot confirm a disputed result', 400);
     }
@@ -532,31 +536,36 @@ export async function confirmResult(resultId: string, userId: string): Promise<R
  * @returns Updated ResultDTO
  * @throws AppError if already confirmed or not found
  */
-export async function disputeResult(resultId: string, userId: string): Promise<ResultDTO> {
+export async function disputeResult(input: DisputeResultInput): Promise<ResultDTO> {
+  const { resultId, userId, isAdmin, disputeNote } = input;
   return await prisma.$transaction(async (tx) => {
-    // Load Result and Match
     const result = await tx.result.findUnique({
       where: { id: resultId },
-      include: { match: true },
+      include: { match: { include: { participants: { select: { userId: true } } } } },
     });
     if (!result) throw new AppError('Result not found', 404);
     if (!result.match) throw new AppError('Match not found for result', 404);
+
+    // Only participants and admins can dispute
+    const participantIds = (result.match as any).participants?.map((p: { userId: string }) => p.userId) ?? [];
+    if (!isAdmin && !participantIds.includes(userId)) {
+      throw new AppError('Only match participants or admins can dispute a result', 403);
+    }
+
     validateResultMatchConsistency(result, { status: result.match.status, type: result.match.type });
     if (result.status === 'confirmed') {
       throw new AppError('Cannot dispute a confirmed result', 409);
     }
 
-    // Update Result and Match status to disputed
     await tx.result.update({
       where: { id: resultId },
-      data: { status: 'disputed' },
+      data: { status: 'disputed', disputeNote: disputeNote ?? null },
     });
     await tx.match.update({
       where: { id: result.matchId },
       data: { status: 'disputed' },
     });
 
-    // Return updated ResultDTO
     const updated = await tx.result.findUnique({ where: { id: resultId }, include: { sets: true } });
     if (!updated) throw new AppError('Result not found after dispute', 500);
     return toResultDTO(updated);
@@ -584,23 +593,33 @@ export async function disputeResult(resultId: string, userId: string): Promise<R
  * - Tournament-specific rules
  */
 export function validateSetScore(input: AddSetResultInput) {
-  const {
-    playerAScore,
-    playerBScore,
-    tiebreakScoreA,
-    tiebreakScoreB
-  } = input;
+  const { playerAScore, playerBScore, tiebreakScoreA, tiebreakScoreB } = input;
 
   if (playerAScore < 0 || playerBScore < 0) {
     throw new AppError('Scores must be positive numbers', 400);
   }
-
   if (playerAScore === playerBScore) {
     throw new AppError('Set cannot end in a tie', 400);
   }
 
-  if (Math.max(playerAScore, playerBScore) < 6) {
-    throw new AppError('Invalid tennis set score', 400);
+  const winner = Math.max(playerAScore, playerBScore);
+  const loser = Math.min(playerAScore, playerBScore);
+
+  // Standard tennis set rules:
+  // 6-x where x <= 4 (winner leads by at least 2)
+  // 7-5 (came back from 5-5, no tiebreak)
+  // 7-6 (tiebreak at 6-6)
+  if (winner < 6) {
+    throw new AppError('Invalid tennis set score: winner must reach at least 6 games', 400);
+  }
+  if (winner === 6 && loser > 4) {
+    throw new AppError('Invalid tennis set score: at 6 games, winner must lead by at least 2 (6-4 or less)', 400);
+  }
+  if (winner === 7 && (loser < 5 || loser > 6)) {
+    throw new AppError('Invalid tennis set score: 7-x is only valid as 7-5 or 7-6', 400);
+  }
+  if (winner > 7) {
+    throw new AppError('Invalid tennis set score: maximum games per set is 7', 400);
   }
 
   if ((tiebreakScoreA ?? 0) < 0 || (tiebreakScoreB ?? 0) < 0) {
@@ -619,17 +638,62 @@ function toResultDTO(result: Result & { sets?: SetResult[] }): ResultDTO {
     id: result.id,
     matchId: result.matchId,
     winnerUserId: result.winnerUserId ?? null,
+    submittedByUserId: (result as any).submittedByUserId ?? null,
     createdAt: result.createdAt.toISOString(),
     status: result.status ?? 'draft',
     confirmedByHostAt: result.confirmedByHostAt ? result.confirmedByHostAt.toISOString() : null,
     confirmedByOpponentAt: result.confirmedByOpponentAt ? result.confirmedByOpponentAt.toISOString() : null,
     disputedByHostAt: result.disputedByHostAt ? result.disputedByHostAt.toISOString() : null,
     disputedByOpponentAt: result.disputedByOpponentAt ? result.disputedByOpponentAt.toISOString() : null,
+    disputeNote: (result as any).disputeNote ?? null,
     sets: (result.sets ?? [])
       .slice()
       .sort((a, b) => a.setNumber - b.setNumber)
       .map(toSetResultDTO)
   };
+}
+
+/**
+ * Auto-confirms results that have been awaiting confirmation for >= 7 days with no dispute.
+ * Called by the nightly autoconfirm job.
+ * Returns the count of results auto-confirmed.
+ */
+export async function autoConfirmResults(): Promise<number> {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const results = await prisma.result.findMany({
+    where: { status: 'submitted', createdAt: { lte: cutoff } },
+    include: { match: { include: { participants: { select: { userId: true, team: true } } } } },
+  });
+
+  let count = 0;
+  for (const result of results) {
+    try {
+      const now = new Date();
+      await prisma.$transaction(async (tx) => {
+        await tx.result.update({
+          where: { id: result.id },
+          data: {
+            status: 'confirmed',
+            confirmedByHostAt: result.confirmedByHostAt ?? now,
+            confirmedByOpponentAt: result.confirmedByOpponentAt ?? now,
+          },
+        });
+        await tx.match.update({
+          where: { id: result.matchId },
+          data: { status: 'completed' },
+        });
+      });
+      if ((result.match as any)?.type === 'competitive') {
+        await RatingService.updateRatingsForCompletedMatch(prisma, result.matchId);
+      }
+      count++;
+    } catch (err) {
+      // Log and continue — one failure should not stop the rest
+      const { logger } = await import('../../config/logger');
+      logger.error('AutoConfirmResult failed', { resultId: result.id, error: err instanceof Error ? err.message : err });
+    }
+  }
+  return count;
 }
 
 /**

@@ -8,14 +8,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import type { Match, PostMatchQuestionnaire } from "@/lib/types"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { resultsService } from "@/lib/services/results.service"
+import { getCurrentUserId } from "@/lib/current-user"
 
 interface ResultUploadDialogProps {
   match: Match
@@ -194,6 +196,7 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
   ])
   const [questionnaireOpen, setQuestionnaireOpen] = useState(false)
   const [questionnaire, setQuestionnaire] = useState<Partial<PostMatchQuestionnaire>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Pick 5 random questions on mount (only when dialog opens)
   const selectedQuestions = useMemo(() => {
@@ -201,7 +204,8 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
     return shuffled.slice(0, 5)
   }, [open])
 
-  const isPlayer1 = match.player1.userId === "user-001"
+  const currentUserId = getCurrentUserId()
+  const isPlayer1 = match.player1.userId === currentUserId
   const currentPlayer = isPlayer1 ? match.player1 : match.player2
   const opponent = isPlayer1 ? match.player2 : match.player1
 
@@ -269,15 +273,15 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
       if (winner === 6 && loser > 4) {
         return "Invalid score: if winner has 6, loser must have 4 or less"
       }
-      // If winner has 7, loser must be 5 or 6
-      if (winner === 7 && loser < 5) {
-        return "Invalid score: if winner has 7, loser must be 5 or 6"
+      // If winner has 7, loser must be exactly 5 or 6
+      if (winner === 7 && (loser < 5 || loser > 6)) {
+        return "Invalid score: 7-x is only valid as 7-5 or 7-6"
       }
     }
     return null
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
     const validationError = validateSets()
@@ -286,28 +290,28 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
       return
     }
 
-    const winner = calculateWinner()
-    if (winner === "Undecided") {
-      toast.error("Match result is undecided - please enter valid scores")
-      return
-    }
-
     const filledSets = sets.filter((s) => s.player1Score && s.player2Score)
+    const setsPayload = filledSets.map((s, i) => ({
+      setNumber: i + 1,
+      player1Score: parseInt(s.player1Score),
+      player2Score: parseInt(s.player2Score),
+    }))
 
-    console.log("[v0] Submitting result:", {
-      matchId: match.id,
-      sets: filledSets,
-      winner,
-      questionnaire,
-    })
-
-    toast.success(
-      match.matchType === "competitive"
-        ? "Result submitted! Awaiting opponent confirmation."
-        : "Result submitted successfully!"
-    )
-    setOpen(false)
-    onResultSubmitted?.()
+    setIsSubmitting(true)
+    try {
+      await resultsService.submitMatchResult(match.id, setsPayload)
+      toast.success(
+        match.matchType === "competitive"
+          ? "Result submitted! Awaiting opponent confirmation."
+          : "Result submitted successfully!"
+      )
+      setOpen(false)
+      onResultSubmitted?.()
+    } catch {
+      toast.error("Failed to submit result. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   function toggleQuestionnaireValue(key: keyof PostMatchQuestionnaire, value: string) {
@@ -322,22 +326,13 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={0}>
-              {trigger || (
-                <Button size="sm" variant="outline" className="gap-2" disabled>
-                  {t("matchDetails.submit.button")}
-                </Button>
-              )}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{t("matchDetails.submit.disabled")}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button size="sm" variant="outline" className="gap-2">
+            {t("matchDetails.submit.button")}
+          </Button>
+        )}
+      </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Upload Match Result</DialogTitle>
@@ -440,8 +435,8 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
             </div>
           </Collapsible>
 
-          <Button type="submit" className="w-full" size="lg">
-            Submit Result
+          <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+            {isSubmitting ? "Submitting…" : "Submit Result"}
           </Button>
         </form>
       </DialogContent>

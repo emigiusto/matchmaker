@@ -30,11 +30,20 @@ export interface ResultDTO {
   createdAt: string; // ISO string
   sets: SetResultDTO[];
   winnerUserId: string | null;
+  submittedByUserId: string | null;
   status: ResultStatus;
   confirmedByHostAt: string | null;
   confirmedByOpponentAt: string | null;
   disputedByHostAt: string | null;
   disputedByOpponentAt: string | null;
+  disputeNote: string | null;
+}
+
+export interface DisputeResultInput {
+  resultId: string;
+  userId: string;
+  isAdmin: boolean;
+  disputeNote?: string | null;
 }
 
 /**

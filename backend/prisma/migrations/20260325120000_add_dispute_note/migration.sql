@@ -1,0 +1,1 @@
+ALTER TABLE `Result` ADD COLUMN `disputeNote` VARCHAR(191) NULL;

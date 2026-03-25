@@ -16,6 +16,10 @@ export const resultsService = {
     return apiClient.get<MatchResult[]>(`/results/by-user/${userId}`)
   },
 
+  async submitMatchResult(matchId: string, sets: SetScore[]): Promise<MatchResult> {
+    return apiClient.post<MatchResult>(`/results/${matchId}/submit-result`, { sets })
+  },
+
   async submitSets(resultId: string, sets: SetScore[]): Promise<MatchResult> {
     return apiClient.post<MatchResult>(`/results/${resultId}/sets`, { sets })
   },
@@ -24,7 +28,7 @@ export const resultsService = {
     return apiClient.post<MatchResult>(`/results/${resultId}/confirm`)
   },
 
-  async dispute(resultId: string, reason: string): Promise<MatchResult> {
-    return apiClient.post<MatchResult>(`/results/${resultId}/dispute`, { reason })
+  async dispute(resultId: string, disputeNote: string): Promise<MatchResult> {
+    return apiClient.post<MatchResult>(`/results/${resultId}/dispute`, { disputeNote })
   },
 }

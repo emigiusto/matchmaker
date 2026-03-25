@@ -94,11 +94,15 @@ export interface PostMatchQuestionnaire {
 export interface MatchResult {
   id: string
   matchId: string
-  winnerId: string
+  winnerUserId: string | null
+  submittedByUserId: string | null
+  status: "draft" | "submitted" | "confirmed" | "disputed"
   sets: SetScore[]
-  confirmedByPlayer1: boolean
-  confirmedByPlayer2: boolean
-  status: "pending" | "confirmed" | "disputed"
+  confirmedByHostAt: string | null
+  confirmedByOpponentAt: string | null
+  disputedByHostAt: string | null
+  disputedByOpponentAt: string | null
+  disputeNote: string | null
   player1RatingChange?: number
   player2RatingChange?: number
   questionnaire?: PostMatchQuestionnaire
