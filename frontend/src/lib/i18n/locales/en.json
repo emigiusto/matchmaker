@@ -1044,7 +1044,7 @@
     "dialog": {
       "title": "Upload Match Result",
       "setResults": "Set Results",
-      "addSet": "+ Add Set",
+      "addSet": "Add Set",
       "set": "Set",
       "tiebreak": "TB",
       "winnerPreview": "Winner:",

@@ -1044,7 +1044,7 @@
     "dialog": {
       "title": "Subir Resultado",
       "setResults": "Resultados por Set",
-      "addSet": "+ Añadir Set",
+      "addSet": "Añadir Set",
       "set": "Set",
       "tiebreak": "TB",
       "winnerPreview": "Ganador:",
