@@ -26,7 +26,8 @@
     "reminderSent": "Sent",
     "reminderPending": "Pending",
     "reminderFailed": "Failed",
-    "matchCancelledBanner": "This match has been cancelled and will not take place"
+    "matchCancelledBanner": "This match has been cancelled and will not take place",
+    "all": "All"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -108,7 +109,8 @@
     "netApproach": "Net approach",
     "tacticAdjustment": "Tactic adjustment",
     "targetedSide": "Targeted side",
-    "mainMistake": "Main mistake"
+    "mainMistake": "Main mistake",
+    "questionnaireDisclaimer": "Your answers are saved and will be used to power personalised AI match insights in a future update."
   },
   "profile": {
     "myProfile": "My Profile",
@@ -294,7 +296,7 @@
     "practice": "Practice",
     "practiceDesc": "Casual, no tracking",
     "competitive": "Competitive",
-    "competitiveDesc": "Coming soon",
+    "competitiveDesc": "Affects your rating",
     "fromList": "From list",
     "friends": "Friends",
     "allContacts": "All contacts",
@@ -718,6 +720,9 @@
       "disputeTitle": "Dispute Result",
       "disputeReason": "Reason",
       "disputePlaceholder": "Explain why you're disputing this result...",
+      "disputeProposedScore": "Proposed correct scores",
+      "disputeProposedScoreHint": "Optional — enter what you believe the correct scores were.",
+      "disputeNoteTitle": "Dispute reason",
       "submitDispute": "Submit Dispute"
     },
     "submit": {
@@ -790,7 +795,9 @@
       "bookingCancelled": "Court booking cancelled",
       "bookingCancelFailed": "Court booking cancellation failed",
       "matchRescheduled": "Match rescheduled",
-      "matchRescheduledVs": "Match vs {{opponents}} rescheduled"
+      "matchRescheduledVs": "Match vs {{opponents}} rescheduled",
+      "resultDisputed": "Result disputed",
+      "resultDisputedAdmin": "Result disputed — review needed"
     },
     "messages": {
       "scheduledForDate": "A match was scheduled for {{date}}.",
@@ -811,7 +818,9 @@
       "bookingCancelled": "The court booking for your cancelled match has been successfully cancelled.",
       "bookingCancelFailed": "The court booking could not be cancelled automatically. Please cancel it manually at the club.",
       "matchRescheduled": "The match has been rescheduled.",
-      "matchRescheduledParts": "New time: {{parts}}."
+      "matchRescheduledParts": "New time: {{parts}}.",
+      "resultDisputed": "A result for one of your matches has been disputed.",
+      "resultDisputedAdmin": "A match result has been disputed and requires your review."
     }
   },
   "contactsPage": {
@@ -947,8 +956,16 @@
       "phoneLabel": "Phone"
     },
     "step2": {
-      "title": "Where do you play?",
-      "description": "Set your default club and city. You can change these at any time.",
+      "title": "Your level & location",
+      "description": "Help us find you the right opponents from your very first match.",
+      "levelLabel": "What's your current level?",
+      "levels": {
+        "beginner":     { "label": "Just starting out",       "desc": "New to the sport, still learning the basics" },
+        "learning":     { "label": "Getting the hang of it",  "desc": "Playing regularly, working on consistency" },
+        "intermediate": { "label": "Regular club player",     "desc": "Solid game, comfortable in match play" },
+        "advanced":     { "label": "Advanced",                "desc": "Strong competitive club player" },
+        "competitive":  { "label": "Tournament level",        "desc": "Regional or national competition experience" }
+      },
       "clubLabel": "Preferred club or court",
       "clubPlaceholder": "e.g. Club Tennis Barcelona",
       "cityLabel": "City",

@@ -32,6 +32,8 @@ export function useNotificationText() {
       case "match.rescheduled":    return opponents
         ? t("notifications.titles.matchRescheduledVs", { opponents })
         : t("notifications.titles.matchRescheduled")
+      case "result.disputed":       return t("notifications.titles.resultDisputed")
+      case "result.disputed.admin": return t("notifications.titles.resultDisputedAdmin")
       default:                     return n.title
     }
   }
@@ -96,6 +98,8 @@ export function useNotificationText() {
       }
       case "booking.cancelled":     return t("notifications.messages.bookingCancelled")
       case "booking.cancel_failed": return t("notifications.messages.bookingCancelFailed")
+      case "result.disputed":       return t("notifications.messages.resultDisputed")
+      case "result.disputed.admin": return t("notifications.messages.resultDisputedAdmin")
       case "match.rescheduled": {
         const parts: string[] = []
         if (opponents) parts.push(`vs ${opponents}`)

@@ -1,10 +1,25 @@
 import { apiClient } from "./api-client"
-import type { MatchResult, SetScore } from "../types"
+import type { MatchResult, SetScore, PostMatchQuestionnaire } from "../types"
 
-export interface SubmitResultDto {
+export interface DisputedResult {
+  id: string
   matchId: string
-  winnerId: string
-  sets: SetScore[]
+  createdAt: string
+  sets: { id: string; setNumber: number; playerAScore: number; playerBScore: number }[]
+  winnerUserId: string | null
+  submittedByUserId: string | null
+  status: string
+  disputedByHostAt: string | null
+  disputedByOpponentAt: string | null
+  disputeNote: string | null
+  match: {
+    id: string
+    date: string
+    time: string
+    location: string
+    type: string
+    participants: { userId: string; userName: string; team: string | null }[]
+  }
 }
 
 export const resultsService = {
@@ -16,6 +31,10 @@ export const resultsService = {
     return apiClient.get<MatchResult[]>(`/results/by-user/${userId}`)
   },
 
+  async submitMatchResult(matchId: string, sets: SetScore[], questionnaire?: PostMatchQuestionnaire): Promise<MatchResult> {
+    return apiClient.post<MatchResult>(`/results/${matchId}/submit-result`, { sets, questionnaire })
+  },
+
   async submitSets(resultId: string, sets: SetScore[]): Promise<MatchResult> {
     return apiClient.post<MatchResult>(`/results/${resultId}/sets`, { sets })
   },
@@ -24,7 +43,15 @@ export const resultsService = {
     return apiClient.post<MatchResult>(`/results/${resultId}/confirm`)
   },
 
-  async dispute(resultId: string, reason: string): Promise<MatchResult> {
-    return apiClient.post<MatchResult>(`/results/${resultId}/dispute`, { reason })
+  async dispute(resultId: string, disputeNote: string): Promise<MatchResult> {
+    return apiClient.post<MatchResult>(`/results/${resultId}/dispute`, { disputeNote })
+  },
+
+  async resolveDispute(resultId: string, sets: SetScore[]): Promise<MatchResult> {
+    return apiClient.post<MatchResult>(`/results/${resultId}/resolve-dispute`, { sets })
+  },
+
+  async getDisputedResults(): Promise<DisputedResult[]> {
+    return apiClient.get<DisputedResult[]>(`/results/disputed`)
   },
 }

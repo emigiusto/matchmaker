@@ -1,6 +1,6 @@
 # Result Upload & Rating Flow
 
-_Last updated: 2026-03-25_
+_Last updated: 2026-03-25 (rev 3)_
 
 ---
 
@@ -44,7 +44,9 @@ Match status and Result status are kept in sync. The valid pairs are:
 | `POST` | `/results/:matchId/submit-result` | Main endpoint — creates Result + SetResults, sets match to `awaiting_confirmation` |
 | `POST` | `/results/:id/sets` | Add an individual set to an existing result |
 | `POST` | `/results/:id/confirm` | Second player confirms; when both confirmed, triggers rating update |
-| `POST` | `/results/:id/dispute` | Either player disputes the result |
+| `POST` | `/results/:id/dispute` | Either player disputes the result; fires notifications to other participant + all admins |
+| `POST` | `/results/:id/resolve-dispute` | **Admin only** — accepts corrected set scores, resets result to `submitted`, restarts confirmation flow |
+| `GET`  | `/results/disputed` | **Admin only** — returns all `disputed` results enriched with match and participant data |
 | `GET`  | `/results/by-match/:matchId` | Fetch result for a match |
 | `GET`  | `/results/by-user/:userId` | Fetch all results for a user |
 | `GET`  | `/results/recent` | Activity feed of recent results |
@@ -82,10 +84,21 @@ Match status and Result status are kept in sync. The valid pairs are:
    - Sends notifications
 3. Method is idempotent — calling it twice returns the same result
 
-**`disputeResult()`** — `results.service.ts` lines 535–564
+**`disputeResult()`** — `results.service.ts`
 
 - Marks result as `disputed`, blocking any further confirmation or rating update
-- No resolution mechanism currently exists (see Missing Pieces)
+- Stores `disputeNote` as a JSON string: `{ reason: string, proposedSets?: SetScore[] }`
+- After the transaction, fires best-effort notifications via `setImmediate`:
+  - `result.disputed` → all participants who did not submit the dispute
+  - `result.disputed.admin` → all admin users (excluding participants)
+
+**`resolveDispute()`** — `results.service.ts`
+
+- Admin-only: accepts corrected set scores, deletes existing `SetResult` rows, inserts new ones
+- Recomputes `winnerUserId` from the corrected sets
+- Resets `Result.status = submitted` and `Match.status = awaiting_confirmation`
+- Clears `disputedByHostAt`, `disputedByOpponentAt`, and `disputeNote`
+- Normal confirmation flow (second player confirms → `completed` → rating update) resumes from here
 
 ---
 
@@ -184,6 +197,8 @@ model Result {
   confirmedByOpponentAt DateTime?
   disputedByHostAt      DateTime?
   disputedByOpponentAt  DateTime?
+  disputeNote           String?      // JSON: { reason: string, proposedSets?: SetScore[] }
+  questionnaire         Json?        // PostMatchQuestionnaire answers
   createdAt             DateTime     @default(now())
 
   match      Match       @relation(...)
@@ -238,53 +253,70 @@ model RatingHistory {
 - Supports 1–5 sets with per-set score entry
 - Validates tennis rules client-side (winner needs ≥6 games, no ties, 7-5/7-6 allowed)
 - Computes winner from set count
-- Includes a post-match questionnaire (5 randomly selected from 14 questions)
+- Includes a post-match questionnaire (5 randomly selected from 14 questions); answers are persisted to `Result.questionnaire` on submission
+
+### Match Details
+
+**File:** `frontend/src/pages/MatchDetails/MatchDetails.tsx`
+
+- Shows current result sets and status
+- When `result.status === "disputed"` and `disputeNote` is present, parses the JSON and renders the dispute reason and proposed corrected scores
+- Participants who did not submit can confirm or dispute; admins have an additional "Resolve dispute" dialog
+
+### Admin Dashboard — Disputes Tab
+
+**File:** `frontend/src/pages/Admin/AdminDashboard.tsx`
+
+- Tab trigger shows a red badge with the count of open disputes
+- Fetches `GET /results/disputed` on mount
+- Each card shows: players, date/time/location, parsed dispute note (reason + proposed scores), current set scores
+- Inline "Resolve…" form lets admins enter corrected scores and call `POST /results/:id/resolve-dispute`
 
 ### Frontend API Service
 
 **File:** `frontend/src/lib/services/results.service.ts`
 
-Methods defined:
-
 ```typescript
 resultsService.getByMatch(matchId)
 resultsService.getByUser(userId)
+resultsService.submitMatchResult(matchId, sets, questionnaire?)
 resultsService.submitSets(resultId, sets)
 resultsService.confirm(resultId)
-resultsService.dispute(resultId, reason)
+resultsService.dispute(resultId, noteJson)
+resultsService.resolveDispute(resultId, sets)
+resultsService.getDisputedResults()   // admin only
 ```
+
+### Notifications
+
+**Files:** `frontend/src/lib/api/adapters.ts`, `frontend/src/lib/hooks/use-notification-text.ts`, `frontend/src/lib/i18n/locales/{en,es}.json`
+
+| Backend type | Frontend type | EN title | ES title |
+|---|---|---|---|
+| `result.disputed` | `result_disputed` | "Result disputed" | "Resultado impugnado" |
+| `result.disputed.admin` | `result_disputed` | "Result disputed — review needed" | "Resultado impugnado — revisión necesaria" |
 
 ---
 
-## 7. Missing Pieces
+## 7. Player Stats
 
-### Critical (Blocking)
+**Endpoint:** `GET /players/:id/stats`
 
-| # | Issue | Location |
-|---|-------|----------|
-| 1 | **`handleSubmit` has no API call** — dialog validates scores and closes with a toast, but never calls the backend | `result-upload-dialog.tsx` lines 280–311 |
-| 2 | **`resultsService` methods are never called** from the UI | `frontend/src/lib/services/results.service.ts` |
+Stats are **computed at read time** from confirmed `Result` and `RatingHistory` records — never cached as mutable counters on the `Player` row. This avoids permanent desync if a counter update fails mid-transaction.
 
-### Notable Gaps
+Fields returned: `totalMatches`, `competitiveMatches`, `practiceMatches`, `wins`, `losses`, `winRate`, `averageOpponentLevel`, `currentStreak`, `streakType`, `ratingHistory`.
+
+---
+
+## 8. Open Gaps
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 3 | **Questionnaire answers not persisted** | 14 questions defined in UI, answers stored in local state, but no backend field or endpoint to save them |
-| 4 | **Backend tennis validation is incomplete** | `results.validators.ts` has a `TODO` — missing 2-game lead rule (no 6-5), tiebreak enforcement at 6-6, super-tiebreak |
-| 5 | **No rating read endpoints** | `RatingHistory` is written but never exposed — no `GET /players/:id/rating-history`, no leaderboard |
-| 6 | **Dispute resolution not designed** | `disputeResult()` sets the flag, but there is no admin override, appeal path, or timeout resolution |
-| 7 | **Confirmation by same player not blocked** | Nothing prevents the submitter from also providing the second confirmation |
-| 8 | **Practice match result behaviour is ambiguous** | Sets can be stored for practice matches, but no rating update happens — intended behaviour is not documented |
-| 9 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` never reads `lastMatchAt`, so inactivity has no effect on deterministic ratings |
-| 10 | **Match completion side effects are minimal** | On `completed`, only rating is updated — no win/loss counters, no leaderboard recalc, no achievement checks |
+| 1 | **Confidence decay only active in ELO mode** | `DeterministicRatingAlgorithm` ignores `lastMatchAt`, so inactivity has no effect on ratings in the default mode. Intentional or oversight — should be documented either way. |
+| 2 | **Questionnaire data not yet surfaced** | Answers are persisted to `Result.questionnaire` but not rendered anywhere in the UI. Planned: AI-powered post-match insight panel on the match detail page. |
 
 ---
 
-## 8. Recommended Next Steps (Priority Order)
+## 9. Next Steps (Priority Order)
 
-1. **Wire the frontend** — in `handleSubmit`, call `resultsService.submitSets()` with the match ID and collected set scores
-2. **Complete server-side tennis validation** — add 2-game lead rule and tiebreak logic to `results.validators.ts`
-3. **Decide on questionnaire** — either add a JSON column to `Result` in Prisma or remove the questionnaire from the UI
-4. **Enforce confirmation by opposite player** — add a guard in `confirmResult()` that blocks the original submitter from providing the second confirmation
-5. **Expose rating history** — add `GET /players/:id/rating-history` and a leaderboard endpoint
-6. **Design dispute resolution** — define whether disputes go to admin review, auto-expire, or are handled differently
+1. **AI post-match insights** — use `Result.questionnaire` data to generate a short insight message after a match is confirmed. Display on the match detail page with a label like "Powered by AI".

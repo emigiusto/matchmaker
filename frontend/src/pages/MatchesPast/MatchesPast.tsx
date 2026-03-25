@@ -4,6 +4,7 @@ import { format } from "date-fns"
 import { Calendar, MapPin, TrendingUp, Clock as ClockIcon, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
+import { MatchTypeBadge } from "@/components/match-type-badge"
 import { matchesService } from "@/lib/services/matches.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import type { Match } from "@/lib/types"
@@ -65,7 +66,7 @@ export default function PastMatchesPage() {
             {pastMatches.map((match) => {
               const opponent =
                 match.player1.userId === currentUserId ? match.player2 : match.player1
-              const isWinner = match.result?.winnerId === currentUserId
+              const isWinner = match.result?.winnerUserId === currentUserId
               return (
                 <Link key={match.id} to={`/matches/${match.id}`}>
                   <Card className="transition-all hover:shadow-lg">
@@ -97,6 +98,7 @@ export default function PastMatchesPage() {
                         </div>
                       </div>
                       <div className="ml-2 flex shrink-0 items-center gap-3">
+                        <MatchTypeBadge type={match.matchType} className="text-xs" />
                         {match.result && (
                           <div className="text-right">
                             <p className="font-mono text-base font-bold text-foreground">

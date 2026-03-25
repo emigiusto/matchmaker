@@ -226,5 +226,6 @@ router.get('/by-user/:userId', PlayersController.getPlayerByUserId);
  *               $ref: '#/components/schemas/Player'
  */
 router.patch('/:id', PlayersController.updatePlayer);
+router.get('/:id/stats', PlayersController.getPlayerStats);
 
 export default router;

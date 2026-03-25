@@ -94,11 +94,15 @@ export interface PostMatchQuestionnaire {
 export interface MatchResult {
   id: string
   matchId: string
-  winnerId: string
+  winnerUserId: string | null
+  submittedByUserId: string | null
+  status: "draft" | "submitted" | "confirmed" | "disputed"
   sets: SetScore[]
-  confirmedByPlayer1: boolean
-  confirmedByPlayer2: boolean
-  status: "pending" | "confirmed" | "disputed"
+  confirmedByHostAt: string | null
+  confirmedByOpponentAt: string | null
+  disputedByHostAt: string | null
+  disputedByOpponentAt: string | null
+  disputeNote: string | null
   player1RatingChange?: number
   player2RatingChange?: number
   questionnaire?: PostMatchQuestionnaire
@@ -122,7 +126,7 @@ export interface SuggestedOpponent {
 export interface Notification {
   id: string
   userId: string
-  type: "invite_received" | "result_pending" | "match_completed" | "rating_change" | "invite_accepted" | "match_cancelled" | "scheduling_no_match" | "booking_cancelled" | "booking_cancel_failed" | "booking_success"
+  type: "invite_received" | "result_pending" | "match_completed" | "rating_change" | "invite_accepted" | "match_cancelled" | "scheduling_no_match" | "booking_cancelled" | "booking_cancel_failed" | "booking_success" | "result_disputed"
   title: string
   message: string
   read: boolean
@@ -151,8 +155,8 @@ export interface PlayerStats {
   wins: number
   losses: number
   winRate: number
-  averageOpponentLevel: number
+  averageOpponentLevel: number | null
   currentStreak: number
   streakType: "win" | "loss" | "none"
-  ratingHistory: { date: string; rating: number }[]
+  ratingHistory: { date: string; rating: number; delta: number }[]
 }

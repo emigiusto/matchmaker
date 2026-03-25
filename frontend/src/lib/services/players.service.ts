@@ -1,11 +1,13 @@
 import { apiClient } from "./api-client"
-import type { Player } from "../types"
+import type { Player, PlayerStats } from "../types"
 
 export interface PlayerPreferences {
   id: string
   userId: string
   defaultCity?: string
   preferredClub?: string
+  levelValue?: number
+  levelConfidence?: number
 }
 
 export const playersService = {
@@ -27,15 +29,19 @@ export const playersService = {
 
   async create(
     userId: string,
-    data: { preferredClub?: string; defaultCity?: string }
+    data: { preferredClub?: string; defaultCity?: string; levelValue?: number; levelConfidence?: number }
   ): Promise<PlayerPreferences> {
     return apiClient.post<PlayerPreferences>("/players", { userId, ...data })
   },
 
   async update(
     playerId: string,
-    data: { preferredClub?: string; defaultCity?: string }
+    data: { preferredClub?: string; defaultCity?: string; levelValue?: number; levelConfidence?: number }
   ): Promise<PlayerPreferences> {
     return apiClient.patch<PlayerPreferences>(`/players/${playerId}`, data)
+  },
+
+  async getStats(playerId: string): Promise<PlayerStats> {
+    return apiClient.get<PlayerStats>(`/players/${playerId}/stats`)
   },
 }

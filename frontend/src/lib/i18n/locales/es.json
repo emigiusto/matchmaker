@@ -26,7 +26,8 @@
     "reminderSent": "Enviado",
     "reminderPending": "Pendiente",
     "reminderFailed": "Fallido",
-    "matchCancelledBanner": "Este partido ha sido cancelado y no tendrá lugar"
+    "matchCancelledBanner": "Este partido ha sido cancelado y no tendrá lugar",
+    "all": "Todos"
   },
   "navigation": {
     "dashboard": "Panel Principal",
@@ -108,7 +109,8 @@
     "netApproach": "Acercamiento a la red",
     "tacticAdjustment": "Ajuste táctico",
     "targetedSide": "Lado atacado",
-    "mainMistake": "Error principal"
+    "mainMistake": "Error principal",
+    "questionnaireDisclaimer": "Tus respuestas se guardan y se usarán para impulsar perspectivas de partido personalizadas con IA en una futura actualización."
   },
   "profile": {
     "myProfile": "Mi Perfil",
@@ -294,7 +296,7 @@
     "practice": "Práctica",
     "practiceDesc": "Casual, sin seguimiento",
     "competitive": "Competitivo",
-    "competitiveDesc": "Próximamente",
+    "competitiveDesc": "Afecta tu puntuación",
     "fromList": "Desde lista",
     "friends": "Amigos",
     "allContacts": "Todos los contactos",
@@ -718,6 +720,9 @@
       "disputeTitle": "Impugnar Resultado",
       "disputeReason": "Razón",
       "disputePlaceholder": "Explica por qué estás impugnando este resultado...",
+      "disputeProposedScore": "Puntuaciones correctas propuestas",
+      "disputeProposedScoreHint": "Opcional — introduce lo que crees que fueron las puntuaciones correctas.",
+      "disputeNoteTitle": "Motivo de impugnación",
       "submitDispute": "Enviar Impugnación"
     },
     "submit": {
@@ -790,7 +795,9 @@
       "bookingCancelled": "Reserva de pista cancelada",
       "bookingCancelFailed": "No se pudo cancelar la reserva de pista",
       "matchRescheduled": "Partido reprogramado",
-      "matchRescheduledVs": "Partido vs {{opponents}} reprogramado"
+      "matchRescheduledVs": "Partido vs {{opponents}} reprogramado",
+      "resultDisputed": "Resultado impugnado",
+      "resultDisputedAdmin": "Resultado impugnado — revisión necesaria"
     },
     "messages": {
       "scheduledForDate": "Se programó un partido para el {{date}}.",
@@ -811,7 +818,9 @@
       "bookingCancelled": "La reserva de pista para tu partido cancelado ha sido cancelada correctamente.",
       "bookingCancelFailed": "No se pudo cancelar la reserva automáticamente. Por favor, cancélala manualmente en el club.",
       "matchRescheduled": "El partido ha sido reprogramado.",
-      "matchRescheduledParts": "Nuevo horario: {{parts}}."
+      "matchRescheduledParts": "Nuevo horario: {{parts}}.",
+      "resultDisputed": "Un resultado de uno de tus partidos ha sido impugnado.",
+      "resultDisputedAdmin": "Un resultado de partido ha sido impugnado y requiere tu revisión."
     }
   },
   "contactsPage": {
@@ -947,8 +956,16 @@
       "phoneLabel": "Teléfono"
     },
     "step2": {
-      "title": "¿Dónde juegas?",
-      "description": "Establece tu club y ciudad por defecto. Puedes cambiarlos en cualquier momento.",
+      "title": "Tu nivel y ubicación",
+      "description": "Ayúdanos a encontrarte los rivales adecuados desde el primer partido.",
+      "levelLabel": "¿Cuál es tu nivel actual?",
+      "levels": {
+        "beginner":     { "label": "Empezando",                  "desc": "Nuevo en el deporte, aprendiendo lo básico" },
+        "learning":     { "label": "Cogiendo el ritmo",          "desc": "Jugando regularmente, mejorando la consistencia" },
+        "intermediate": { "label": "Jugador de club habitual",   "desc": "Buen juego, cómodo en partidos" },
+        "advanced":     { "label": "Avanzado",                   "desc": "Jugador de club competitivo de alto nivel" },
+        "competitive":  { "label": "Nivel de competición",       "desc": "Experiencia en torneos regionales o nacionales" }
+      },
       "clubLabel": "Club o pista preferida",
       "clubPlaceholder": "ej. Club Tennis Barcelona",
       "cityLabel": "Ciudad",

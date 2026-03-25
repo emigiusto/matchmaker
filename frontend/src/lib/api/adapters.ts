@@ -120,6 +120,8 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, Notification["type"]> = {
   "result_pending": "result_pending",
   "rating_change": "rating_change",
   "match.rescheduled": "invite_accepted",
+  "result.disputed": "result_disputed",
+  "result.disputed.admin": "result_disputed",
 }
 
 function deriveNotificationTitle(type: string, payload: Record<string, unknown>): string {
@@ -153,6 +155,8 @@ function deriveNotificationTitle(type: string, payload: Record<string, unknown>)
       const opponents = payload.opponentNames && typeof payload.opponentNames === "string" ? payload.opponentNames : null
       return opponents ? `Match vs ${opponents} rescheduled` : "Match rescheduled"
     }
+    case "result.disputed":       return "Result disputed"
+    case "result.disputed.admin": return "Result disputed — review needed"
     default:
       return type.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   }
@@ -237,6 +241,8 @@ function deriveNotificationMessage(type: string, payload: Record<string, unknown
       const courtName = payload.courtName && typeof payload.courtName === "string" ? payload.courtName : null
       return courtName ? `${courtName} has been booked for your match.` : "Your court has been booked."
     }
+    case "result.disputed":       return "A result for one of your matches has been disputed."
+    case "result.disputed.admin": return "A match result has been disputed and requires your review."
     default:
       return ""
   }

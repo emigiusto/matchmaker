@@ -129,7 +129,6 @@ export async function checkCourtAvailability(
   try {
     const cached = await cacheGet(cacheKey)
     if (cached) {
-      logger.info(`[booking] Availability cache hit: ${cacheKey}`)
       return JSON.parse(cached) as CourtAvailabilityResult
     }
   } catch (err) {
@@ -734,6 +733,51 @@ export async function resetBookingForReschedule(matchId: string): Promise<void> 
 
   logBookingEvent(matchId, 'booking_pending', { reschedule: true }).catch(() => {})
   await triggerBookingForMatch(matchId)
+}
+
+/**
+ * Finds all failed booking attempts for future matches where:
+ * - The failure is retryable (not MISSING_SOCIO_NUMBER, which requires user action)
+ * - The match is still in the future
+ * - The host's club membership is still active
+ * Resets each attempt to pending and re-runs the booking job.
+ * Returns the number of attempts re-queued.
+ */
+export async function retryFailedBookingsForFutureMatches(): Promise<number> {
+  const attempts = await prisma.bookingAttempt.findMany({
+    where: {
+      status: 'failed',
+      errorCode: { not: 'MISSING_SOCIO_NUMBER' },
+      clubMembership: { status: 'active' },
+      match: { scheduledAt: { gt: new Date() } },
+    },
+    select: { id: true, matchId: true, clubMembershipId: true },
+  })
+
+  let count = 0
+  for (const attempt of attempts) {
+    try {
+      await prisma.bookingAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: 'pending',
+          errorMessage: null,
+          errorCode: null,
+          completedAt: null,
+          attemptedAt: new Date(),
+        },
+      })
+      logBookingEvent(attempt.matchId, 'booking_pending', { retry: true, source: 'nightly_job' }).catch(() => {})
+      runBookingJob(attempt.id, attempt.matchId, attempt.clubMembershipId).catch((err) => {
+        logger.error(`[booking] Unhandled error in nightly retry job for match ${attempt.matchId}:`, err)
+      })
+      count++
+    } catch (err) {
+      logger.error(`[booking] Failed to re-queue attempt ${attempt.id} for match ${attempt.matchId}:`, err instanceof Error ? err.message : err)
+    }
+  }
+
+  return count
 }
 
 export async function getBookingAttemptByMatch(matchId: string): Promise<BookingAttemptDTO | null> {

@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import type { SchedulingInviteEventDTO } from "@/lib/services/scheduling.service"
 import { SportFormatBadge } from "@/components/sport-format-badge"
+import { MatchTypeBadge } from "@/components/match-type-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
@@ -607,6 +608,7 @@ export function InviteRequestsSection({
                             sport={request.sport}
                             format={request.matchFormat}
                           />
+                          <MatchTypeBadge type={request.matchType} className="text-xs" />
                           {displayStatus === "scheduling" && (
                             <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-200/60 bg-blue-500/8 px-2.5 py-1 text-xs font-medium text-blue-700 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-400">
                               <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />

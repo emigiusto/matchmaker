@@ -7,6 +7,7 @@
 // - POST /results/:id/sets: Add a set result to a result
 // - POST /results/:id/confirm: Confirm a submitted result (second player)
 // - POST /results/:id/dispute: Dispute a result
+// - POST /results/:id/resolve-dispute: Admin-only resolve a disputed result
 // - GET /results/by-match/:matchId: Fetch result for a match
 
 import { Request, Response, NextFunction } from 'express';
@@ -53,7 +54,9 @@ export class ResultsController {
         if (!currentUserId) {
           return res.status(401).json({ error: 'Unauthorized: missing user id' });
         }
-        const result = await ResultsService.disputeResult(id, currentUserId);
+        const isAdmin = !!(req.user as any)?.isAdmin;
+        const disputeNote = typeof req.body?.disputeNote === 'string' ? req.body.disputeNote : null;
+        const result = await ResultsService.disputeResult({ resultId: id, userId: currentUserId, isAdmin, disputeNote });
         return res.status(200).json(result);
       } catch (error) {
         next(error);
@@ -117,6 +120,21 @@ export class ResultsController {
   }
 
   /**
+   * GET /results/disputed
+   * Admin-only: fetch all disputed results with match context
+   */
+  static async getDisputedResults(req: Request, res: Response, next: NextFunction) {
+    try {
+      const isAdmin = !!(req.user as any)?.isAdmin;
+      if (!isAdmin) return res.status(403).json({ error: 'Admin only' });
+      const results = await ResultsService.getDisputedResults();
+      return res.status(200).json(results);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /results/recent?limit=10
    * Fetch recent results
    */
@@ -126,6 +144,29 @@ export class ResultsController {
       const parsedLimit = limit && typeof limit === 'string' ? parseInt(limit, 10) : 10;
       const results = await ResultsService.getRecentResults(parsedLimit);
       return res.status(200).json(results);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /results/:id/resolve-dispute
+   * Admin-only: resolve a disputed result with corrected sets
+   */
+  static async resolveDispute(req: Request, res: Response, next: NextFunction) {
+    try {
+      let { id } = req.params;
+      if (Array.isArray(id)) id = id[0];
+      const currentUserId = req.user?.id;
+      if (!currentUserId) return res.status(401).json({ error: 'Unauthorized' });
+      const isAdmin = !!(req.user as any)?.isAdmin;
+      if (!isAdmin) return res.status(403).json({ error: 'Admin only' });
+      const sets = req.body.sets;
+      if (!Array.isArray(sets) || sets.length === 0) {
+        return res.status(400).json({ error: 'Missing or invalid sets array' });
+      }
+      const result = await ResultsService.resolveDispute({ resultId: id, adminUserId: currentUserId, sets });
+      return res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -150,11 +191,13 @@ export class ResultsController {
       if (!currentUserId) {
         return res.status(401).json({ error: 'Unauthorized: missing user id' });
       }
+      const questionnaire = req.body.questionnaire ?? null;
       // Call service (winnerUserId will be computed server-side)
       const result = await ResultsService.submitMatchResult({
         matchId,
         sets,
-        currentUserId
+        currentUserId,
+        questionnaire,
       });
       if (result === null) {
         // Practice match with no sets: no result created

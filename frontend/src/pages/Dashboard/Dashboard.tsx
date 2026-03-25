@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { InviteRequestsSection } from "@/components/invite-requests-section"
 import { SportFormatBadge } from "@/components/sport-format-badge"
+import { MatchTypeBadge } from "@/components/match-type-badge"
 import { IWantToPlayWizard } from "@/components/i-want-to-play-wizard"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
@@ -134,6 +135,7 @@ export default function Dashboard() {
                           format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
                           size="sm"
                         />
+                        <MatchTypeBadge type={match.matchType} className="text-xs" />
                         <p className="text-base font-semibold text-foreground">
                           {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                         </p>

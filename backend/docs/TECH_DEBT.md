@@ -4,23 +4,6 @@
 
 ---
 
-## Competitive / Practice – Reintroducir en la UI
-
-**Prioridad:** Media
-**Módulo:** `frontend`
-
-La distinción Competitive/Practice existe en el schema (`MatchType`, `SchedulingMatchType`) pero está oculta en la UI. Todos los partidos se crean como `competitive` por defecto; no hay selector ni badge visible.
-
-**Propuesta:**
-
-1. **I Want to Play wizard** — Restaurar el paso que permite elegir Competitive vs Practice.
-2. **MatchTypeBadge** — Volver a usar en Dashboard, Matches, MatchDetails, MatchesPast, InviteRequestsSection.
-3. **AddToCalendarButton** — Restaurar títulos diferenciados ("Competitive match" vs "Practice session").
-4. **Filtro** — Restaurar filtro por tipo de partido en `/matches`.
-5. **i18n** — Las claves `matchType`, `competitive`, `practice` ya existen en los locales ES/EN.
-
----
-
 
 ## Rate limiting en endpoints públicos
 
