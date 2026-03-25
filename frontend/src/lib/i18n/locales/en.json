@@ -26,7 +26,8 @@
     "reminderSent": "Sent",
     "reminderPending": "Pending",
     "reminderFailed": "Failed",
-    "matchCancelledBanner": "This match has been cancelled and will not take place"
+    "matchCancelledBanner": "This match has been cancelled and will not take place",
+    "all": "All"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -295,7 +296,7 @@
     "practice": "Practice",
     "practiceDesc": "Casual, no tracking",
     "competitive": "Competitive",
-    "competitiveDesc": "Coming soon",
+    "competitiveDesc": "Affects your rating",
     "fromList": "From list",
     "friends": "Friends",
     "allContacts": "All contacts",

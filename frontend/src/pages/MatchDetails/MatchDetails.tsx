@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/status-badge"
 import { SportFormatBadge } from "@/components/sport-format-badge"
+import { MatchTypeBadge } from "@/components/match-type-badge"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
@@ -401,6 +402,7 @@ export default function MatchDetailPage() {
                 sport={match.sport ?? "tennis"}
                 format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
               />
+              <MatchTypeBadge type={match.matchType} />
               <StatusBadge status={match.status} />
             </div>
           </div>

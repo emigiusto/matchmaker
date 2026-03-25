@@ -4,6 +4,7 @@ import { format } from "date-fns"
 import { Calendar, MapPin, TrendingUp, Clock as ClockIcon, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
+import { MatchTypeBadge } from "@/components/match-type-badge"
 import { matchesService } from "@/lib/services/matches.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import type { Match } from "@/lib/types"
@@ -97,6 +98,7 @@ export default function PastMatchesPage() {
                         </div>
                       </div>
                       <div className="ml-2 flex shrink-0 items-center gap-3">
+                        <MatchTypeBadge type={match.matchType} className="text-xs" />
                         {match.result && (
                           <div className="text-right">
                             <p className="font-mono text-base font-bold text-foreground">

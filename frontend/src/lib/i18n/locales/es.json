@@ -26,7 +26,8 @@
     "reminderSent": "Enviado",
     "reminderPending": "Pendiente",
     "reminderFailed": "Fallido",
-    "matchCancelledBanner": "Este partido ha sido cancelado y no tendrá lugar"
+    "matchCancelledBanner": "Este partido ha sido cancelado y no tendrá lugar",
+    "all": "Todos"
   },
   "navigation": {
     "dashboard": "Panel Principal",
@@ -295,7 +296,7 @@
     "practice": "Práctica",
     "practiceDesc": "Casual, sin seguimiento",
     "competitive": "Competitivo",
-    "competitiveDesc": "Próximamente",
+    "competitiveDesc": "Afecta tu puntuación",
     "fromList": "Desde lista",
     "friends": "Amigos",
     "allContacts": "Todos los contactos",

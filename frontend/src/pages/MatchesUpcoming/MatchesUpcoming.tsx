@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
 import { SportFormatBadge } from "@/components/sport-format-badge"
+import { MatchTypeBadge } from "@/components/match-type-badge"
 import { AddReminderDialog } from "@/components/add-reminder-dialog"
 import { AddToCalendarButton } from "@/components/add-to-calendar-button"
 import { CancelMatchButton } from "@/components/cancel-match-button"
@@ -38,6 +39,7 @@ export default function MatchesPage() {
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([])
   const [pastMatches, setPastMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
+  const [matchTypeFilter, setMatchTypeFilter] = useState<"all" | "competitive" | "practice">("all")
   const today = format(new Date(), "yyyy-MM-dd")
 
   const fetchAllMatches = useCallback(async () => {
@@ -81,12 +83,20 @@ export default function MatchesPage() {
     }
   }, [currentUserId])
 
-  const matchesToday = upcomingMatches.filter(
-    (m) => m.date === today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
+  const applyTypeFilter = (matches: Match[]) =>
+    matchTypeFilter === "all" ? matches : matches.filter((m) => m.matchType === matchTypeFilter)
+
+  const matchesToday = applyTypeFilter(
+    upcomingMatches.filter(
+      (m) => m.date === today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
+    )
   )
-  const matchesLater = upcomingMatches.filter(
-    (m) => m.date > today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
+  const matchesLater = applyTypeFilter(
+    upcomingMatches.filter(
+      (m) => m.date > today && (m.status === "scheduled" || m.status === "awaiting_confirmation")
+    )
   )
+  const filteredPastMatches = applyTypeFilter(pastMatches)
   const hasUpcoming = matchesToday.length > 0 || matchesLater.length > 0
 
   function handleMatchCancelled() {
@@ -126,6 +136,23 @@ export default function MatchesPage() {
           </Card>
         ) : (
           <div className="space-y-8">
+            {/* Match type filter */}
+            <div className="flex items-center gap-2">
+              {(["all", "competitive", "practice"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setMatchTypeFilter(type)}
+                  className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                    matchTypeFilter === type
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {type === "all" ? t("common.all") : type === "competitive" ? t("common.competitive") : t("common.practice")}
+                </button>
+              ))}
+            </div>
+
             {/* Upcoming matches */}
             <section>
               {!hasUpcoming ? (
@@ -166,6 +193,7 @@ export default function MatchesPage() {
                                     format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
                                     size="sm"
                                   />
+                                  <MatchTypeBadge type={match.matchType} className="text-xs" />
                                   <p className="text-base font-semibold text-foreground">
                                     {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                                   </p>
@@ -250,6 +278,7 @@ export default function MatchesPage() {
                                     format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
                                     size="sm"
                                   />
+                                  <MatchTypeBadge type={match.matchType} className="text-xs" />
                                   <p className="text-base font-semibold text-foreground">
                                     {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                                   </p>
@@ -322,7 +351,7 @@ export default function MatchesPage() {
                 <History className="h-5 w-5 text-muted-foreground" />
                 {t("matchesUpcoming.past")}
               </h2>
-              {pastMatches.length === 0 ? (
+              {filteredPastMatches.length === 0 ? (
                 <Card>
                   <CardContent className="flex items-center justify-center py-12">
                     <p className="text-muted-foreground">{t("matchesUpcoming.noPast")}</p>
@@ -331,7 +360,7 @@ export default function MatchesPage() {
               ) : (
                 <Card>
                   <CardContent className="space-y-3 pt-4">
-                    {pastMatches.map((match) => {
+                    {filteredPastMatches.map((match) => {
                       return (
                         <Link
                           key={match.id}
@@ -344,6 +373,7 @@ export default function MatchesPage() {
                               format={match.format ?? ((match.participants ?? []).length >= 4 ? "doubles" : "singles")}
                               size="sm"
                             />
+                            <MatchTypeBadge type={match.matchType} className="text-xs" />
                             <p className="text-base font-semibold text-foreground">
                               {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                             </p>
