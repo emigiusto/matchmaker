@@ -296,7 +296,7 @@ function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Per
 
       {/* ── ACTIVE (logged-in users only) ── */}
       <TabsContent value="active">
-        <ActiveUsersTab loggedInStats={stats.loggedInStats} period={period} onImpersonate={async (userId, displayName) => {
+        <ActiveUsersTab loggedInStats={stats.loggedInStats ?? { dau: 0, wau: 0, mau: 0, activeUsersDaily: [], topUsers: [] }} period={period} onImpersonate={async (userId, displayName) => {
           const res = await analyticsService.impersonate(userId)
           startImpersonation(res.token, displayName)
           await refreshUser()

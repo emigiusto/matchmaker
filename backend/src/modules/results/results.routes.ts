@@ -4,6 +4,7 @@
 
 import { Router } from 'express';
 import { ResultsController } from './results.controller';
+import { requireAdmin } from '../../shared/middleware/requireAdmin';
 
 const router = Router();
 
@@ -98,8 +99,8 @@ router.post('/:id/confirm', ResultsController.confirmResult);
  *         description: Cannot dispute a confirmed result
  */
 router.post('/:id/dispute', ResultsController.disputeResult);
-router.post('/:id/resolve-dispute', ResultsController.resolveDispute);
-router.get('/disputed', ResultsController.getDisputedResults);
+router.post('/:id/resolve-dispute', requireAdmin, ResultsController.resolveDispute);
+router.get('/disputed', requireAdmin, ResultsController.getDisputedResults);
 
 /**
  * @openapi
