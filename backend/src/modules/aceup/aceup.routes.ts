@@ -78,14 +78,12 @@ router.get('/validate/:matchId', async (req: Request, res: Response, next: NextF
       return res.status(400).json({ error: 'Result must be submitted before sending to AceUp' })
     }
 
-    if (!match.playerA?.user?.email || !match.playerB?.user?.email) {
-      return res.status(400).json({ error: 'Match players are missing email information' })
-    }
-
-    const validation = await validateUsersOnAceUp(
-      match.playerA.user.email,
-      match.playerB.user.email,
-    )
+    const validation = await validateUsersOnAceUp({
+      playerEmail: match.playerA?.user?.email ?? undefined,
+      playerPhone: match.playerA?.user?.phone ?? undefined,
+      opponentEmail: match.playerB?.user?.email ?? undefined,
+      opponentPhone: match.playerB?.user?.phone ?? undefined,
+    })
 
     return res.status(200).json(validation)
   } catch (err) {
@@ -128,15 +126,13 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
       return res.status(200).json({ success: true, aceupMatchId: match.result!.aceupMatchId })
     }
 
-    if (!match.playerA?.user?.email || !match.playerB?.user?.email) {
-      return res.status(400).json({ error: 'Match players are missing email information' })
-    }
-
     // Re-validate to get AceUp player IDs
-    const validation = await validateUsersOnAceUp(
-      match.playerA.user.email,
-      match.playerB.user.email,
-    )
+    const validation = await validateUsersOnAceUp({
+      playerEmail: match.playerA?.user?.email ?? undefined,
+      playerPhone: match.playerA?.user?.phone ?? undefined,
+      opponentEmail: match.playerB?.user?.email ?? undefined,
+      opponentPhone: match.playerB?.user?.phone ?? undefined,
+    })
 
     if (!validation.valid) {
       return res.status(422).json({ valid: false, reason: validation.reason })
@@ -150,7 +146,7 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
     const player2PlayerId = opponent.playerId
 
     // Determine winner's AceUp player ID
-    const winnerIsPlayerA = match.result!.winnerUserId === match.playerA.userId
+    const winnerIsPlayerA = match.result!.winnerUserId === match.playerA?.userId
     const winnerPlayerId = winnerIsPlayerA ? player1PlayerId : player2PlayerId
 
     // Format sets from player1 (=playerA) perspective

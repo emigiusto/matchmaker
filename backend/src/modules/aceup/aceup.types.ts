@@ -11,10 +11,14 @@
 
 /** Request body for POST /api/external/validate-users */
 export interface AceUpValidateUsersRequest {
-  /** Email of the match host (Matchmaker's playerA) */
-  playerEmail: string
-  /** Email of the opponent (Matchmaker's playerB) */
-  opponentEmail: string
+  /** Email of the match host (Matchmaker's playerA). Used as primary lookup key. */
+  playerEmail?: string
+  /** Phone of the match host. Used as fallback when playerEmail is not available (guest users). */
+  playerPhone?: string
+  /** Email of the opponent (Matchmaker's playerB). Used as primary lookup key. */
+  opponentEmail?: string
+  /** Phone of the opponent. Used as fallback when opponentEmail is not available (guest users). */
+  opponentPhone?: string
 }
 
 /** Successful validation — both players exist and share exactly one ladder */
@@ -34,8 +38,8 @@ export interface AceUpValidateUsersFailure {
   valid: false
   /**
    * Machine-readable reason:
-   *  - player_not_found      → playerEmail has no AceUp account
-   *  - opponent_not_found    → opponentEmail has no AceUp account
+   *  - player_not_found      → no AceUp account matched by email or phone for the player
+   *  - opponent_not_found    → no AceUp account matched by email or phone for the opponent
    *  - player_not_active     → player exists but has no points (currentPoints <= 0) or is deleted
    *  - opponent_not_active   → opponent exists but has no points (currentPoints <= 0) or is deleted
    *  - no_shared_ladder      → both exist but are not in the same ladder

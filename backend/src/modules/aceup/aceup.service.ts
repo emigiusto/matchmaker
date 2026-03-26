@@ -53,12 +53,9 @@ function headers() {
 }
 
 export async function validateUsersOnAceUp(
-  playerEmail: string,
-  opponentEmail: string,
+  body: AceUpValidateUsersRequest,
 ): Promise<AceUpValidateUsersResponse> {
   if (!ACEUP_API_URL) throw new AppError('ACEUP_API_URL is not configured', 500)
-
-  const body: AceUpValidateUsersRequest = { playerEmail, opponentEmail }
 
   const response = await fetch(`${ACEUP_API_URL}/api/external/validate-users`, {
     method: 'POST',
