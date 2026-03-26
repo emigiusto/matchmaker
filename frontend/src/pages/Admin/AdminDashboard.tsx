@@ -178,6 +178,7 @@ function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Per
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="pages">Pages</TabsTrigger>
         <TabsTrigger value="users">Users</TabsTrigger>
+        <TabsTrigger value="active">Active</TabsTrigger>
         <TabsTrigger value="events">Events</TabsTrigger>
         <TabsTrigger value="disputes" className="flex items-center gap-1.5">
           <AlertTriangle className="h-3.5 w-3.5" />
@@ -286,6 +287,16 @@ function DashboardContent({ stats, period }: { stats: AdminStatsDTO; period: Per
       {/* ── USERS ── */}
       <TabsContent value="users">
         <UsersTab topUsers={stats.topUsers} period={period} onImpersonate={async (userId, displayName) => {
+          const res = await analyticsService.impersonate(userId)
+          startImpersonation(res.token, displayName)
+          await refreshUser()
+          navigate('/')
+        }} />
+      </TabsContent>
+
+      {/* ── ACTIVE (logged-in users only) ── */}
+      <TabsContent value="active">
+        <ActiveUsersTab loggedInStats={stats.loggedInStats} period={period} onImpersonate={async (userId, displayName) => {
           const res = await analyticsService.impersonate(userId)
           startImpersonation(res.token, displayName)
           await refreshUser()
@@ -508,6 +519,133 @@ function UsersTab({ topUsers, period, onImpersonate }: { topUsers: TopUser[]; pe
           </span>
         </div>
 
+        <Card>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">#</th>
+                  <th className="px-4 py-3 font-medium">User</th>
+                  <th className="px-4 py-3 font-medium text-right">Events</th>
+                  <th className="px-4 py-3 font-medium text-right">Last seen</th>
+                  <th className="px-4 py-3 font-medium">Activity</th>
+                  <th className="px-4 py-3 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((u, i) => (
+                  <tr key={u.userId} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                    <td className="px-4 py-3 text-muted-foreground text-xs w-8">{i + 1}</td>
+                    <td className="px-4 py-3">
+                      {u.name && <p className="font-medium">{u.name}</p>}
+                      {u.email
+                        ? <p className="text-xs text-muted-foreground">{u.email}</p>
+                        : <p className="text-xs text-muted-foreground font-mono">{u.userId.slice(0, 12)}…</p>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold">{u.eventCount}</td>
+                    <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap">
+                      {fmtRelative(u.lastSeenAt)}
+                    </td>
+                    <td className="px-4 py-3 w-32">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary/70 rounded-full"
+                          style={{ width: `${Math.round((u.eventCount / max) * 100)}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ImpersonateButton
+                        userId={u.userId}
+                        displayName={u.name ?? u.email ?? u.userId}
+                        onImpersonate={onImpersonate}
+                      />
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                      No users match your filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+// ── Active users tab (logged-in users only) ────────────────────────────────
+
+type LoggedInStats = AdminStatsDTO['loggedInStats']
+
+function ActiveUsersTab({ loggedInStats, period, onImpersonate }: {
+  loggedInStats: LoggedInStats
+  period: Period
+  onImpersonate: (userId: string, displayName: string) => Promise<void>
+}) {
+  const [search, setSearch] = useState('')
+
+  const chartData = useMemo(() =>
+    loggedInStats.activeUsersDaily.map((r) => ({ date: fmtDate(r.date), count: r.count })),
+    [loggedInStats.activeUsersDaily],
+  )
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    if (!q) return loggedInStats.topUsers
+    return loggedInStats.topUsers.filter(
+      (u) => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.userId.includes(q),
+    )
+  }, [loggedInStats.topUsers, search])
+
+  const max = loggedInStats.topUsers[0]?.eventCount ?? 1
+
+  return (
+    <div className="space-y-6">
+      {/* DAU / WAU / MAU */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard icon={<Activity />} title="DAU" value={loggedInStats.dau} sub="today" />
+        <StatCard icon={<Activity />} title="WAU" value={loggedInStats.wau} sub="7 days" />
+        <StatCard icon={<TrendingUp />} title="MAU" value={loggedInStats.mau} sub="30 days" />
+      </div>
+
+      {/* Daily chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Logged-in active users — last {period} days</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
+              <Tooltip contentStyle={{ fontSize: 12 }} />
+              <Line type="monotone" dataKey="count" name="Active users" stroke="#6366f1" dot={false} strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Top active logged-in users */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder="Filter by name or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+          <span className="text-sm text-muted-foreground">
+            {filtered.length} of {loggedInStats.topUsers.length} · top active ({period}d)
+          </span>
+        </div>
         <Card>
           <CardContent className="p-0">
             <table className="w-full text-sm">

@@ -170,6 +170,46 @@ export async function getAdminStats(days = 30, eventTypeFilter?: string): Promis
     : []
   const topUserMap = new Map(topUserDetails.map((u) => [u.id, u]))
 
+  // Logged-in only stats (non-guest, non-admin users)
+  const [liDauRows, liWauRows, liMauRows, liDailyRows, liTopUsersRows] = await Promise.all([
+    prisma.$queryRaw<[{ c: bigint }]>`
+      SELECT COUNT(DISTINCT ue.userId) AS c FROM UserEvent ue
+      INNER JOIN User u ON ue.userId = u.id
+      WHERE u.isGuest = 0 AND u.isAdmin = 0 AND ue.createdAt >= ${todayStart}`,
+    prisma.$queryRaw<[{ c: bigint }]>`
+      SELECT COUNT(DISTINCT ue.userId) AS c FROM UserEvent ue
+      INNER JOIN User u ON ue.userId = u.id
+      WHERE u.isGuest = 0 AND u.isAdmin = 0 AND ue.createdAt >= ${minus7}`,
+    prisma.$queryRaw<[{ c: bigint }]>`
+      SELECT COUNT(DISTINCT ue.userId) AS c FROM UserEvent ue
+      INNER JOIN User u ON ue.userId = u.id
+      WHERE u.isGuest = 0 AND u.isAdmin = 0 AND ue.createdAt >= ${minus30}`,
+    prisma.$queryRaw<Array<{ date: string; c: bigint }>>`
+      SELECT DATE(ue.createdAt) AS date, COUNT(DISTINCT ue.userId) AS c
+      FROM UserEvent ue
+      INNER JOIN User u ON ue.userId = u.id
+      WHERE u.isGuest = 0 AND u.isAdmin = 0 AND ue.createdAt >= ${minusDays}
+      GROUP BY DATE(ue.createdAt)
+      ORDER BY date ASC`,
+    prisma.$queryRaw<Array<{ userId: string; eventCount: bigint; lastSeenAt: string }>>`
+      SELECT ue.userId, COUNT(*) AS eventCount, MAX(ue.createdAt) AS lastSeenAt
+      FROM UserEvent ue
+      INNER JOIN User u ON ue.userId = u.id
+      WHERE u.isGuest = 0 AND u.isAdmin = 0 AND ue.createdAt >= ${minusDays}
+      GROUP BY ue.userId
+      ORDER BY eventCount DESC
+      LIMIT 20`,
+  ])
+
+  const liTopUserIds = liTopUsersRows.map((r) => r.userId)
+  const liTopUserDetails = liTopUserIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: liTopUserIds } },
+        select: { id: true, name: true, email: true },
+      })
+    : []
+  const liTopUserMap = new Map(liTopUserDetails.map((u) => [u.id, u]))
+
   // Recent 100 events, with optional eventType filter + user name/email joined
   const recentEvents = await prisma.userEvent.findMany({
     where: eventTypeFilter ? { eventType: eventTypeFilter } : undefined,
@@ -223,6 +263,22 @@ export async function getAdminStats(days = 30, eventTypeFilter?: string): Promis
         lastSeenAt: typeof r.lastSeenAt === 'string' ? r.lastSeenAt : (r.lastSeenAt as Date).toISOString(),
       }
     }),
+    loggedInStats: {
+      dau: Number(liDauRows[0]?.c ?? 0),
+      wau: Number(liWauRows[0]?.c ?? 0),
+      mau: Number(liMauRows[0]?.c ?? 0),
+      activeUsersDaily: liDailyRows.map((r) => ({ date: r.date, count: Number(r.c) })),
+      topUsers: liTopUsersRows.map((r) => {
+        const u = liTopUserMap.get(r.userId)
+        return {
+          userId: r.userId,
+          email: u?.email ?? null,
+          name: u?.name ?? null,
+          eventCount: Number(r.eventCount),
+          lastSeenAt: typeof r.lastSeenAt === 'string' ? r.lastSeenAt : (r.lastSeenAt as Date).toISOString(),
+        }
+      }),
+    },
     recentEvents: recentEvents.map((e) => ({
       id: e.id,
       userId: e.userId,

@@ -18,6 +18,14 @@ export interface AdminStatsDTO {
   topUsers: Array<{ userId: string; email: string | null; name: string | null; eventCount: number; lastSeenAt: string }>
   topPages: Array<{ path: string; views: number; uniques: number }>
   pageViewsDaily: Array<{ date: string; views: number }>
+  /** Activity metrics for authenticated (non-guest, non-admin) users only */
+  loggedInStats: {
+    dau: number
+    wau: number
+    mau: number
+    activeUsersDaily: Array<{ date: string; count: number }>
+    topUsers: Array<{ userId: string; email: string | null; name: string | null; eventCount: number; lastSeenAt: string }>
+  }
   recentEvents: Array<{
     id: string
     userId: string | null

@@ -42,12 +42,13 @@ import type { ClientEventInput } from './analytics.types';
 
 /** Build a minimal $queryRaw sequence for getAdminStats */
 function makeQueryRawSequence() {
-  // getAdminStats fires $queryRaw 9 times sequentially via Promise.all groups:
-  //   [dau, wau, mau, totalUsers, signupToday, signupWeek, signupMonth]  → 7
-  //   [topEvents]                                                         → 1
-  //   [signupCount, matchCount, bookingCount]                             → 3
-  //   [dailyRows, newUsersDailyRows, topUsersRows, topPagesRows, pageViewsDailyRows] → 5
-  // Total: 16 $queryRaw calls
+  // getAdminStats fires $queryRaw in Promise.all groups:
+  //   [dau, wau, mau, totalUsers, signupToday, signupWeek, signupMonth]              → 7
+  //   [topEvents]                                                                     → 1
+  //   [signupCount, matchCount, bookingCount]                                         → 3
+  //   [dailyRows, newUsersDailyRows, topUsersRows, topPagesRows, pageViewsDailyRows]  → 5
+  //   [liDau, liWau, liMau, liDailyRows, liTopUsersRows]                             → 5
+  // Total: 21 $queryRaw calls
   const zero = [{ c: 0n }];
   return vi
     .fn()
@@ -70,7 +71,13 @@ function makeQueryRawSequence() {
     .mockResolvedValueOnce([])    // newUsersDailyRows
     .mockResolvedValueOnce([])    // topUsersRows
     .mockResolvedValueOnce([])    // topPagesRows
-    .mockResolvedValueOnce([]);   // pageViewsDailyRows
+    .mockResolvedValueOnce([])    // pageViewsDailyRows
+    // logged-in only stats
+    .mockResolvedValueOnce(zero)  // liDau
+    .mockResolvedValueOnce(zero)  // liWau
+    .mockResolvedValueOnce(zero)  // liMau
+    .mockResolvedValueOnce([])    // liDailyRows
+    .mockResolvedValueOnce([]);   // liTopUsersRows
 }
 
 beforeEach(() => {
@@ -228,11 +235,16 @@ describe('getAdminStats', () => {
       .mockResolvedValueOnce([{ c: 50n }])  // signupCount
       .mockResolvedValueOnce([{ c: 30n }])  // matchCount
       .mockResolvedValueOnce([{ c: 10n }])  // bookingCount
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([])    // dailyRows
+      .mockResolvedValueOnce([])    // newUsersDailyRows
+      .mockResolvedValueOnce([])    // topUsersRows
+      .mockResolvedValueOnce([])    // topPagesRows
+      .mockResolvedValueOnce([])    // pageViewsDailyRows
+      .mockResolvedValueOnce([{ c: 0n }]) // liDau
+      .mockResolvedValueOnce([{ c: 0n }]) // liWau
+      .mockResolvedValueOnce([{ c: 0n }]) // liMau
+      .mockResolvedValueOnce([])    // liDailyRows
+      .mockResolvedValueOnce([]);   // liTopUsersRows
     mockPrisma.userEvent.findMany.mockResolvedValue([]);
     mockPrisma.user.findMany.mockResolvedValue([]);
 
