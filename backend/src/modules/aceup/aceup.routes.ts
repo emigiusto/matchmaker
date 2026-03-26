@@ -13,6 +13,7 @@ import {
   validateUsersOnAceUp,
   sendMatchResultToAceUp,
   formatSetsForAceUp,
+  type AceUpValidateUsersSuccess,
 } from './aceup.service'
 
 const router = Router()
@@ -137,13 +138,16 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
       match.playerB.user.email,
     )
 
-    if (!validation.valid || !validation.ladderId || !validation.player || !validation.opponent) {
+    if (!validation.valid) {
       return res.status(422).json({ valid: false, reason: validation.reason })
     }
 
+    // TypeScript now knows validation is AceUpValidateUsersSuccess
+    const { ladderId, player, opponent } = validation as AceUpValidateUsersSuccess
+
     // playerA → player1, playerB → player2 (consistent mapping)
-    const player1PlayerId = validation.player.playerId
-    const player2PlayerId = validation.opponent.playerId
+    const player1PlayerId = player.playerId
+    const player2PlayerId = opponent.playerId
 
     // Determine winner's AceUp player ID
     const winnerIsPlayerA = match.result!.winnerUserId === match.playerA.userId
@@ -154,7 +158,7 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
 
     const aceupResponse = await sendMatchResultToAceUp({
       externalMatchId: match.id,
-      ladderId: validation.ladderId,
+      ladderId,
       player1PlayerId,
       player2PlayerId,
       winnerPlayerId,
