@@ -19,6 +19,7 @@ import whatsappRoutes from './modules/whatsapp/whatsapp.routes';
 import remindersRoutes from './modules/reminders/reminders.routes';
 import bookingRoutes from './modules/booking/booking.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
+import aceupRoutes from './modules/aceup/aceup.routes';
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use('/whatsapp', whatsappRoutes);
 router.use('/reminders', remindersRoutes);
 router.use('/booking', bookingRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/aceup', aceupRoutes);
 
 export default router;
