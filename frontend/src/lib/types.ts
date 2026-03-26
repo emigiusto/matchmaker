@@ -106,6 +106,8 @@ export interface MatchResult {
   player1RatingChange?: number
   player2RatingChange?: number
   questionnaire?: PostMatchQuestionnaire
+  aceupSyncedAt?: string | null
+  aceupMatchId?: number | null
 }
 
 export interface SetScore {

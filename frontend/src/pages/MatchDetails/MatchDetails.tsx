@@ -52,6 +52,7 @@ import { remindersService, type Reminder } from "@/lib/services/reminders.servic
 import { bookingService, type BookingAttemptDTO, type ClubMembershipDTO, SUPPORTED_CLUBS } from "@/lib/services/booking.service"
 import { contactsService, type ContactDTO } from "@/lib/services/contacts.service"
 import { resultsService } from "@/lib/services/results.service"
+import { aceupService, type AceUpValidation } from "@/lib/services/aceup.service"
 import { Input } from "@/components/ui/input"
 import type { Match, MatchResult, SetScore } from "@/lib/types"
 import { Loader2 } from "lucide-react"
@@ -93,6 +94,9 @@ export default function MatchDetailPage() {
   const [savingSocioFor, setSavingSocioFor] = useState<string | null>(null)
   const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const [aceupValidation, setAceupValidation] = useState<AceUpValidation | null>(null)
+  const [sendingToAceup, setSendingToAceup] = useState(false)
+
   function fetchReminders() {
     if (!currentUserId) return
     setRemindersLoading(true)
@@ -132,6 +136,14 @@ export default function MatchDetailPage() {
   useEffect(() => {
     if (id && currentUserId) fetchReminders()
   }, [id, currentUserId])
+
+  useEffect(() => {
+    if (!id || !result || !currentUserId) return
+    const hostUserId = match?.hostUserId ?? match?.player1.userId
+    if (hostUserId !== currentUserId) return
+    if (!["submitted", "confirmed"].includes(result.status)) return
+    aceupService.validate(id).then(setAceupValidation).catch(() => {})
+  }, [id, result?.status, currentUserId, match?.hostUserId])
 
   const stopBookingPoll = useCallback(() => {
     if (bookingPollRef.current) {
@@ -1126,6 +1138,44 @@ export default function MatchDetailPage() {
                       </div>
                     )
                   })()}
+
+                  {/* Send to AceUp — host only, when both players are on AceUp */}
+                  {isHost && aceupValidation?.valid && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      {result.aceupSyncedAt ? (
+                        <Button size="sm" variant="outline" className="w-full" disabled>
+                          <CheckCircle className="mr-1.5 h-4 w-4 text-green-500" />
+                          Sent to AceUp
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          disabled={sendingToAceup || result.status !== "confirmed"}
+                          onClick={async () => {
+                            setSendingToAceup(true)
+                            try {
+                              await aceupService.send(id!)
+                              setResult((prev) => prev ? { ...prev, aceupSyncedAt: new Date().toISOString() } : prev)
+                              toast.success("Result sent to AceUp")
+                            } catch {
+                              toast.error("Failed to send to AceUp. Please try again.")
+                            } finally {
+                              setSendingToAceup(false)
+                            }
+                          }}
+                        >
+                          {sendingToAceup
+                            ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                            : null}
+                          {result.status === "confirmed"
+                            ? "Send to AceUp"
+                            : "Send to AceUp (pending confirmation)"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Admin: resolve disputed result */}
                   {isAdmin && match.status === "disputed" && result && (
