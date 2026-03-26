@@ -51,10 +51,10 @@ async function processPendingReminders() {
           where: { id: reminder.id },
           data: { status: 'failed', error: errorMsg },
         });
-        logger.info('ReminderSkippedMatchNotConfirmed', {
-          reminderId: reminder.id,
-          matchStatus: reminder.match.status,
-        });
+        //logger.info('ReminderSkippedMatchNotConfirmed', {
+        //  reminderId: reminder.id,
+        //  matchStatus: reminder.match.status,
+        //});
         continue;
       }
 
@@ -83,7 +83,7 @@ async function processPendingReminders() {
           where: { id: reminder.id },
           data: { status: 'sent', sentAt: new Date() },
         });
-        logger.info('ReminderSent', { reminderId: reminder.id, userId: reminder.userId });
+        //logger.info('ReminderSent', { reminderId: reminder.id, userId: reminder.userId });
       } else {
         await prisma.reminder.update({
           where: { id: reminder.id },

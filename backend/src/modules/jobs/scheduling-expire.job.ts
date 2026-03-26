@@ -12,7 +12,7 @@ async function runExpireJob() {
       schedulingService.expireRequestsPastScheduledTime(),
     ]);
     if (expiredCandidates > 0 || expiredRequests > 0) {
-      logger.info('SchedulingExpireJob', { expiredCandidates, expiredRequests });
+      //logger.info('SchedulingExpireJob', { expiredCandidates, expiredRequests });
     }
   } catch (err) {
     logger.error('SchedulingExpireJob failed', { error: err instanceof Error ? err.message : err });

@@ -10,6 +10,7 @@ import { getAdapter } from '../booking/adapters/adapter.registry'
 import { decrypt } from '../../shared/utils/crypto.utils'
 import { cacheSet, redisAvailable } from '../../shared/cache/redis'
 import { logger } from '../../config/logger'
+import { AppError } from '../../shared/errors/AppError'
 import type { CourtAvailabilityResult } from '../booking/booking.types'
 
 const SPORTS = ['tennis', 'padel']
@@ -59,15 +60,24 @@ async function warmAvailabilityCache(): Promise<void> {
     }
 
     for (const sport of SPORTS) {
+      let credentialsInvalid = false
       for (const date of dates) {
+        if (credentialsInvalid) break
         const cacheKey = `matchmaker:booking:availability:${membership.adapterType}:${membership.clubSlug}:${date}:${sport}`
         try {
           const result: CourtAvailabilityResult = await adapter.checkAvailability(creds, date, undefined, { sport })
           await cacheSet(cacheKey, JSON.stringify(result), CACHE_TTL_SECONDS)
         } catch (err) {
+          if (err instanceof AppError && err.errorCode === 'INVALID_CLUB_CREDENTIALS') {
+            logger.warn(`[availability-cache-job] Invalid credentials for ${membership.clubSlug} (socio ${membership.socioNumber}) — marking invalid, skipping remaining dates`)
+            await prisma.clubMembership.update({ where: { id: membership.id }, data: { status: 'invalid_credentials' } }).catch(() => {})
+            credentialsInvalid = true
+            break
+          }
           logger.warn(`[availability-cache-job] Failed ${membership.clubSlug}/${sport}/${date}: ${err instanceof Error ? err.message : err}`)
         }
       }
+      if (credentialsInvalid) break
     }
   }
 

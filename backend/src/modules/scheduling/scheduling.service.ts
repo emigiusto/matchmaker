@@ -326,7 +326,7 @@ async function notifyHostSchedulingNoMatch(
     );
     const result = await whatsappService.sendInviteMessage(hostPhone, msg);
     if (result.success) {
-      logger.info('NoMatchWhatsAppSent', { requestId: request.id, hostUserId: request.hostUserId });
+      //logger.info('NoMatchWhatsAppSent', { requestId: request.id, hostUserId: request.hostUserId });
     } else {
       logger.warn('FailedToSendNoMatchWhatsApp', { requestId: request.id, error: result.error });
     }
