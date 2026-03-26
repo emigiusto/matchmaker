@@ -36,8 +36,8 @@ export interface AceUpValidateUsersFailure {
    * Machine-readable reason:
    *  - player_not_found      → playerEmail has no AceUp account
    *  - opponent_not_found    → opponentEmail has no AceUp account
-   *  - player_not_active     → player exists but is inactive in AceUp
-   *  - opponent_not_active   → opponent exists but is inactive in AceUp
+   *  - player_not_active     → player exists but has no points (currentPoints <= 0) or is deleted
+   *  - opponent_not_active   → opponent exists but has no points (currentPoints <= 0) or is deleted
    *  - no_shared_ladder      → both exist but are not in the same ladder
    */
   reason: 'player_not_found' | 'opponent_not_found' | 'player_not_active' | 'opponent_not_active' | 'no_shared_ladder'
