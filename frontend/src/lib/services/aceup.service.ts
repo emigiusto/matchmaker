@@ -5,8 +5,8 @@ export interface AceUpValidation {
   reason?: string
   ladderId?: number
   ladderName?: string
-  player?: { playerId: number; ranking: number | null }
-  opponent?: { playerId: number; ranking: number | null }
+  player?: { playerId: number }
+  opponent?: { playerId: number }
 }
 
 export const aceupService = {

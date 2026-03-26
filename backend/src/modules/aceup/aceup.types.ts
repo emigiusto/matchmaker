@@ -24,9 +24,9 @@ export interface AceUpValidateUsersSuccess {
   ladderId: number
   ladderName: string
   /** AceUp player record for playerEmail */
-  player: { playerId: number; ranking: number | null }
+  player: { playerId: number }
   /** AceUp player record for opponentEmail */
-  opponent: { playerId: number; ranking: number | null }
+  opponent: { playerId: number }
 }
 
 /** Failed validation — one or both players cannot receive results */
