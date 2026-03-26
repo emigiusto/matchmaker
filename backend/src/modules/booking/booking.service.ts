@@ -700,6 +700,28 @@ export async function cancelBookingForMatch(matchId: string): Promise<void> {
 
   logBookingEvent(matchId, 'booking_cancelled').catch(() => {})
   logger.info(`[booking] Booking cancelled for match ${matchId}`)
+
+  // Notify the WhatsApp group
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { availability: true },
+  }).catch(() => null)
+
+  if (match?.whatsappGroupId && attempt.courtName) {
+    const schedulingRequest = await prisma.schedulingRequest.findUnique({ where: { matchId } }).catch(() => null)
+    const hostUserId = schedulingRequest?.hostUserId ?? match.availability?.userId
+    const hostLocale = hostUserId
+      ? await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).then((u) => u?.locale ?? 'es').catch(() => 'es')
+      : 'es'
+    const tz = schedulingRequest?.timezone ?? 'UTC'
+    const scheduled = new Date(match.scheduledAt)
+    const date = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
+    const time = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
+    const message = getMessages(hostLocale).courtCancelled(attempt.courtName, `${date} · ${time}`, match.availability?.locationText ?? '')
+    whatsappService.sendGroupMessage(match.whatsappGroupId, message).catch((err) => {
+      logger.warn(`[booking] Failed to send WhatsApp cancellation notification for match ${matchId}:`, err)
+    })
+  }
 }
 
 /**
