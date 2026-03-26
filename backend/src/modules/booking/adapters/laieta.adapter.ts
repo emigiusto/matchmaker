@@ -213,7 +213,14 @@ export class LaietaAdapter implements BookingAdapter {
             const links = Array.from(fieldset.querySelectorAll('a[href]'))
             const reservaLink = links.find((a) => /\/reservas\/\d+/.test((a as HTMLAnchorElement).getAttribute('href') ?? ''))
             const hrefMatch = (reservaLink as HTMLAnchorElement | null)?.getAttribute('href')?.match(/\/reservas\/(\d+)/)
-            const bookingId = hrefMatch ? hrefMatch[1] : null
+            let bookingId = hrefMatch ? hrefMatch[1] : null
+
+            // Fallback: extract ID from the cancel button name, e.g. "cancel-629061"
+            if (!bookingId) {
+              const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
+              const cancelMatch = cancelBtn?.name?.match(/cancel-(\d+)/)
+              if (cancelMatch) bookingId = cancelMatch[1]
+            }
 
             return { courtName: bookingPlace.replace(/\s+/g, ' ').trim(), bookingId }
           }

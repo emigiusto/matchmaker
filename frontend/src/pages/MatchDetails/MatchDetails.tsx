@@ -465,8 +465,8 @@ export default function MatchDetailPage() {
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
                       {currentPlayer.name.split(" ").map((n) => n[0]).join("")}
                     </div>
-                    <div className="w-20 text-center">
-                      <p className="truncate text-sm font-semibold text-foreground">{currentPlayer.name}</p>
+                    <div className="w-28 text-center">
+                      <p className="break-words text-sm font-semibold text-foreground">{currentPlayer.name}</p>
                       <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {currentPlayer.levelValue.toFixed(1)}</p>
                     </div>
                   </div>
@@ -482,8 +482,8 @@ export default function MatchDetailPage() {
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-bold text-muted-foreground">
                       {opponent.name.split(" ").map((n) => n[0]).join("")}
                     </div>
-                    <div className="w-20 text-center">
-                      <p className="truncate text-sm font-semibold text-foreground">{opponent.name}</p>
+                    <div className="w-28 text-center">
+                      <p className="break-words text-sm font-semibold text-foreground">{opponent.name}</p>
                       <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {opponent.levelValue.toFixed(1)}</p>
                     </div>
                   </div>
