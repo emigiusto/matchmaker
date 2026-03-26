@@ -118,46 +118,35 @@ export class LaietaAdapter implements BookingAdapter {
     await page.waitForSelector('#edit-gpa-piw-pistas', { timeout: 10000 })
 
     return page.evaluate((hhmm: string | undefined) => {
-      const results: { courtName: string; hour: string }[] = []
-      const fieldset = document.querySelector('#edit-gpa-piw-pistas')
-      if (!fieldset) return results
-      const table = fieldset.querySelector('table')
-      if (!table) return results
+      // Iterate a.a_pistas_hora elements directly instead of walking the table via
+      // querySelectorAll('tr') → querySelectorAll('td'), which is recursive and
+      // double-counts courts in nested table structures.
+      // Group by courtNum:hour (from the ID) — same logic as the book() slot selector.
+      const targetHour = hhmm ? hhmm.slice(0, 2) : undefined  // e.g. "17" from "1700"
 
-      table.querySelectorAll('tr').forEach((row) => {
-        row.querySelectorAll('td').forEach((cell) => {
-          const emptySlots: string[] = []
-          const occupiedSlots: string[] = []
-          let cellHourMin = ''
-          let courtName = ''
+      const cells: Record<string, { courtName: string; hour: string; emptyCount: number; valid: boolean }> = {}
 
-          cell.querySelectorAll('a.a_pistas_hora').forEach((el) => {
-            const a = el as HTMLAnchorElement
-            const parts = a.className.split(' ')
-            const slotClass = parts[2]?.trim()
-            const namePart = parts[3]?.trim().split('_')[1]
-            // Take only the FIRST sub-slot's time — cells contain multiple anchors
-            // (e.g. 09:00, 09:15, 09:30, 09:45) and the last one would otherwise win,
-            // causing all times to appear as :45.
-            if (namePart && !cellHourMin) {
-              cellHourMin = namePart.slice(0, 4)  // full HHMM from first sub-slot, e.g. "0900"
-              courtName = a.id.split(':')[1] ?? ''
-            }
-            if (slotClass === 'classempty') emptySlots.push(a.className)
-            if (slotClass === 'class4') occupiedSlots.push(a.className)
-          })
+      document.querySelectorAll('a.a_pistas_hora').forEach((link) => {
+        const a = link as HTMLAnchorElement
+        const idParts = a.id.split(':')
+        const courtNum = idParts[0]            // e.g. "07"
+        const courtName = idParts[1]           // e.g. "TENNIS"
+        const hourRaw = idParts[2]             // e.g. "8" or "17" (portal uses single-digit hours)
+        if (!courtNum || !courtName || !hourRaw) return
+        const hour = hourRaw.padStart(2, '0')  // normalise to 2 digits: "8" → "08", "17" → "17"
+        if (targetHour && hour !== targetHour) return
 
-          const isAvailable =
-            (emptySlots.length === 2 && occupiedSlots.length === 2) ||
-            (emptySlots.length === 1 && occupiedSlots.length === 3)
+        const slotClass = a.className.split(' ')[2]?.trim()
+        const key = `${courtNum}:${hour}`
+        if (!cells[key]) cells[key] = { courtName, hour: hour + '00', emptyCount: 0, valid: true }
 
-          if (isAvailable && (!hhmm || cellHourMin === hhmm)) {
-            results.push({ courtName, hour: cellHourMin })
-          }
-        })
+        if (slotClass === 'classempty') cells[key].emptyCount++
+        if (slotClass !== 'classempty' && slotClass !== 'class4') cells[key].valid = false
       })
 
-      return results
+      return Object.values(cells)
+        .filter(({ valid, emptyCount }) => valid && emptyCount >= 1)
+        .map(({ courtName, hour }) => ({ courtName, hour }))
     }, targetHourMin)
   }
 
