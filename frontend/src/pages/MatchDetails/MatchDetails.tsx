@@ -729,6 +729,27 @@ export default function MatchDetailPage() {
                   )}
                 </div>
               )}
+              {bookingAttempt?.status === "cancelled" && !isMatchInPast(match.date, match.time) && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <XCircle className="h-4 w-4 shrink-0" />
+                    <span>{t("matchDetails.booking.bookingCancelled")}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleRetryBooking}
+                    disabled={retryingBooking || !allParticipantsHaveSocio || !selectedMembershipId}
+                  >
+                    {retryingBooking
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <RefreshCw className="h-3.5 w-3.5" />
+                    }
+                    {t("matchDetails.booking.retryBooking")}
+                  </Button>
+                </div>
+              )}
               {bookingAttempt?.status === "pending" && (() => {
                 const stale = Date.now() - new Date(bookingAttempt.attemptedAt).getTime() > 10 * 60 * 1000
                 return stale ? (

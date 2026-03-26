@@ -636,6 +636,7 @@
       "cancellingBooking": "Cancelando reserva…",
       "cancelBooking": "Cancelar reserva",
       "bookingFailed": "Reserva fallida",
+      "bookingCancelled": "La reserva de pista fue cancelada.",
       "retryBooking": "Reintentar reserva",
       "attempting": "Intentando reservar una pista…",
       "attemptingNote": "Esto puede tardar unos segundos. La página se actualizará automáticamente.",
