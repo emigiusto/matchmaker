@@ -86,7 +86,29 @@ export const whatsappService = {
     participantPhones: string[];
     groupName: string;
     botPhone?: string;
+    /** If provided, skip API listing and directly rename this group. Falls back to creating a new group if rename fails. */
+    existingGroupId?: string;
   }): Promise<CreateGroupResult> {
+    // Fast path: caller already knows the group to reuse (looked up from DB)
+    if (input.existingGroupId) {
+      const updateRes = await provider.updateGroupSubject(input.existingGroupId, input.groupName);
+      if (updateRes.success) {
+        logger.info('WhatsappGroupReused', {
+          groupId: input.existingGroupId,
+          groupName: input.groupName,
+          participants: input.participantPhones.length,
+          source: 'db',
+        });
+        return { success: true, groupId: input.existingGroupId, reused: true };
+      }
+      // Group may have been deleted — fall through to create a new one
+      logger.warn('WhatsappGroupRenameFailedFallingBack', {
+        groupId: input.existingGroupId,
+        error: updateRes.error,
+      });
+    }
+
+    // Slow path: scan all API groups and compare participant sets
     const expected = toParticipantSet(input.participantPhones, input.botPhone);
     if (expected.size < 2) return provider.createMatchGroup(input);
 
@@ -101,8 +123,9 @@ export const whatsappService = {
         groupId: existing.groupId,
         groupName: input.groupName,
         participants: input.participantPhones.length,
+        source: 'api',
       });
-      return { success: true, groupId: existing.groupId };
+      return { success: true, groupId: existing.groupId, reused: true };
     }
     return provider.createMatchGroup(input);
   },

@@ -24,7 +24,7 @@ vi.mock('./providers/mock.provider', () => ({
     return mockProvider;
   },
 }));
-vi.mock('../../config/logger', () => ({ logger: { info: vi.fn() } }));
+vi.mock('../../config/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
 
 describe('whatsappService', () => {
   beforeEach(() => {
@@ -76,7 +76,7 @@ describe('whatsappService', () => {
       botPhone: '34600000000',
     });
 
-    expect(result).toEqual({ success: true, groupId: 'existing-group-456' });
+    expect(result).toEqual({ success: true, groupId: 'existing-group-456', reused: true });
     expect(mockProvider.listGroupsWithParticipants).toHaveBeenCalledTimes(1);
     expect(mockProvider.updateGroupSubject).toHaveBeenCalledWith(
       'existing-group-456',
@@ -103,7 +103,7 @@ describe('whatsappService', () => {
       botPhone: '34600000000',
     });
 
-    expect(result).toEqual({ success: true, groupId: 'group-789' });
+    expect(result).toEqual({ success: true, groupId: 'group-789', reused: true });
     expect(mockProvider.updateGroupSubject).toHaveBeenCalled();
     expect(mockProvider.createMatchGroup).not.toHaveBeenCalled();
   });
@@ -155,6 +155,77 @@ describe('whatsappService', () => {
     expect(result).toEqual({ success: false, error: 'Need at least 2 participants' });
     expect(mockProvider.listGroupsWithParticipants).not.toHaveBeenCalled();
     expect(mockProvider.createMatchGroup).toHaveBeenCalledTimes(1);
+  });
+
+  it('createMatchGroup uses existingGroupId fast path: renames group without listing', async () => {
+    vi.resetModules();
+    const { whatsappService } = await import('./whatsapp.service');
+
+    mockProvider.updateGroupSubject.mockResolvedValue({ success: true });
+
+    const result = await whatsappService.createMatchGroup({
+      participantPhones: ['34611111111', '34622222222'],
+      groupName: 'Wednesday 18:00 · Alice · Bob',
+      botPhone: '34600000000',
+      existingGroupId: 'db-known-group-abc',
+    });
+
+    expect(result).toEqual({ success: true, groupId: 'db-known-group-abc', reused: true });
+    expect(mockProvider.updateGroupSubject).toHaveBeenCalledWith('db-known-group-abc', 'Wednesday 18:00 · Alice · Bob');
+    expect(mockProvider.listGroupsWithParticipants).not.toHaveBeenCalled();
+    expect(mockProvider.createMatchGroup).not.toHaveBeenCalled();
+  });
+
+  it('createMatchGroup falls back to API listing when existingGroupId rename fails (group deleted)', async () => {
+    vi.resetModules();
+    const { whatsappService } = await import('./whatsapp.service');
+
+    // Fast-path rename fails (group was deleted from WhatsApp)
+    mockProvider.updateGroupSubject.mockResolvedValue({ success: false, error: 'Group not found' });
+    // API listing finds no matching group either → creates new one
+    mockProvider.listGroupsWithParticipants.mockResolvedValue([]);
+    mockProvider.createMatchGroup.mockResolvedValue({ success: true, groupId: 'brand-new-group' });
+
+    const result = await whatsappService.createMatchGroup({
+      participantPhones: ['34611111111', '34622222222'],
+      groupName: 'Thursday 09:00 · Alice · Bob',
+      botPhone: '34600000000',
+      existingGroupId: 'stale-group-xyz',
+    });
+
+    expect(result).toEqual({ success: true, groupId: 'brand-new-group' });
+    expect(mockProvider.listGroupsWithParticipants).toHaveBeenCalledTimes(1);
+    expect(mockProvider.createMatchGroup).toHaveBeenCalledTimes(1);
+  });
+
+  it('createMatchGroup falls back to API listing when existingGroupId rename fails and finds API match', async () => {
+    vi.resetModules();
+    const { whatsappService } = await import('./whatsapp.service');
+
+    // First updateGroupSubject call: fast-path rename fails
+    // Second updateGroupSubject call: API-path rename succeeds
+    mockProvider.updateGroupSubject
+      .mockResolvedValueOnce({ success: false, error: 'Group not found' })
+      .mockResolvedValueOnce({ success: true });
+    mockProvider.listGroupsWithParticipants.mockResolvedValue([
+      {
+        groupId: 'api-found-group',
+        participantPhones: ['34611111111', '34622222222', '34600000000'],
+      },
+    ]);
+
+    const result = await whatsappService.createMatchGroup({
+      participantPhones: ['34611111111', '34622222222'],
+      groupName: 'Friday 20:00 · Alice · Bob',
+      botPhone: '34600000000',
+      existingGroupId: 'stale-group-xyz',
+    });
+
+    expect(result).toEqual({ success: true, groupId: 'api-found-group', reused: true });
+    expect(mockProvider.updateGroupSubject).toHaveBeenCalledTimes(2);
+    expect(mockProvider.updateGroupSubject).toHaveBeenNthCalledWith(1, 'stale-group-xyz', 'Friday 20:00 · Alice · Bob');
+    expect(mockProvider.updateGroupSubject).toHaveBeenNthCalledWith(2, 'api-found-group', 'Friday 20:00 · Alice · Bob');
+    expect(mockProvider.createMatchGroup).not.toHaveBeenCalled();
   });
 
   it('parseWebhookPayload delegates to provider', async () => {

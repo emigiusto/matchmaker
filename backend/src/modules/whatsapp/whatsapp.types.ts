@@ -11,6 +11,8 @@ export interface CreateGroupResult {
   success: boolean;
   groupId?: string;
   error?: string;
+  /** True when an existing group was reused (renamed) rather than a new one created. */
+  reused?: boolean;
 }
 
 export interface GetGroupInviteLinkResult {

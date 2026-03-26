@@ -954,14 +954,32 @@ export const schedulingService = {
         ? `${capitalize(dateStr)} · ${timeStr} · ${nameLabel}`
         : `${capitalize(dateStr)} · ${timeStr}`;
 
+      // Look up most recent match with the same participant set that already has a WhatsApp group
+      const previousMatchWithGroup = await prisma.match.findFirst({
+        where: {
+          id: { not: match.id },
+          whatsappGroupId: { not: null },
+          participants: { every: { userId: { in: participantUserIds } } },
+        },
+        include: { participants: { select: { userId: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
+      // Verify exact participant count (Prisma `every` alone doesn't enforce the count)
+      const existingGroupId =
+        previousMatchWithGroup &&
+        previousMatchWithGroup.participants.length === participantUserIds.length
+          ? (previousMatchWithGroup.whatsappGroupId ?? undefined)
+          : undefined;
+
       const groupResult = await whatsappService.createMatchGroup({
         participantPhones,
         groupName,
         botPhone: whapiBotPhone || undefined,
+        existingGroupId,
       });
 
       if (groupResult.success && groupResult.groupId) {
-        logger.info('WhatsappGroupCreated', { groupId: groupResult.groupId, matchId: match.id, groupName });
+        logger.info('WhatsappGroupReady', { groupId: groupResult.groupId, matchId: match.id, groupName, reused: groupResult.reused ?? false });
         await prisma.match.update({
           where: { id: match.id },
           data: { whatsappGroupId: groupResult.groupId },
@@ -977,48 +995,51 @@ export const schedulingService = {
         );
         await whatsappService.sendGroupMessage(groupResult.groupId, detailsMessage);
 
-        const inviteFallback = await whatsappService.ensureParticipantsReceiveGroupInvite(
-          groupResult.groupId,
-          participantPhones,
-          (missingDigitsPhone: string) => {
-            const recipient = participantByDigits.get(normalizeDigits(missingDigitsPhone));
-            const recipientName = recipient?.name?.trim();
-            const others = usersWithPhones
-              .filter((u) => u.id !== recipient?.id)
-              .map((u) => u.name)
-              .filter((n): n is string => !!n && n.trim().length > 0);
+        // Only send group invite links for new groups — participants are already in a reused group
+        if (!groupResult.reused) {
+          const inviteFallback = await whatsappService.ensureParticipantsReceiveGroupInvite(
+            groupResult.groupId,
+            participantPhones,
+            (missingDigitsPhone: string) => {
+              const recipient = participantByDigits.get(normalizeDigits(missingDigitsPhone));
+              const recipientName = recipient?.name?.trim();
+              const others = usersWithPhones
+                .filter((u) => u.id !== recipient?.id)
+                .map((u) => u.name)
+                .filter((n): n is string => !!n && n.trim().length > 0);
 
-            const rivalOrPlayersStr =
-              format === 'singles'
-                ? others[0] || (allNames.length >= 2 ? allNames.filter((n) => n !== recipientName)[0] : undefined)
-                : others.length > 0
-                  ? others.join(', ')
-                  : undefined;
+              const rivalOrPlayersStr =
+                format === 'singles'
+                  ? others[0] || (allNames.length >= 2 ? allNames.filter((n) => n !== recipientName)[0] : undefined)
+                  : others.length > 0
+                    ? others.join(', ')
+                    : undefined;
 
-            return formatGroupInviteMessage({
-              sportType: request.sportType,
-              format,
-              whenStr,
-              location: request.locationText,
-              rivalOrPlayersStr,
-              matchUrl: publicMatchUrl,
-              locale: recipient?.locale ?? hostUserLocale,
+              return formatGroupInviteMessage({
+                sportType: request.sportType,
+                format,
+                whenStr,
+                location: request.locationText,
+                rivalOrPlayersStr,
+                matchUrl: publicMatchUrl,
+                locale: recipient?.locale ?? hostUserLocale,
+              });
+            },
+            whapiBotPhone || undefined
+          );
+          if (inviteFallback.sentTo.length > 0) {
+            logger.info('GroupInviteLinksSent', {
+              groupId: groupResult.groupId,
+              sentTo: inviteFallback.sentTo,
+              count: inviteFallback.sentTo.length,
             });
-          },
-          whapiBotPhone || undefined
-        );
-        if (inviteFallback.sentTo.length > 0) {
-          logger.info('GroupInviteLinksSent', {
-            groupId: groupResult.groupId,
-            sentTo: inviteFallback.sentTo,
-            count: inviteFallback.sentTo.length,
-          });
-        }
-        if (inviteFallback.errors.length > 0) {
-          logger.warn('GroupInviteLinkErrors', {
-            groupId: groupResult.groupId,
-            errors: inviteFallback.errors,
-          });
+          }
+          if (inviteFallback.errors.length > 0) {
+            logger.warn('GroupInviteLinkErrors', {
+              groupId: groupResult.groupId,
+              errors: inviteFallback.errors,
+            });
+          }
         }
       }
     }
