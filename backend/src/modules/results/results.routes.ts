@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { ResultsController } from './results.controller';
 import { requireAdmin } from '../../shared/middleware/requireAdmin';
+import { requireAuth } from '../../shared/middleware/requireAuth';
 
 const router = Router();
 
@@ -222,6 +223,6 @@ router.get('/recent', ResultsController.getRecentResults);
  *             schema:
  *               $ref: '#/components/schemas/Result'
  */
-router.post('/:matchId/submit-result', ResultsController.submitMatchResult);
+router.post('/:matchId/submit-result', requireAuth, ResultsController.submitMatchResult);
 
 export default router;
