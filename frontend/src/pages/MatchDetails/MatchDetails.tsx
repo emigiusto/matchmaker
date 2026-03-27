@@ -1375,7 +1375,10 @@ export default function MatchDetailPage() {
               <CardContent className="flex flex-col items-center justify-center py-8">
                 <ResultUploadDialog
                   match={match}
-                  onResultSubmitted={() => setMatch((m) => m ? { ...m, status: "awaiting_confirmation" } : m)}
+                  onResultSubmitted={() => {
+                    setMatch((m) => m ? { ...m, status: "awaiting_confirmation" } : m)
+                    resultsService.getByMatch(match.id).then((r) => setResult(r as unknown as MatchResult)).catch(() => {})
+                  }}
                   trigger={
                     <Button size="lg" className="gap-2">
                       {t("matchDetails.submit.button")}
