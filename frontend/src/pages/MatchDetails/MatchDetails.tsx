@@ -561,25 +561,29 @@ export default function MatchDetailPage() {
                       : opponent.name
                   }
                 />
-                <RescheduleMatchDialog
-                  matchId={match.id}
-                  userId={currentUserId}
-                  match={match}
-                  onSuccess={(m) => {
-                    setMatch(m)
-                    if (id) {
-                      bookingService.getAttempt(id).then((attempt) => {
-                        setBookingAttempt(attempt)
-                        if (attempt?.status === "pending") startBookingPoll(id)
-                      }).catch(() => {})
-                    }
-                  }}
-                />
-                <CancelMatchButton
-                  matchId={match.id}
-                  userId={currentUserId}
-                  onSuccess={(m) => setMatch(m)}
-                />
+                {!match.result && (
+                  <RescheduleMatchDialog
+                    matchId={match.id}
+                    userId={currentUserId}
+                    match={match}
+                    onSuccess={(m) => {
+                      setMatch(m)
+                      if (id) {
+                        bookingService.getAttempt(id).then((attempt) => {
+                          setBookingAttempt(attempt)
+                          if (attempt?.status === "pending") startBookingPoll(id)
+                        }).catch(() => {})
+                      }
+                    }}
+                  />
+                )}
+                {!match.result && (
+                  <CancelMatchButton
+                    matchId={match.id}
+                    userId={currentUserId}
+                    onSuccess={(m) => setMatch(m)}
+                  />
+                )}
               </div>
             )}
           </CardContent>
@@ -1275,123 +1279,15 @@ export default function MatchDetailPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {result?.questionnaire.matchPlayedOut &&
-                      result?.questionnaire.matchPlayedOut.length > 0 && (
+                    {Object.entries(result?.questionnaire ?? {}).map(([key, values]) =>
+                      Array.isArray(values) && values.length > 0 ? (
                         <QuestionnaireItem
-                          label="Match intensity"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.matchPlayedOut
-                          )}
+                          key={key}
+                          label={t(`results.questionnaire.${key}.label`)}
+                          value={formatQuestionnaireArrayValues(values as string[])}
                         />
-                      )}
-                    {result?.questionnaire.mainStrategy &&
-                      result?.questionnaire.mainStrategy.length > 0 && (
-                        <QuestionnaireItem
-                          label="Strategy"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.mainStrategy
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.whatWorkedBest &&
-                      result?.questionnaire.whatWorkedBest.length > 0 && (
-                        <QuestionnaireItem
-                          label="Worked best"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.whatWorkedBest
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.whatDidntWork &&
-                      result?.questionnaire.whatDidntWork.length > 0 && (
-                        <QuestionnaireItem
-                          label="Didn't work"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.whatDidntWork
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.generalSensation &&
-                      result?.questionnaire.generalSensation.length > 0 && (
-                        <QuestionnaireItem
-                          label="General feeling"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.generalSensation
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.opponentStrength &&
-                      result?.questionnaire.opponentStrength.length > 0 && (
-                        <QuestionnaireItem
-                          label="Opponent's strength"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.opponentStrength
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.pointBuilding &&
-                      result?.questionnaire.pointBuilding.length > 0 && (
-                        <QuestionnaireItem
-                          label="Point building"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.pointBuilding
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.serveStrategy &&
-                      result?.questionnaire.serveStrategy.length > 0 && (
-                        <QuestionnaireItem
-                          label="Serve strategy"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.serveStrategy
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.importantPoints &&
-                      result?.questionnaire.importantPoints.length > 0 && (
-                        <QuestionnaireItem
-                          label="Important points"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.importantPoints
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.netApproach &&
-                      result?.questionnaire.netApproach.length > 0 && (
-                        <QuestionnaireItem
-                          label="Net approach"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.netApproach
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.tacticAdjustment &&
-                      result?.questionnaire.tacticAdjustment.length > 0 && (
-                        <QuestionnaireItem
-                          label="Tactic adjustment"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.tacticAdjustment
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.targetedSide &&
-                      result?.questionnaire.targetedSide.length > 0 && (
-                        <QuestionnaireItem
-                          label="Targeted side"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.targetedSide
-                          )}
-                        />
-                      )}
-                    {result?.questionnaire.mainMistake &&
-                      result?.questionnaire.mainMistake.length > 0 && (
-                        <QuestionnaireItem
-                          label="Main mistake"
-                          value={formatQuestionnaireArrayValues(
-                            result?.questionnaire.mainMistake
-                          )}
-                        />
-                      )}
+                      ) : null
+                    )}
                   </CardContent>
                 </Card>
               )}

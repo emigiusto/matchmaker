@@ -4,19 +4,63 @@
 // Result is purely descriptive: it records the outcome of a match, but has no competitive or ranking meaning yet.
 
 export interface PostMatchQuestionnaire {
+  // Shared across all formats
   matchPlayedOut?: string[];
+  generalSensation?: string[];
+  tacticAdjustment?: string[];
+  importantPoints?: string[];
+  physicalCondition?: string[];
+
+  // Tennis singles
   mainStrategy?: string[];
   whatWorkedBest?: string[];
   whatDidntWork?: string[];
-  generalSensation?: string[];
   pointBuilding?: string[];
   serveStrategy?: string[];
   targetedSide?: string[];
-  tacticAdjustment?: string[];
-  importantPoints?: string[];
   netApproach?: string[];
   opponentStrength?: string[];
   mainMistake?: string[];
+  returnStrategy?: string[];
+  mentalPerformance?: string[];
+  breakPointPerformance?: string[];
+  firstSetImpact?: string[];
+  courtPositioning?: string[];
+  decisionMaking?: string[];
+
+  // Tennis doubles
+  doublesMainStrategy?: string[];
+  teamCoordination?: string[];
+  netCoverage?: string[];
+  poachingFrequency?: string[];
+  formationUsed?: string[];
+  doublesOpponentStrength?: string[];
+  partnerCommunication?: string[];
+  doublesServeStrategy?: string[];
+  doublesReturnStrategy?: string[];
+  doublesTargetedOpponent?: string[];
+  netDuelOutcome?: string[];
+  doublesBreakPoints?: string[];
+  doublesWeakness?: string[];
+  serviceHoldRate?: string[];
+  doublesClutchPerformance?: string[];
+
+  // Padel doubles
+  padelMainStrategy?: string[];
+  padelWallUsage?: string[];
+  padelNetDomination?: string[];
+  padelPartnerSync?: string[];
+  padelShotVariety?: string[];
+  padelOpponentStrength?: string[];
+  padelLobDefense?: string[];
+  padelServeReturn?: string[];
+  padelBandeja?: string[];
+  padelVibora?: string[];
+  padelDefenseFromBack?: string[];
+  padelAttackOpportunity?: string[];
+  padelNetConquering?: string[];
+  padelWallVariety?: string[];
+  padelMentalGame?: string[];
 }
 
 /**

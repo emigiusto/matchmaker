@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { toast } from "sonner"
 import type { Match, PostMatchQuestionnaire } from "@/lib/types"
+import { type QuestionKey, QUESTION_OPTIONS, getQuestionPool } from "@/lib/questionnaire.config"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { resultsService } from "@/lib/services/results.service"
 import { getCurrentUserId } from "@/lib/current-user"
@@ -31,40 +32,6 @@ interface SetInput {
   player2Score: string
   tiebreak1: string
   tiebreak2: string
-}
-
-type QuestionKey = keyof PostMatchQuestionnaire
-
-const QUESTION_KEYS: QuestionKey[] = [
-  "matchPlayedOut",
-  "mainStrategy",
-  "whatWorkedBest",
-  "whatDidntWork",
-  "generalSensation",
-  "pointBuilding",
-  "serveStrategy",
-  "targetedSide",
-  "tacticAdjustment",
-  "importantPoints",
-  "netApproach",
-  "opponentStrength",
-  "mainMistake",
-]
-
-const QUESTION_OPTIONS: Record<QuestionKey, string[]> = {
-  matchPlayedOut:   ["dominated", "balanced", "very_close", "struggled"],
-  mainStrategy:     ["baseline", "aggressive_forehand", "net_play", "defensive", "serve_focused", "mixed"],
-  whatWorkedBest:   ["first_serve", "return", "forehand", "backhand", "movement", "mental"],
-  whatDidntWork:    ["unforced_errors", "weak_second_serve", "positioning", "focus", "fatigue", "tactics"],
-  generalSensation: ["confident", "nervous", "in_rhythm", "out_of_sync", "strong", "tired"],
-  pointBuilding:    ["long_rallies", "short_aggressive", "serve_first_shot", "counter_attacking", "waiting_errors", "mixed"],
-  serveStrategy:    ["high_percentage", "aggressive", "targeted_weakness", "body_serves", "wide_serves", "no_strategy"],
-  targetedSide:     ["forehand", "backhand", "mixed", "no_targeting"],
-  tacticAdjustment: ["yes_successful", "yes_unsuccessful", "no_adjustment", "no_plan"],
-  importantPoints:  ["very_strong", "solid", "inconsistent", "struggled"],
-  netApproach:      ["frequently", "occasionally", "rarely", "never"],
-  opponentStrength: ["serve", "forehand", "backhand", "defense", "consistency", "mental", "endurance"],
-  mainMistake:      ["forced_errors", "unforced_errors", "shot_selection", "predictable", "positioning", "second_serve"],
 }
 
 function isTiebreakSet(p1: string, p2: string) {
@@ -97,9 +64,12 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
     return initial
   })
 
+  const questionPool = getQuestionPool(match.sport, match.format)
+
   const selectedQuestions = useMemo(() => {
-    const shuffled = [...QUESTION_KEYS].sort(() => Math.random() - 0.5)
+    const shuffled = [...questionPool].sort(() => Math.random() - 0.5)
     return shuffled.slice(0, 5)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const currentUserId = getCurrentUserId()
@@ -414,11 +384,11 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
                   <QuestionCheckboxGroup
                     key={key}
                     label={t(`results.questionnaire.${key}.label`)}
-                    options={QUESTION_OPTIONS[key].map((v) => ({
+                    options={(QUESTION_OPTIONS[key as QuestionKey] as string[]).map((v: string) => ({
                       value: v,
                       label: t(`results.questionnaire.${key}.${v}`),
                     }))}
-                    selectedValues={(questionnaire[key] as string[]) || []}
+                    selectedValues={(questionnaire[key as QuestionKey] as string[]) || []}
                     onToggle={(value) => toggleQuestionnaireValue(key, value)}
                   />
                 ))}
