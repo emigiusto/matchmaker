@@ -54,6 +54,8 @@ export interface ResultDTO {
   disputedByOpponentAt: string | null;
   disputeNote: string | null;
   questionnaire: PostMatchQuestionnaire | null;
+  aceupSyncedAt: string | null;
+  aceupChallengeId: number | null;
 }
 
 export interface ResolveDisputeInput {

@@ -775,6 +775,8 @@ function toResultDTO(result: Result & { sets?: SetResult[] }): ResultDTO {
     disputedByOpponentAt: result.disputedByOpponentAt ? result.disputedByOpponentAt.toISOString() : null,
     disputeNote: (result as any).disputeNote ?? null,
     questionnaire: ((result as any).questionnaire as PostMatchQuestionnaire | null) ?? null,
+    aceupSyncedAt: result.aceupSyncedAt ? result.aceupSyncedAt.toISOString() : null,
+    aceupChallengeId: result.aceupChallengeId ?? null,
     sets: (result.sets ?? [])
       .slice()
       .sort((a, b) => a.setNumber - b.setNumber)
