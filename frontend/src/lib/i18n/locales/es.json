@@ -641,6 +641,7 @@
       "attempting": "Intentando reservar una pista…",
       "attemptingNote": "Esto puede tardar unos segundos. La página se actualizará automáticamente.",
       "timedOut": "La reserva tardó demasiado. Puedes reintentarlo a continuación.",
+      "autoRetryMessage": "Se reintentará automáticamente a las 2:00.",
       "errors": {
         "missingSocioNumber": "Falta el número de socio de un participante",
         "noAvailableCourts": "No hay pistas disponibles en el horario seleccionado",

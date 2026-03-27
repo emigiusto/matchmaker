@@ -31,6 +31,11 @@ export interface BackendMatchDTO {
   whatsappGroupId?: string | null
   publicToken?: string | null
   hostUserId?: string | null
+  result?: {
+    status: "draft" | "submitted" | "confirmed" | "disputed"
+    winnerUserId: string | null
+    sets: { setNumber: number; player1Score: number; player2Score: number }[]
+  } | null
 }
 
 // Backend InviteDTO shape (from /invites endpoints)
@@ -357,6 +362,7 @@ export function adaptMatch(dto: BackendMatchDTO): Match {
     location: dto.location ?? "",
     matchType: dto.type,
     status: dto.status as Match["status"],
+    result: dto.result ?? null,
     participants: participants.map((p) => ({ userId: p.userId, userName: p.userName, team: p.team })),
     showVsLayout,
     sport,

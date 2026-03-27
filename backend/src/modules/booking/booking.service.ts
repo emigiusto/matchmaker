@@ -781,12 +781,16 @@ export async function resetBookingForReschedule(matchId: string): Promise<void> 
  * Returns the number of attempts re-queued.
  */
 export async function retryFailedBookingsForFutureMatches(): Promise<number> {
+  const NON_RETRYABLE_ERRORS = ['MISSING_SOCIO_NUMBER', 'INVALID_CLUB_CREDENTIALS']
   const attempts = await prisma.bookingAttempt.findMany({
     where: {
       status: 'failed',
-      errorCode: { not: 'MISSING_SOCIO_NUMBER' },
+      errorCode: { notIn: NON_RETRYABLE_ERRORS },
       clubMembership: { status: 'active' },
-      match: { scheduledAt: { gt: new Date() } },
+      match: {
+        scheduledAt: { gt: new Date() },
+        result: { is: null },
+      },
     },
     select: { id: true, matchId: true, clubMembershipId: true },
   })

@@ -728,6 +728,11 @@ export default function MatchDetailPage() {
                       {getBookingErrorMessage(bookingAttempt.errorCode, t, bookingAttempt.errorMessage)}
                     </span>
                   </div>
+                  {!isMatchInPast(match.date, match.time) && !match.result &&
+                    bookingAttempt.errorCode !== "MISSING_SOCIO_NUMBER" &&
+                    bookingAttempt.errorCode !== "INVALID_CLUB_CREDENTIALS" && (
+                    <p className="text-xs text-muted-foreground">{t("matchDetails.booking.autoRetryMessage")}</p>
+                  )}
                   {!isMatchInPast(match.date, match.time) && (
                     <Button
                       variant="outline"

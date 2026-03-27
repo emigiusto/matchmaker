@@ -641,6 +641,7 @@
       "attempting": "Attempting to reserve a court…",
       "attemptingNote": "This may take a few seconds. The page will update automatically.",
       "timedOut": "Booking timed out — the process took too long. You can retry below.",
+      "autoRetryMessage": "Will be automatically retried at 2am tomorrow.",
       "errors": {
         "missingSocioNumber": "A participant is missing their socio number",
         "noAvailableCourts": "No courts available at the selected time",
