@@ -762,12 +762,12 @@ function toResultDTO(result: Result & { sets?: SetResult[] }): ResultDTO {
 }
 
 /**
- * Auto-confirms results that have been awaiting confirmation for >= 7 days with no dispute.
+ * Auto-confirms results that have been awaiting confirmation for >= 5 days with no dispute.
  * Called by the nightly autoconfirm job.
  * Returns the count of results auto-confirmed.
  */
 export async function autoConfirmResults(): Promise<number> {
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
   const results = await prisma.result.findMany({
     where: { status: 'submitted', createdAt: { lte: cutoff } },
     include: { match: { include: { participants: { select: { userId: true, team: true } } } } },

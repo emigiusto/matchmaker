@@ -734,6 +734,7 @@
       "set": "Set {{number}}",
       "status": "Status",
       "awaitingConfirmation": "Awaiting Confirmation",
+      "autoConfirmHint": "If no disputes are raised, the result will be automatically confirmed in 5 days.",
       "confirmed": "Confirmed",
       "confirmResult": "Confirm Result",
       "dispute": "Dispute",

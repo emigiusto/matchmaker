@@ -1041,9 +1041,9 @@ export default function MatchDetailPage() {
                   )}
 
                   {match.matchType === "competitive" && (
-                    <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                    <div className="rounded-lg border border-border/50 bg-muted/30 p-3 space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">{t("matchDetails.result.status")}</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">
+                      <p className="text-sm font-semibold text-foreground">
                         {result.status === "submitted"
                           ? t("matchDetails.result.awaitingConfirmation")
                           : result.status === "confirmed"
@@ -1052,6 +1052,9 @@ export default function MatchDetailPage() {
                           ? t("matchDetails.result.disputed")
                           : result.status}
                       </p>
+                      {result.status === "submitted" && (
+                        <p className="text-xs text-muted-foreground">{t("matchDetails.result.autoConfirmHint")}</p>
+                      )}
                     </div>
                   )}
 
@@ -1083,7 +1086,7 @@ export default function MatchDetailPage() {
                     const isParticipant = currentUserId === match.player1.userId || currentUserId === match.player2.userId ||
                       (match.participants ?? []).some((p) => p.userId === currentUserId)
                     const isSubmitter = result.submittedByUserId === currentUserId
-                    const canAct = (isParticipant && !isSubmitter) || isAdmin
+                    const canAct = isParticipant && !isSubmitter
                     if (!canAct || match.status !== "awaiting_confirmation") return null
                     return (
                       <div className="flex gap-2">
