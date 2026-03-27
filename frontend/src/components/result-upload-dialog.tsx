@@ -137,13 +137,8 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
       const p1 = parseInt(s.player1Score)
       const p2 = parseInt(s.player2Score)
       if (isNaN(p1) || isNaN(p2)) return t("results.dialog.validation.invalidScores")
-      if (p1 < 0 || p2 < 0 || p1 > 7 || p2 > 7) return t("results.dialog.validation.scoreRange")
+      if (p1 < 0 || p2 < 0 || p1 > 15 || p2 > 15) return t("results.dialog.validation.scoreRange")
       if (p1 === p2) return t("results.dialog.validation.tied")
-      const winner = Math.max(p1, p2)
-      const loser = Math.min(p1, p2)
-      if (winner < 6) return t("results.dialog.validation.minGames")
-      if (winner === 6 && loser > 4) return t("results.dialog.validation.invalid6")
-      if (winner === 7 && (loser < 5 || loser > 6)) return t("results.dialog.validation.invalid7")
     }
     return null
   }
