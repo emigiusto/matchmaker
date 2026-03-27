@@ -363,7 +363,7 @@ function QuestionCheckboxGroup({ label, options, selectedValues, onToggle }: Que
   return (
     <div className="space-y-2.5">
       <Label className="text-sm font-medium">{label}</Label>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+      <div className="flex flex-col gap-2">
         {options.map((option) => (
           <div key={option.value} className="flex items-center gap-2">
             <Checkbox
