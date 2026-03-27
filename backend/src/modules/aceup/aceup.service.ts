@@ -57,13 +57,25 @@ export async function validateUsersOnAceUp(
 ): Promise<AceUpValidateUsersResponse> {
   if (!ACEUP_API_URL) throw new AppError('ACEUP_API_URL is not configured', 500)
 
-  const response = await fetch(`${ACEUP_API_URL}/api/external/validate-users`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(body),
-  })
+  const url = `${ACEUP_API_URL}/api/external/validate-users`
+  console.log('[aceup] validateUsersOnAceUp →', url, JSON.stringify(body))
 
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    console.error('[aceup] validateUsersOnAceUp fetch error:', err)
+    throw err
+  }
+
+  console.log('[aceup] validateUsersOnAceUp ←', response.status)
   if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    console.error('[aceup] validateUsersOnAceUp error body:', text)
     throw new AppError(`AceUp validate-users request failed (${response.status})`, 502)
   }
 
@@ -75,14 +87,25 @@ export async function sendMatchResultToAceUp(
 ): Promise<AceUpMatchResultResponse> {
   if (!ACEUP_API_URL) throw new AppError('ACEUP_API_URL is not configured', 500)
 
-  const response = await fetch(`${ACEUP_API_URL}/api/external/match-result`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(payload),
-  })
+  const url = `${ACEUP_API_URL}/api/external/match-result`
+  console.log('[aceup] sendMatchResultToAceUp →', url, JSON.stringify(payload))
 
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(payload),
+    })
+  } catch (err) {
+    console.error('[aceup] sendMatchResultToAceUp fetch error:', err)
+    throw err
+  }
+
+  console.log('[aceup] sendMatchResultToAceUp ←', response.status)
   if (!response.ok) {
     const err = await response.json().catch(() => ({})) as { error?: string }
+    console.error('[aceup] sendMatchResultToAceUp error body:', err)
     throw new AppError(err.error ?? `AceUp match-result request failed (${response.status})`, 502)
   }
 
