@@ -21,7 +21,7 @@ interface MessageTemplates {
   courtBooked(courtName: string, when: string, loc: string, bookingUrl?: string): string;
   courtBookingFailed(when: string, loc: string, reason: string): string;
   courtCancelled(courtName: string, when: string, loc: string): string;
-  resultSubmitted(sets: { setNumber: number; scoreA: number; scoreB: number }[], url: string): string;
+  resultSubmitted(sets: { setNumber: number; scoreA: number; scoreB: number }[], labelA: string, labelB: string, url: string): string;
 }
 
 /**
@@ -209,8 +209,8 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
-    resultSubmitted(sets, url) {
-      const setsStr = sets.map((s) => `Set ${s.setNumber}: ${s.scoreA} - ${s.scoreB}`).join('\n');
+    resultSubmitted(sets, labelA, labelB, url) {
+      const setsStr = sets.map((s) => `Set ${s.setNumber}: *${labelA}* ${s.scoreA} - ${s.scoreB} *${labelB}*`).join('\n');
       return [
         '📊 *Resultado cargado*',
         '',
@@ -371,8 +371,8 @@ const templates: Record<Locale, MessageTemplates> = {
       ].join('\n');
     },
 
-    resultSubmitted(sets, url) {
-      const setsStr = sets.map((s) => `Set ${s.setNumber}: ${s.scoreA} - ${s.scoreB}`).join('\n');
+    resultSubmitted(sets, labelA, labelB, url) {
+      const setsStr = sets.map((s) => `Set ${s.setNumber}: *${labelA}* ${s.scoreA} - ${s.scoreB} *${labelB}*`).join('\n');
       return [
         '📊 *Result submitted*',
         '',

@@ -38,10 +38,22 @@ const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame
 export async function notifyResultSubmittedToGroup(matchId: string, result: ResultDTO): Promise<void> {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { whatsappGroupId: true },
+    select: {
+      whatsappGroupId: true,
+      participants: {
+        select: { userId: true, team: true, user: { select: { name: true } } },
+      },
+    },
   });
   const groupId = match?.whatsappGroupId;
   if (!groupId) return;
+
+  // Build per-team labels from participant first names
+  const firstName = (name: string | null | undefined) => (name ?? '').split(' ')[0] || '?';
+  const teamA = (match.participants ?? []).filter((p) => p.team === 'A');
+  const teamB = (match.participants ?? []).filter((p) => p.team === 'B');
+  const labelA = teamA.map((p) => firstName(p.user?.name)).join(' / ') || 'A';
+  const labelB = teamB.map((p) => firstName(p.user?.name)).join(' / ') || 'B';
 
   const sets = result.sets
     .slice()
@@ -49,7 +61,7 @@ export async function notifyResultSubmittedToGroup(matchId: string, result: Resu
     .map((s) => ({ setNumber: s.setNumber, scoreA: s.player1Score, scoreB: s.player2Score }));
 
   const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
-  const message = getMessages('es').resultSubmitted(sets, matchUrl);
+  const message = getMessages('es').resultSubmitted(sets, labelA, labelB, matchUrl);
 
   try {
     await whatsappService.sendGroupMessage(groupId, message);
