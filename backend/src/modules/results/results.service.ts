@@ -710,26 +710,6 @@ export function validateSetScore(input: AddSetResultInput) {
     throw new AppError('Set cannot end in a tie', 400);
   }
 
-  const winner = Math.max(playerAScore, playerBScore);
-  const loser = Math.min(playerAScore, playerBScore);
-
-  // Standard tennis set rules:
-  // 6-x where x <= 4 (winner leads by at least 2)
-  // 7-5 (came back from 5-5, no tiebreak)
-  // 7-6 (tiebreak at 6-6)
-  if (winner < 6) {
-    throw new AppError('Invalid tennis set score: winner must reach at least 6 games', 400);
-  }
-  if (winner === 6 && loser > 4) {
-    throw new AppError('Invalid tennis set score: at 6 games, winner must lead by at least 2 (6-4 or less)', 400);
-  }
-  if (winner === 7 && (loser < 5 || loser > 6)) {
-    throw new AppError('Invalid tennis set score: 7-x is only valid as 7-5 or 7-6', 400);
-  }
-  if (winner > 7) {
-    throw new AppError('Invalid tennis set score: maximum games per set is 7', 400);
-  }
-
   if ((tiebreakScoreA ?? 0) < 0 || (tiebreakScoreB ?? 0) < 0) {
     throw new AppError('Invalid tiebreak score', 400);
   }
