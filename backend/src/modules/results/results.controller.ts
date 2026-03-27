@@ -203,6 +203,7 @@ export class ResultsController {
         // Practice match with no sets: no result created
         return res.status(204).send();
       }
+      void ResultsService.notifyResultSubmittedToGroup(matchId, result);
       return res.status(201).json(result);
     } catch (error) {
       next(error);

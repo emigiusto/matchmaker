@@ -29,6 +29,39 @@ import { RatingService } from '../rating/rating.service';
 import { ResultDTO, SetResultDTO, AddSetResultInput, SubmitMatchResultInput, DisputeResultInput, ResolveDisputeInput, PostMatchQuestionnaire } from './results.types';
 import { MatchStatus, Result, SetResult } from '@prisma/client';
 import { createNotification } from '../notifications/notifications.service';
+import { whatsappService } from '../whatsapp/whatsapp.service';
+import { getMessages } from '../../lib/whatsapp-messages';
+import { logger } from '../../config/logger';
+
+const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
+
+export async function notifyResultSubmittedToGroup(matchId: string, result: ResultDTO): Promise<void> {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { whatsappGroupId: true },
+  });
+  const groupId = match?.whatsappGroupId;
+  if (!groupId) return;
+
+  const sets = result.sets
+    .slice()
+    .sort((a, b) => a.setNumber - b.setNumber)
+    .map((s) => ({ setNumber: s.setNumber, scoreA: s.playerAScore, scoreB: s.playerBScore }));
+
+  const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
+  const message = getMessages('es').resultSubmitted(sets, matchUrl);
+
+  try {
+    await whatsappService.sendGroupMessage(groupId, message);
+    logger.info('ResultSubmittedWhatsAppSent', { matchId, groupId });
+  } catch (err) {
+    logger.error('Failed to send WhatsApp result notification', {
+      matchId,
+      groupId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 ////////////////////////////////////////////////////////////
 // CREATE RESULT

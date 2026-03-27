@@ -21,6 +21,7 @@ interface MessageTemplates {
   courtBooked(courtName: string, when: string, loc: string, bookingUrl?: string): string;
   courtBookingFailed(when: string, loc: string, reason: string): string;
   courtCancelled(courtName: string, when: string, loc: string): string;
+  resultSubmitted(sets: { setNumber: number; scoreA: number; scoreB: number }[], url: string): string;
 }
 
 /**
@@ -207,6 +208,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
       ].join('\n');
     },
+
+    resultSubmitted(sets, url) {
+      const setsStr = sets.map((s) => `Set ${s.setNumber}: ${s.scoreA} - ${s.scoreB}`).join('\n');
+      return [
+        '📊 *Resultado cargado*',
+        '',
+        setsStr,
+        '',
+        'El resultado está pendiente de confirmación.',
+        '',
+        `🔗 *Ver partido:* ${url}`,
+      ].join('\n');
+    },
   },
 
   en: {
@@ -354,6 +368,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `🏟️ ${courtName}`,
         `📅 ${when}`,
         `📍 ${loc || 'TBD'}`,
+      ].join('\n');
+    },
+
+    resultSubmitted(sets, url) {
+      const setsStr = sets.map((s) => `Set ${s.setNumber}: ${s.scoreA} - ${s.scoreB}`).join('\n');
+      return [
+        '📊 *Result submitted*',
+        '',
+        setsStr,
+        '',
+        'The result is pending confirmation.',
+        '',
+        `🔗 *View match:* ${url}`,
       ].join('\n');
     },
   },
