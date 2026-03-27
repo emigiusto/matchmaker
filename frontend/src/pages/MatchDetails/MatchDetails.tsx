@@ -986,19 +986,37 @@ export default function MatchDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    {result.sets.map((set) => (
-                      <div
-                        key={set.setNumber}
-                        className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-2.5"
-                      >
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {t("matchDetails.result.set", { number: set.setNumber })}
-                        </span>
-                        <span className="font-mono text-sm font-semibold text-foreground">
-                          {set.player1Score} - {set.player2Score}
-                        </span>
-                      </div>
-                    ))}
+                    {/* Column headers */}
+                    <div className="grid grid-cols-[3rem_1fr_2rem_1fr] items-center gap-1 px-4">
+                      <span />
+                      <span className="text-center text-xs font-medium text-muted-foreground truncate">
+                        {match.format === 'doubles' ? t("results.dialog.teamALabel") : match.player1.name.split(" ")[0]}
+                      </span>
+                      <span />
+                      <span className="text-center text-xs font-medium text-muted-foreground truncate">
+                        {match.format === 'doubles' ? t("results.dialog.teamBLabel") : match.player2.name.split(" ")[0]}
+                      </span>
+                    </div>
+                    {result.sets.map((set) => {
+                      const p1Wins = set.player1Score > set.player2Score
+                      return (
+                        <div
+                          key={set.setNumber}
+                          className="grid grid-cols-[3rem_1fr_2rem_1fr] items-center gap-1 rounded-lg bg-muted/30 px-4 py-2.5"
+                        >
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {t("matchDetails.result.set", { number: set.setNumber })}
+                          </span>
+                          <span className={`text-center font-mono text-sm ${p1Wins ? "font-bold text-foreground" : "font-normal text-muted-foreground"}`}>
+                            {set.player1Score}
+                          </span>
+                          <span className="text-center text-xs text-muted-foreground">–</span>
+                          <span className={`text-center font-mono text-sm ${!p1Wins ? "font-bold text-foreground" : "font-normal text-muted-foreground"}`}>
+                            {set.player2Score}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
 
                   {result.player1RatingChange !== undefined && (
