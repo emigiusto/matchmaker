@@ -135,8 +135,8 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
       return res.status(400).json({ error: 'Result must be confirmed before sending to AceUp' })
     }
 
-    // Already synced — return cached info
-    if (match.result!.aceupSyncedAt) {
+    // Already synced and challengeId is cached — return immediately
+    if (match.result!.aceupSyncedAt && match.result!.aceupChallengeId) {
       return res.status(200).json({ success: true, challengeId: match.result!.aceupChallengeId })
     }
 
