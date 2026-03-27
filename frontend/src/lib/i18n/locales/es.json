@@ -1075,6 +1075,10 @@
       "submittedCompetitive": "¡Resultado enviado! Esperando confirmación del oponente.",
       "submittedPractice": "¡Resultado enviado correctamente!",
       "submitFailed": "Error al enviar el resultado. Por favor, inténtalo de nuevo.",
+      "matchTypeLabel": "Tipo de partido",
+      "competitive": "Competitivo",
+      "practice": "Práctica",
+      "teamsLabel": "Asignar equipos",
       "validation": {
         "required": "Se requiere al menos 1 set",
         "invalidScores": "Todos los sets completados deben tener puntuaciones válidas",
@@ -1082,7 +1086,8 @@
         "tied": "Los sets no pueden quedar empatados",
         "minGames": "El ganador debe tener al menos 6 juegos",
         "invalid6": "Puntuación inválida: si el ganador tiene 6, el perdedor debe tener 4 o menos",
-        "invalid7": "Puntuación inválida: 7-x sólo es válido como 7-5 o 7-6"
+        "invalid7": "Puntuación inválida: 7-x sólo es válido como 7-5 o 7-6",
+        "teamsRequired": "Asigna todos los jugadores a un equipo (2 por equipo)"
       }
     },
     "questionnaire": {

@@ -31,8 +31,19 @@ export const resultsService = {
     return apiClient.get<MatchResult[]>(`/results/by-user/${userId}`)
   },
 
-  async submitMatchResult(matchId: string, sets: SetScore[], questionnaire?: PostMatchQuestionnaire): Promise<MatchResult> {
-    return apiClient.post<MatchResult>(`/results/${matchId}/submit-result`, { sets, questionnaire })
+  async submitMatchResult(
+    matchId: string,
+    sets: SetScore[],
+    questionnaire?: PostMatchQuestionnaire,
+    teamAssignment?: { teamAUserIds: string[]; teamBUserIds: string[] },
+    matchType?: 'competitive' | 'practice',
+  ): Promise<MatchResult> {
+    return apiClient.post<MatchResult>(`/results/${matchId}/submit-result`, {
+      sets,
+      questionnaire,
+      teamAssignment,
+      matchType,
+    })
   },
 
   async submitSets(resultId: string, sets: SetScore[]): Promise<MatchResult> {

@@ -83,6 +83,19 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
   const [questionnaireOpen, setQuestionnaireOpen] = useState(false)
   const [questionnaire, setQuestionnaire] = useState<Partial<PostMatchQuestionnaire>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [matchType, setMatchType] = useState<'competitive' | 'practice'>(match.matchType)
+
+  const isDoubles = match.format === 'doubles'
+  const participants = match.participants ?? []
+
+  // Team assignment state: userId → 'A' | 'B' | null
+  const [teamAssignment, setTeamAssignment] = useState<Record<string, 'A' | 'B' | null>>(() => {
+    const initial: Record<string, 'A' | 'B' | null> = {}
+    for (const p of participants) {
+      initial[p.userId] = p.team ?? (p.userId === match.player1.userId ? 'A' : p.userId === match.player2.userId ? 'B' : null)
+    }
+    return initial
+  })
 
   const selectedQuestions = useMemo(() => {
     const shuffled = [...QUESTION_KEYS].sort(() => Math.random() - 0.5)
@@ -148,6 +161,15 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
     const error = validateSets()
     if (error) { toast.error(error); return }
 
+    if (isDoubles) {
+      const teamAIds = participants.filter((p) => teamAssignment[p.userId] === 'A').map((p) => p.userId)
+      const teamBIds = participants.filter((p) => teamAssignment[p.userId] === 'B').map((p) => p.userId)
+      if (teamAIds.length !== 2 || teamBIds.length !== 2) {
+        toast.error(t("results.dialog.validation.teamsRequired"))
+        return
+      }
+    }
+
     const filled = sets.filter((s) => s.player1Score && s.player2Score)
     const setsPayload = filled.map((s, i) => {
       const tb = isTiebreakSet(s.player1Score, s.player2Score)
@@ -163,15 +185,22 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
       }
     })
 
+    const teamAssignmentPayload = isDoubles ? {
+      teamAUserIds: participants.filter((p) => teamAssignment[p.userId] === 'A').map((p) => p.userId),
+      teamBUserIds: participants.filter((p) => teamAssignment[p.userId] === 'B').map((p) => p.userId),
+    } : undefined
+
     setIsSubmitting(true)
     try {
       await resultsService.submitMatchResult(
         match.id,
         setsPayload,
-        Object.keys(questionnaire).length > 0 ? questionnaire : undefined
+        Object.keys(questionnaire).length > 0 ? questionnaire : undefined,
+        teamAssignmentPayload,
+        matchType !== match.matchType ? matchType : undefined,
       )
       toast.success(
-        match.matchType === "competitive"
+        matchType === "competitive"
           ? t("results.dialog.submittedCompetitive")
           : t("results.dialog.submittedPractice")
       )
@@ -210,6 +239,61 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Match Type Toggle */}
+          <div className="flex items-center gap-3">
+            <Label className="text-sm font-medium shrink-0">{t("results.dialog.matchTypeLabel")}</Label>
+            <div className="flex rounded-md overflow-hidden border border-border">
+              <button
+                type="button"
+                onClick={() => setMatchType('competitive')}
+                className={`px-3 py-1.5 text-sm transition-colors ${matchType === 'competitive' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+              >
+                {t("results.dialog.competitive")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatchType('practice')}
+                className={`px-3 py-1.5 text-sm transition-colors border-l border-border ${matchType === 'practice' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+              >
+                {t("results.dialog.practice")}
+              </button>
+            </div>
+          </div>
+
+          {/* Doubles Team Assignment */}
+          {isDoubles && participants.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">{t("results.dialog.teamsLabel")}</Label>
+              <div className="space-y-2">
+                {participants.map((p) => (
+                  <div key={p.userId} className="flex items-center justify-between py-1">
+                    <span className="text-sm truncate max-w-[60%]">{p.userName ?? p.userId.slice(0, 8)}</span>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={teamAssignment[p.userId] === 'A' ? 'default' : 'outline'}
+                        className="h-7 w-8 p-0 text-xs"
+                        onClick={() => setTeamAssignment((prev) => ({ ...prev, [p.userId]: 'A' }))}
+                      >
+                        A
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={teamAssignment[p.userId] === 'B' ? 'default' : 'outline'}
+                        className="h-7 w-8 p-0 text-xs"
+                        onClick={() => setTeamAssignment((prev) => ({ ...prev, [p.userId]: 'B' }))}
+                      >
+                        B
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Set Results */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">

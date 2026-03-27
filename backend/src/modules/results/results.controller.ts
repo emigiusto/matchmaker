@@ -192,12 +192,16 @@ export class ResultsController {
         return res.status(401).json({ error: 'Unauthorized: missing user id' });
       }
       const questionnaire = req.body.questionnaire ?? null;
+      const teamAssignment = req.body.teamAssignment ?? undefined;
+      const matchType = req.body.matchType ?? undefined;
       // Call service (winnerUserId will be computed server-side)
       const result = await ResultsService.submitMatchResult({
         matchId,
         sets,
         currentUserId,
         questionnaire,
+        teamAssignment,
+        matchType,
       });
       if (result === null) {
         // Practice match with no sets: no result created

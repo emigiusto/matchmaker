@@ -97,6 +97,8 @@ export interface SubmitMatchResultInput {
   questionnaire?: PostMatchQuestionnaire | null;
   /** When participants have no teams yet, define who played on each side. Team A = playerAScore, Team B = playerBScore. */
   teamAssignment?: { teamAUserIds: string[]; teamBUserIds: string[] };
+  /** Allow overriding the match type at submission time (e.g. switching competitive → practice). */
+  matchType?: 'competitive' | 'practice';
 }
 
 // Note: submitMatchResult may return null for practice matches with no sets

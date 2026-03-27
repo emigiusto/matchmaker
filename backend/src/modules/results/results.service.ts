@@ -336,7 +336,7 @@ function getTeamAAndTeamB(
 }
 
 export async function submitMatchResult(input: SubmitMatchResultInput): Promise<ResultDTO | null> {
-  const { matchId, sets, currentUserId, teamAssignment, questionnaire } = input;
+  const { matchId, sets, currentUserId, teamAssignment, questionnaire, matchType: requestedMatchType } = input;
 
   return prisma.$transaction(async (tx) => {
     const match = await tx.match.findUnique({
@@ -352,6 +352,12 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       throw new AppError('Cannot submit result: Match is not scheduled', 409);
     }
     const isParticipant = (match as any).participants?.some((p: { userId: string }) => p.userId === currentUserId);
+
+    // Override match type if requested (e.g. competitive → practice at submission time)
+    if (requestedMatchType && requestedMatchType !== match.type) {
+      await tx.match.update({ where: { id: matchId }, data: { type: requestedMatchType } });
+      (match as any).type = requestedMatchType;
+    }
     if (!isParticipant) {
       throw new AppError('Only match participants can submit result', 403);
     }
