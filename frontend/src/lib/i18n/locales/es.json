@@ -1079,6 +1079,8 @@
       "competitive": "Competitivo",
       "practice": "Práctica",
       "teamsLabel": "Asignar equipos",
+      "teamALabel": "Pareja A",
+      "teamBLabel": "Pareja B",
       "validation": {
         "required": "Se requiere al menos 1 set",
         "invalidScores": "Todos los sets completados deben tener puntuaciones válidas",

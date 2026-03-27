@@ -1079,6 +1079,8 @@
       "competitive": "Competitive",
       "practice": "Practice",
       "teamsLabel": "Assign teams",
+      "teamALabel": "Team A",
+      "teamBLabel": "Team B",
       "validation": {
         "required": "At least 1 set is required",
         "invalidScores": "All filled sets must have valid scores",

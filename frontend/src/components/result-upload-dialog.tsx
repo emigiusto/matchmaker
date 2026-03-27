@@ -309,9 +309,13 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
             {/* Column headers */}
             <div className="grid grid-cols-[2.5rem_1fr_1.25rem_1fr_2rem] items-center gap-2 px-1">
               <span />
-              <span className="text-center text-xs font-medium text-muted-foreground truncate">{abbrev(currentPlayer.name)}</span>
+              <span className="text-center text-xs font-medium text-muted-foreground truncate">
+                {isDoubles ? t("results.dialog.teamALabel") : abbrev(currentPlayer.name)}
+              </span>
               <span />
-              <span className="text-center text-xs font-medium text-muted-foreground truncate">{abbrev(opponent.name)}</span>
+              <span className="text-center text-xs font-medium text-muted-foreground truncate">
+                {isDoubles ? t("results.dialog.teamBLabel") : abbrev(opponent.name)}
+              </span>
               <span />
             </div>
 
