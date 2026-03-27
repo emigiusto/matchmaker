@@ -102,9 +102,11 @@ export default function PastMatchesPage() {
                         {match.result && (
                           <div className="text-right">
                             <p className="font-mono text-base font-bold text-foreground">
-                              {match.result.sets
-                                .map((s) => `${s.player1Score}-${s.player2Score}`)
-                                .join("  ")}
+                              {match.result.sets && match.result.sets.length > 0
+                                ? match.result.sets
+                                    .map((s) => `${s.player1Score}-${s.player2Score}`)
+                                    .join("  ")
+                                : "No result"}
                             </p>
                             <div className="mt-0.5 flex flex-col items-end gap-0.5 text-sm">
                               <div className="flex items-center gap-1">
