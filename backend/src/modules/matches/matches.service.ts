@@ -39,8 +39,19 @@ const matchInclude = {
   participants: { include: { user: { select: { id: true, name: true } } } },
   result: {
     select: {
+      id: true,
+      matchId: true,
       status: true,
       winnerUserId: true,
+      submittedByUserId: true,
+      confirmedByHostAt: true,
+      confirmedByOpponentAt: true,
+      disputedByHostAt: true,
+      disputedByOpponentAt: true,
+      disputeNote: true,
+      aceupSyncedAt: true,
+      aceupChallengeId: true,
+      createdAt: true,
       sets: { select: { setNumber: true, playerAScore: true, playerBScore: true }, orderBy: { setNumber: 'asc' as const } },
     },
   },
@@ -706,7 +717,7 @@ type EnrichedMatch = Match & {
   availability?: { locationText: string; date: Date; startTime: Date; endTime: Date; userId: string } | null;
   schedulingRequest?: { sportType: string; format: string; timezone?: string | null; bookingEnabled?: boolean | null } | null;
   participants?: { userId: string; team: string | null; user?: { id: string; name: string | null } }[];
-  result?: { status: string; winnerUserId: string | null; sets: { setNumber: number; playerAScore: number; playerBScore: number }[] } | null;
+  result?: { id: string; matchId: string; status: string; winnerUserId: string | null; submittedByUserId: string | null; confirmedByHostAt: Date | null; confirmedByOpponentAt: Date | null; disputedByHostAt: Date | null; disputedByOpponentAt: Date | null; disputeNote: string | null; aceupSyncedAt: Date | null; aceupChallengeId: number | null; createdAt: Date; sets: { setNumber: number; playerAScore: number; playerBScore: number }[] } | null;
 };
 
 function toMatchDTO(match: EnrichedMatch): MatchDTO {
@@ -742,8 +753,19 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     bookingEnabled: sr?.bookingEnabled ?? false,
     hostUserId: av?.userId ?? null,
     result: match.result ? {
+      id: match.result.id,
+      matchId: match.result.matchId,
       status: match.result.status as 'draft' | 'submitted' | 'confirmed' | 'disputed',
       winnerUserId: match.result.winnerUserId ?? null,
+      submittedByUserId: match.result.submittedByUserId ?? null,
+      confirmedByHostAt: match.result.confirmedByHostAt ? match.result.confirmedByHostAt.toISOString() : null,
+      confirmedByOpponentAt: match.result.confirmedByOpponentAt ? match.result.confirmedByOpponentAt.toISOString() : null,
+      disputedByHostAt: match.result.disputedByHostAt ? match.result.disputedByHostAt.toISOString() : null,
+      disputedByOpponentAt: match.result.disputedByOpponentAt ? match.result.disputedByOpponentAt.toISOString() : null,
+      disputeNote: match.result.disputeNote ?? null,
+      aceupSyncedAt: match.result.aceupSyncedAt ? match.result.aceupSyncedAt.toISOString() : null,
+      aceupChallengeId: match.result.aceupChallengeId ?? null,
+      createdAt: match.result.createdAt instanceof Date ? match.result.createdAt.toISOString() : String(match.result.createdAt),
       sets: (match.result.sets ?? []).map((s) => ({
         setNumber: s.setNumber,
         player1Score: s.playerAScore,

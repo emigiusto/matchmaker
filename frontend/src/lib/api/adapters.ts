@@ -32,8 +32,19 @@ export interface BackendMatchDTO {
   publicToken?: string | null
   hostUserId?: string | null
   result?: {
+    id: string
+    matchId: string
     status: "draft" | "submitted" | "confirmed" | "disputed"
     winnerUserId: string | null
+    submittedByUserId: string | null
+    confirmedByHostAt: string | null
+    confirmedByOpponentAt: string | null
+    disputedByHostAt: string | null
+    disputedByOpponentAt: string | null
+    disputeNote: string | null
+    aceupSyncedAt: string | null
+    aceupChallengeId: number | null
+    createdAt: string
     sets: { setNumber: number; player1Score: number; player2Score: number }[]
   } | null
 }
