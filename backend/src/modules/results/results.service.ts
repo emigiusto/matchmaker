@@ -341,7 +341,11 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
   return prisma.$transaction(async (tx) => {
     const match = await tx.match.findUnique({
       where: { id: matchId },
-      include: { participants: { select: { userId: true, team: true } } },
+      include: {
+        participants: { select: { userId: true, team: true } },
+        playerA: { select: { userId: true } },
+        playerB: { select: { userId: true } },
+      },
     });
     if (!match) throw new AppError('Match not found', 404);
     if (match.status !== MatchStatus.scheduled) {
@@ -371,7 +375,16 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       teamAUserIds = teams.teamAUserIds;
       teamBUserIds = teams.teamBUserIds;
       if (teamAUserIds.length === 0 || teamBUserIds.length === 0) {
-        throw new AppError('Teams must be defined when submitting result. Provide teamAssignment.', 400);
+        // Singles matches have playerA/playerB instead of explicit team assignments
+        const playerAUserId = (match as any).playerA?.userId as string | undefined;
+        const playerBUserId = (match as any).playerB?.userId as string | undefined;
+        if (!playerAUserId || !playerBUserId) {
+          throw new AppError('Teams must be defined when submitting result. Provide teamAssignment.', 400);
+        }
+        teamAUserIds = [playerAUserId];
+        teamBUserIds = [playerBUserId];
+        await tx.matchParticipant.updateMany({ where: { matchId, userId: playerAUserId }, data: { team: 'A' } });
+        await tx.matchParticipant.updateMany({ where: { matchId, userId: playerBUserId }, data: { team: 'B' } });
       }
     }
 
