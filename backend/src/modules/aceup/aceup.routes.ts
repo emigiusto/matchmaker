@@ -50,7 +50,7 @@ function resolvePlayers(match: MatchWithDetails, requestingUserId: string) {
 }
 
 function isEligibleToSend(match: MatchWithDetails): boolean {
-  return !!match.result && match.result.status === 'confirmed'
+  return !!match.result && ['submitted', 'confirmed'].includes(match.result.status)
 }
 
 function isEligibleToValidate(match: MatchWithDetails): boolean {
