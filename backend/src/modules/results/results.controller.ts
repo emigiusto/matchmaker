@@ -183,10 +183,18 @@ export class ResultsController {
         return res.status(400).json({ error: 'Missing or invalid matchId' });
       }
       // Validate request body
-      const sets = req.body.sets;
-      if (!Array.isArray(sets) || sets.length === 0) {
+      // Normalize sets: accept both player1Score/player2Score (frontend) and playerAScore/playerBScore (internal)
+      const rawSets = req.body.sets;
+      if (!Array.isArray(rawSets) || rawSets.length === 0) {
         return res.status(400).json({ error: 'Missing or invalid sets array' });
       }
+      const sets = rawSets.map((s: any) => ({
+        setNumber: s.setNumber,
+        playerAScore: s.playerAScore ?? s.player1Score,
+        playerBScore: s.playerBScore ?? s.player2Score,
+        tiebreakScoreA: s.tiebreakScoreA ?? s.tiebreakScore1 ?? null,
+        tiebreakScoreB: s.tiebreakScoreB ?? s.tiebreakScore2 ?? null,
+      }));
       const currentUserId = req.user?.id;
       if (!currentUserId) {
         return res.status(401).json({ error: 'Unauthorized: missing user id' });
