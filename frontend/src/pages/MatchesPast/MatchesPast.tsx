@@ -120,8 +120,12 @@ export default function PastMatchesPage() {
                               {(typeof match.result.player1RatingChange === 'number' || typeof match.result.player2RatingChange === 'number') && (
                                 <span className="font-mono text-xs text-muted-foreground">
                                   Rating change: {match.player1.userId === currentUserId
-                                    ? (match.result.player1RatingChange > 0 ? '+' : '') + match.result.player1RatingChange
-                                    : (match.result.player2RatingChange > 0 ? '+' : '') + match.result.player2RatingChange}
+                                    ? (match.result.player1RatingChange !== undefined
+                                        ? (match.result.player1RatingChange > 0 ? '+' : '') + match.result.player1RatingChange
+                                        : '-')
+                                    : (match.result.player2RatingChange !== undefined
+                                        ? (match.result.player2RatingChange > 0 ? '+' : '') + match.result.player2RatingChange
+                                        : '-')}
                                 </span>
                               )}
                             </div>
