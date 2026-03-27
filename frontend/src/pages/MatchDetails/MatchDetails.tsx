@@ -1062,7 +1062,15 @@ export default function MatchDetailPage() {
                           : result.status}
                       </p>
                       {result.status === "submitted" && (
-                        <p className="text-xs text-muted-foreground">{t("matchDetails.result.autoConfirmHint")}</p>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">{t("matchDetails.result.autoConfirmHint")}</p>
+                          {result.createdAt && (() => {
+                            const hoursRemaining = Math.max(0, Math.ceil((new Date(result.createdAt!).getTime() + 5 * 24 * 60 * 60 * 1000 - Date.now()) / (60 * 60 * 1000)))
+                            return hoursRemaining > 0 ? (
+                              <p className="text-xs font-medium text-primary">{t("matchDetails.result.autoConfirmCountdown", { hours: hoursRemaining })}</p>
+                            ) : null
+                          })()}
+                        </div>
                       )}
                     </div>
                   )}

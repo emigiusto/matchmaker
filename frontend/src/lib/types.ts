@@ -152,6 +152,7 @@ export interface MatchResult {
   questionnaire?: PostMatchQuestionnaire
   aceupSyncedAt?: string | null
   aceupChallengeId?: number | null
+  createdAt?: string
 }
 
 export interface SetScore {
