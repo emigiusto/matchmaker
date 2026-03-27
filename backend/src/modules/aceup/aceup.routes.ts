@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client'
 import { requireAuth } from '../../shared/middleware/requireAuth'
 import { prisma } from '../../prisma'
 import { AppError } from '../../shared/errors/AppError'
+import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils'
 import {
   validateUsersOnAceUp,
   sendMatchResultToAceUp,
@@ -80,9 +81,13 @@ router.get('/validate/:matchId', async (req: Request, res: Response, next: NextF
 
     const validation = await validateUsersOnAceUp({
       playerEmail: match.playerA?.user?.email ?? undefined,
-      playerPhone: match.playerA?.user?.phone ?? undefined,
+      playerPhone: match.playerA?.user?.phone
+        ? normalizePhoneToCanonical(match.playerA.user.phone)
+        : undefined,
       opponentEmail: match.playerB?.user?.email ?? undefined,
-      opponentPhone: match.playerB?.user?.phone ?? undefined,
+      opponentPhone: match.playerB?.user?.phone
+        ? normalizePhoneToCanonical(match.playerB.user.phone)
+        : undefined,
     })
 
     return res.status(200).json(validation)
@@ -129,9 +134,13 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
     // Re-validate to get AceUp player IDs
     const validation = await validateUsersOnAceUp({
       playerEmail: match.playerA?.user?.email ?? undefined,
-      playerPhone: match.playerA?.user?.phone ?? undefined,
+      playerPhone: match.playerA?.user?.phone
+        ? normalizePhoneToCanonical(match.playerA.user.phone)
+        : undefined,
       opponentEmail: match.playerB?.user?.email ?? undefined,
-      opponentPhone: match.playerB?.user?.phone ?? undefined,
+      opponentPhone: match.playerB?.user?.phone
+        ? normalizePhoneToCanonical(match.playerB.user.phone)
+        : undefined,
     })
 
     if (!validation.valid) {
