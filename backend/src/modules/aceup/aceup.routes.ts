@@ -38,6 +38,17 @@ function isSingles(match: MatchWithDetails): boolean {
   return match.participants.length === 2
 }
 
+/** Returns [playerUser, opponentUser] preferring playerA/playerB, falling back to participants. */
+function resolvePlayers(match: MatchWithDetails, requestingUserId: string) {
+  if (match.playerA?.user && match.playerB?.user) {
+    return [match.playerA.user, match.playerB.user] as const
+  }
+  // Fall back to participants: requesting user = player, other = opponent
+  const self = match.participants.find((p) => p.userId === requestingUserId)
+  const other = match.participants.find((p) => p.userId !== requestingUserId)
+  return [self?.user ?? null, other?.user ?? null] as const
+}
+
 function isEligibleToSend(match: MatchWithDetails): boolean {
   return !!match.result && match.result.status === 'confirmed'
 }
@@ -79,15 +90,13 @@ router.get('/validate/:matchId', async (req: Request, res: Response, next: NextF
       return res.status(400).json({ error: 'Result must be submitted before sending to AceUp' })
     }
 
+    const [playerUser, opponentUser] = resolvePlayers(match, requestingUserId)
+
     const validation = await validateUsersOnAceUp({
-      playerEmail: match.playerA?.user?.email ?? undefined,
-      playerPhone: match.playerA?.user?.phone
-        ? normalizePhoneToCanonical(match.playerA.user.phone)
-        : undefined,
-      opponentEmail: match.playerB?.user?.email ?? undefined,
-      opponentPhone: match.playerB?.user?.phone
-        ? normalizePhoneToCanonical(match.playerB.user.phone)
-        : undefined,
+      playerEmail: playerUser?.email ?? undefined,
+      playerPhone: playerUser?.phone ? normalizePhoneToCanonical(playerUser.phone) : undefined,
+      opponentEmail: opponentUser?.email ?? undefined,
+      opponentPhone: opponentUser?.phone ? normalizePhoneToCanonical(opponentUser.phone) : undefined,
     })
 
     return res.status(200).json(validation)
@@ -132,15 +141,13 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
     }
 
     // Re-validate to get AceUp player IDs
+    const [playerUser, opponentUser] = resolvePlayers(match, requestingUserId)
+
     const validation = await validateUsersOnAceUp({
-      playerEmail: match.playerA?.user?.email ?? undefined,
-      playerPhone: match.playerA?.user?.phone
-        ? normalizePhoneToCanonical(match.playerA.user.phone)
-        : undefined,
-      opponentEmail: match.playerB?.user?.email ?? undefined,
-      opponentPhone: match.playerB?.user?.phone
-        ? normalizePhoneToCanonical(match.playerB.user.phone)
-        : undefined,
+      playerEmail: playerUser?.email ?? undefined,
+      playerPhone: playerUser?.phone ? normalizePhoneToCanonical(playerUser.phone) : undefined,
+      opponentEmail: opponentUser?.email ?? undefined,
+      opponentPhone: opponentUser?.phone ? normalizePhoneToCanonical(opponentUser.phone) : undefined,
     })
 
     if (!validation.valid) {
@@ -154,9 +161,9 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
     const player1PlayerId = player.playerId
     const player2PlayerId = opponent.playerId
 
-    // Determine winner's AceUp player ID
-    const winnerIsPlayerA = match.result!.winnerUserId === match.playerA?.userId
-    const winnerPlayerId = winnerIsPlayerA ? player1PlayerId : player2PlayerId
+    // Determine winner's AceUp player ID (player1 = requesting user)
+    const winnerIsPlayer1 = match.result!.winnerUserId === playerUser?.id
+    const winnerPlayerId = winnerIsPlayer1 ? player1PlayerId : player2PlayerId
 
     // Format sets from player1 (=playerA) perspective
     const sets = formatSetsForAceUp(match.result!.sets, /* playerAIsPlayer1 */ true)
