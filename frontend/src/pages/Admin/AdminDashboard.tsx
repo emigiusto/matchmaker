@@ -877,7 +877,7 @@ function ResolveDisputeForm({ result, onResolve }: {
   onResolve: (resultId: string, sets: { setNumber: number; player1Score: number; player2Score: number }[]) => Promise<void>
 }) {
   const initialSets = result.sets.length > 0
-    ? result.sets.map((s) => ({ setNumber: s.setNumber, player1Score: s.playerAScore, player2Score: s.playerBScore }))
+    ? result.sets.map((s) => ({ setNumber: s.setNumber, player1Score: s.player1Score, player2Score: s.player2Score }))
     : [{ setNumber: 1, player1Score: 0, player2Score: 0 }]
   const [sets, setSets] = useState(initialSets)
   const [saving, setSaving] = useState(false)
@@ -997,7 +997,7 @@ function DisputesTab({ disputes, loading, onResolve }: {
                 <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
                   {d.sets.map((s) => (
                     <span key={s.setNumber} className="font-mono">
-                      {s.playerAScore}–{s.playerBScore}
+                      {s.player1Score}–{s.player2Score}
                     </span>
                   ))}
                 </div>
