@@ -319,12 +319,42 @@ describe('submitMatchResult — team assignment', () => {
     );
   });
 
-  it('throws 400 when no team info and no playerA/playerB', async () => {
-    const noTeamInfo = makeMatch({
+  it('falls back to submitter=TeamA when no teams and no playerA/playerB', async () => {
+    const noRelations = makeMatch({
       participants: [
         { userId: USER_A, team: null },
         { userId: USER_B, team: null },
       ],
+      playerA: null,
+      playerB: null,
+    });
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
+    mockTx.match.findUnique.mockResolvedValue(noRelations);
+    mockTx.match.update.mockResolvedValue({});
+    mockTx.matchParticipant.updateMany.mockResolvedValue({});
+    mockTx.result.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(makeResultWithSets());
+    mockTx.result.create.mockResolvedValue({ id: RESULT_ID });
+    mockTx.setResult.create.mockResolvedValue({});
+
+    await ResultsService.submitMatchResult({
+      matchId: MATCH_ID,
+      sets: VALID_SETS,
+      currentUserId: USER_A,
+    });
+
+    expect(mockTx.matchParticipant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: USER_A }), data: { team: 'A' } })
+    );
+    expect(mockTx.matchParticipant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: USER_B }), data: { team: 'B' } })
+    );
+  });
+
+  it('throws 400 when no team info and no playerA/playerB and only one participant', async () => {
+    const noTeamInfo = makeMatch({
+      participants: [{ userId: USER_A, team: null }],
       playerA: null,
       playerB: null,
     });

@@ -385,12 +385,21 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
         const playerAUserId = (match as any).playerA?.userId as string | undefined;
         const playerBUserId = (match as any).playerB?.userId as string | undefined;
         if (!playerAUserId || !playerBUserId) {
-          throw new AppError('Teams must be defined when submitting result. Provide teamAssignment.', 400);
+          // Last resort: submitter = TeamA, other participant = TeamB
+          const otherParticipant = ((match as any).participants ?? []).find(
+            (p: any) => p.userId !== currentUserId,
+          );
+          if (!otherParticipant?.userId) {
+            throw new AppError('Teams must be defined when submitting result. Provide teamAssignment.', 400);
+          }
+          teamAUserIds = [currentUserId];
+          teamBUserIds = [otherParticipant.userId];
+        } else {
+          teamAUserIds = [playerAUserId];
+          teamBUserIds = [playerBUserId];
         }
-        teamAUserIds = [playerAUserId];
-        teamBUserIds = [playerBUserId];
-        await tx.matchParticipant.updateMany({ where: { matchId, userId: playerAUserId }, data: { team: 'A' } });
-        await tx.matchParticipant.updateMany({ where: { matchId, userId: playerBUserId }, data: { team: 'B' } });
+        await tx.matchParticipant.updateMany({ where: { matchId, userId: teamAUserIds[0] }, data: { team: 'A' } });
+        await tx.matchParticipant.updateMany({ where: { matchId, userId: teamBUserIds[0] }, data: { team: 'B' } });
       }
     }
 
