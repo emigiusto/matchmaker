@@ -106,19 +106,23 @@ export default function PastMatchesPage() {
                                 .map((s) => `${s.player1Score}-${s.player2Score}`)
                                 .join("  ")}
                             </p>
-                            <div className="mt-0.5 flex items-center justify-end gap-1 text-sm">
-                              {isWinner ? (
-                                <>
-                                  <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                                  <span className="font-semibold text-primary">Won</span>
-                                  {match.result.player1RatingChange && (
-                                    <span className="font-mono text-primary">
-                                      (+{match.result.player1RatingChange})
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground">Lost</span>
+                            <div className="mt-0.5 flex flex-col items-end gap-0.5 text-sm">
+                              <div className="flex items-center gap-1">
+                                {isWinner ? (
+                                  <>
+                                    <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                                    <span className="font-semibold text-primary">Won</span>
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground">Lost</span>
+                                )}
+                              </div>
+                              {(typeof match.result.player1RatingChange === 'number' || typeof match.result.player2RatingChange === 'number') && (
+                                <span className="font-mono text-xs text-muted-foreground">
+                                  Rating change: {match.player1.userId === currentUserId
+                                    ? (match.result.player1RatingChange > 0 ? '+' : '') + match.result.player1RatingChange
+                                    : (match.result.player2RatingChange > 0 ? '+' : '') + match.result.player2RatingChange}
+                                </span>
                               )}
                             </div>
                           </div>
