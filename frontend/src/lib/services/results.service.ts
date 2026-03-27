@@ -5,7 +5,7 @@ export interface DisputedResult {
   id: string
   matchId: string
   createdAt: string
-  sets: { id: string; setNumber: number; playerAScore: number; playerBScore: number }[]
+  sets: { id: string; setNumber: number; player1Score: number; player2Score: number }[]
   winnerUserId: string | null
   submittedByUserId: string | null
   status: string

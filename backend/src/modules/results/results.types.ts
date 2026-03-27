@@ -26,10 +26,10 @@ export interface PostMatchQuestionnaire {
 export interface SetResultDTO {
   id: string;
   setNumber: number;
-  playerAScore: number;
-  playerBScore: number;
-  tiebreakScoreA: number | null;
-  tiebreakScoreB: number | null;
+  player1Score: number;
+  player2Score: number;
+  tiebreakScore1: number | null;
+  tiebreakScore2: number | null;
 }
 
 export type ResultStatus = 'draft' | 'submitted' | 'confirmed' | 'disputed';

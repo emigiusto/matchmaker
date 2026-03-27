@@ -46,7 +46,7 @@ export async function notifyResultSubmittedToGroup(matchId: string, result: Resu
   const sets = result.sets
     .slice()
     .sort((a, b) => a.setNumber - b.setNumber)
-    .map((s) => ({ setNumber: s.setNumber, scoreA: s.playerAScore, scoreB: s.playerBScore }));
+    .map((s) => ({ setNumber: s.setNumber, scoreA: s.player1Score, scoreB: s.player2Score }));
 
   const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
   const message = getMessages('es').resultSubmitted(sets, matchUrl);
@@ -811,10 +811,10 @@ function toSetResultDTO(set: SetResult): SetResultDTO {
   return {
     id: set.id,
     setNumber: set.setNumber,
-    playerAScore: set.playerAScore,
-    playerBScore: set.playerBScore,
-    tiebreakScoreA: set.tiebreakScoreA,
-    tiebreakScoreB: set.tiebreakScoreB
+    player1Score: set.playerAScore,
+    player2Score: set.playerBScore,
+    tiebreakScore1: set.tiebreakScoreA,
+    tiebreakScore2: set.tiebreakScoreB,
   };
 }
 
