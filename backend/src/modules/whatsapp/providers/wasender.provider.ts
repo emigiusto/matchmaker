@@ -89,15 +89,19 @@ export class WasenderProvider implements IWhatsAppProvider {
       if (buttons && buttons.length >= 2) {
         if (message.length > 255) {
           // The full message (with court availability note) exceeds the poll question limit.
-          // Send only the intro line first as a short plain-text message — it's tiny and
-          // guaranteed to arrive before the poll (long text messages can be delivered out of order).
-          const intro = message.split('\n\n')[0];
-          await sendWithRetry({ to, text: intro });
-          // Use the base message (without the appended court availability note) as the poll
-          // question — it contains date/location/sport/prompt/timer and fits within 255 chars.
+          // Send the availability note as a separate plain-text message first, then use the
+          // base invite message (without the note) as the poll question. This avoids duplicating
+          // the invite header and ensures the availability info is not lost.
           const noteStart = message.indexOf('\n\n🏟️');
-          const baseMessage = noteStart >= 0 ? message.slice(0, noteStart) : message;
-          pollBody = { to, poll: { question: baseMessage, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
+          if (noteStart >= 0) {
+            const note = message.slice(noteStart + 2); // skip the leading \n\n
+            await sendWithRetry({ to, text: note });
+            const baseMessage = message.slice(0, noteStart);
+            pollBody = { to, poll: { question: baseMessage, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
+          } else {
+            // No availability note but still too long — use message as-is, poll API may truncate
+            pollBody = { to, poll: { question: message, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
+          }
         } else {
           pollBody = { to, poll: { question: message, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
         }

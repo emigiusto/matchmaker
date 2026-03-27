@@ -502,13 +502,19 @@ async function runBookingJob(
         })
 
         // Notify the WhatsApp group
-        if (match.whatsappGroupId) {
+        // Re-fetch whatsappGroupId here: the booking job starts before the scheduling service
+        // saves the group ID to the match, so the initial match fetch may have had it as null.
+        const freshGroupId = await prisma.match.findUnique({ where: { id: matchId }, select: { whatsappGroupId: true } })
+          .then((m) => m?.whatsappGroupId ?? null)
+          .catch(() => null)
+        if (freshGroupId) {
           const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).catch(() => null)
           const hostLocale = hostUser?.locale ?? 'es'
           const message = getMessages(hostLocale).courtBooked(result.courtName, `${date} · ${time}`, match.availability?.locationText ?? '', result.confirmationUrl)
-          whatsappService.sendGroupMessage(match.whatsappGroupId, message).catch((err) => {
+          whatsappService.sendGroupMessage(freshGroupId, message).catch((err) => {
             logger.warn(`[booking] Failed to send WhatsApp group notification for match ${matchId}:`, err)
           })
+          logger.info(`[booking] WhatsApp court booked notification sent for match ${matchId}`)
         }
         return // success — exit retry loop
       } catch (err) {

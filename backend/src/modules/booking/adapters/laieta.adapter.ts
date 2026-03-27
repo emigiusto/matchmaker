@@ -209,17 +209,19 @@ export class LaietaAdapter implements BookingAdapter {
             const hasSocio = socioNumbers.some((n) => playersText.includes(`[${n}]`))
             if (!hasSocio) continue
 
-            // Try to extract the numeric booking ID from links in the fieldset
-            const links = Array.from(fieldset.querySelectorAll('a[href]'))
-            const reservaLink = links.find((a) => /\/reservas\/\d+/.test((a as HTMLAnchorElement).getAttribute('href') ?? ''))
-            const hrefMatch = (reservaLink as HTMLAnchorElement | null)?.getAttribute('href')?.match(/\/reservas\/(\d+)/)
-            let bookingId = hrefMatch ? hrefMatch[1] : null
+            // Prefer the cancel button ID (e.g. name="cancel-629061") — it directly encodes
+            // the booking ID and is more reliable than link href matching which can pick up
+            // pagination or navigation links with small numbers.
+            const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
+            const cancelMatch = cancelBtn?.name?.match(/cancel-(\d+)/)
+            let bookingId: string | null = cancelMatch ? cancelMatch[1] : null
 
-            // Fallback: extract ID from the cancel button name, e.g. "cancel-629061"
+            // Fallback: extract ID from a link href, e.g. /reservas/629061
             if (!bookingId) {
-              const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
-              const cancelMatch = cancelBtn?.name?.match(/cancel-(\d+)/)
-              if (cancelMatch) bookingId = cancelMatch[1]
+              const links = Array.from(fieldset.querySelectorAll('a[href]'))
+              const reservaLink = links.find((a) => /\/reservas\/\d{3,}/.test((a as HTMLAnchorElement).getAttribute('href') ?? ''))
+              const hrefMatch = (reservaLink as HTMLAnchorElement | null)?.getAttribute('href')?.match(/\/reservas\/(\d+)/)
+              if (hrefMatch) bookingId = hrefMatch[1]
             }
 
             return { courtName: bookingPlace.replace(/\s+/g, ' ').trim(), bookingId }
