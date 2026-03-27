@@ -37,6 +37,13 @@ const matchInclude = {
   availability: true,
   schedulingRequest: { select: { sportType: true, format: true, timezone: true, bookingEnabled: true } },
   participants: { include: { user: { select: { id: true, name: true } } } },
+  result: {
+    select: {
+      status: true,
+      winnerUserId: true,
+      sets: { select: { setNumber: true, playerAScore: true, playerBScore: true }, orderBy: { setNumber: 'asc' as const } },
+    },
+  },
 } as const;
 
 export async function getMatchByPublicToken(token: string): Promise<MatchDTO> {
@@ -699,6 +706,7 @@ type EnrichedMatch = Match & {
   availability?: { locationText: string; date: Date; startTime: Date; endTime: Date; userId: string } | null;
   schedulingRequest?: { sportType: string; format: string; timezone?: string | null; bookingEnabled?: boolean | null } | null;
   participants?: { userId: string; team: string | null; user?: { id: string; name: string | null } }[];
+  result?: { status: string; winnerUserId: string | null; sets: { setNumber: number; playerAScore: number; playerBScore: number }[] } | null;
 };
 
 function toMatchDTO(match: EnrichedMatch): MatchDTO {
@@ -733,6 +741,15 @@ function toMatchDTO(match: EnrichedMatch): MatchDTO {
     publicToken: (match as any).publicToken ?? null,
     bookingEnabled: sr?.bookingEnabled ?? false,
     hostUserId: av?.userId ?? null,
+    result: match.result ? {
+      status: match.result.status as 'draft' | 'submitted' | 'confirmed' | 'disputed',
+      winnerUserId: match.result.winnerUserId ?? null,
+      sets: (match.result.sets ?? []).map((s) => ({
+        setNumber: s.setNumber,
+        player1Score: s.playerAScore,
+        player2Score: s.playerBScore,
+      })),
+    } : null,
     ...(av && {
       location: av.locationText,
       date: scheduled.toLocaleDateString('en-CA', { timeZone: tz }),

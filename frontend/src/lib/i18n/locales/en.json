@@ -794,8 +794,9 @@
     "past": "Past matches",
     "noPast": "No past matches yet",
     "disputed": "Disputed",
-    "awaiting": "Awaiting",
-    "pastStatus": "Past"
+    "awaiting": "Pending Confirmation",
+    "pastStatus": "Past",
+    "resultScore": "Result"
   },
   "notifications": {
     "title": "Notifications",

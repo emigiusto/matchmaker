@@ -794,8 +794,9 @@
     "past": "Partidos pasados",
     "noPast": "Aún no hay partidos pasados",
     "disputed": "Disputado",
-    "awaiting": "Pendiente",
-    "pastStatus": "Pasado"
+    "awaiting": "Confirmación Pendiente",
+    "pastStatus": "Pasado",
+    "resultScore": "Resultado"
   },
   "notifications": {
     "title": "Notificaciones",

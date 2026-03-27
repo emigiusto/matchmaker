@@ -56,6 +56,12 @@ export interface MatchDTO {
   bookingEnabled?: boolean;
   /** The userId who owns the availability — the actual host of the match */
   hostUserId?: string | null;
+  /** Result summary — included for list views to show score without a separate fetch */
+  result?: {
+    status: 'draft' | 'submitted' | 'confirmed' | 'disputed';
+    winnerUserId: string | null;
+    sets: { setNumber: number; player1Score: number; player2Score: number }[];
+  } | null;
 }
 
 export interface CreateMatchInput {

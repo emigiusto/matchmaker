@@ -197,7 +197,17 @@ export default function MatchesPage() {
                                   <p className="text-base font-semibold text-foreground">
                                     {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                                   </p>
+                                  {match.status === "awaiting_confirmation" && (
+                                    <span className="rounded-full bg-chart-4/15 px-2 py-0.5 text-xs font-medium text-chart-4">
+                                      {t("matchesUpcoming.awaiting")}
+                                    </span>
+                                  )}
                                 </div>
+                                {match.result && match.result.sets.length > 0 && (
+                                  <p className="mt-1 text-sm font-medium text-foreground">
+                                    {match.result.sets.map((s) => `${match.player1.userId === currentUserId ? s.player1Score : s.player2Score}-${match.player1.userId === currentUserId ? s.player2Score : s.player1Score}`).join("  ")}
+                                  </p>
+                                )}
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1.5">
                                     <Clock className="h-4 w-4 shrink-0" />
@@ -282,7 +292,17 @@ export default function MatchesPage() {
                                   <p className="text-base font-semibold text-foreground">
                                     {matchParticipantsLabel(match, currentUserId, t("common.vs"))}
                                   </p>
+                                  {match.status === "awaiting_confirmation" && (
+                                    <span className="rounded-full bg-chart-4/15 px-2 py-0.5 text-xs font-medium text-chart-4">
+                                      {t("matchesUpcoming.awaiting")}
+                                    </span>
+                                  )}
                                 </div>
+                                {match.result && match.result.sets.length > 0 && (
+                                  <p className="mt-1 text-sm font-medium text-foreground">
+                                    {match.result.sets.map((s) => `${match.player1.userId === currentUserId ? s.player1Score : s.player2Score}-${match.player1.userId === currentUserId ? s.player2Score : s.player1Score}`).join("  ")}
+                                  </p>
+                                )}
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1.5">
                                     <Calendar className="h-4 w-4 shrink-0" />
@@ -397,6 +417,11 @@ export default function MatchesPage() {
                                       : t("matchesUpcoming.pastStatus")}
                             </span>
                           </div>
+                          {match.result && match.result.sets.length > 0 && (
+                            <p className="mt-1 text-sm font-medium text-foreground">
+                              {match.result.sets.map((s) => `${match.player1.userId === currentUserId ? s.player1Score : s.player2Score}-${match.player1.userId === currentUserId ? s.player2Score : s.player1Score}`).join("  ")}
+                            </p>
+                          )}
                           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1.5">
                               <Calendar className="h-4 w-4 shrink-0" />
