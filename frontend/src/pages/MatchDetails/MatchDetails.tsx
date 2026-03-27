@@ -1163,11 +1163,23 @@ export default function MatchDetailPage() {
                   {/* Send to AceUp — host only, when both players are on AceUp */}
                   {isHost && aceupValidation?.valid && (
                     <div className="mt-3 pt-3 border-t border-border/50">
-                      {result.aceupSyncedAt ? (
-                        <Button size="sm" variant="outline" className="w-full" disabled>
-                          <CheckCircle className="mr-1.5 h-4 w-4 text-green-500" />
-                          Sent to AceUp
-                        </Button>
+                      {(result.aceupSyncedAt || result.aceupChallengeId) ? (
+                        <div className="flex flex-col gap-1.5">
+                          <Button size="sm" variant="outline" className="w-full" disabled>
+                            <CheckCircle className="mr-1.5 h-4 w-4 text-green-500" />
+                            {t("matchDetails.aceup.sentToAceUp")}
+                          </Button>
+                          {result.aceupChallengeId && (
+                            <a
+                              href={`https://aceup.club/challenges/${result.aceupChallengeId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-center text-muted-foreground hover:text-foreground underline underline-offset-2"
+                            >
+                              {t("matchDetails.aceup.viewOnAceUp")}
+                            </a>
+                          )}
+                        </div>
                       ) : (
                         <Button
                           size="sm"
@@ -1177,11 +1189,11 @@ export default function MatchDetailPage() {
                           onClick={async () => {
                             setSendingToAceup(true)
                             try {
-                              await aceupService.send(id!)
-                              setResult((prev) => prev ? { ...prev, aceupSyncedAt: new Date().toISOString() } : prev)
-                              toast.success("Result sent to AceUp")
+                              const response = await aceupService.send(id!)
+                              setResult((prev) => prev ? { ...prev, aceupSyncedAt: new Date().toISOString(), aceupChallengeId: response.challengeId } : prev)
+                              toast.success(t("matchDetails.aceup.sendSuccess"))
                             } catch {
-                              toast.error("Failed to send to AceUp. Please try again.")
+                              toast.error(t("matchDetails.aceup.sendFailed"))
                             } finally {
                               setSendingToAceup(false)
                             }
@@ -1190,7 +1202,7 @@ export default function MatchDetailPage() {
                           {sendingToAceup
                             ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                             : null}
-                          Send to AceUp
+                          {t("matchDetails.aceup.sendToAceUp")}
                         </Button>
                       )}
                     </div>

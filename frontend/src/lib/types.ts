@@ -107,7 +107,7 @@ export interface MatchResult {
   player2RatingChange?: number
   questionnaire?: PostMatchQuestionnaire
   aceupSyncedAt?: string | null
-  aceupMatchId?: number | null
+  aceupChallengeId?: number | null
 }
 
 export interface SetScore {

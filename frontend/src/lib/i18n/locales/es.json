@@ -774,6 +774,13 @@
         "yes": "Sí, cancelar reserva",
         "no": "Mantener reserva"
       }
+    },
+    "aceup": {
+      "sendToAceUp": "Enviar a AceUp",
+      "sentToAceUp": "Enviado a AceUp",
+      "viewOnAceUp": "Ver en AceUp",
+      "sendSuccess": "Resultado enviado a AceUp",
+      "sendFailed": "Error al enviar a AceUp. Por favor, inténtalo de nuevo."
     }
   },
   "matchesUpcoming": {

@@ -137,7 +137,7 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
 
     // Already synced — return cached info
     if (match.result!.aceupSyncedAt) {
-      return res.status(200).json({ success: true, aceupMatchId: match.result!.aceupMatchId })
+      return res.status(200).json({ success: true, challengeId: match.result!.aceupChallengeId })
     }
 
     // Re-validate to get AceUp player IDs
@@ -183,11 +183,11 @@ router.post('/send/:matchId', async (req: Request, res: Response, next: NextFunc
       where: { id: match.result!.id },
       data: {
         aceupSyncedAt: new Date(),
-        aceupMatchId: aceupResponse.matchId,
+        aceupChallengeId: aceupResponse.challengeId,
       },
     })
 
-    return res.status(200).json({ success: true, aceupMatchId: aceupResponse.matchId })
+    return res.status(200).json({ success: true, challengeId: aceupResponse.challengeId })
   } catch (err) {
     next(err)
   }

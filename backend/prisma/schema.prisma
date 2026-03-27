@@ -297,8 +297,8 @@ model Result {
   disputedByOpponentAt  DateTime?
 
   /// AceUp integration — set when this result has been successfully sent to AceUp
-  aceupSyncedAt DateTime?
-  aceupMatchId  Int?
+  aceupSyncedAt    DateTime?
+  aceupChallengeId Int?
   /// Free-text note stored on dispute (JSON: { reason, proposedSets? })
   disputeNote           String?
   /// Post-match questionnaire answers (JSON: PostMatchQuestionnaire)

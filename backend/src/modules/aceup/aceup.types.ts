@@ -105,6 +105,8 @@ export interface AceUpMatchResultResponse {
   success: true
   /** AceUp internal Match.id for the created (or pre-existing) match */
   matchId: number
+  /** AceUp internal Challenge.id — used to build the challenge URL */
+  challengeId: number
 }
 
 // ─── Internal helper ─────────────────────────────────────────────────────────

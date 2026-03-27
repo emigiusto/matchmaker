@@ -14,7 +14,7 @@ export const aceupService = {
     return apiClient.get<AceUpValidation>(`/aceup/validate/${matchId}`)
   },
 
-  async send(matchId: string): Promise<{ success: boolean; aceupMatchId: number }> {
-    return apiClient.post<{ success: boolean; aceupMatchId: number }>(`/aceup/send/${matchId}`)
+  async send(matchId: string): Promise<{ success: boolean; challengeId: number }> {
+    return apiClient.post<{ success: boolean; challengeId: number }>(`/aceup/send/${matchId}`)
   },
 }
