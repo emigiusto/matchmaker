@@ -1173,7 +1173,7 @@ export default function MatchDetailPage() {
                           size="sm"
                           variant="outline"
                           className="w-full"
-                          disabled={sendingToAceup || result.status !== "confirmed"}
+                          disabled={sendingToAceup}
                           onClick={async () => {
                             setSendingToAceup(true)
                             try {
@@ -1190,9 +1190,7 @@ export default function MatchDetailPage() {
                           {sendingToAceup
                             ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                             : null}
-                          {result.status === "confirmed"
-                            ? "Send to AceUp"
-                            : "Send to AceUp (pending confirmation)"}
+                          Send to AceUp
                         </Button>
                       )}
                     </div>
