@@ -56,11 +56,7 @@ export interface Match {
   location: string
   matchType: "competitive" | "practice"
   status: "scheduled" | "awaiting_confirmation" | "completed" | "cancelled" | "disputed"
-  result?: {
-    status: "draft" | "submitted" | "confirmed" | "disputed"
-    winnerUserId: string | null
-    sets: { setNumber: number; player1Score: number; player2Score: number }[]
-  } | null
+  result?: MatchResult | null
   /** All participants (for doubles: always list all 4) */
   participants?: { userId: string; userName?: string; team?: "A" | "B" | null }[]
   /** False for doubles before result: teams unknown, hide vs layout */
