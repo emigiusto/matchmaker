@@ -204,9 +204,20 @@ export default function MatchesPage() {
                                   )}
                                 </div>
                                 {match.result && match.result.sets.length > 0 && (
-                                  <p className="mt-1 text-sm font-medium text-foreground">
-                                    {match.result.sets.map((s) => `${match.player1.userId === currentUserId ? s.player1Score : s.player2Score}-${match.player1.userId === currentUserId ? s.player2Score : s.player1Score}`).join("  ")}
-                                  </p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    {match.result.sets.map((s, i) => {
+                                      const myScore = match.player1.userId === currentUserId ? s.player1Score : s.player2Score
+                                      const oppScore = match.player1.userId === currentUserId ? s.player2Score : s.player1Score
+                                      const iWon = myScore > oppScore
+                                      return (
+                                        <div key={i} className="flex items-baseline gap-0.5 font-mono">
+                                          <span className={iWon ? "text-base font-bold text-foreground" : "text-xs text-muted-foreground/60"}>{myScore}</span>
+                                          <span className="text-xs text-muted-foreground/40">–</span>
+                                          <span className={!iWon ? "text-base font-bold text-foreground" : "text-xs text-muted-foreground/60"}>{oppScore}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
                                 )}
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1.5">
@@ -299,9 +310,20 @@ export default function MatchesPage() {
                                   )}
                                 </div>
                                 {match.result && match.result.sets.length > 0 && (
-                                  <p className="mt-1 text-sm font-medium text-foreground">
-                                    {match.result.sets.map((s) => `${match.player1.userId === currentUserId ? s.player1Score : s.player2Score}-${match.player1.userId === currentUserId ? s.player2Score : s.player1Score}`).join("  ")}
-                                  </p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    {match.result.sets.map((s, i) => {
+                                      const myScore = match.player1.userId === currentUserId ? s.player1Score : s.player2Score
+                                      const oppScore = match.player1.userId === currentUserId ? s.player2Score : s.player1Score
+                                      const iWon = myScore > oppScore
+                                      return (
+                                        <div key={i} className="flex items-baseline gap-0.5 font-mono">
+                                          <span className={iWon ? "text-base font-bold text-foreground" : "text-xs text-muted-foreground/60"}>{myScore}</span>
+                                          <span className="text-xs text-muted-foreground/40">–</span>
+                                          <span className={!iWon ? "text-base font-bold text-foreground" : "text-xs text-muted-foreground/60"}>{oppScore}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
                                 )}
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1.5">
@@ -418,9 +440,25 @@ export default function MatchesPage() {
                             </span>
                           </div>
                           {match.result && match.result.sets.length > 0 && (
-                            <p className="mt-1 text-sm font-medium text-foreground">
-                              {match.result.sets.map((s) => `${match.player1.userId === currentUserId ? s.player1Score : s.player2Score}-${match.player1.userId === currentUserId ? s.player2Score : s.player1Score}`).join("  ")}
-                            </p>
+                            <div className="mt-1 flex items-center gap-2">
+                              {match.result.winnerUserId && (
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${match.result.winnerUserId === currentUserId ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-destructive/10 text-destructive"}`}>
+                                  {match.result.winnerUserId === currentUserId ? "W" : "L"}
+                                </span>
+                              )}
+                              {match.result.sets.map((s, i) => {
+                                const myScore = match.player1.userId === currentUserId ? s.player1Score : s.player2Score
+                                const oppScore = match.player1.userId === currentUserId ? s.player2Score : s.player1Score
+                                const iWon = myScore > oppScore
+                                return (
+                                  <div key={i} className="flex items-baseline gap-0.5 font-mono">
+                                    <span className={iWon ? "text-base font-bold text-foreground" : "text-xs text-muted-foreground/60"}>{myScore}</span>
+                                    <span className="text-xs text-muted-foreground/40">–</span>
+                                    <span className={!iWon ? "text-base font-bold text-foreground" : "text-xs text-muted-foreground/60"}>{oppScore}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           )}
                           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1.5">

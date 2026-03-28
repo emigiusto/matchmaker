@@ -484,10 +484,23 @@ export default function MatchDetailPage() {
                   </div>
                   <div className="flex shrink-0 flex-col items-center gap-1">
                     <span className="text-2xl font-bold text-muted-foreground/40">{t("common.vs")}</span>
-                    {match.result && (
-                      <p className="font-mono text-lg font-bold text-foreground">
-                        {match.result.sets.map((s) => `${s.player1Score}-${s.player2Score}`).join(" ")}
-                      </p>
+                    {match.result && match.result.sets.length > 0 && (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {match.result.sets.map((s, i) => {
+                          const p1Wins = s.player1Score > s.player2Score
+                          return (
+                            <div key={i} className="flex items-baseline gap-0.5 font-mono">
+                              <span className={p1Wins ? "text-xl font-bold text-foreground" : "text-sm text-muted-foreground"}>
+                                {s.player1Score}
+                              </span>
+                              <span className="text-xs text-muted-foreground/40 px-0.5">–</span>
+                              <span className={!p1Wins ? "text-xl font-bold text-foreground" : "text-sm text-muted-foreground"}>
+                                {s.player2Score}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
                     )}
                   </div>
                   <div className="flex flex-col items-center gap-2">
@@ -1016,11 +1029,11 @@ export default function MatchDetailPage() {
                           <span className="text-xs font-medium text-muted-foreground">
                             {t("matchDetails.result.set", { number: set.setNumber })}
                           </span>
-                          <span className={`text-center font-mono text-sm ${p1Wins ? "font-bold text-foreground" : "font-normal text-muted-foreground"}`}>
+                          <span className={`text-center font-mono leading-none ${p1Wins ? "text-2xl font-bold text-foreground" : "text-sm text-muted-foreground/60"}`}>
                             {set.player1Score}
                           </span>
-                          <span className="text-center text-xs text-muted-foreground">–</span>
-                          <span className={`text-center font-mono text-sm ${!p1Wins ? "font-bold text-foreground" : "font-normal text-muted-foreground"}`}>
+                          <span className="text-center text-xs text-muted-foreground/40">–</span>
+                          <span className={`text-center font-mono leading-none ${!p1Wins ? "text-2xl font-bold text-foreground" : "text-sm text-muted-foreground/60"}`}>
                             {set.player2Score}
                           </span>
                         </div>
@@ -1050,24 +1063,44 @@ export default function MatchDetailPage() {
                   )}
 
                   {match.matchType === "competitive" && (
-                    <div className="rounded-lg border border-border/50 bg-muted/30 p-3 space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground">{t("matchDetails.result.status")}</p>
-                      <p className="text-sm font-semibold text-foreground">
-                        {result.status === "submitted"
-                          ? t("matchDetails.result.awaitingConfirmation")
-                          : result.status === "confirmed"
-                          ? t("matchDetails.result.confirmed")
-                          : result.status === "disputed"
-                          ? t("matchDetails.result.disputed")
-                          : result.status}
-                      </p>
+                    <div className={`rounded-lg border p-3 space-y-1.5 ${
+                      result.status === "confirmed"
+                        ? "border-emerald-500/30 bg-emerald-500/5"
+                        : result.status === "disputed"
+                        ? "border-destructive/30 bg-destructive/5"
+                        : "border-amber-500/30 bg-amber-500/5"
+                    }`}>
+                      <div className="flex items-center gap-1.5">
+                        {result.status === "confirmed" ? (
+                          <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : result.status === "disputed" ? (
+                          <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                        ) : (
+                          <Clock className="h-3.5 w-3.5 text-amber-500" />
+                        )}
+                        <p className={`text-sm font-semibold ${
+                          result.status === "confirmed"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : result.status === "disputed"
+                            ? "text-destructive"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}>
+                          {result.status === "submitted"
+                            ? t("matchDetails.result.awaitingConfirmation")
+                            : result.status === "confirmed"
+                            ? t("matchDetails.result.confirmed")
+                            : result.status === "disputed"
+                            ? t("matchDetails.result.disputed")
+                            : result.status}
+                        </p>
+                      </div>
                       {result.status === "submitted" && (
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           <p className="text-xs text-muted-foreground">{t("matchDetails.result.autoConfirmHint")}</p>
                           {result.createdAt && (() => {
                             const hoursRemaining = Math.max(0, Math.ceil((new Date(result.createdAt!).getTime() + 5 * 24 * 60 * 60 * 1000 - Date.now()) / (60 * 60 * 1000)))
                             return hoursRemaining > 0 ? (
-                              <p className="text-xs font-medium text-primary">{t("matchDetails.result.autoConfirmCountdown", { hours: hoursRemaining })}</p>
+                              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{t("matchDetails.result.autoConfirmCountdown", { hours: hoursRemaining })}</p>
                             ) : null
                           })()}
                         </div>
