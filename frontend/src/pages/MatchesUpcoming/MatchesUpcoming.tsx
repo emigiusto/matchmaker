@@ -211,9 +211,9 @@ export default function MatchesPage() {
                                       const iWon = myScore > oppScore
                                       return (
                                         <div key={i} className="flex items-baseline gap-0.5 font-mono">
-                                          <span className={iWon ? "text-lg font-bold text-foreground" : "text-xs text-muted-foreground/50"}>{myScore}</span>
+                                          <span className={iWon ? "text-base font-bold text-foreground" : "text-sm text-muted-foreground/60"}>{myScore}</span>
                                           <span className="text-[10px] text-muted-foreground/30">–</span>
-                                          <span className={!iWon ? "text-lg font-bold text-foreground" : "text-xs text-muted-foreground/50"}>{oppScore}</span>
+                                          <span className={!iWon ? "text-base font-bold text-foreground" : "text-sm text-muted-foreground/60"}>{oppScore}</span>
                                         </div>
                                       )
                                     })}
@@ -317,9 +317,9 @@ export default function MatchesPage() {
                                       const iWon = myScore > oppScore
                                       return (
                                         <div key={i} className="flex items-baseline gap-0.5 font-mono">
-                                          <span className={iWon ? "text-lg font-bold text-foreground" : "text-xs text-muted-foreground/50"}>{myScore}</span>
+                                          <span className={iWon ? "text-base font-bold text-foreground" : "text-sm text-muted-foreground/60"}>{myScore}</span>
                                           <span className="text-[10px] text-muted-foreground/30">–</span>
-                                          <span className={!iWon ? "text-lg font-bold text-foreground" : "text-xs text-muted-foreground/50"}>{oppScore}</span>
+                                          <span className={!iWon ? "text-base font-bold text-foreground" : "text-sm text-muted-foreground/60"}>{oppScore}</span>
                                         </div>
                                       )
                                     })}
@@ -452,9 +452,9 @@ export default function MatchesPage() {
                                 const iWon = myScore > oppScore
                                 return (
                                   <div key={i} className="flex items-baseline gap-0.5 font-mono">
-                                    <span className={iWon ? "text-lg font-bold text-foreground" : "text-xs text-muted-foreground/50"}>{myScore}</span>
+                                    <span className={iWon ? "text-base font-bold text-foreground" : "text-sm text-muted-foreground/60"}>{myScore}</span>
                                     <span className="text-[10px] text-muted-foreground/30">–</span>
-                                    <span className={!iWon ? "text-lg font-bold text-foreground" : "text-xs text-muted-foreground/50"}>{oppScore}</span>
+                                    <span className={!iWon ? "text-base font-bold text-foreground" : "text-sm text-muted-foreground/60"}>{oppScore}</span>
                                   </div>
                                 )
                               })}
