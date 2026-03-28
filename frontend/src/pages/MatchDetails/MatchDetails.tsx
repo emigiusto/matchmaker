@@ -490,11 +490,11 @@ export default function MatchDetailPage() {
                           const p1Wins = s.player1Score > s.player2Score
                           return (
                             <div key={i} className="flex items-baseline gap-0.5 font-mono">
-                              <span className={p1Wins ? "text-xl font-bold text-foreground" : "text-sm text-muted-foreground"}>
+                              <span className={p1Wins ? "text-2xl font-bold text-foreground" : "text-xs text-muted-foreground/50"}>
                                 {s.player1Score}
                               </span>
-                              <span className="text-xs text-muted-foreground/40 px-0.5">–</span>
-                              <span className={!p1Wins ? "text-xl font-bold text-foreground" : "text-sm text-muted-foreground"}>
+                              <span className="text-[10px] text-muted-foreground/30 px-0.5">–</span>
+                              <span className={!p1Wins ? "text-2xl font-bold text-foreground" : "text-xs text-muted-foreground/50"}>
                                 {s.player2Score}
                               </span>
                             </div>
@@ -1029,11 +1029,11 @@ export default function MatchDetailPage() {
                           <span className="text-xs font-medium text-muted-foreground">
                             {t("matchDetails.result.set", { number: set.setNumber })}
                           </span>
-                          <span className={`text-center font-mono leading-none ${p1Wins ? "text-2xl font-bold text-foreground" : "text-sm text-muted-foreground/60"}`}>
+                          <span className={`text-center font-mono leading-none ${p1Wins ? "text-2xl font-bold text-foreground" : "text-xs text-muted-foreground/50"}`}>
                             {set.player1Score}
                           </span>
-                          <span className="text-center text-xs text-muted-foreground/40">–</span>
-                          <span className={`text-center font-mono leading-none ${!p1Wins ? "text-2xl font-bold text-foreground" : "text-sm text-muted-foreground/60"}`}>
+                          <span className="text-center text-[10px] text-muted-foreground/30">–</span>
+                          <span className={`text-center font-mono leading-none ${!p1Wins ? "text-2xl font-bold text-foreground" : "text-xs text-muted-foreground/50"}`}>
                             {set.player2Score}
                           </span>
                         </div>
