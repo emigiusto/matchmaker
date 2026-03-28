@@ -37,7 +37,6 @@
   "dependencies": {
     "@faker-js/faker": "^10.3.0",
     "@prisma/client": "6.19.2",
-    "@prisma/extension-accelerate": "^3.0.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "bcryptjs": "^3.0.3",
