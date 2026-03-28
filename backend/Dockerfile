@@ -29,7 +29,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install -g npm@11 && npm ci
 
 # Generate Prisma client (no DB needed at build time)
 COPY prisma ./prisma
