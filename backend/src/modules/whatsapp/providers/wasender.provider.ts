@@ -87,24 +87,7 @@ export class WasenderProvider implements IWhatsAppProvider {
       let pollBody: Record<string, unknown>;
 
       if (buttons && buttons.length >= 2) {
-        if (message.length > 255) {
-          // The full message (with court availability note) exceeds the poll question limit.
-          // Send the availability note as a separate plain-text message first, then use the
-          // base invite message (without the note) as the poll question. This avoids duplicating
-          // the invite header and ensures the availability info is not lost.
-          const noteStart = message.indexOf('\n\n🏟️');
-          if (noteStart >= 0) {
-            const note = message.slice(noteStart + 2); // skip the leading \n\n
-            await sendWithRetry({ to, text: note });
-            const baseMessage = message.slice(0, noteStart);
-            pollBody = { to, poll: { question: baseMessage, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
-          } else {
-            // No availability note but still too long — use message as-is, poll API may truncate
-            pollBody = { to, poll: { question: message, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
-          }
-        } else {
-          pollBody = { to, poll: { question: message, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
-        }
+        pollBody = { to, poll: { question: message, options: buttons.map((b) => b.title.slice(0, 25)), multiSelect: true } };
       } else {
         pollBody = { to, text: message };
       }

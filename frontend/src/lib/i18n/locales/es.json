@@ -393,7 +393,8 @@
       "candidatesAdded": "{{count}} contacto(s) añadido(s)",
       "bookingSuccess": "Pista reservada{{court}}",
       "bookingFailed": "Error en la reserva{{error}}",
-      "inviteLinkAccepted": "{{name}} aceptó a través del enlace de invitación"
+      "inviteLinkAccepted": "{{name}} aceptó a través del enlace de invitación",
+      "pollVote": "{{name}} votó en la encuesta"
     },
     "candidateStatus": {
       "pending": "Pendiente",

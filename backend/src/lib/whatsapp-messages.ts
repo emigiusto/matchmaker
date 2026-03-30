@@ -394,29 +394,3 @@ export function getMessages(locale?: string | null): MessageTemplates {
   return templates[resolveLocale(locale)];
 }
 
-/**
- * Builds a short court-availability note to append to multi-hour invite messages.
- * `courtsPerSlot` maps "HH:MM" → number of available courts (0 means none).
- * Only slots with data are shown; if all are 0 or the map is empty, returns null.
- */
-export function buildCourtAvailabilityNote(
-  courtsPerSlot: Record<string, number>,
-  locale?: string | null,
-): string | null {
-  const loc = resolveLocale(locale);
-  const entries = Object.entries(courtsPerSlot).sort(([a], [b]) => a.localeCompare(b));
-  if (entries.length === 0) return null;
-
-  const lines = entries.map(([slot, count]) => {
-    if (count === 0) {
-      return loc === 'es' ? `  • ${slot} — sin pistas` : `  • ${slot} — no courts`;
-    }
-    if (loc === 'es') {
-      return `  • ${slot} — ${count} ${count === 1 ? 'pista' : 'pistas'} disponible${count === 1 ? '' : 's'}`;
-    }
-    return `  • ${slot} — ${count} ${count === 1 ? 'court' : 'courts'} available`;
-  });
-
-  const header = loc === 'es' ? '🏟️ *Disponibilidad de pistas:*' : '🏟️ *Court availability:*';
-  return `${header}\n${lines.join('\n')}`;
-}

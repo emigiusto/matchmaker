@@ -22,7 +22,7 @@ import type {
 import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { findUserByNormalizedPhone, createGuestUser } from '../users/users.service';
 import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './scheduling.types';
-import { getMessages, formatResponseWindow, resolveLocale, buildCourtAvailabilityNote } from '../../lib/whatsapp-messages';
+import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/whatsapp-messages';
 
 const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
 const NONE_OPTION_RE = /^(none|ninguno)$/i;
@@ -502,7 +502,7 @@ export const schedulingService = {
       const endHHMM = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
       const slots = slotsInRange(startHHMM, endHHMM);
       let message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
-      // Append court availability note if booking is enabled for this request
+      // Annotate unavailable slots inline in the message body (only when booking is enabled and at least one slot has no courts)
       if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && slots.length > 0) {
         const dateStrISO = new Date(request.date).toISOString().slice(0, 10);
         const hostMembership = await prisma.clubMembership.findFirst({
@@ -513,8 +513,14 @@ export const schedulingService = {
             request.hostUserId, hostMembership.clubSlug, dateStrISO, request.sportType, slots,
           );
           if (courtsPerSlot) {
-            const note = buildCourtAvailabilityNote(courtsPerSlot, candidateLocale);
-            if (note) message = `${message}\n\n${note}`;
+            const hasUnavailable = slots.some(slot => (courtsPerSlot[slot] ?? 1) === 0);
+            if (hasUnavailable) {
+              const noCourtsLabel = loc === 'es' ? 'No hay pistas disponibles' : 'No courts available';
+              const slotLines = slots.map(slot =>
+                (courtsPerSlot[slot] ?? 1) === 0 ? `${slot} - ${noCourtsLabel}` : slot,
+              );
+              message = `${message}\n\n${slotLines.join('\n')}`;
+            }
           }
         }
       }

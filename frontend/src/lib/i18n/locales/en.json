@@ -393,7 +393,8 @@
       "candidatesAdded": "{{count}} contact(s) added",
       "bookingSuccess": "Court booked{{court}}",
       "bookingFailed": "Booking failed{{error}}",
-      "inviteLinkAccepted": "{{name}} accepted via invite link"
+      "inviteLinkAccepted": "{{name}} accepted via invite link",
+      "pollVote": "{{name}} voted in the poll"
     },
     "candidateStatus": {
       "pending": "Pending",

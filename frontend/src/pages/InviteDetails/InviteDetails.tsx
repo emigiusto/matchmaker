@@ -123,6 +123,7 @@ function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?
     case "request_cancelled": return t("invites.events.requestCancelled")
     case "request_completed": return t("invites.events.matchConfirmed")
     case "request_expired": return t("invites.events.noMatchFound")
+    case "poll_vote": return t("invites.events.pollVote", { name })
     default: return event.action
   }
 }
@@ -141,6 +142,7 @@ function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
     case "request_cancelled": return <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
     case "request_completed": return <CheckCircle className="h-3.5 w-3.5 text-green-600" />
     case "request_expired": return <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+    case "poll_vote": return <Clock className="h-3.5 w-3.5 text-blue-500" />
     default: return <Clock className="h-3.5 w-3.5 text-muted-foreground" />
   }
 }
