@@ -22,6 +22,8 @@ import {
   Trash2,
   CirclePlay,
   History,
+  Building2,
+  Ban,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -124,6 +126,10 @@ function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?
     case "request_completed": return t("invites.events.matchConfirmed")
     case "request_expired": return t("invites.events.noMatchFound")
     case "poll_vote": return t("invites.events.pollVote", { name })
+    case "booking_pending": return t("invites.events.bookingInProgress")
+    case "booking_success": return t("invites.events.bookingSuccess", { court: event.metadata?.courtName ? `: ${event.metadata.courtName}` : "" })
+    case "booking_failed": return t("invites.events.bookingFailed", { error: event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : "" })
+    case "booking_cancelled": return t("invites.events.bookingCancelled")
     default: return event.action
   }
 }
@@ -143,6 +149,10 @@ function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
     case "request_completed": return <CheckCircle className="h-3.5 w-3.5 text-green-600" />
     case "request_expired": return <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
     case "poll_vote": return <Clock className="h-3.5 w-3.5 text-blue-500" />
+    case "booking_pending": return <Building2 className="h-3.5 w-3.5 text-amber-500" />
+    case "booking_success": return <Building2 className="h-3.5 w-3.5 text-green-600" />
+    case "booking_failed": return <Building2 className="h-3.5 w-3.5 text-destructive" />
+    case "booking_cancelled": return <Ban className="h-3.5 w-3.5 text-muted-foreground" />
     default: return <Clock className="h-3.5 w-3.5 text-muted-foreground" />
   }
 }

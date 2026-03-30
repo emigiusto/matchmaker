@@ -491,6 +491,8 @@ export function InviteRequestsSection({
       case "booking_success": return t("invites.events.bookingSuccess", { court: event.metadata?.courtName ? `: ${event.metadata.courtName}` : "" })
       case "booking_failed": return t("invites.events.bookingFailed", { error: event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : "" })
       case "booking_cancelled": return t("invites.events.bookingCancelled")
+      case "poll_vote": return t("invites.events.pollVote", { name })
+      case "invite_link_accepted": return t("invites.events.inviteLinkAccepted", { name: event.metadata?.userName as string ?? name })
       default: return event.action
     }
   }
@@ -513,6 +515,8 @@ export function InviteRequestsSection({
       case "booking_success": return <Building2 className="h-3 w-3 text-green-600" />
       case "booking_failed": return <Building2 className="h-3 w-3 text-destructive" />
       case "booking_cancelled": return <Ban className="h-3 w-3 text-muted-foreground" />
+      case "poll_vote": return <Clock className="h-3 w-3 text-blue-500" />
+      case "invite_link_accepted": return <UserCheck className="h-3 w-3 text-green-600" />
       default: return <Clock className="h-3 w-3 text-muted-foreground" />
     }
   }
