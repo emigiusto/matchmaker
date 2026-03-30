@@ -31,20 +31,24 @@ import { MatchStatus, Result, SetResult } from '@prisma/client';
 import { createNotification } from '../notifications/notifications.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages } from '../../lib/whatsapp-messages';
+import { resolveGroupMessageLocale } from '../../lib/locale-helpers';
 import { logger } from '../../config/logger';
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
 
 export async function notifyResultSubmittedToGroup(matchId: string, result: ResultDTO): Promise<void> {
-  const match = await prisma.match.findUnique({
-    where: { id: matchId },
-    select: {
-      whatsappGroupId: true,
-      participants: {
-        select: { userId: true, team: true, user: { select: { name: true } } },
+  const [match, schedulingRequest] = await Promise.all([
+    prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        whatsappGroupId: true,
+        participants: {
+          select: { userId: true, team: true, user: { select: { name: true } } },
+        },
       },
-    },
-  });
+    }),
+    prisma.schedulingRequest.findUnique({ where: { matchId }, select: { hostUserId: true, format: true } }).catch(() => null),
+  ]);
   const groupId = match?.whatsappGroupId;
   if (!groupId) return;
 
@@ -60,8 +64,13 @@ export async function notifyResultSubmittedToGroup(matchId: string, result: Resu
     .sort((a, b) => a.setNumber - b.setNumber)
     .map((s) => ({ setNumber: s.setNumber, scoreA: s.player1Score, scoreB: s.player2Score }));
 
+  const hostUserId = schedulingRequest?.hostUserId ?? match.participants[0]?.userId ?? '';
+  const participantIds = match.participants.map((p) => p.userId);
+  const locale = hostUserId
+    ? await resolveGroupMessageLocale(hostUserId, participantIds, schedulingRequest?.format ?? 'singles')
+    : 'es';
   const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
-  const message = getMessages('es').resultSubmitted(sets, labelA, labelB, matchUrl);
+  const message = getMessages(locale).resultSubmitted(sets, labelA, labelB, matchUrl);
 
   try {
     await whatsappService.sendGroupMessage(groupId, message);

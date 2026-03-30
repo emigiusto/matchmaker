@@ -42,7 +42,7 @@ function clubLabel(clubSlug: string): string {
 }
 
 export default function Contacts() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const currentUserId = getCurrentUserId()
 
   const [contacts, setContacts] = useState<ContactDTO[]>([])
@@ -56,6 +56,7 @@ export default function Contacts() {
   const [newContactOpen, setNewContactOpen] = useState(false)
   const [newName, setNewName] = useState("")
   const [newPhone, setNewPhone] = useState("")
+  const [newCommLang, setNewCommLang] = useState<"es" | "en">("es")
   const [creatingContact, setCreatingContact] = useState(false)
 
   // New list dialog
@@ -75,6 +76,7 @@ export default function Contacts() {
   // Edit contact dialog
   const [editingContact, setEditingContact] = useState<ContactDTO | null>(null)
   const [editName, setEditName] = useState("")
+  const [editCommLang, setEditCommLang] = useState<"es" | "en">("es")
   const [editSocioInputs, setEditSocioInputs] = useState<Record<string, string>>({})
   const [editListIds, setEditListIds] = useState<Set<string>>(new Set())
   const [savingEdit, setSavingEdit] = useState(false)
@@ -116,6 +118,7 @@ export default function Contacts() {
   function openEdit(c: ContactDTO) {
     setEditingContact(c)
     setEditName(c.name)
+    setEditCommLang((c.communicationLanguage === "en" ? "en" : "es") as "es" | "en")
     setEditSocioInputs({ ...c.socioNumbers })
     setEditListIds(
       new Set(lists.filter((l) => l.members.some((m) => m.id === c.id)).map((l) => l.id))
@@ -127,6 +130,7 @@ export default function Contacts() {
     setSavingEdit(true)
     try {
       const nameChanged = editName.trim() !== editingContact.name
+      const langChanged = editCommLang !== editingContact.communicationLanguage
 
       // Build merged socioNumbers from inputs
       const newSocioNumbers: Record<string, string> = { ...editingContact.socioNumbers }
@@ -141,11 +145,12 @@ export default function Contacts() {
       const socioChanged =
         JSON.stringify(newSocioNumbers) !== JSON.stringify(editingContact.socioNumbers)
 
-      // Single PATCH if name or socio changed
-      if (nameChanged || socioChanged) {
+      // Single PATCH if name, socio, or language changed
+      if (nameChanged || socioChanged || langChanged) {
         const patch: Record<string, unknown> = { ownerUserId: currentUserId }
         if (nameChanged) patch.name = editName.trim()
         if (socioChanged) patch.socioNumbers = newSocioNumbers
+        if (langChanged) patch.communicationLanguage = editCommLang
         await apiClient.patch(`/contacts/${editingContact.id}`, patch)
       }
 
@@ -188,11 +193,12 @@ export default function Contacts() {
     if (!validation.valid) { toast.error(validation.error); return }
     setCreatingContact(true)
     try {
-      await contactsService.create(currentUserId, name, phone)
+      await contactsService.create(currentUserId, name, phone, newCommLang)
       toast.success(t("contactsPage.toast.contactCreated"))
       setNewContactOpen(false)
       setNewName("")
       setNewPhone("")
+      setNewCommLang(language as "es" | "en")
       await refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
@@ -298,7 +304,7 @@ export default function Contacts() {
       <div className="flex flex-1 flex-col gap-6 p-5 lg:p-8">
         {/* Action bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" className="gap-1.5" onClick={() => setNewContactOpen(true)}>
+          <Button size="sm" className="gap-1.5" onClick={() => { setNewCommLang(language as "es" | "en"); setNewContactOpen(true) }}>
             <Plus className="h-4 w-4" />
             {t("contactsPage.newContact")}
           </Button>
@@ -548,6 +554,24 @@ export default function Contacts() {
               <p className="text-xs text-muted-foreground">{t("contactsPage.phoneImmutable")}</p>
             </div>
 
+            {/* Communication language */}
+            <div className="space-y-1.5">
+              <Label>{t("contactsPage.communicationLanguage")}</Label>
+              <div className="flex gap-2">
+                {(["es", "en"] as const).map((lang) => (
+                  <Button
+                    key={lang}
+                    type="button"
+                    size="sm"
+                    variant={editCommLang === lang ? "default" : "outline"}
+                    onClick={() => setEditCommLang(lang)}
+                  >
+                    {lang === "es" ? "Español" : "English"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             {/* Socio numbers — one row per club membership */}
             {memberships.length > 0 && (
               <>
@@ -635,6 +659,22 @@ export default function Contacts() {
             <div>
               <Label className="mb-1 block text-sm">{t("contactsPage.phonePlaceholder")}</Label>
               <PhoneInput value={newPhone} onChange={setNewPhone} defaultCountryCode="34" />
+            </div>
+            <div>
+              <Label className="mb-1 block text-sm">{t("contactsPage.communicationLanguage")}</Label>
+              <div className="flex gap-2">
+                {(["es", "en"] as const).map((lang) => (
+                  <Button
+                    key={lang}
+                    type="button"
+                    size="sm"
+                    variant={newCommLang === lang ? "default" : "outline"}
+                    onClick={() => setNewCommLang(lang)}
+                  >
+                    {lang === "es" ? "Español" : "English"}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

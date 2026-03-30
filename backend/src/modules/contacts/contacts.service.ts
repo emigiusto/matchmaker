@@ -38,6 +38,7 @@ function toContactDTO(
     linkedUserName: c.linkedUser?.name ?? null,
     linkedUserIsGuest: c.linkedUser?.isGuest ?? null,
     importSource: c.importSource ?? null,
+    communicationLanguage: c.communicationLanguage,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
@@ -90,6 +91,7 @@ export async function createContact(input: CreateContactInput): Promise<CreateCo
       importSource: input.importSource ?? 'manual',
       externalId: input.externalId ?? null,
       socioNumbers: {},
+      communicationLanguage: input.communicationLanguage ?? owner.locale ?? 'es',
     },
     include: { linkedUser: { select: { id: true, name: true, isGuest: true } } },
   });
@@ -119,6 +121,7 @@ export async function updateContact(
   const data: Prisma.ContactUpdateInput = {};
   if (patch.name !== undefined) data.name = patch.name.trim();
   if (patch.socioNumbers !== undefined) data.socioNumbers = patch.socioNumbers;
+  if (patch.communicationLanguage !== undefined) data.communicationLanguage = patch.communicationLanguage;
 
   const updated = await prisma.contact.update({
     where: { id },

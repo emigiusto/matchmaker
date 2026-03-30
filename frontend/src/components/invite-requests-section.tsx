@@ -596,7 +596,7 @@ export function InviteRequestsSection({
                   </p>
                   <Button size="lg" className="mt-6 gap-2" onClick={() => setWizardOpen(true)}>
                     <Zap className="h-5 w-5" />
-                    I Want to Play
+                    {t("common.iWantToPlay")}
                   </Button>
                 </CardContent>
               </Card>

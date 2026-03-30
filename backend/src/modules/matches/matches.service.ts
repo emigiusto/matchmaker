@@ -16,6 +16,7 @@ import { validateResultMatchConsistency } from '../results/results.service';
 import { logServerEvent } from '../analytics/analytics.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
+import { resolveGroupMessageLocale } from '../../lib/locale-helpers';
 import { cancelBookingForMatch, resetBookingForReschedule } from '../booking/booking.service';
 
 const FRONTEND_BASE = process.env.FRONTEND_BASE_URL || 'https://matchmaker-flame.vercel.app';
@@ -515,12 +516,9 @@ async function notifyMatchParticipantsOnReschedule(matchId: string, match: Match
   try {
     const tz = timezone
     const scheduled = new Date(match.scheduledAt)
-    const hostUser = await prisma.user.findFirst({
-      where: { id: { in: participants.map((p) => p.userId) } },
-      select: { locale: true },
-    })
-    const hostLocale = resolveLocale(hostUser?.locale)
-    const intlLocale = hostLocale === 'es' ? 'es-ES' : 'en-US'
+    const hostUserId = match.hostUserId ?? participants[0]?.userId ?? ''
+    const hostLocale = await resolveGroupMessageLocale(hostUserId, participants.map((p) => p.userId), match.format ?? 'singles')
+    const intlLocale = resolveLocale(hostLocale) === 'es' ? 'es-ES' : 'en-US'
 
     const dateStr = scheduled.toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz })
     const timeStr = formatTimeInTz(scheduled, tz)
@@ -645,18 +643,17 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
   if (groupId && groupId.trim()) {
     try {
       const hostUserId = (match.availability as any)?.userId as string | undefined;
-      let hostLocale = 'es';
-      if (hostUserId) {
-        const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } });
-        hostLocale = hostUser?.locale ?? 'es';
-      }
+      const participantIds = ((match as any).participants as { userId: string }[] | undefined)?.map((p) => p.userId) ?? [];
+      const sport = (match as any).schedulingRequest?.sportType ?? 'tennis';
+      const format = (match as any).schedulingRequest?.format ?? 'singles';
+      const hostLocale = hostUserId
+        ? await resolveGroupMessageLocale(hostUserId, participantIds, format)
+        : 'es';
       const intlLocale = resolveLocale(hostLocale) === 'es' ? 'es-ES' : 'en-US';
       const rawDateStr = av?.date
         ? new Date(av.date).toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'short' })
         : 'TBD';
       const localeDateStr = rawDateStr.charAt(0).toUpperCase() + rawDateStr.slice(1);
-      const sport = (match as any).schedulingRequest?.sportType ?? 'tennis';
-      const format = (match as any).schedulingRequest?.format ?? 'singles';
       const whenStr = `${localeDateStr}${timeStr ? ` · ${timeStr}` : ''}`;
       const participantNames = ((match as any).participants as { user?: { name: string | null } }[] | undefined)
         ?.map((p) => p.user?.name)

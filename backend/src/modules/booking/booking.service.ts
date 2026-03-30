@@ -9,6 +9,7 @@ import { getAdapter } from './adapters/adapter.registry'
 import { logger } from '../../config/logger'
 import { whatsappService } from '../whatsapp/whatsapp.service'
 import { getMessages } from '../../lib/whatsapp-messages'
+import { resolveGroupMessageLocale } from '../../lib/locale-helpers'
 import { cacheGet, cacheSet } from '../../shared/cache/redis'
 import { createNotification } from '../notifications/notifications.service'
 import { logServerEvent } from '../analytics/analytics.service'
@@ -403,7 +404,7 @@ async function runBookingJob(
       const reason = `Missing socio number for participant ${participantName}`
       await failAttempt(attemptId, reason, 'MISSING_SOCIO_NUMBER')
       logBookingEvent(matchId, 'booking_failed', { errorMessage: reason }).catch(() => {})
-      notifyBookingFailed(match, hostUserId, date, time,reason)
+      notifyBookingFailed(match, hostUserId, date, time, reason, schedulingRequest?.format)
       return
     }
 
@@ -508,8 +509,7 @@ async function runBookingJob(
           .then((m) => m?.whatsappGroupId ?? null)
           .catch(() => null)
         if (freshGroupId) {
-          const hostUser = await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).catch(() => null)
-          const hostLocale = hostUser?.locale ?? 'es'
+          const hostLocale = await resolveGroupMessageLocale(hostUserId, match.participants.map((p) => p.userId), schedulingRequest?.format ?? 'singles')
           const message = getMessages(hostLocale).courtBooked(result.courtName, `${date} · ${time}`, match.availability?.locationText ?? '', result.confirmationUrl)
           whatsappService.sendGroupMessage(freshGroupId, message).catch((err) => {
             logger.warn(`[booking] Failed to send WhatsApp group notification for match ${matchId}:`, err)
@@ -541,7 +541,7 @@ async function runBookingJob(
           const userMessage = offline
             ? 'Club booking system is offline or unreachable'
             : (err instanceof AppError ? message : 'An error occurred during court booking')
-          notifyBookingFailed(match, hostUserId, date, time,userMessage)
+          notifyBookingFailed(match, hostUserId, date, time, userMessage, schedulingRequest?.format)
           break
         }
       }
@@ -553,7 +553,7 @@ async function runBookingJob(
     logBookingEvent(matchId, 'booking_failed', { errorMessage: message }).catch(() => {})
     logger.error(`[booking] Unexpected setup error for match ${matchId}: ${message}`)
     // Reload match for group notification (match variable may not be in scope)
-    const m = await prisma.match.findUnique({ where: { id: matchId }, include: { availability: true } }).catch(() => null)
+    const m = await prisma.match.findUnique({ where: { id: matchId }, include: { availability: true, participants: true } }).catch(() => null)
     if (m) {
       const sr = await prisma.schedulingRequest.findUnique({ where: { matchId } }).catch(() => null)
       const tz = sr?.timezone ?? 'UTC'
@@ -561,26 +561,26 @@ async function runBookingJob(
       const d = scheduled.toLocaleDateString('en-CA', { timeZone: tz })
       const t = scheduled.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz })
       const hId = sr?.hostUserId ?? m.availability?.userId ?? ''
-      notifyBookingFailed(m, hId, d, t, 'An unexpected error occurred during court booking')
+      notifyBookingFailed(m, hId, d, t, 'An unexpected error occurred during court booking', sr?.format)
     }
   }
 }
 
 function notifyBookingFailed(
-  match: { id: string; whatsappGroupId: string | null; availability: { locationText?: string | null } | null },
+  match: { id: string; whatsappGroupId: string | null; availability: { locationText?: string | null } | null; participants: { userId: string }[] },
   hostUserId: string,
   date: string,
   time: string,
   reason: string,
+  format?: string,
 ): void {
   createNotification(hostUserId, 'booking.failed', { matchId: match.id, errorMessage: reason }).catch((err) => {
     logger.warn(`[booking] Failed to send booking.failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
   })
 
   if (match.whatsappGroupId) {
-    prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } })
-      .then((hostUser) => {
-        const locale = hostUser?.locale ?? 'es'
+    resolveGroupMessageLocale(hostUserId, match.participants.map((p) => p.userId), format ?? 'singles')
+      .then((locale) => {
         const when = `${date} · ${time}`
         const loc = match.availability?.locationText ?? ''
         const message = getMessages(locale).courtBookingFailed(when, loc, reason)
@@ -710,14 +710,15 @@ export async function cancelBookingForMatch(matchId: string): Promise<void> {
   // Notify the WhatsApp group
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    include: { availability: true },
+    include: { availability: true, participants: true },
   }).catch(() => null)
 
   if (match?.whatsappGroupId && attempt.courtName) {
     const schedulingRequest = await prisma.schedulingRequest.findUnique({ where: { matchId } }).catch(() => null)
     const hostUserId = schedulingRequest?.hostUserId ?? match.availability?.userId
+    const participantIds = match.participants.map((p) => p.userId)
     const hostLocale = hostUserId
-      ? await prisma.user.findUnique({ where: { id: hostUserId }, select: { locale: true } }).then((u) => u?.locale ?? 'es').catch(() => 'es')
+      ? await resolveGroupMessageLocale(hostUserId, participantIds, schedulingRequest?.format ?? 'singles')
       : 'es'
     const tz = schedulingRequest?.timezone ?? 'UTC'
     const scheduled = new Date(match.scheduledAt)

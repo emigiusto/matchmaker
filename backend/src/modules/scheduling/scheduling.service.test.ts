@@ -52,6 +52,7 @@ vi.mock('../../prisma', () => {
     schedulingInviteEvent: mockTx.schedulingInviteEvent,
     availability: mockTx.availability,
     match: mockTx.match,
+    contact: { findFirst: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => fn(mockTx)),
     __mockTx: mockTx,
   };

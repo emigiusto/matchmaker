@@ -13,6 +13,7 @@ export interface ContactDTO {
   linkedUserName: string | null
   linkedUserIsGuest: boolean | null
   importSource: string | null
+  communicationLanguage: string // "es" | "en"
   createdAt: string
   updatedAt: string
 }
@@ -37,12 +38,14 @@ export const contactsService = {
     ownerUserId: string,
     name: string,
     phone: string,
+    communicationLanguage?: string,
   ): Promise<CreateContactResult> {
     return apiClient.post<CreateContactResult>("/contacts", {
       ownerUserId,
       name,
       phone,
       importSource: "manual",
+      ...(communicationLanguage ? { communicationLanguage } : {}),
     })
   },
 

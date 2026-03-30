@@ -23,6 +23,7 @@ import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { findUserByNormalizedPhone, createGuestUser } from '../users/users.service';
 import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './scheduling.types';
 import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/whatsapp-messages';
+import { resolveGroupMessageLocale } from '../../lib/locale-helpers';
 
 const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
 const NONE_OPTION_RE = /^(none|ninguno)$/i;
@@ -487,7 +488,13 @@ export const schedulingService = {
         continue;
       }
 
-      const candidateLocale = (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
+      const ownerContact = await prisma.contact.findFirst({
+        where: { ownerUserId: request.hostUserId, linkedUserId: candidate.contactUserId },
+        select: { communicationLanguage: true },
+      });
+      const candidateLocale = ownerContact?.communicationLanguage
+        ?? (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale
+        ?? 'es';
       const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
       const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       const loc = resolveLocale(candidateLocale);
@@ -991,13 +998,14 @@ export const schedulingService = {
           data: { whatsappGroupId: groupResult.groupId },
         });
         const publicMatchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
+        const groupLocale = await resolveGroupMessageLocale(request.hostUserId, participantUserIds, format);
         const detailsMessage = formatMatchDetailsMessage(
           request.sportType,
           format,
           whenStr,
           request.locationText,
           publicMatchUrl,
-          hostUserLocale
+          groupLocale
         );
         await whatsappService.sendGroupMessage(groupResult.groupId, detailsMessage);
 

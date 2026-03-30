@@ -118,6 +118,10 @@ model Contact {
   // e.g. { "laieta": "12345" }
   socioNumbers Json @default("{}")
 
+  // Language to use for WhatsApp messages sent to this contact ("es" | "en")
+  // Defaults to the owner's locale at creation time; can be overridden per contact
+  communicationLanguage String @default("es")
+
   // Import metadata — ready for future mobile native contacts integration
   importSource String? // "manual" | "native"
   externalId   String? // device contact ID for dedup on re-import
