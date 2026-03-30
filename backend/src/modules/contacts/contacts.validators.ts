@@ -28,6 +28,7 @@ export const createContactSchema = z.object({
 export const updateContactSchema = z.object({
   name: z.string().min(1).optional(),
   socioNumbers: z.record(z.string(), z.string()).optional(),
+  communicationLanguage: z.enum(['es', 'en']).optional(),
 });
 
 export const createContactListSchema = z.object({
