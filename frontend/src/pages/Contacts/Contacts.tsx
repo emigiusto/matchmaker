@@ -371,28 +371,29 @@ export default function Contacts() {
                             <p className="truncate text-sm font-medium">{c.name}</p>
                             <p className="text-xs text-muted-foreground">{c.phone}</p>
 
-                            {((c.linkedUserId && !c.linkedUserIsGuest) || socioEntries.length > 0 || memberOfLists.length > 0) && (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
-                                {c.linkedUserId && !c.linkedUserIsGuest && (
-                                  <Badge
-                                    variant="outline"
-                                    className="h-5 px-1.5 py-0 text-[10px] font-medium border-green-300 text-green-700 dark:border-green-800 dark:text-green-400"
-                                  >
-                                    {t("contactsPage.linkedUser")}
-                                  </Badge>
-                                )}
-                                {socioEntries.map(([slug, num]) => (
-                                  <Badge key={slug} variant="secondary" className="h-5 px-1.5 py-0 text-[10px]">
-                                    {clubLabel(slug)} · {num}
-                                  </Badge>
-                                ))}
-                                {memberOfLists.map((name) => (
-                                  <Badge key={name} variant="outline" className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground">
-                                    {name}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {c.linkedUserId && !c.linkedUserIsGuest && (
+                                <Badge
+                                  variant="outline"
+                                  className="h-5 px-1.5 py-0 text-[10px] font-medium border-green-300 text-green-700 dark:border-green-800 dark:text-green-400"
+                                >
+                                  {t("contactsPage.linkedUser")}
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground">
+                                {c.communicationLanguage === "en" ? "EN" : "ES"}
+                              </Badge>
+                              {socioEntries.map(([slug, num]) => (
+                                <Badge key={slug} variant="secondary" className="h-5 px-1.5 py-0 text-[10px]">
+                                  {clubLabel(slug)} · {num}
+                                </Badge>
+                              ))}
+                              {memberOfLists.map((name) => (
+                                <Badge key={name} variant="outline" className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground">
+                                  {name}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
 
                           <div className="mt-0.5 flex shrink-0 items-center gap-0.5">
