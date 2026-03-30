@@ -893,6 +893,17 @@
     "confirmDeleteListDesc": "The list will be deleted. Contacts are not affected.",
     "membersCount": "{{count}} member",
     "membersCount_plural": "{{count}} members",
+    "contactsAboutTitle": "Contacts",
+    "contactsAbout": "Your personal address book of players. Add people with their phone number and preferred language to invite them to matches via WhatsApp.",
+    "listsAboutTitle": "Lists",
+    "listsAbout": "Group contacts and define their priority order. When creating an invite you can add an entire list and that order is used as the starting point.",
+    "manageList": "Manage",
+    "managingListTitle": "Manage list",
+    "dragToReorder": "Drag to reorder",
+    "addMembersTitle": "Add contacts",
+    "addMembersSearch": "Search contacts...",
+    "noMoreContacts": "All your contacts are already in this list",
+    "noMembersYet": "This list is empty",
     "toast": {
       "contactCreated": "Contact added",
       "contactDeleted": "Contact deleted",
@@ -903,7 +914,8 @@
       "memberRemoved": "Removed from list",
       "contactUpdated": "Contact saved",
       "socioSaved": "Socio number saved",
-      "saveFailed": "Could not save"
+      "saveFailed": "Could not save",
+      "orderSaved": "Order saved"
     }
   },
   "profilePage": {

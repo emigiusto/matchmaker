@@ -44,6 +44,10 @@ export const addListMemberSchema = z.object({
   contactId: z.string().uuid('Invalid contactId'),
 });
 
+export const reorderListMembersSchema = z.object({
+  contactIds: z.array(z.string().uuid()).min(1),
+});
+
 export const ensureUserByPhoneSchema = z.object({
   phone: phoneE164,
   name: z.string().min(1, 'Name is required'),

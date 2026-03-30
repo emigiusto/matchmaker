@@ -185,7 +185,7 @@ export async function listContactLists(ownerUserId: string): Promise<ContactList
     include: {
       members: {
         include: { contact: { include: { linkedUser: { select: { id: true, name: true, isGuest: true } } } } },
-        orderBy: { addedAt: 'asc' },
+        orderBy: [{ position: 'asc' }, { addedAt: 'asc' }],
       },
     },
     orderBy: { name: 'asc' },
@@ -230,13 +230,38 @@ export async function addMemberToList(
   if (list.ownerUserId !== ownerUserId) throw new AppError('Forbidden', 403);
   if (!contact || contact.ownerUserId !== ownerUserId) throw new AppError('Contact not found', 404);
 
+  const maxPosition = await prisma.contactListMember.aggregate({
+    where: { contactListId: listId },
+    _max: { position: true },
+  });
+  const nextPosition = (maxPosition._max.position ?? -1) + 1;
+
   await prisma.contactListMember.upsert({
     where: { contactListId_contactId: { contactListId: listId, contactId } },
-    create: { contactListId: listId, contactId },
+    create: { contactListId: listId, contactId, position: nextPosition },
     update: {},
   });
 
   return listContactListById(listId);
+}
+
+export async function reorderListMembers(
+  listId: string,
+  ownerUserId: string,
+  contactIds: string[],
+): Promise<void> {
+  const list = await prisma.contactList.findUnique({ where: { id: listId } });
+  if (!list) throw new AppError('Contact list not found', 404);
+  if (list.ownerUserId !== ownerUserId) throw new AppError('Forbidden', 403);
+
+  await prisma.$transaction(
+    contactIds.map((contactId, position) =>
+      prisma.contactListMember.updateMany({
+        where: { contactListId: listId, contactId },
+        data: { position },
+      }),
+    ),
+  );
 }
 
 export async function removeMemberFromList(
@@ -259,7 +284,7 @@ async function listContactListById(id: string): Promise<ContactListDTO> {
     include: {
       members: {
         include: { contact: { include: { linkedUser: { select: { id: true, name: true, isGuest: true } } } } },
-        orderBy: { addedAt: 'asc' },
+        orderBy: [{ position: 'asc' }, { addedAt: 'asc' }],
       },
     },
   });

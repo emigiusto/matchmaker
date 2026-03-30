@@ -18,5 +18,6 @@ router.patch('/lists/:id', ContactsController.renameList);
 router.delete('/lists/:id', ContactsController.deleteList);
 router.post('/lists/:id/members', ContactsController.addMember);
 router.delete('/lists/:id/members/:contactId', ContactsController.removeMember);
+router.put('/lists/:id/members/order', ContactsController.reorderMembers);
 
 export default router;

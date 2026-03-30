@@ -110,4 +110,12 @@ export const contactsService = {
       `/contacts/lists/${listId}/members/${contactId}?ownerUserId=${encodeURIComponent(ownerUserId)}`,
     )
   },
+
+  async reorderListMembers(
+    listId: string,
+    ownerUserId: string,
+    contactIds: string[],
+  ): Promise<void> {
+    return apiClient.put(`/contacts/lists/${listId}/members/order`, { ownerUserId, contactIds })
+  },
 }

@@ -8,6 +8,7 @@ import {
   createContactListSchema,
   renameContactListSchema,
   addListMemberSchema,
+  reorderListMembersSchema,
 } from './contacts.validators';
 
 /** Extract a single string from a query param (handles string | string[] union) */
@@ -118,6 +119,18 @@ export class ContactsController {
       const ownerUserId = qs(req, 'ownerUserId');
       if (!ownerUserId) return res.status(400).json({ error: 'Missing ownerUserId query param' });
       await ContactsService.removeMemberFromList(listId, contactId, ownerUserId);
+      return res.status(204).send();
+    } catch (err) { next(err); }
+  }
+
+  static async reorderMembers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const listId = String(req.params.id);
+      const ownerUserId = String(req.body.ownerUserId ?? '');
+      if (!ownerUserId) return res.status(400).json({ error: 'Missing ownerUserId' });
+      const parsed = reorderListMembersSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'Invalid request body', details: parsed.error.issues });
+      await ContactsService.reorderListMembers(listId, ownerUserId, parsed.data.contactIds);
       return res.status(204).send();
     } catch (err) { next(err); }
   }

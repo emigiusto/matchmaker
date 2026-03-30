@@ -893,6 +893,17 @@
     "confirmDeleteListDesc": "Se eliminará la lista. Los contactos no se ven afectados.",
     "membersCount": "{{count}} miembro",
     "membersCount_plural": "{{count}} miembros",
+    "contactsAboutTitle": "Contactos",
+    "contactsAbout": "Tu agenda personal de jugadores. Añade personas con su teléfono e idioma preferido para invitarles a partidos por WhatsApp.",
+    "listsAboutTitle": "Listas",
+    "listsAbout": "Agrupa contactos y define su orden de prioridad. Al crear una invitación puedes añadir una lista entera y ese orden se usa como punto de partida.",
+    "manageList": "Gestionar",
+    "managingListTitle": "Gestionar lista",
+    "dragToReorder": "Arrastra para reordenar",
+    "addMembersTitle": "Añadir contactos",
+    "addMembersSearch": "Buscar contactos...",
+    "noMoreContacts": "Todos tus contactos ya están en esta lista",
+    "noMembersYet": "Esta lista está vacía",
     "toast": {
       "contactCreated": "Contacto añadido",
       "contactDeleted": "Contacto eliminado",
@@ -903,7 +914,8 @@
       "memberRemoved": "Eliminado de la lista",
       "contactUpdated": "Contacto guardado",
       "socioSaved": "Número de socio guardado",
-      "saveFailed": "No se pudo guardar"
+      "saveFailed": "No se pudo guardar",
+      "orderSaved": "Orden guardado"
     }
   },
   "profilePage": {

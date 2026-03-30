@@ -157,6 +157,7 @@ model ContactListMember {
   id            String   @id @default(uuid())
   contactListId String
   contactId     String
+  position      Int      @default(0)
   addedAt       DateTime @default(now())
 
   contactList ContactList @relation(fields: [contactListId], references: [id], onDelete: Cascade)
