@@ -1323,7 +1323,7 @@ export default function MatchDetailPage() {
                 <Card className="border-border/50">
                   <CardHeader>
                     <CardTitle className="text-base font-semibold tracking-tight">
-                      Match Insights
+                      {t("matchDetails.matchInsights")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -1332,7 +1332,7 @@ export default function MatchDetailPage() {
                         <QuestionnaireItem
                           key={key}
                           label={t(`results.questionnaire.${key}.label`)}
-                          value={formatQuestionnaireArrayValues(values as string[])}
+                          value={(values as string[]).map(v => t(`results.questionnaire.${key}.${v}`)).join(", ")}
                         />
                       ) : null
                     )}
@@ -1433,13 +1433,3 @@ function QuestionnaireItem({ label, value }: { label: string; value: string }) {
   )
 }
 
-function formatQuestionnaireValue(value: string): string {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
-function formatQuestionnaireArrayValues(values: string[]): string {
-  return values.map(formatQuestionnaireValue).join(", ")
-}
