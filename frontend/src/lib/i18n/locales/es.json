@@ -736,7 +736,7 @@
       "status": "Estado",
       "awaitingConfirmation": "Esperando Confirmación",
       "autoConfirmHint": "Si no hay impugnaciones, el resultado se confirmará automáticamente en 5 días.",
-      "autoConfirmCountdown": "Se autoconfirma en {{hours}}h",
+      "autoConfirmCountdown": "Se autoconfirma en {{days}}d {{hours}}h",
       "confirmed": "Confirmado",
       "confirmResult": "Confirmar Resultado",
       "dispute": "Impugnar",

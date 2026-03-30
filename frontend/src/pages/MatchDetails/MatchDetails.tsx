@@ -1098,9 +1098,11 @@ export default function MatchDetailPage() {
                         <div className="space-y-0.5">
                           <p className="text-xs text-muted-foreground">{t("matchDetails.result.autoConfirmHint")}</p>
                           {result.createdAt && (() => {
-                            const hoursRemaining = Math.max(0, Math.ceil((new Date(result.createdAt!).getTime() + 5 * 24 * 60 * 60 * 1000 - Date.now()) / (60 * 60 * 1000)))
-                            return hoursRemaining > 0 ? (
-                              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{t("matchDetails.result.autoConfirmCountdown", { hours: hoursRemaining })}</p>
+                            const msRemaining = Math.max(0, new Date(result.createdAt!).getTime() + 5 * 24 * 60 * 60 * 1000 - Date.now())
+                            const daysRemaining = Math.floor(msRemaining / (24 * 60 * 60 * 1000))
+                            const hoursRemaining = Math.ceil((msRemaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
+                            return msRemaining > 0 ? (
+                              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{t("matchDetails.result.autoConfirmCountdown", { days: daysRemaining, hours: hoursRemaining })}</p>
                             ) : null
                           })()}
                         </div>
