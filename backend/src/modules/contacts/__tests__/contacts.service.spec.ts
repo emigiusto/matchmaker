@@ -172,7 +172,7 @@ describe('reorderListMembers', () => {
     await reorderListMembers(LIST_ID, OWNER_ID, orderedIds);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    const txArg = vi.mocked(prisma.$transaction).mock.calls[0][0] as unknown[];
+    const txArg = vi.mocked(prisma.$transaction).mock.calls[0][0] as unknown as unknown[];
     expect(txArg).toHaveLength(3);
   });
 

@@ -224,5 +224,7 @@ router.get('/recent', ResultsController.getRecentResults);
  *               $ref: '#/components/schemas/Result'
  */
 router.post('/:matchId/submit-result', requireAuth, ResultsController.submitMatchResult);
+router.post('/:matchId/questionnaire', requireAuth, ResultsController.submitQuestionnaire);
+router.get('/:matchId/questionnaire/mine', requireAuth, ResultsController.getMyQuestionnaire);
 
 export default router;

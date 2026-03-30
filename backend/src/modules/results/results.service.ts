@@ -27,7 +27,7 @@ import { prisma } from '../../prisma';
 import { AppError } from '../../shared/errors/AppError';
 import { RatingService } from '../rating/rating.service';
 import { ResultDTO, SetResultDTO, AddSetResultInput, SubmitMatchResultInput, DisputeResultInput, ResolveDisputeInput, PostMatchQuestionnaire } from './results.types';
-import { MatchStatus, Result, SetResult } from '@prisma/client';
+import { MatchStatus, Prisma, Result, SetResult } from '@prisma/client';
 import { createNotification } from '../notifications/notifications.service';
 import { whatsappService } from '../whatsapp/whatsapp.service';
 import { getMessages } from '../../lib/whatsapp-messages';
@@ -471,9 +471,17 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
         matchId,
         winnerUserId,
         ...confirmationFields,
-        questionnaire: questionnaire ?? undefined,
       },
     });
+
+    // Save questionnaire to per-user table (private — not stored on the shared Result)
+    if (questionnaire && Object.keys(questionnaire).length > 0) {
+      await tx.matchQuestionnaire.upsert({
+        where: { matchId_userId: { matchId, userId: currentUserId } },
+        create: { matchId, userId: currentUserId, answers: questionnaire as Prisma.InputJsonValue },
+        update: { answers: questionnaire as Prisma.InputJsonValue },
+      });
+    }
 
     // Insert sets
     for (const set of sets) {
@@ -783,7 +791,7 @@ function toResultDTO(result: Result & { sets?: SetResult[] }): ResultDTO {
     disputedByHostAt: result.disputedByHostAt ? result.disputedByHostAt.toISOString() : null,
     disputedByOpponentAt: result.disputedByOpponentAt ? result.disputedByOpponentAt.toISOString() : null,
     disputeNote: (result as any).disputeNote ?? null,
-    questionnaire: ((result as any).questionnaire as PostMatchQuestionnaire | null) ?? null,
+    questionnaire: null, // Questionnaire answers are per-user private — use GET /results/:matchId/questionnaire/mine
     aceupSyncedAt: result.aceupSyncedAt ? result.aceupSyncedAt.toISOString() : null,
     aceupChallengeId: result.aceupChallengeId ?? null,
     sets: (result.sets ?? [])
@@ -834,6 +842,44 @@ export async function autoConfirmResults(): Promise<number> {
     }
   }
   return count;
+}
+
+// ─── Per-user questionnaire ─────────────────────────────────
+
+/**
+ * Upsert the calling user's questionnaire answers for a match.
+ * Validates that the user is a match participant.
+ */
+export async function upsertMatchQuestionnaire(
+  matchId: string,
+  userId: string,
+  answers: PostMatchQuestionnaire,
+): Promise<PostMatchQuestionnaire> {
+  const participant = await prisma.matchParticipant.findFirst({
+    where: { matchId, userId },
+  });
+  if (!participant) throw new AppError('Only match participants can submit a questionnaire', 403);
+
+  const record = await prisma.matchQuestionnaire.upsert({
+    where: { matchId_userId: { matchId, userId } },
+    create: { matchId, userId, answers: answers as Prisma.InputJsonValue },
+    update: { answers: answers as Prisma.InputJsonValue },
+  });
+  return record.answers as PostMatchQuestionnaire;
+}
+
+/**
+ * Get the calling user's own questionnaire answers for a match.
+ * Returns null if the user has not submitted answers yet.
+ */
+export async function getMyMatchQuestionnaire(
+  matchId: string,
+  userId: string,
+): Promise<PostMatchQuestionnaire | null> {
+  const record = await prisma.matchQuestionnaire.findUnique({
+    where: { matchId_userId: { matchId, userId } },
+  });
+  return record ? (record.answers as PostMatchQuestionnaire) : null;
 }
 
 /**

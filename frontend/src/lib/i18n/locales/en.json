@@ -1120,8 +1120,10 @@
     },
     "questionnaire": {
       "title": "Optional: Improve your match insights",
+      "editTitle": "Edit your match insights",
       "subtitle": "5 quick questions (select all that apply)",
-      "disclaimer": "Your answers are saved and will be used to power personalised AI match insights in a future update.",
+      "disclaimer": "Your answers are private — only you can see them.",
+      "saved": "Match insights saved",
       "matchPlayedOut": { "label": "How did the match play out?", "dominated": "I dominated", "balanced": "Balanced", "very_close": "Very close", "struggled": "I struggled" },
       "generalSensation": { "label": "General sensations?", "confident": "High confidence", "nervous": "Nervous", "in_rhythm": "In rhythm", "out_of_sync": "Out of sync", "strong": "Physically strong", "tired": "Physically tired" },
       "tacticAdjustment": { "label": "Did you adjust tactics mid-match?", "yes_successful": "Yes, successfully", "yes_unsuccessful": "Yes, unsuccessfully", "no_adjustment": "No adjustment", "no_plan": "No clear plan" },

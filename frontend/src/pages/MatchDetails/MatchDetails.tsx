@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Link, useParams } from "react-router-dom"
 import { format, parseISO } from "date-fns"
 import { es as esLocale, enUS } from "date-fns/locale"
@@ -20,9 +20,14 @@ import {
   Ban,
   X,
   Plus,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -54,8 +59,8 @@ import { contactsService, type ContactDTO } from "@/lib/services/contacts.servic
 import { resultsService } from "@/lib/services/results.service"
 import { aceupService, type AceUpValidation } from "@/lib/services/aceup.service"
 import { Input } from "@/components/ui/input"
-import type { Match, MatchResult, SetScore } from "@/lib/types"
-import { Loader2 } from "lucide-react"
+import type { Match, MatchResult, SetScore, PostMatchQuestionnaire } from "@/lib/types"
+import { type QuestionKey, QUESTION_OPTIONS, getQuestionPool } from "@/lib/questionnaire.config"
 
 export default function MatchDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -96,6 +101,11 @@ export default function MatchDetailPage() {
 
   const [aceupValidation, setAceupValidation] = useState<AceUpValidation | null>(null)
   const [sendingToAceup, setSendingToAceup] = useState(false)
+
+  const [myQuestionnaire, setMyQuestionnaire] = useState<PostMatchQuestionnaire | null>(null)
+  const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Partial<PostMatchQuestionnaire>>({})
+  const [questionnaireOpen, setQuestionnaireOpen] = useState(false)
+  const [savingQuestionnaire, setSavingQuestionnaire] = useState(false)
 
   function fetchReminders() {
     if (!currentUserId) return
@@ -144,6 +154,14 @@ export default function MatchDetailPage() {
     if (!["submitted", "confirmed"].includes(result.status)) return
     aceupService.validate(id).then(setAceupValidation).catch(() => {})
   }, [id, result?.status, currentUserId, match?.hostUserId])
+
+  useEffect(() => {
+    if (!id || !result || !currentUserId) return
+    resultsService.getMyQuestionnaire(id).then((q) => {
+      setMyQuestionnaire(q)
+      if (q) setQuestionnaireAnswers(q)
+    }).catch(() => {})
+  }, [id, result?.id, currentUserId])
 
   const stopBookingPoll = useCallback(() => {
     if (bookingPollRef.current) {
@@ -265,6 +283,31 @@ export default function MatchDetailPage() {
       toast.error(err instanceof Error ? err.message : "Failed to delete reminder")
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const questionPool = match ? getQuestionPool(match.sport, match.format) : []
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const selectedQuestions = useMemo(() => [...questionPool].sort(() => Math.random() - 0.5).slice(0, 5), [match?.id])
+
+  function toggleQuestionnaireValue(key: QuestionKey, value: string) {
+    const current = (questionnaireAnswers[key] as string[]) || []
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+    setQuestionnaireAnswers((prev) => ({ ...prev, [key]: next.length > 0 ? next : undefined }))
+  }
+
+  async function handleSaveQuestionnaire() {
+    if (!id) return
+    setSavingQuestionnaire(true)
+    try {
+      const saved = await resultsService.submitQuestionnaire(id, questionnaireAnswers as PostMatchQuestionnaire)
+      setMyQuestionnaire(saved)
+      setQuestionnaireOpen(false)
+      toast.success(t("results.questionnaire.saved"))
+    } catch {
+      toast.error(t("error.somethingWentWrong"))
+    } finally {
+      setSavingQuestionnaire(false)
     }
   }
 
@@ -1318,27 +1361,77 @@ export default function MatchDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Show Questionnaire Answers if available */}
-              {result?.questionnaire && Object.keys(result?.questionnaire).length > 0 && (
-                <Card className="border-border/50">
-                  <CardHeader>
-                    <CardTitle className="text-base font-semibold tracking-tight">
-                      {t("matchDetails.matchInsights")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {Object.entries(result?.questionnaire ?? {}).map(([key, values]) =>
-                      Array.isArray(values) && values.length > 0 ? (
-                        <QuestionnaireItem
-                          key={key}
-                          label={t(`results.questionnaire.${key}.label`)}
-                          value={(values as string[]).map(v => t(`results.questionnaire.${key}.${v}`)).join(", ")}
-                        />
-                      ) : null
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+              {/* Per-user Match Insights */}
+              {result && (() => {
+                const isParticipant = (match.participants ?? []).some(p => p.userId === currentUserId)
+                  || match.player1.userId === currentUserId
+                  || match.player2.userId === currentUserId
+                if (!isParticipant) return null
+                return (
+                  <Card className="border-border/50">
+                    <CardHeader>
+                      <CardTitle className="text-base font-semibold tracking-tight">
+                        {t("matchDetails.matchInsights")}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {myQuestionnaire && Object.keys(myQuestionnaire).length > 0 && (
+                        <div className="space-y-2">
+                          {Object.entries(myQuestionnaire).map(([key, values]) =>
+                            Array.isArray(values) && values.length > 0 ? (
+                              <QuestionnaireItem
+                                key={key}
+                                label={t(`results.questionnaire.${key}.label`)}
+                                value={(values as string[]).map(v => t(`results.questionnaire.${key}.${v}`)).join(", ")}
+                              />
+                            ) : null
+                          )}
+                        </div>
+                      )}
+                      <Collapsible open={questionnaireOpen} onOpenChange={setQuestionnaireOpen}>
+                        <div className="rounded-lg border border-border bg-muted/30">
+                          <CollapsibleTrigger className="flex w-full items-center justify-between p-4 hover:bg-muted/50 rounded-lg">
+                            <div className="text-left">
+                              <p className="text-sm font-semibold">
+                                {myQuestionnaire ? t("results.questionnaire.editTitle") : t("results.questionnaire.title")}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{t("results.questionnaire.subtitle")}</p>
+                            </div>
+                            {questionnaireOpen
+                              ? <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" />
+                              : <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" />
+                            }
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-4 border-t border-border p-4">
+                            <p className="text-xs text-muted-foreground">{t("results.questionnaire.disclaimer")}</p>
+                            {selectedQuestions.map((key) => (
+                              <QuestionCheckboxGroup
+                                key={key}
+                                label={t(`results.questionnaire.${key}.label`)}
+                                options={(QUESTION_OPTIONS[key as QuestionKey] as string[]).map((v: string) => ({
+                                  value: v,
+                                  label: t(`results.questionnaire.${key}.${v}`),
+                                }))}
+                                selectedValues={(questionnaireAnswers[key as QuestionKey] as string[]) || []}
+                                onToggle={(value) => toggleQuestionnaireValue(key as QuestionKey, value)}
+                              />
+                            ))}
+                            <Button
+                              className="w-full"
+                              size="sm"
+                              disabled={savingQuestionnaire}
+                              onClick={handleSaveQuestionnaire}
+                            >
+                              {savingQuestionnaire ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                              {t("common.save")}
+                            </Button>
+                          </CollapsibleContent>
+                        </div>
+                      </Collapsible>
+                    </CardContent>
+                  </Card>
+                )
+              })()}
             </>
           ) : match.status === "scheduled" || match.status === "awaiting_confirmation" ? (
             <Card className="border-border/50">
@@ -1429,6 +1522,35 @@ function QuestionnaireItem({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-2">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-sm font-medium text-foreground">{value}</span>
+    </div>
+  )
+}
+
+interface QuestionCheckboxGroupProps {
+  label: string
+  options: { value: string; label: string }[]
+  selectedValues: string[]
+  onToggle: (value: string) => void
+}
+
+function QuestionCheckboxGroup({ label, options, selectedValues, onToggle }: QuestionCheckboxGroupProps) {
+  return (
+    <div className="space-y-2.5">
+      <Label className="text-sm font-medium">{label}</Label>
+      <div className="flex flex-col gap-2">
+        {options.map((option) => (
+          <div key={option.value} className="flex items-center gap-2">
+            <Checkbox
+              id={`md-${label}-${option.value}`}
+              checked={selectedValues.includes(option.value)}
+              onCheckedChange={() => onToggle(option.value)}
+            />
+            <label htmlFor={`md-${label}-${option.value}`} className="cursor-pointer text-sm">
+              {option.label}
+            </label>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -165,10 +165,16 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
       await resultsService.submitMatchResult(
         match.id,
         setsPayload,
-        Object.keys(questionnaire).length > 0 ? questionnaire : undefined,
+        undefined, // questionnaire now saved separately per-user
         teamAssignmentPayload,
         matchType !== match.matchType ? matchType : undefined,
       )
+      // Save questionnaire answers privately under the current user
+      if (Object.keys(questionnaire).length > 0) {
+        await resultsService.submitQuestionnaire(match.id, questionnaire as PostMatchQuestionnaire).catch(() => {
+          // Non-fatal: questionnaire can be filled in later from Match Details
+        })
+      }
       toast.success(
         matchType === "competitive"
           ? t("results.dialog.submittedCompetitive")

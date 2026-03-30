@@ -46,6 +46,16 @@ export const resultsService = {
     })
   },
 
+  async submitQuestionnaire(matchId: string, answers: PostMatchQuestionnaire): Promise<PostMatchQuestionnaire> {
+    const res = await apiClient.post<{ answers: PostMatchQuestionnaire }>(`/results/${matchId}/questionnaire`, { answers })
+    return res.answers
+  },
+
+  async getMyQuestionnaire(matchId: string): Promise<PostMatchQuestionnaire | null> {
+    const res = await apiClient.get<{ answers: PostMatchQuestionnaire | null }>(`/results/${matchId}/questionnaire/mine`)
+    return res.answers
+  },
+
   async submitSets(resultId: string, sets: SetScore[]): Promise<MatchResult> {
     return apiClient.post<MatchResult>(`/results/${resultId}/sets`, { sets })
   },

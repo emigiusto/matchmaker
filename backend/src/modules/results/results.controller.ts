@@ -221,4 +221,42 @@ export class ResultsController {
       next(error);
     }
   }
+
+  /**
+   * POST /results/:matchId/questionnaire
+   * Upsert the authenticated user's questionnaire answers for a match.
+   */
+  static async submitQuestionnaire(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { matchId } = req.params;
+      const currentUserId = req.user?.id;
+      if (!currentUserId) return res.status(401).json({ error: 'Unauthorized' });
+      if (!matchId || typeof matchId !== 'string') return res.status(400).json({ error: 'Missing matchId' });
+      const answers = req.body.answers;
+      if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
+        return res.status(400).json({ error: 'Missing or invalid answers object' });
+      }
+      const saved = await ResultsService.upsertMatchQuestionnaire(matchId, currentUserId, answers);
+      return res.status(200).json({ answers: saved });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /results/:matchId/questionnaire/mine
+   * Get the authenticated user's own questionnaire answers for a match.
+   */
+  static async getMyQuestionnaire(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { matchId } = req.params;
+      const currentUserId = req.user?.id;
+      if (!currentUserId) return res.status(401).json({ error: 'Unauthorized' });
+      if (!matchId || typeof matchId !== 'string') return res.status(400).json({ error: 'Missing matchId' });
+      const answers = await ResultsService.getMyMatchQuestionnaire(matchId, currentUserId);
+      return res.status(200).json({ answers });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

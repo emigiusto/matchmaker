@@ -43,7 +43,8 @@ model User {
 
   clubMemberships ClubMembership[]
 
-  resultsWon Result[] @relation("WinnerUser")
+  resultsWon     Result[]             @relation("WinnerUser")
+  questionnaires MatchQuestionnaire[]
 
   events UserEvent[]
 
@@ -236,6 +237,7 @@ model Match {
   conversation   Conversation?
   participants   MatchParticipant[]
   reminders      Reminder[]
+  questionnaires MatchQuestionnaire[]
 
   schedulingRequest SchedulingRequest? @relation("SchedulingMatch")
 
@@ -324,6 +326,28 @@ enum ResultStatus {
   submitted
   confirmed
   disputed
+}
+
+////////////////////////////////////////////////////////////
+// MATCH QUESTIONNAIRE — per-user post-match answers
+////////////////////////////////////////////////////////////
+/// Each participant submits their own answers. Private: only the author can read them.
+
+model MatchQuestionnaire {
+  id        String   @id @default(uuid())
+  matchId   String
+  userId    String
+  /// Questionnaire answers (JSON: PostMatchQuestionnaire)
+  answers   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId])
+  @@index([matchId])
+  @@index([userId])
 }
 
 ////////////////////////////////////////////////////////////
