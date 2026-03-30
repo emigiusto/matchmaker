@@ -173,9 +173,9 @@ export default function Contacts() {
       }
       await Promise.all(listOps)
 
+      await refresh()
       toast.success(t("contactsPage.toast.contactUpdated"))
       setEditingContact(null)
-      await refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
     } finally {
