@@ -28,7 +28,8 @@
     "reminderFailed": "Failed",
     "matchCancelledBanner": "This match has been cancelled and will not take place",
     "statusAwaitingResult": "Awaiting result",
-    "all": "All"
+    "all": "All",
+    "save": "Save"
   },
   "navigation": {
     "dashboard": "Dashboard",

@@ -28,7 +28,8 @@
     "reminderFailed": "Fallido",
     "matchCancelledBanner": "Este partido ha sido cancelado y no tendrá lugar",
     "statusAwaitingResult": "Pendiente de resultado",
-    "all": "Todos"
+    "all": "Todos",
+    "save": "Guardar"
   },
   "navigation": {
     "dashboard": "Panel Principal",
