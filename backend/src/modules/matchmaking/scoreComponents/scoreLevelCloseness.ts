@@ -18,21 +18,21 @@ export function scoreLevelCompatibility({requesterLevel, candidateLevel, confide
     };
   }
   const diff = Math.abs(requesterLevel - candidateLevel);
-  if (diff <= 0.5) {
+  if (diff <= 50) {
     return {
       score: 20 * MatchmakingConstants.WEIGHT_LEVEL_COMPATIBILITY,
-      reason: `Very close in level (Δ${diff.toFixed(1)})`
+      reason: `Very close in level (Δ${Math.round(diff)})`
     };
   }
-  if (diff <= 1.5) {
+  if (diff <= 150) {
     return {
       score: 5 * MatchmakingConstants.WEIGHT_LEVEL_COMPATIBILITY,
-      reason: `Playable level difference (Δ${diff.toFixed(1)})`
+      reason: `Playable level difference (Δ${Math.round(diff)})`
     };
   }
   return {
     score: -5 * MatchmakingConstants.WEIGHT_LEVEL_COMPATIBILITY,
-    reason: `Level difference is significant (Δ${diff.toFixed(1)})`
+    reason: `Level difference is significant (Δ${Math.round(diff)})`
   };
 }
 

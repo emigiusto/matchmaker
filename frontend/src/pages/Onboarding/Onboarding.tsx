@@ -20,11 +20,11 @@ import { Link, useSearchParams } from "react-router-dom"
 const TOTAL_STEPS = 4
 
 const LEVEL_OPTIONS = [
-  { key: "beginner",     value: 1.0, confidence: 0.15 },
-  { key: "learning",     value: 2.0, confidence: 0.18 },
-  { key: "intermediate", value: 3.0, confidence: 0.20 },
-  { key: "advanced",     value: 4.5, confidence: 0.20 },
-  { key: "competitive",  value: 5.5, confidence: 0.25 },
+  { key: "beginner",     value:  800, confidence: 0.15 },
+  { key: "learning",     value:  900, confidence: 0.18 },
+  { key: "intermediate", value: 1000, confidence: 0.20 },
+  { key: "advanced",     value: 1200, confidence: 0.22 },
+  { key: "competitive",  value: 1400, confidence: 0.25 },
 ] as const
 type LevelOption = typeof LEVEL_OPTIONS[number]
 
