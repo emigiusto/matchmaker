@@ -287,8 +287,21 @@ export default function MatchDetailPage() {
   }
 
   const questionPool = match ? getQuestionPool(match.sport, match.format) : []
+  // When editing: show previously answered keys (stable across sessions).
+  // When new: pick 5 random questions from the pool.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const selectedQuestions = useMemo(() => [...questionPool].sort(() => Math.random() - 0.5).slice(0, 5), [match?.id])
+  const selectedQuestions = useMemo(() => {
+    if (myQuestionnaire) {
+      return Object.keys(myQuestionnaire).filter((k) => questionPool.includes(k as QuestionKey)) as QuestionKey[]
+    }
+    return [...questionPool].sort(() => Math.random() - 0.5).slice(0, 5)
+  }, [match?.id, myQuestionnaire])
+
+  const [showMoreQuestions, setShowMoreQuestions] = useState(false)
+  const extraQuestions = useMemo(
+    () => questionPool.filter((k) => !selectedQuestions.includes(k)),
+    [questionPool, selectedQuestions]
+  )
 
   function toggleQuestionnaireValue(key: QuestionKey, value: string) {
     const current = (questionnaireAnswers[key] as string[]) || []
@@ -1405,6 +1418,28 @@ export default function MatchDetailPage() {
                           <CollapsibleContent className="space-y-4 border-t border-border p-4">
                             <p className="text-xs text-muted-foreground">{t("results.questionnaire.disclaimer")}</p>
                             {selectedQuestions.map((key) => (
+                              <QuestionCheckboxGroup
+                                key={key}
+                                label={t(`results.questionnaire.${key}.label`)}
+                                options={(QUESTION_OPTIONS[key as QuestionKey] as string[]).map((v: string) => ({
+                                  value: v,
+                                  label: t(`results.questionnaire.${key}.${v}`),
+                                }))}
+                                selectedValues={(questionnaireAnswers[key as QuestionKey] as string[]) || []}
+                                onToggle={(value) => toggleQuestionnaireValue(key as QuestionKey, value)}
+                              />
+                            ))}
+                            {extraQuestions.length > 0 && !showMoreQuestions && (
+                              <button
+                                type="button"
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                onClick={() => setShowMoreQuestions(true)}
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                                {t("results.questionnaire.addMore")}
+                              </button>
+                            )}
+                            {showMoreQuestions && extraQuestions.map((key) => (
                               <QuestionCheckboxGroup
                                 key={key}
                                 label={t(`results.questionnaire.${key}.label`)}

@@ -1125,6 +1125,7 @@
       "subtitle": "5 preguntas rápidas (marca todas las que apliquen)",
       "disclaimer": "Tus respuestas son privadas — solo tú puedes verlas.",
       "saved": "Análisis de partido guardados",
+      "addMore": "Añadir más preguntas",
       "matchPlayedOut": { "label": "¿Cómo fue el partido?", "dominated": "Dominé el partido", "balanced": "Equilibrado", "very_close": "Muy igualado", "struggled": "Tuve dificultades" },
       "generalSensation": { "label": "¿Sensaciones generales?", "confident": "Alta confianza", "nervous": "Nervioso", "in_rhythm": "En ritmo", "out_of_sync": "Fuera de ritmo", "strong": "Físicamente fuerte", "tired": "Físicamente cansado" },
       "tacticAdjustment": { "label": "¿Ajustaste la táctica durante el partido?", "yes_successful": "Sí, con éxito", "yes_unsuccessful": "Sí, sin éxito", "no_adjustment": "Sin ajuste", "no_plan": "Sin plan claro" },
