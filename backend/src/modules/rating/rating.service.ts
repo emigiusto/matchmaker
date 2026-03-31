@@ -5,7 +5,7 @@ import { DeterministicRatingAlgorithm } from './algorithms/deterministic.algorit
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 
-// Default config for deterministic algorithm
+// Default config (shared fields used as fallback defaults)
 export const defaultConfig: RatingConfig = {
   baseGain: 0.1,
   upsetMultiplier: 1.5,
@@ -13,7 +13,7 @@ export const defaultConfig: RatingConfig = {
   lossFactor: 0.5,
   confidenceIncrement: 0.02,
   confidenceMax: 1,
-  defaultRating: 3.0,
+  defaultRating: 1000,
   defaultConfidence: 0.3,
   minExpectedGain: 0.03,
   enableHistoryTracking: true,
@@ -65,8 +65,8 @@ export type RatingTx = {
 
 
 export class RatingService {
-  // Pluggable algorithm (default: Deterministic)
-  private static algorithm: RatingAlgorithm = new DeterministicRatingAlgorithm(defaultConfig);
+  // Active algorithm: ELO with confidence-driven volatility and inactivity decay
+  private static algorithm: RatingAlgorithm = new EloRatingAlgorithm();
 
   // Allow runtime algorithm switching
   static setAlgorithm(algo: RatingAlgorithm) {

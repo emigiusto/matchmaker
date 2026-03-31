@@ -4,9 +4,9 @@
 
 import { z } from 'zod';
 
-// Reasonable bounds for levelValue
+// Bounds for ELO-based levelValue
 const LEVEL_MIN = 0;
-const LEVEL_MAX = 10;
+const LEVEL_MAX = 3000;
 
 /**
  * Schema for validating playerId param (e.g., in route params)
