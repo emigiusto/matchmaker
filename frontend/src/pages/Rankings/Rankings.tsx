@@ -148,7 +148,7 @@ export default function RankingsPage() {
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="font-mono text-xl font-bold text-foreground">{player.levelValue.toFixed(1)}</p>
+                        <p className="font-mono text-xl font-bold text-foreground">{Math.round(player.levelValue)}</p>
                         <div className="hidden items-center justify-end gap-1 text-xs text-muted-foreground sm:flex">
                           <TrendingUp className="h-3 w-3" />
                           <span>{Math.round(player.levelConfidence * 100)}%</span>

@@ -190,7 +190,7 @@ export default function AIMatchCompanionPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="rounded-lg bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground">
-                          Lvl {opp.levelValue.toFixed(1)}
+                          ELO {Math.round(opp.levelValue)}
                         </span>
                         <ChevronRight
                           className={`h-4 w-4 transition-colors ${

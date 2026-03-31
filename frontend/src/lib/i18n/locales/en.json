@@ -13,7 +13,7 @@
     "unknown": "Unknown",
     "cancelled": "Cancelled",
     "confirmed": "Confirmed",
-    "level": "Level",
+    "level": "ELO",
     "court": "Court",
     "statusScheduled": "Scheduled",
     "statusAwaiting": "Awaiting",

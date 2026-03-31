@@ -12,7 +12,7 @@ import type { SuggestedOpponent } from "@/lib/types"
 export default function SuggestedOpponentsPage() {
   const currentUserId = getCurrentUserId()
   const [distanceRadius, setDistanceRadius] = useState([10])
-  const [levelRange, setLevelRange] = useState([2.0, 6.0])
+  const [levelRange, setLevelRange] = useState([700, 1600])
   const [suggestions, setSuggestions] = useState<SuggestedOpponent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -75,12 +75,12 @@ export default function SuggestedOpponentsPage() {
               </div>
               <div className="space-y-3">
                 <Label className="text-xs font-medium">
-                  Level: {levelRange[0].toFixed(1)} - {levelRange[1].toFixed(1)}
+                  ELO: {levelRange[0]} - {levelRange[1]}
                 </Label>
                 <Slider
-                  min={1}
-                  max={7}
-                  step={0.5}
+                  min={600}
+                  max={2000}
+                  step={50}
                   value={levelRange}
                   onValueChange={setLevelRange}
                 />

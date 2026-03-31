@@ -522,7 +522,7 @@ export default function MatchDetailPage() {
                     </div>
                     <div className="w-28 text-center">
                       <p className="break-words text-sm font-semibold text-foreground">{currentPlayer.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {currentPlayer.levelValue.toFixed(1)}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {Math.round(currentPlayer.levelValue)}</p>
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-center gap-1">
@@ -552,7 +552,7 @@ export default function MatchDetailPage() {
                     </div>
                     <div className="w-28 text-center">
                       <p className="break-words text-sm font-semibold text-foreground">{opponent.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {opponent.levelValue.toFixed(1)}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{t("common.level")} {Math.round(opponent.levelValue)}</p>
                     </div>
                   </div>
                 </div>
@@ -1499,7 +1499,7 @@ export default function MatchDetailPage() {
                     {player.levelValue > 0 ? (
                       <>
                         <p className="font-mono text-sm font-semibold text-foreground">
-                          {player.levelValue.toFixed(1)}
+                          {Math.round(player.levelValue)}
                         </p>
                         <p className="text-xs text-muted-foreground">{t("common.level")}</p>
                       </>

@@ -13,7 +13,7 @@
     "unknown": "Desconocido",
     "cancelled": "Cancelado",
     "confirmed": "Confirmado",
-    "level": "Nivel",
+    "level": "ELO",
     "court": "Pista",
     "statusScheduled": "Programado",
     "statusAwaiting": "Pendiente",

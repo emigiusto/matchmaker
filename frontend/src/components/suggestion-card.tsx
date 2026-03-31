@@ -35,7 +35,7 @@ export function SuggestionCard({ suggestion }: SuggestionCardProps) {
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold text-foreground">{player.name}</h3>
               <p className="font-mono text-sm text-muted-foreground">
-                Level {player.levelValue.toFixed(1)}
+                ELO {Math.round(player.levelValue)}
               </p>
             </div>
           </div>
@@ -59,7 +59,7 @@ export function SuggestionCard({ suggestion }: SuggestionCardProps) {
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <TrendingUp className="h-4 w-4 text-primary/60" />
-              <span>{levelDifference > 0 ? "+" : ""}{levelDifference} level</span>
+              <span>{levelDifference > 0 ? "+" : ""}{Math.round(levelDifference)} ELO</span>
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Users className="h-4 w-4 text-primary/60" />

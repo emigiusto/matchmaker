@@ -111,7 +111,7 @@ export default function PlayerProfilePage() {
                       {player.city}
                     </span>
                     <span className="font-mono">
-                      Level {player.levelValue.toFixed(1)}
+                      ELO {Math.round(player.levelValue)}
                     </span>
                     <span className="hidden font-mono text-xs sm:inline">
                       ({Math.round(player.levelConfidence * 100)}% confidence)
@@ -119,7 +119,7 @@ export default function PlayerProfilePage() {
                   </div>
                   <div className="mt-1.5 flex items-center gap-2">
                     <span className="font-mono text-xl font-bold text-primary">
-                      {player.levelValue.toFixed(1)}
+                      {Math.round(player.levelValue)}
                     </span>
                     <span className="text-sm text-muted-foreground">{t("common.level")}</span>
                   </div>

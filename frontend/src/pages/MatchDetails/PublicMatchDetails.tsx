@@ -220,7 +220,7 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
                       </p>
                       {match.player1.levelValue > 0 && (
                         <p className="font-mono text-xs text-muted-foreground">
-                          {t("common.level")} {match.player1.levelValue.toFixed(1)}
+                          {t("common.level")} {Math.round(match.player1.levelValue)}
                         </p>
                       )}
                     </div>
@@ -234,7 +234,7 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
                       </p>
                       {match.player2.levelValue > 0 && (
                         <p className="font-mono text-xs text-muted-foreground">
-                          {t("common.level")} {match.player2.levelValue.toFixed(1)}
+                          {t("common.level")} {Math.round(match.player2.levelValue)}
                         </p>
                       )}
                     </div>
@@ -380,7 +380,7 @@ export default function PublicMatchDetails({ matchId }: PublicMatchDetailsProps)
                     {player.levelValue > 0 && (
                       <div className="text-right">
                         <p className="font-mono text-sm font-semibold text-foreground">
-                          {player.levelValue.toFixed(1)}
+                          {Math.round(player.levelValue)}
                         </p>
                         <p className="text-xs text-muted-foreground">{t("common.level")}</p>
                       </div>
