@@ -68,8 +68,19 @@ export class LaietaAdapter implements BookingAdapter {
 
       const currentUrl = page.url()
       if (currentUrl.includes('/user/login')) {
-        // Still on login page → credentials rejected
-        throw new AppError('Invalid credentials for club portal', 401, 'INVALID_CLUB_CREDENTIALS')
+        // Still on login page — check for an explicit Drupal auth error before assuming bad credentials.
+        // A redirect back to /user/login can also happen due to transient portal issues.
+        const hasAuthError = await page.evaluate(() => {
+          const messages = document.querySelector('.messages.error, .messages--error, [role="alert"]')
+          if (!messages) return false
+          const text = messages.textContent ?? ''
+          return text.toLowerCase().includes('password') || text.toLowerCase().includes('incorrect') || text.toLowerCase().includes('unrecognized')
+        }).catch(() => false)
+        if (hasAuthError) {
+          throw new AppError('Invalid credentials for club portal', 401, 'INVALID_CLUB_CREDENTIALS')
+        }
+        // No explicit auth error — treat as transient portal issue
+        throw new AppError('Login redirected back without auth error — portal may be temporarily unavailable', 503, 'ADAPTER_OFFLINE')
       }
 
       const cookies = await page.cookies()
