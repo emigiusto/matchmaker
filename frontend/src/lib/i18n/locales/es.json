@@ -99,6 +99,7 @@
     "ratingChange": "Cambio de clasificación",
     "matchResult": "Resultado del Partido",
     "matchInsights": "Perspectivas del Partido",
+    "matchInsightsDesc": "Tus respuestas son privadas y nos ayudan a entender mejor tu juego. Impulsarán análisis de partido personalizados con IA en una próxima actualización.",
     "matchIntensity": "Intensidad del partido",
     "strategy": "Estrategia",
     "workedBest": "Funcionó mejor",
@@ -628,6 +629,7 @@
     "teamB": "Equipo B",
     "doublesNote": "Dobles — equipos asignados al enviar el resultado",
     "matchInsights": "Análisis del Partido",
+    "matchInsightsDesc": "Tus respuestas son privadas y nos ayudan a entender mejor tu juego. Impulsarán análisis de partido personalizados con IA en una próxima actualización.",
     "booking": {
       "title": "Reserva de Pista",
       "inProgress": "En progreso…",

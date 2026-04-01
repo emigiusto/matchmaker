@@ -1087,17 +1087,32 @@ export default function MatchDetailPage() {
                           <span className="text-xs font-medium text-muted-foreground">
                             {t("matchDetails.result.set", { number: set.setNumber })}
                           </span>
-                          <span className={`text-center font-mono leading-none ${p1Wins ? "text-xl font-bold text-foreground" : "text-sm text-muted-foreground/60"}`}>
+                          <span className={`text-center font-mono leading-none ${p1Wins ? "text-xl font-bold text-foreground" : "text-base font-medium text-muted-foreground"}`}>
                             {set.player1Score}
                           </span>
-                          <span className="text-center text-[10px] text-muted-foreground/30">–</span>
-                          <span className={`text-center font-mono leading-none ${!p1Wins ? "text-xl font-bold text-foreground" : "text-sm text-muted-foreground/60"}`}>
+                          <span className="text-center text-xs text-muted-foreground/50">–</span>
+                          <span className={`text-center font-mono leading-none ${!p1Wins ? "text-xl font-bold text-foreground" : "text-base font-medium text-muted-foreground"}`}>
                             {set.player2Score}
                           </span>
                         </div>
                       )
                     })}
                   </div>
+
+                  {result.winnerUserId && (() => {
+                    const winnerName = result.winnerUserId === match.player1.userId
+                      ? match.player1.name
+                      : result.winnerUserId === match.player2.userId
+                      ? match.player2.name
+                      : (match.participants ?? []).find(p => p.userId === result.winnerUserId)?.userName
+                    if (!winnerName) return null
+                    return (
+                      <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-4 py-2.5">
+                        <span className="text-xs font-medium text-muted-foreground">{t("common.winner")}</span>
+                        <span className="text-sm font-semibold text-primary">{winnerName}</span>
+                      </div>
+                    )
+                  })()}
 
                   {result.player1RatingChange !== undefined && (
                     <div className="flex items-center gap-4 rounded-lg border border-border/50 p-3">
@@ -1388,6 +1403,7 @@ export default function MatchDetailPage() {
                       <CardTitle className="text-base font-semibold tracking-tight">
                         {t("matchDetails.matchInsights")}
                       </CardTitle>
+                      <p className="text-xs text-muted-foreground">{t("matchDetails.matchInsightsDesc")}</p>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {myQuestionnaire && Object.keys(myQuestionnaire).length > 0 && (

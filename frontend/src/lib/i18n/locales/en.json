@@ -99,6 +99,7 @@
     "ratingChange": "Rating change",
     "matchResult": "Match Result",
     "matchInsights": "Match Insights",
+    "matchInsightsDesc": "Your answers are private and help us understand your game better. They will power personalised AI match insights in a future update.",
     "matchIntensity": "Match intensity",
     "strategy": "Strategy",
     "workedBest": "Worked best",
@@ -628,6 +629,7 @@
     "teamB": "Team B",
     "doublesNote": "Doubles — teams assigned when result is submitted",
     "matchInsights": "Match Insights",
+    "matchInsightsDesc": "Your answers are private and help us understand your game better. They will power personalised AI match insights in a future update.",
     "booking": {
       "title": "Court Booking",
       "inProgress": "In progress…",
