@@ -321,6 +321,7 @@
     "fromList": "Desde lista",
     "friends": "Amigos",
     "allContacts": "Todos los contactos",
+    "importFromDevice": "Del dispositivo",
     "addManuallyLabel": "Añadir manualmente (nombre + teléfono)",
     "hide": "Ocultar",
     "addManuallyHint": "Guardado en tus contactos. Usa el código de país (ej. +34 para España).",
@@ -363,6 +364,8 @@
       "enterNamePhone": "Introduce nombre y teléfono",
       "contactSaved": "Contacto guardado y añadido a la lista de invitaciones",
       "contactFailed": "Error al añadir contacto",
+      "contactPermissionDenied": "Se necesita permiso de contactos para importar desde tu dispositivo",
+      "noDeviceContacts": "No se encontraron contactos con número de teléfono en tu dispositivo",
       "linkCopied": "Enlace de invitación copiado al portapapeles",
       "schedulingStarted": "¡Planificación iniciada! Se enviarán invitaciones por WhatsApp.",
       "schedulingFailed": "Error al iniciar la planificación"

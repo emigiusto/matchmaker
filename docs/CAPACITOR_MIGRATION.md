@@ -13,8 +13,6 @@ This document describes how to migrate the MatchMaker frontend to run as a nativ
 | **Code reuse** | Full reuse of frontend logic, API client, and UI |
 | **Trade-off** | WebView-based (not native UI); acceptable for quick MVP and contact access |
 
----
-
 ## Technology Discussion: What is Capacitor?
 
 **Capacitor** is an open-source runtime and plugin system created by Ionic. It wraps your existing web app (HTML, CSS, JavaScript) in a native container and provides a bridge to access native device APIs that are unavailable or limited in the browser.

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { UserPlus, List, Search, Loader2 } from "lucide-react"
+import { UserPlus, List, Search, Loader2, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
 import { schedulingService } from "@/lib/services/scheduling.service"
+import { deviceContactsService } from "@/lib/services/device-contacts.service"
 import { useTranslation } from "@/lib/i18n"
 
 interface AddContactsToInviteProps {
@@ -36,6 +37,7 @@ export function AddContactsToInvite({
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [importingDevice, setImportingDevice] = useState(false)
 
   useEffect(() => {
     if (!open || !hostUserId) return
@@ -81,6 +83,48 @@ export function AddContactsToInvite({
       toast.error(e instanceof Error ? e.message : t("invites.failedToAddContacts"))
     } finally {
       setAdding(false)
+    }
+  }
+
+  async function handleImportDeviceContacts() {
+    setImportingDevice(true)
+    try {
+      const permission = await deviceContactsService.requestPermission()
+      if (permission !== "granted") {
+        toast.error(t("wizard.toast.contactPermissionDenied") || "Contact permission is required")
+        return
+      }
+      const deviceContacts = await deviceContactsService.getContacts()
+      if (deviceContacts.length === 0) {
+        toast.info("No contacts with phone numbers found")
+        return
+      }
+      let imported = 0
+      for (const dc of deviceContacts) {
+        const phone = dc.phones[0]
+        if (!phone) continue
+        try {
+          const { user } = await contactsService.create(hostUserId, dc.name, phone)
+          const userId = user.id
+          if (userId === hostUserId || existingContactIds.includes(userId)) continue
+          setSelectedIds((prev) => new Set(prev).add(userId))
+          imported++
+        } catch {
+          // skip contacts that fail
+        }
+      }
+      if (imported > 0) {
+        toast.success(`Imported ${imported} contact${imported !== 1 ? "s" : ""}`)
+        // Refresh contacts list to include newly created ones
+        const cs = await contactsService.list(hostUserId).catch(() => [] as ContactDTO[])
+        setContacts(cs.filter((c) => c.linkedUserId !== hostUserId))
+      } else {
+        toast.info("All device contacts are already added")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to import device contacts")
+    } finally {
+      setImportingDevice(false)
     }
   }
 
@@ -141,6 +185,21 @@ export function AddContactsToInvite({
                     </Button>
                   ))}
                 </div>
+              </div>
+            )}
+            {/* Import from device contacts (native only) */}
+            {deviceContactsService.isNative() && (
+              <div className="mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-full gap-1.5 text-xs"
+                  disabled={importingDevice}
+                  onClick={handleImportDeviceContacts}
+                >
+                  {importingDevice ? <Loader2 className="h-3 w-3 animate-spin" /> : <Smartphone className="h-3 w-3" />}
+                  {t("wizard.importFromDevice") || "Import from device"}
+                </Button>
               </div>
             )}
             <div className="relative mb-2">

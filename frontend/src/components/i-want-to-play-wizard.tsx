@@ -40,6 +40,7 @@ import {
   List,
   UserCircle,
   Search,
+  Smartphone,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -77,6 +78,7 @@ import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/ser
 import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO, type CourtAvailabilityResult } from "@/lib/services/booking.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import { useTranslation } from "@/lib/i18n"
+import { deviceContactsService } from "@/lib/services/device-contacts.service"
 
 interface WizardProps {
   open: boolean
@@ -226,6 +228,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [fromListOpen, setFromListOpen] = useState(false)
   const [searchAllContacts, setSearchAllContacts] = useState("")
   const [showAllContacts, setShowAllContacts] = useState(false)
+  const [importingDeviceContacts, setImportingDeviceContacts] = useState(false)
 
   function resetWizard() {
     setStep(1)
@@ -504,6 +507,59 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       toast.success(t("wizard.toast.contactSaved"))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("wizard.toast.contactFailed"))
+    }
+  }
+
+  async function handleImportDeviceContacts() {
+    setImportingDeviceContacts(true)
+    try {
+      const permission = await deviceContactsService.requestPermission()
+      if (permission !== "granted") {
+        toast.error(t("wizard.toast.contactPermissionDenied") || "Contact permission is required to import from your device")
+        return
+      }
+      const deviceContacts = await deviceContactsService.getContacts()
+      if (deviceContacts.length === 0) {
+        toast.info(t("wizard.toast.noDeviceContacts") || "No contacts with phone numbers found on your device")
+        return
+      }
+      let imported = 0
+      for (const dc of deviceContacts) {
+        const phone = dc.phones[0]
+        if (!phone) continue
+        if (priorityList.some((c) => c.phone === phone)) continue
+        try {
+          const { contact, user } = await contactsService.create(hostUserId, dc.name, phone)
+          const userId = user.id
+          if (userId === hostUserId) continue
+          if (priorityList.some((c) => c.id === userId)) continue
+          addContact({ id: userId, name: user.name || dc.name, phone })
+          setContactMeta((prev) => ({
+            ...prev,
+            [userId]: { contactId: contact.id, socioNumbers: {} },
+          }))
+          setSocioEdits((prev) => ({ ...prev, [userId]: "" }))
+          imported++
+        } catch {
+          // skip contacts that fail (e.g. invalid phone)
+        }
+      }
+      if (imported > 0) {
+        toast.success(`Imported ${imported} contact${imported !== 1 ? "s" : ""} from your device`)
+        // Refresh available contacts list
+        contactsService.list(hostUserId).then((cs) =>
+          setAvailableContacts(cs.filter((c) => c.linkedUserId !== hostUserId).map((c) => ({
+            id: c.id, name: c.name, phone: c.phone,
+            linkedUserId: c.linkedUserId, socioNumbers: c.socioNumbers,
+          })))
+        ).catch(() => {})
+      } else {
+        toast.info("All device contacts are already in your list")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to import device contacts")
+    } finally {
+      setImportingDeviceContacts(false)
     }
   }
 
@@ -1075,6 +1131,19 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                       <UserCircle className="h-4 w-4" />
                       {t("wizard.allContacts")}
                     </Button>
+                    {/* Import from device contacts (native only) */}
+                    {deviceContactsService.isNative() && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={importingDeviceContacts}
+                        onClick={handleImportDeviceContacts}
+                      >
+                        {importingDeviceContacts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
+                        {t("wizard.importFromDevice") || "From device"}
+                      </Button>
+                    )}
                   </div>
                   {/* Inline all-contacts panel */}
                   {showAllContacts && (
