@@ -45,7 +45,6 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
   const [open, setOpen] = useState(false)
   const [sets, setSets] = useState<SetInput[]>([
     { id: "set-1", player1Score: "", player2Score: "", tiebreak1: "", tiebreak2: "" },
-    { id: "set-2", player1Score: "", player2Score: "", tiebreak1: "", tiebreak2: "" },
   ])
   const [questionnaireOpen, setQuestionnaireOpen] = useState(false)
   const [questionnaire, setQuestionnaire] = useState<Partial<PostMatchQuestionnaire>>({})
@@ -115,7 +114,8 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
 
   function validateSets(): string | null {
     const filled = sets.filter((s) => s.player1Score !== "" && s.player2Score !== "")
-    if (filled.length < 1) return t("results.dialog.validation.required")
+    // Practice mode: sets are optional — zero filled sets is allowed
+    if (filled.length < 1 && matchType === 'competitive') return t("results.dialog.validation.required")
     for (const s of filled) {
       const p1 = parseInt(s.player1Score)
       const p2 = parseInt(s.player2Score)
@@ -131,7 +131,10 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
     const error = validateSets()
     if (error) { toast.error(error); return }
 
-    if (isDoubles) {
+    const filled = sets.filter((s) => s.player1Score && s.player2Score)
+    const isPracticeNoScore = matchType === 'practice' && filled.length === 0
+
+    if (!isPracticeNoScore && isDoubles) {
       const teamAIds = participants.filter((p) => teamAssignment[p.userId] === 'A').map((p) => p.userId)
       const teamBIds = participants.filter((p) => teamAssignment[p.userId] === 'B').map((p) => p.userId)
       if (teamAIds.length !== 2 || teamBIds.length !== 2) {
@@ -140,43 +143,48 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
       }
     }
 
-    const filled = sets.filter((s) => s.player1Score && s.player2Score)
-    const setsPayload = filled.map((s, i) => {
-      const tb = isTiebreakSet(s.player1Score, s.player2Score)
-      return {
-        setNumber: i + 1,
-        player1Score: parseInt(s.player1Score),
-        player2Score: parseInt(s.player2Score),
-        tiebreak: tb,
-        ...(tb && s.tiebreak1 && s.tiebreak2 ? {
-          tiebreakScore1: parseInt(s.tiebreak1),
-          tiebreakScore2: parseInt(s.tiebreak2),
-        } : {}),
-      }
-    })
-
-    const teamAssignmentPayload = isDoubles ? {
-      teamAUserIds: participants.filter((p) => teamAssignment[p.userId] === 'A').map((p) => p.userId),
-      teamBUserIds: participants.filter((p) => teamAssignment[p.userId] === 'B').map((p) => p.userId),
-    } : undefined
-
     setIsSubmitting(true)
     try {
-      await resultsService.submitMatchResult(
-        match.id,
-        setsPayload,
-        undefined, // questionnaire now saved separately per-user
-        teamAssignmentPayload,
-        matchType !== match.matchType ? matchType : undefined,
-      )
+      if (!isPracticeNoScore) {
+        const setsPayload = filled.map((s, i) => {
+          const tb = isTiebreakSet(s.player1Score, s.player2Score)
+          return {
+            setNumber: i + 1,
+            player1Score: parseInt(s.player1Score),
+            player2Score: parseInt(s.player2Score),
+            tiebreak: tb,
+            ...(tb && s.tiebreak1 && s.tiebreak2 ? {
+              tiebreakScore1: parseInt(s.tiebreak1),
+              tiebreakScore2: parseInt(s.tiebreak2),
+            } : {}),
+          }
+        })
+
+        const teamAssignmentPayload = isDoubles ? {
+          teamAUserIds: participants.filter((p) => teamAssignment[p.userId] === 'A').map((p) => p.userId),
+          teamBUserIds: participants.filter((p) => teamAssignment[p.userId] === 'B').map((p) => p.userId),
+        } : undefined
+
+        await resultsService.submitMatchResult(
+          match.id,
+          setsPayload,
+          undefined, // questionnaire now saved separately per-user
+          teamAssignmentPayload,
+          matchType !== match.matchType ? matchType : undefined,
+        )
+      }
+
       // Save questionnaire answers privately under the current user
       if (Object.keys(questionnaire).length > 0) {
         await resultsService.submitQuestionnaire(match.id, questionnaire as PostMatchQuestionnaire).catch(() => {
           // Non-fatal: questionnaire can be filled in later from Match Details
         })
       }
+
       toast.success(
-        matchType === "competitive"
+        isPracticeNoScore
+          ? t("results.dialog.submittedPracticeNoScore")
+          : matchType === "competitive"
           ? t("results.dialog.submittedCompetitive")
           : t("results.dialog.submittedPractice")
       )
@@ -273,7 +281,12 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
           {/* Set Results */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-semibold">{t("results.dialog.setResults")}</Label>
+              <div className="flex items-baseline gap-2">
+                <Label className="text-base font-semibold">{t("results.dialog.setResults")}</Label>
+                {matchType === 'practice' && (
+                  <span className="text-xs text-muted-foreground">{t("results.dialog.practiceScoreOptional")}</span>
+                )}
+              </div>
               {sets.length < 5 && (
                 <Button type="button" size="sm" variant="outline" onClick={addSet}>
                   <Plus className="mr-1 h-3.5 w-3.5" />
@@ -402,9 +415,20 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
             </div>
           </Collapsible>
 
-          <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? t("results.dialog.submitting") : t("results.dialog.submitButton")}
-          </Button>
+          {(() => {
+            const filled = sets.filter((s) => s.player1Score && s.player2Score)
+            const isPracticeNoScore = matchType === 'practice' && filled.length === 0
+            const label = isSubmitting
+              ? t("results.dialog.submitting")
+              : isPracticeNoScore
+              ? t("results.dialog.submitQuestionnaire")
+              : t("results.dialog.submitButton")
+            return (
+              <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+                {label}
+              </Button>
+            )
+          })()}
         </form>
       </DialogContent>
     </Dialog>
