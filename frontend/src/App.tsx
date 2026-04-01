@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { initAnalytics } from '@/lib/analytics/analytics'
 import { usePageTracking } from '@/lib/analytics/usePageTracking'
@@ -73,7 +73,7 @@ function App() {
     <ThemeProvider defaultTheme="system" storageKey="matchmaker-theme">
       <LanguageProvider>
         <AuthProvider>
-          <BrowserRouter>
+          <HashRouter>
             <AnalyticsInit />
             <ImpersonationBanner />
             <Routes>
@@ -120,7 +120,7 @@ function App() {
               {/* 404 catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
+          </HashRouter>
         </AuthProvider>
         <Toaster />
       </LanguageProvider>
