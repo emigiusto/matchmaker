@@ -444,7 +444,7 @@ export function InviteRequestsSection({
 
   function handleShareWhatsApp(request: InviteRequest) {
     const message = encodeURIComponent(
-      `Want to play ${request.sport} on ${format(parseISO(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || t("common.tbd")}? Accept my invite here:\n\n${window.location.origin}/play?invite=${request.inviteToken}`
+      `Want to play ${request.sport} on ${format(parseISO(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || t("common.tbd")}? Accept my invite here:\n\n${window.location.origin}/#/play?invite=${request.inviteToken}`
     )
     window.open(`https://wa.me/?text=${message}`, "_blank")
   }
@@ -452,13 +452,13 @@ export function InviteRequestsSection({
   async function handleCopyRequestLink(request: InviteRequest) {
     try {
       const link = await schedulingService.getInviteLink(request.id, window.location.origin)
-      const fullUrl = link.startsWith("http") ? link : `${window.location.origin}${link}`
+      const fullUrl = link.startsWith("http") ? link : `${window.location.origin}/#${link}`
       await navigator.clipboard.writeText(fullUrl)
       setCopiedRequestId(request.id)
       toast.success(t("invites.toast.linkCopied"))
       setTimeout(() => setCopiedRequestId(null), 2000)
     } catch {
-      const fallback = `${window.location.origin}/play?invite=${request.inviteToken}`
+      const fallback = `${window.location.origin}/#/play?invite=${request.inviteToken}`
       await navigator.clipboard.writeText(fallback)
       setCopiedRequestId(request.id)
       toast.success(t("invites.toast.linkCopied"))

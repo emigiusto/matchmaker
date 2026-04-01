@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { initAnalytics } from '@/lib/analytics/analytics'
 import { usePageTracking } from '@/lib/analytics/usePageTracking'
 import { getImpersonationState, stopImpersonation } from '@/lib/auth/impersonation'
@@ -10,28 +10,22 @@ import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { DashboardLayout } from '@/layouts/DashboardLayout'
-import Dashboard from '@/pages/Dashboard/Dashboard'
-import Play from '@/pages/Play/Play'
-import Profile from '@/pages/Profile/Profile'
-import Notifications from '@/pages/Notifications/Notifications'
-import JoinRequest from '@/pages/JoinRequest/JoinRequest'
-import MatchesUpcoming from '@/pages/MatchesUpcoming/MatchesUpcoming'
-import Login from '@/pages/Login/Login'
-import Signup from '@/pages/Signup/Signup'
-// Disabled for v1 - components kept for future use
-// import Suggested from '@/pages/Suggested/Suggested'
-// import MatchesPast from '@/pages/MatchesPast/MatchesPast'
-import Onboarding from '@/pages/Onboarding/Onboarding'
-import MatchDetailsGate from '@/pages/MatchDetails/MatchDetailsGate'
-import InviteDetails from '@/pages/InviteDetails/InviteDetails'
-// import Rankings from '@/pages/Rankings/Rankings'
-import ProfileView from '@/pages/ProfileView/ProfileView'
-import Contacts from '@/pages/Contacts/Contacts'
-import NotFound from '@/pages/NotFound/NotFound'
-import AdminDashboard from '@/pages/Admin/AdminDashboard'
-// import Reminders from '@/pages/Reminders/Reminders'
-// import AiCoachCompanion from '@/pages/AiCoachCompanion/AiCoachCompanion'
-// import AiCoachInsights from '@/pages/AiCoachInsights/AiCoachInsights'
+
+const Dashboard = lazy(() => import('@/pages/Dashboard/Dashboard'))
+const Play = lazy(() => import('@/pages/Play/Play'))
+const Profile = lazy(() => import('@/pages/Profile/Profile'))
+const Notifications = lazy(() => import('@/pages/Notifications/Notifications'))
+const JoinRequest = lazy(() => import('@/pages/JoinRequest/JoinRequest'))
+const MatchesUpcoming = lazy(() => import('@/pages/MatchesUpcoming/MatchesUpcoming'))
+const Login = lazy(() => import('@/pages/Login/Login'))
+const Signup = lazy(() => import('@/pages/Signup/Signup'))
+const Onboarding = lazy(() => import('@/pages/Onboarding/Onboarding'))
+const MatchDetailsGate = lazy(() => import('@/pages/MatchDetails/MatchDetailsGate'))
+const InviteDetails = lazy(() => import('@/pages/InviteDetails/InviteDetails'))
+const ProfileView = lazy(() => import('@/pages/ProfileView/ProfileView'))
+const Contacts = lazy(() => import('@/pages/Contacts/Contacts'))
+const NotFound = lazy(() => import('@/pages/NotFound/NotFound'))
+const AdminDashboard = lazy(() => import('@/pages/Admin/AdminDashboard'))
 
 function AnalyticsInit() {
   usePageTracking()
@@ -76,6 +70,7 @@ function App() {
           <HashRouter>
             <AnalyticsInit />
             <ImpersonationBanner />
+            <Suspense fallback={<div className="flex h-screen items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
             <Routes>
               {/* Public: Login and Signup */}
               <Route path="/login" element={<Login />} />
@@ -120,6 +115,7 @@ function App() {
               {/* 404 catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </HashRouter>
         </AuthProvider>
         <Toaster />

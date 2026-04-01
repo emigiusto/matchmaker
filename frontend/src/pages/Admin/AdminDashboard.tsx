@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { analyticsService } from '@/lib/services/analytics.service'
 import { startImpersonation } from '@/lib/auth/impersonation'
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
       <div className="border-b bg-card px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <a href="/" className="text-muted-foreground hover:text-foreground transition-colors text-sm">← Home</a>
+            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors text-sm">← Home</Link>
             <h1 className="text-xl font-bold">Admin Dashboard</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -982,7 +982,7 @@ function DisputesTab({ disputes, loading, onResolve }: {
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge variant="destructive" className="text-xs">disputed</Badge>
                   <a
-                    href={`/matches/${d.matchId}`}
+                    href={`/#/matches/${d.matchId}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-primary underline hover:no-underline"

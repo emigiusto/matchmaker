@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 /v0-download
+
+# Capacitor
+android/.idea/
+android/release/

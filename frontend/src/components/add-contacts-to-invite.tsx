@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { UserPlus, List, Search, Loader2 } from "lucide-react"
+import { UserPlus, List, Search, Loader2, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
+import { deviceContactsService, type DeviceContact } from "@/lib/services/device-contacts.service"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { useTranslation } from "@/lib/i18n"
 
@@ -36,6 +37,14 @@ export function AddContactsToInvite({
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Device contacts (native only)
+  const isNative = deviceContactsService.isNative()
+  const [deviceMode, setDeviceMode] = useState(false)
+  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([])
+  const [deviceLoading, setDeviceLoading] = useState(false)
+  const [deviceSearch, setDeviceSearch] = useState("")
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!open || !hostUserId) return
@@ -64,6 +73,57 @@ export function AddContactsToInvite({
   const filtered = contacts
     .filter((c) => !existingContactIds.includes(resolveId(c)))
     .filter((c) => !search.trim() || c.name.toLowerCase().includes(search.trim().toLowerCase()))
+
+  async function handleOpenDevicePicker() {
+    setDeviceLoading(true)
+    setDeviceSearch("")
+    setSelectedDeviceIds(new Set())
+    try {
+      const permission = await deviceContactsService.requestPermission()
+      if (permission !== 'granted') {
+        toast.error("Contacts permission is required")
+        return
+      }
+      const all = await deviceContactsService.getContacts()
+      setDeviceContacts(all)
+      setDeviceMode(true)
+    } catch {
+      toast.error("Could not load device contacts")
+    } finally {
+      setDeviceLoading(false)
+    }
+  }
+
+  async function handleDeviceAdd() {
+    const selected = deviceContacts.filter((c) => selectedDeviceIds.has(c.id))
+    if (selected.length === 0) {
+      toast.info(t("invites.selectAtLeastOne"))
+      return
+    }
+    setAdding(true)
+    try {
+      const userIds: string[] = []
+      for (const dc of selected) {
+        const phone = dc.phones[0]
+        const { user } = await contactsService.create(hostUserId, dc.name, phone)
+        userIds.push(user.id)
+      }
+      const unique = [...new Set(userIds)].filter((id) => !existingContactIds.includes(id))
+      if (unique.length === 0) {
+        toast.info("All selected contacts are already invited")
+        setOpen(false)
+        return
+      }
+      await schedulingService.addCandidates(requestId, unique, hostUserId)
+      toast.success(`${unique.length} contact(s) added`)
+      setOpen(false)
+      onSuccess()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("invites.failedToAddContacts"))
+    } finally {
+      setAdding(false)
+    }
+  }
 
   async function handleAdd() {
     const ids = Array.from(selectedIds)
@@ -109,7 +169,7 @@ export function AddContactsToInvite({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setDeviceMode(false) }}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5" disabled={disabled}>
           <UserPlus className="h-3.5 w-3.5" />
@@ -117,12 +177,94 @@ export function AddContactsToInvite({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3" align="start">
-        <p className="mb-3 text-sm font-medium">{t("invites.addContactsToInvite")}</p>
-        {loading ? (
+        {/* Header with optional device toggle */}
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm font-medium">
+            {deviceMode ? "From device contacts" : t("invites.addContactsToInvite")}
+          </p>
+          {isNative && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => {
+                if (deviceMode) {
+                  setDeviceMode(false)
+                } else {
+                  handleOpenDevicePicker()
+                }
+              }}
+              disabled={deviceLoading}
+            >
+              {deviceLoading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Smartphone className="h-3.5 w-3.5" />}
+              {deviceMode ? "My contacts" : "Device"}
+            </Button>
+          )}
+        </div>
+
+        {loading && !deviceMode ? (
           <div className="flex justify-center py-6">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
+        ) : deviceMode ? (
+          /* ── Device contacts picker ── */
+          <>
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search device contacts…"
+                value={deviceSearch}
+                onChange={(e) => setDeviceSearch(e.target.value)}
+                className="h-8 pl-8"
+              />
+            </div>
+            <div className="max-h-40 overflow-y-auto space-y-0.5 rounded border p-1">
+              {deviceContacts
+                .filter((c) => !deviceSearch.trim() || c.name.toLowerCase().includes(deviceSearch.trim().toLowerCase()))
+                .slice(0, 50)
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedDeviceIds((prev) => {
+                        const next = new Set(prev)
+                        next.has(c.id) ? next.delete(c.id) : next.add(c.id)
+                        return next
+                      })
+                    }
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted",
+                      selectedDeviceIds.has(c.id) && "bg-primary/10"
+                    )}
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border">
+                      {selectedDeviceIds.has(c.id) ? "✓" : ""}
+                    </span>
+                    <span className="flex-1">{c.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{c.phones[0]}</span>
+                  </button>
+                ))}
+              {deviceContacts.length === 0 && (
+                <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                  No contacts with phone numbers found
+                </p>
+              )}
+            </div>
+            <Button
+              className="mt-3 w-full"
+              size="sm"
+              onClick={handleDeviceAdd}
+              disabled={selectedDeviceIds.size === 0 || adding}
+            >
+              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Add {selectedDeviceIds.size} contact{selectedDeviceIds.size !== 1 ? "s" : ""}
+            </Button>
+          </>
         ) : (
+          /* ── Saved contacts picker (existing behaviour) ── */
           <>
             {lists.length > 0 && (
               <div className="mb-3">

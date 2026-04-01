@@ -40,6 +40,7 @@ import {
   List,
   UserCircle,
   Search,
+  Smartphone,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -74,6 +75,7 @@ import { cn } from "@/lib/utils"
 import { schedulingService } from "@/lib/services/scheduling.service"
 import { playersService } from "@/lib/services/players.service"
 import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
+import { deviceContactsService, type DeviceContact } from "@/lib/services/device-contacts.service"
 import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO, type CourtAvailabilityResult } from "@/lib/services/booking.service"
 import { getCurrentUserId } from "@/lib/current-user"
 import { useTranslation } from "@/lib/i18n"
@@ -226,6 +228,15 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [fromListOpen, setFromListOpen] = useState(false)
   const [searchAllContacts, setSearchAllContacts] = useState("")
   const [showAllContacts, setShowAllContacts] = useState(false)
+
+  // Device contacts (native only)
+  const isNative = deviceContactsService.isNative()
+  const [showDevicePicker, setShowDevicePicker] = useState(false)
+  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([])
+  const [deviceContactsLoading, setDeviceContactsLoading] = useState(false)
+  const [deviceContactSearch, setDeviceContactSearch] = useState("")
+  const [selectedDeviceContactIds, setSelectedDeviceContactIds] = useState<Set<string>>(new Set())
+  const [addingDeviceContacts, setAddingDeviceContacts] = useState(false)
 
   function resetWizard() {
     setStep(1)
@@ -455,6 +466,53 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     }
   }
 
+  async function handleOpenDevicePicker() {
+    setDeviceContactsLoading(true)
+    setDeviceContactSearch("")
+    setSelectedDeviceContactIds(new Set())
+    try {
+      const permission = await deviceContactsService.requestPermission()
+      if (permission !== 'granted') {
+        toast.error("Contacts permission is required")
+        return
+      }
+      const all = await deviceContactsService.getContacts()
+      setDeviceContacts(all)
+      setShowDevicePicker(true)
+    } catch (e) {
+      const msg = deviceContactsService.extractErrorMessage(e)
+      console.error('[contacts] handleOpenDevicePicker error:', msg)
+      toast.error(`Contacts error: ${msg}`)
+    } finally {
+      setDeviceContactsLoading(false)
+    }
+  }
+
+  async function handleAddDeviceContacts() {
+    const selected = deviceContacts.filter((c) => selectedDeviceContactIds.has(c.id))
+    if (selected.length === 0) return
+    setAddingDeviceContacts(true)
+    try {
+      for (const dc of selected) {
+        const phone = dc.phones[0]
+        const { contact, user } = await contactsService.create(hostUserId, dc.name, phone)
+        const userId = user.id
+        addContact({ id: userId, name: user.name || dc.name, phone })
+        setContactMeta((prev) => ({
+          ...prev,
+          [userId]: { contactId: contact.id, socioNumbers: {} },
+        }))
+      }
+      setShowDevicePicker(false)
+      setSelectedDeviceContactIds(new Set())
+      toast.success(`${selected.length} contact(s) added`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("wizard.toast.contactFailed"))
+    } finally {
+      setAddingDeviceContacts(false)
+    }
+  }
+
   async function handleAddManualContact() {
     const name = manualName.trim()
     const phone = manualPhone.trim()
@@ -532,7 +590,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [linkCopied, setLinkCopied] = useState(false)
 
   function handleCopyInviteLink() {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/join/tok-${Date.now()}` : ""
+    const url = typeof window !== "undefined" ? `${window.location.origin}/#/join/tok-${Date.now()}` : ""
     navigator.clipboard.writeText(url)
     setLinkCopied(true)
     toast.success(t("wizard.toast.linkCopied"))
@@ -1168,6 +1226,91 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 <UserPlus className="h-4 w-4" />
                 {t("wizard.addManualContactsButton")}
               </Button>
+            )}
+
+            {/* Device contacts picker (native only) */}
+            {isNative && (
+              showDevicePicker ? (
+                <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">From device contacts</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto gap-1 py-1 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowDevicePicker(false)}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                      {t("wizard.hide")}
+                    </Button>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search…"
+                      value={deviceContactSearch}
+                      onChange={(e) => setDeviceContactSearch(e.target.value)}
+                      className="h-8 pl-8"
+                    />
+                  </div>
+                  <div className="max-h-36 overflow-y-auto space-y-0.5 rounded border p-1">
+                    {deviceContacts
+                      .filter((c) => !deviceContactSearch.trim() || c.name.toLowerCase().includes(deviceContactSearch.trim().toLowerCase()))
+                      .slice(0, 50)
+                      .map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedDeviceContactIds((prev) => {
+                              const next = new Set(prev)
+                              next.has(c.id) ? next.delete(c.id) : next.add(c.id)
+                              return next
+                            })
+                          }
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted",
+                            selectedDeviceContactIds.has(c.id) && "bg-primary/10"
+                          )}
+                        >
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border">
+                            {selectedDeviceContactIds.has(c.id) ? "✓" : ""}
+                          </span>
+                          <span className="flex-1">{c.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{c.phones[0]}</span>
+                        </button>
+                      ))}
+                    {deviceContacts.length === 0 && (
+                      <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                        No contacts with phone numbers found
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleAddDeviceContacts}
+                    disabled={selectedDeviceContactIds.size === 0 || addingDeviceContacts}
+                  >
+                    {addingDeviceContacts ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                    Add {selectedDeviceContactIds.size} contact{selectedDeviceContactIds.size !== 1 ? "s" : ""}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center gap-2 border-dashed py-5 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  onClick={handleOpenDevicePicker}
+                  disabled={deviceContactsLoading}
+                >
+                  {deviceContactsLoading
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Smartphone className="h-4 w-4" />}
+                  From device contacts
+                </Button>
+              )
             )}
 
             {/* Priority list */}

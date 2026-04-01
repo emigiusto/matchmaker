@@ -317,11 +317,11 @@ export default function InviteDetailsPage() {
     if (!request) return
     try {
       const link = await schedulingService.getInviteLink(request.id, window.location.origin)
-      const fullUrl = link.startsWith("http") ? link : `${window.location.origin}${link}`
+      const fullUrl = link.startsWith("http") ? link : `${window.location.origin}/#${link}`
       await navigator.clipboard.writeText(fullUrl)
     } catch {
       navigator.clipboard.writeText(
-        `${window.location.origin}/join/${request.inviteToken}`
+        `${window.location.origin}/#/join/${request.inviteToken}`
       )
     }
     setCopiedLink(true)
@@ -331,7 +331,7 @@ export default function InviteDetailsPage() {
 
   function handleShareWhatsApp() {
     if (!request) return
-    const link = `${window.location.origin}/join/${request.inviteToken}`
+    const link = `${window.location.origin}/#/join/${request.inviteToken}`
     const message = encodeURIComponent(`Join my match! ${link}`)
     window.open(`https://wa.me/?text=${message}`, "_blank")
   }
