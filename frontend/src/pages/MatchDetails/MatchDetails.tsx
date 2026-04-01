@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Trophy,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1059,127 +1060,120 @@ export default function MatchDetailPage() {
           {result ? (
             <>
               <Card className="border-border/50">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold tracking-tight">
-                    {t("matchDetails.result.title")}
-                  </CardTitle>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-base font-semibold tracking-tight">
+                      {t("matchDetails.result.title")}
+                    </CardTitle>
+                    {match.matchType === "competitive" && (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        result.status === "confirmed"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : result.status === "disputed"
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      }`}>
+                        {result.status === "confirmed" ? <CheckCircle className="h-3 w-3" />
+                          : result.status === "disputed" ? <AlertTriangle className="h-3 w-3" />
+                          : <Clock className="h-3 w-3" />}
+                        {result.status === "submitted"
+                          ? t("matchDetails.result.awaitingConfirmation")
+                          : result.status === "confirmed"
+                          ? t("matchDetails.result.confirmed")
+                          : result.status === "disputed"
+                          ? t("matchDetails.result.disputed")
+                          : result.status}
+                      </span>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    {/* Column headers */}
-                    <div className="grid grid-cols-[3rem_1fr_2rem_1fr] items-center gap-1 px-4">
-                      <span />
-                      <span className="text-center text-xs font-medium text-muted-foreground truncate">
-                        {match.format === 'doubles' ? t("results.dialog.teamALabel") : match.player1.name.split(" ")[0]}
-                      </span>
-                      <span />
-                      <span className="text-center text-xs font-medium text-muted-foreground truncate">
-                        {match.format === 'doubles' ? t("results.dialog.teamBLabel") : match.player2.name.split(" ")[0]}
-                      </span>
-                    </div>
-                    {result.sets.map((set) => {
-                      const p1Wins = set.player1Score > set.player2Score
-                      return (
-                        <div
-                          key={set.setNumber}
-                          className="grid grid-cols-[3rem_1fr_2rem_1fr] items-center gap-1 rounded-lg bg-muted/30 px-4 py-2.5"
-                        >
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {t("matchDetails.result.set", { number: set.setNumber })}
-                          </span>
-                          <span className={`text-center font-mono leading-none ${p1Wins ? "text-xl font-bold text-foreground" : "text-base font-medium text-muted-foreground"}`}>
-                            {set.player1Score}
-                          </span>
-                          <span className="text-center text-xs text-muted-foreground/50">–</span>
-                          <span className={`text-center font-mono leading-none ${!p1Wins ? "text-xl font-bold text-foreground" : "text-base font-medium text-muted-foreground"}`}>
-                            {set.player2Score}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {result.winnerUserId && (() => {
-                    const winnerName = result.winnerUserId === match.player1.userId
-                      ? match.player1.name
-                      : result.winnerUserId === match.player2.userId
-                      ? match.player2.name
-                      : (match.participants ?? []).find(p => p.userId === result.winnerUserId)?.userName
-                    if (!winnerName) return null
+                  {/* Scoreboard */}
+                  {(() => {
+                    const p1Name = match.format === 'doubles' ? t("results.dialog.teamALabel") : match.player1.name.split(" ")[0]
+                    const p2Name = match.format === 'doubles' ? t("results.dialog.teamBLabel") : match.player2.name.split(" ")[0]
+                    const p1IsWinner = result.winnerUserId === match.player1.userId
+                    const p2IsWinner = result.winnerUserId === match.player2.userId
                     return (
-                      <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-4 py-2.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("common.winner")}</span>
-                        <span className="text-sm font-semibold text-primary">{winnerName}</span>
+                      <div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
+                        {/* Player headers */}
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pt-4 pb-3">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm font-semibold truncate max-w-full text-center">{p1Name}</span>
+                            {p1IsWinner && <Trophy className="h-3.5 w-3.5 text-amber-500" />}
+                          </div>
+                          <span className="text-xs font-medium text-muted-foreground/60 px-1">vs</span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm font-semibold truncate max-w-full text-center">{p2Name}</span>
+                            {p2IsWinner && <Trophy className="h-3.5 w-3.5 text-amber-500" />}
+                          </div>
+                        </div>
+                        {/* Sets */}
+                        <div className="divide-y divide-border/30">
+                          {result.sets.map((set) => {
+                            const p1Wins = set.player1Score > set.player2Score
+                            return (
+                              <div key={set.setNumber} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-3">
+                                <span className={`text-center font-mono font-bold leading-none tabular-nums ${p1Wins ? "text-2xl text-foreground" : "text-lg text-muted-foreground"}`}>
+                                  {set.player1Score}
+                                </span>
+                                <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/50 px-1 whitespace-nowrap">
+                                  {t("matchDetails.result.set", { number: set.setNumber })}
+                                </span>
+                                <span className={`text-center font-mono font-bold leading-none tabular-nums ${!p1Wins ? "text-2xl text-foreground" : "text-lg text-muted-foreground"}`}>
+                                  {set.player2Score}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {/* Winner footer */}
+                        {result.winnerUserId && (() => {
+                          const winnerName = result.winnerUserId === match.player1.userId
+                            ? match.player1.name
+                            : result.winnerUserId === match.player2.userId
+                            ? match.player2.name
+                            : (match.participants ?? []).find(p => p.userId === result.winnerUserId)?.userName
+                          if (!winnerName) return null
+                          return (
+                            <div className="flex items-center justify-center gap-2 border-t border-border/30 bg-primary/5 px-4 py-2.5">
+                              <Trophy className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                              <span className="text-xs text-muted-foreground">{t("matchDetails.result.winner")}:</span>
+                              <span className="text-sm font-semibold text-foreground">{winnerName}</span>
+                            </div>
+                          )
+                        })()}
                       </div>
                     )
                   })()}
 
+                  {/* Rating change */}
                   {result.player1RatingChange !== undefined && (
-                    <div className="flex items-center gap-4 rounded-lg border border-border/50 p-3">
-                      <div className="flex items-center gap-2">
-                        {result.player1RatingChange! > 0 ? (
-                          <TrendingUp className="h-4 w-4 text-primary" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-destructive" />
-                        )}
-                        <span className="text-xs text-muted-foreground">{t("matchDetails.result.ratingChange")}</span>
-                        <span
-                          className={`font-mono text-sm font-semibold ${
-                            result.player1RatingChange! > 0 ? "text-primary" : "text-destructive"
-                          }`}
-                        >
-                          {result.player1RatingChange! > 0 ? "+" : ""}
-                          {result.player1RatingChange}
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-4 py-2.5">
+                      {result.player1RatingChange! > 0
+                        ? <TrendingUp className="h-4 w-4 shrink-0 text-primary" />
+                        : <TrendingDown className="h-4 w-4 shrink-0 text-destructive" />}
+                      <span className="text-xs text-muted-foreground">{t("matchDetails.result.ratingChange")}</span>
+                      <span className={`font-mono text-sm font-semibold ml-auto ${result.player1RatingChange! > 0 ? "text-primary" : "text-destructive"}`}>
+                        {result.player1RatingChange! > 0 ? "+" : ""}{result.player1RatingChange}
+                      </span>
                     </div>
                   )}
 
-                  {match.matchType === "competitive" && (
-                    <div className={`rounded-lg border p-3 space-y-1.5 ${
-                      result.status === "confirmed"
-                        ? "border-emerald-500/30 bg-emerald-500/5"
-                        : result.status === "disputed"
-                        ? "border-destructive/30 bg-destructive/5"
-                        : "border-amber-500/30 bg-amber-500/5"
-                    }`}>
-                      <div className="flex items-center gap-1.5">
-                        {result.status === "confirmed" ? (
-                          <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                        ) : result.status === "disputed" ? (
-                          <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                        ) : (
-                          <Clock className="h-3.5 w-3.5 text-amber-500" />
-                        )}
-                        <p className={`text-sm font-semibold ${
-                          result.status === "confirmed"
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : result.status === "disputed"
-                            ? "text-destructive"
-                            : "text-amber-600 dark:text-amber-400"
-                        }`}>
-                          {result.status === "submitted"
-                            ? t("matchDetails.result.awaitingConfirmation")
-                            : result.status === "confirmed"
-                            ? t("matchDetails.result.confirmed")
-                            : result.status === "disputed"
-                            ? t("matchDetails.result.disputed")
-                            : result.status}
-                        </p>
-                      </div>
-                      {result.status === "submitted" && (
-                        <div className="space-y-0.5">
-                          <p className="text-xs text-muted-foreground">{t("matchDetails.result.autoConfirmHint")}</p>
-                          {result.createdAt && (() => {
-                            const msRemaining = Math.max(0, new Date(result.createdAt!).getTime() + 5 * 24 * 60 * 60 * 1000 - Date.now())
-                            const daysRemaining = Math.floor(msRemaining / (24 * 60 * 60 * 1000))
-                            const hoursRemaining = Math.ceil((msRemaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
-                            return msRemaining > 0 ? (
-                              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{t("matchDetails.result.autoConfirmCountdown", { days: daysRemaining, hours: hoursRemaining })}</p>
-                            ) : null
-                          })()}
-                        </div>
-                      )}
+                  {/* Awaiting confirmation hint */}
+                  {match.matchType === "competitive" && result.status === "submitted" && (
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-1">
+                      <p className="text-xs text-muted-foreground">{t("matchDetails.result.autoConfirmHint")}</p>
+                      {result.createdAt && (() => {
+                        const msRemaining = Math.max(0, new Date(result.createdAt!).getTime() + 5 * 24 * 60 * 60 * 1000 - Date.now())
+                        const daysRemaining = Math.floor(msRemaining / (24 * 60 * 60 * 1000))
+                        const hoursRemaining = Math.ceil((msRemaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
+                        return msRemaining > 0 ? (
+                          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            {t("matchDetails.result.autoConfirmCountdown", { days: daysRemaining, hours: hoursRemaining })}
+                          </p>
+                        ) : null
+                      })()}
                     </div>
                   )}
 
