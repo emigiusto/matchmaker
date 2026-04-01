@@ -128,8 +128,10 @@ export default function MatchDetailPage() {
       .then((m) => {
         if (!cancelled) {
           setMatch(m)
-          // Fetch result separately if the match has one
-          if (m.status === "awaiting_confirmation" || m.status === "completed" || m.status === "disputed") {
+          // Use result embedded in match response if present, otherwise fetch separately
+          if (m.result) {
+            setResult(m.result as unknown as MatchResult)
+          } else if (m.status === "awaiting_confirmation" || m.status === "completed" || m.status === "disputed") {
             resultsService.getByMatch(m.id).then((r) => { if (!cancelled) setResult(r as unknown as MatchResult) }).catch(() => {})
           }
         }

@@ -199,7 +199,7 @@ describe('submitMatchResult — matchType override', () => {
     expect(result).toBeNull();
   });
 
-  it('does not set match status to awaiting_confirmation when type is practice', async () => {
+  it('sets match status to awaiting_confirmation for practice (no rating impact)', async () => {
     setupHappyPath({ type: 'practice' });
 
     await ResultsService.submitMatchResult({
@@ -211,7 +211,7 @@ describe('submitMatchResult — matchType override', () => {
     const statusCalls = mockTx.match.update.mock.calls.filter(
       (c: any) => c[0].data?.status === 'awaiting_confirmation'
     );
-    expect(statusCalls).toHaveLength(0);
+    expect(statusCalls).toHaveLength(1);
   });
 
   it('sets match status to awaiting_confirmation for competitive', async () => {

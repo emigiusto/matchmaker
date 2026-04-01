@@ -497,13 +497,12 @@ export async function submitMatchResult(input: SubmitMatchResultInput): Promise<
       });
     }
 
-    // Update match status to awaiting_confirmation (only for competitive)
-    if (matchType === 'competitive') {
-      await tx.match.update({
-        where: { id: matchId },
-        data: { status: MatchStatus.awaiting_confirmation },
-      });
-    }
+    // Update match status to awaiting_confirmation for all match types.
+    // Rating updates are gated on match.type === 'competitive' separately.
+    await tx.match.update({
+      where: { id: matchId },
+      data: { status: MatchStatus.awaiting_confirmation },
+    });
 
     // Return full result with sets
     const fullResult = await tx.result.findUnique({
