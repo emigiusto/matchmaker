@@ -182,13 +182,13 @@ export default function Dashboard() {
                         />
                       </div>
                       <div className="ml-auto flex items-center gap-2">
-                        <ResultUploadDialog match={match} />
+                        <ResultUploadDialog match={match} compact />
                         <CancelMatchButton
                           matchId={match.id}
                           userId={currentUserId}
                           onSuccess={refreshMatches}
                           compact
-                          size="sm"
+                          size="icon"
                         />
                       </div>
                     </div>

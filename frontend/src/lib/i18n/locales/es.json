@@ -759,6 +759,7 @@
       "title": "Enviar Resultado",
       "disabled": "El envío de resultados está temporalmente desactivado.",
       "button": "Cargar Resultado",
+      "buttonCompact": "Resultado",
       "submitted": "Resultado enviado, esperando confirmación"
     },
     "notFound": "Partido no encontrado",

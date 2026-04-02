@@ -24,6 +24,7 @@ interface ResultUploadDialogProps {
   match: Match
   onResultSubmitted?: (scoreSubmitted: boolean) => void
   trigger?: React.ReactNode
+  compact?: boolean
 }
 
 interface SetInput {
@@ -40,7 +41,7 @@ function isTiebreakSet(p1: string, p2: string) {
   return (a === 7 && b === 6) || (a === 6 && b === 7)
 }
 
-export function ResultUploadDialog({ match, onResultSubmitted, trigger }: ResultUploadDialogProps) {
+export function ResultUploadDialog({ match, onResultSubmitted, trigger, compact }: ResultUploadDialogProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [sets, setSets] = useState<SetInput[]>([
@@ -210,7 +211,7 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
       <DialogTrigger asChild>
         {trigger || (
           <Button size="sm" variant="outline" className="gap-2">
-            {t("matchDetails.submit.button")}
+            {compact ? t("matchDetails.submit.buttonCompact") : t("matchDetails.submit.button")}
           </Button>
         )}
       </DialogTrigger>

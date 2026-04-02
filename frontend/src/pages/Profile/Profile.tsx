@@ -652,51 +652,20 @@ export default function ProfilePage() {
               const isEditing = editingClub === club.clubSlug
 
               return (
-                <div key={club.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-4">
+                <div key={club.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
                   {/* Club header */}
-                  <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-foreground">{club.label}</p>
                       {membership && !isEditing && (
-                        <>
-                          <p className="mt-0.5 text-sm text-muted-foreground">{t("profilePage.clubConnections.socio", { number: membership.socioNumber })}</p>
-                          <div className="mt-1.5 flex items-center gap-1.5">
-                            {testingClub === club.clubSlug ? (
-                              <>
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">{t("profilePage.clubConnections.testing")}</span>
-                              </>
-                            ) : membership.status === "active" ? (
-                              <>
-                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                                <span className="text-xs text-green-600 dark:text-green-400">{t("profilePage.clubConnections.verified")}</span>
-                              </>
-                            ) : membership.status === "invalid_credentials" ? (
-                              <>
-                                <XCircle className="h-3.5 w-3.5 text-destructive" />
-                                <span className="text-xs text-destructive">{t("profilePage.clubConnections.invalidCredentials")}</span>
-                              </>
-                            ) : (
-                              <>
-                                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">{t("profilePage.clubConnections.notVerified")}</span>
-                              </>
-                            )}
-                            {membership.lastVerifiedAt && testingClub !== club.clubSlug && (
-                              <span className="text-xs text-muted-foreground/60">
-                                · {new Date(membership.lastVerifiedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}{" "}
-                                {new Date(membership.lastVerifiedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                              </span>
-                            )}
-                          </div>
-                        </>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{t("profilePage.clubConnections.socio", { number: membership.socioNumber })}</p>
                       )}
                       {!membership && !isEditing && (
                         <p className="mt-0.5 text-sm text-muted-foreground">{t("profilePage.clubConnections.notConnected")}</p>
                       )}
                     </div>
                     {membership && !isEditing && (
-                      <div className="flex shrink-0 flex-wrap gap-2">
+                      <div className="flex shrink-0 items-center gap-1">
                         <Button
                           variant="outline"
                           size="sm"
@@ -723,7 +692,7 @@ export default function ProfilePage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-destructive hover:text-destructive"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                           onClick={() => handleDeleteMembership(club.clubSlug)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -743,6 +712,38 @@ export default function ProfilePage() {
                       </Button>
                     )}
                   </div>
+
+                  {/* Status row — below title, full width */}
+                  {membership && !isEditing && (
+                    <div className="flex items-center gap-1.5">
+                      {testingClub === club.clubSlug ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{t("profilePage.clubConnections.testing")}</span>
+                        </>
+                      ) : membership.status === "active" ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          <span className="text-xs text-green-600 dark:text-green-400">{t("profilePage.clubConnections.verified")}</span>
+                        </>
+                      ) : membership.status === "invalid_credentials" ? (
+                        <>
+                          <XCircle className="h-3.5 w-3.5 text-destructive" />
+                          <span className="text-xs text-destructive">{t("profilePage.clubConnections.invalidCredentials")}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{t("profilePage.clubConnections.notVerified")}</span>
+                        </>
+                      )}
+                      {membership.lastVerifiedAt && testingClub !== club.clubSlug && (
+                        <span className="text-xs text-muted-foreground/50">
+                          · {new Date(membership.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Inline form — shown when adding or editing */}
                   {isEditing && (
