@@ -81,14 +81,14 @@ export function AddContactsToInvite({
     try {
       const permission = await deviceContactsService.requestPermission()
       if (permission !== 'granted') {
-        toast.error("Contacts permission is required")
+        toast.error(t("contactsPage.device.permissionDenied"))
         return
       }
       const all = await deviceContactsService.getContacts()
       setDeviceContacts(all)
       setDeviceMode(true)
     } catch {
-      toast.error("Could not load device contacts")
+      toast.error(t("contactsPage.device.loadFailed"))
     } finally {
       setDeviceLoading(false)
     }
@@ -110,12 +110,12 @@ export function AddContactsToInvite({
       }
       const unique = [...new Set(userIds)].filter((id) => !existingContactIds.includes(id))
       if (unique.length === 0) {
-        toast.info("All selected contacts are already invited")
+        toast.info(t("contactsPage.device.allAlreadyAdded"))
         setOpen(false)
         return
       }
       await schedulingService.addCandidates(requestId, unique, hostUserId)
-      toast.success(`${unique.length} contact(s) added`)
+      toast.success(t(unique.length === 1 ? "contactsPage.device.addCount" : "contactsPage.device.addCount_plural", { count: String(unique.length) }))
       setOpen(false)
       onSuccess()
     } catch (e) {
@@ -134,7 +134,7 @@ export function AddContactsToInvite({
     setAdding(true)
     try {
       await schedulingService.addCandidates(requestId, ids, hostUserId)
-      toast.success(`${ids.length} contact(s) added`)
+      toast.success(t(ids.length === 1 ? "contactsPage.device.addCount" : "contactsPage.device.addCount_plural", { count: String(ids.length) }))
       setOpen(false)
       onSuccess()
     } catch (e) {
@@ -180,7 +180,7 @@ export function AddContactsToInvite({
         {/* Header with optional device toggle */}
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-medium">
-            {deviceMode ? "From device contacts" : t("invites.addContactsToInvite")}
+            {deviceMode ? t("contactsPage.device.fromDeviceContacts") : t("invites.addContactsToInvite")}
           </p>
           {isNative && (
             <Button
@@ -199,7 +199,7 @@ export function AddContactsToInvite({
               {deviceLoading
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 : <Smartphone className="h-3.5 w-3.5" />}
-              {deviceMode ? "My contacts" : "Device"}
+              {deviceMode ? t("contactsPage.device.myContacts") : t("contactsPage.device.deviceButton")}
             </Button>
           )}
         </div>
@@ -214,7 +214,7 @@ export function AddContactsToInvite({
             <div className="relative mb-2">
               <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search device contacts…"
+                placeholder={t("contactsPage.device.searchPlaceholder")}
                 value={deviceSearch}
                 onChange={(e) => setDeviceSearch(e.target.value)}
                 className="h-8 pl-8"
@@ -249,7 +249,7 @@ export function AddContactsToInvite({
                 ))}
               {deviceContacts.length === 0 && (
                 <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-                  No contacts with phone numbers found
+                  {t("contactsPage.device.noContacts")}
                 </p>
               )}
             </div>
@@ -260,7 +260,7 @@ export function AddContactsToInvite({
               disabled={selectedDeviceIds.size === 0 || adding}
             >
               {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Add {selectedDeviceIds.size} contact{selectedDeviceIds.size !== 1 ? "s" : ""}
+              {t(selectedDeviceIds.size === 1 ? "contactsPage.device.addCount" : "contactsPage.device.addCount_plural", { count: String(selectedDeviceIds.size) })}
             </Button>
           </>
         ) : (
@@ -330,7 +330,7 @@ export function AddContactsToInvite({
               disabled={selectedIds.size === 0 || adding}
             >
               {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Add {selectedIds.size} contact{selectedIds.size !== 1 ? "s" : ""}
+              {t(selectedIds.size === 1 ? "contactsPage.device.addCount" : "contactsPage.device.addCount_plural", { count: String(selectedIds.size) })}
             </Button>
           </>
         )}

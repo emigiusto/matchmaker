@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
-  Plus, Pencil, Trash2, Search, Loader2, BookUser, Users, List, GripVertical, X,
+  Plus, Pencil, Trash2, Search, Loader2, BookUser, Users, List, GripVertical, X, Smartphone,
 } from "lucide-react"
 import {
   DndContext,
@@ -49,6 +49,7 @@ import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { getCurrentUserId } from "@/lib/current-user"
 import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
+import { deviceContactsService, type DeviceContact } from "@/lib/services/device-contacts.service"
 import { bookingService, SUPPORTED_CLUBS, type ClubMembershipDTO } from "@/lib/services/booking.service"
 import { validatePhoneE164 } from "@/lib/phone.utils"
 import { apiClient } from "@/lib/services/api-client"
@@ -157,6 +158,15 @@ export default function Contacts() {
   // Delete dialogs
   const [deletingContact, setDeletingContact] = useState<ContactDTO | null>(null)
   const [deletingList, setDeletingList] = useState<ContactListDTO | null>(null)
+
+  // Import from phone
+  const isNative = deviceContactsService.isNative()
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([])
+  const [deviceLoading, setDeviceLoading] = useState(false)
+  const [deviceSearch, setDeviceSearch] = useState("")
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set())
+  const [importing, setImporting] = useState(false)
 
   // Manage list dialog
   const [managingList, setManagingList] = useState<ContactListDTO | null>(null)
@@ -307,6 +317,49 @@ export default function Contacts() {
       await refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
+    }
+  }
+
+  // ─── Import from phone ───────────────────────────────────
+
+  async function handleOpenImportDialog() {
+    setDeviceLoading(true)
+    setDeviceSearch("")
+    setSelectedDeviceIds(new Set())
+    try {
+      const permission = await deviceContactsService.requestPermission()
+      if (permission !== 'granted') {
+        toast.error(t("contactsPage.device.permissionDenied"))
+        return
+      }
+      const all = await deviceContactsService.getContacts()
+      setDeviceContacts(all)
+      setImportDialogOpen(true)
+    } catch {
+      toast.error(t("contactsPage.device.loadFailed"))
+    } finally {
+      setDeviceLoading(false)
+    }
+  }
+
+  async function handleImportDeviceContacts() {
+    const selected = deviceContacts.filter((c) => selectedDeviceIds.has(c.id))
+    if (selected.length === 0) return
+    setImporting(true)
+    let count = 0
+    try {
+      for (const dc of selected) {
+        const phone = dc.phones[0]
+        await contactsService.create(currentUserId, dc.name, phone).catch(() => {})
+        count++
+      }
+      toast.success(t("contactsPage.device.importSuccess", { count: String(count) }))
+      setImportDialogOpen(false)
+      await refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -488,6 +541,20 @@ export default function Contacts() {
             <Plus className="h-4 w-4" />
             {t("contactsPage.newList")}
           </Button>
+          {isNative && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={handleOpenImportDialog}
+              disabled={deviceLoading}
+            >
+              {deviceLoading
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Smartphone className="h-4 w-4" />}
+              {t("contactsPage.device.importFromPhone")}
+            </Button>
+          )}
         </div>
 
         {loading ? (
@@ -1025,6 +1092,80 @@ export default function Contacts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Import from phone dialog ──────────────────────── */}
+      {isNative && (
+        <Dialog open={importDialogOpen} onOpenChange={(o) => { setImportDialogOpen(o); if (!o) setSelectedDeviceIds(new Set()) }}>
+          <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 p-0">
+            <DialogHeader className="shrink-0 border-b px-6 py-4">
+              <DialogTitle>{t("contactsPage.device.importTitle")}</DialogTitle>
+            </DialogHeader>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={t("contactsPage.device.searchPlaceholder")}
+                  value={deviceSearch}
+                  onChange={(e) => setDeviceSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {(() => {
+                const filtered = deviceContacts.filter(
+                  (c) => !deviceSearch.trim() || c.name.toLowerCase().includes(deviceSearch.trim().toLowerCase())
+                )
+                if (filtered.length === 0) {
+                  return (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      {t("contactsPage.device.noContacts")}
+                    </p>
+                  )
+                }
+                return (
+                  <div className="space-y-1">
+                    {filtered.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedDeviceIds((prev) => {
+                            const next = new Set(prev)
+                            next.has(c.id) ? next.delete(c.id) : next.add(c.id)
+                            return next
+                          })
+                        }
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted ${selectedDeviceIds.has(c.id) ? "bg-primary/10" : ""}`}
+                      >
+                        <Checkbox checked={selectedDeviceIds.has(c.id)} className="pointer-events-none" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                          {c.name[0]?.toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{c.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{c.phones[0]}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+            <div className="shrink-0 border-t px-6 py-3 flex gap-2">
+              <DialogClose asChild>
+                <Button variant="outline" className="flex-1">{t("form.cancel")}</Button>
+              </DialogClose>
+              <Button
+                className="flex-1"
+                onClick={handleImportDeviceContacts}
+                disabled={selectedDeviceIds.size === 0 || importing}
+              >
+                {importing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                {t(selectedDeviceIds.size === 1 ? "contactsPage.device.importCount" : "contactsPage.device.importCount_plural", { count: String(selectedDeviceIds.size) })}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* ── Delete list alert ──────────────────────────────── */}
       <AlertDialog open={!!deletingList} onOpenChange={(o) => !o && setDeletingList(null)}>

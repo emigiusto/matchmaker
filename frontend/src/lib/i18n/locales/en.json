@@ -909,6 +909,23 @@
     "addMembersSearch": "Search contacts...",
     "noMoreContacts": "All your contacts are already in this list",
     "noMembersYet": "This list is empty",
+    "device": {
+      "importFromPhone": "Import from phone",
+      "fromDeviceContacts": "From device contacts",
+      "myContacts": "My contacts",
+      "deviceButton": "Phone",
+      "searchPlaceholder": "Search device contacts…",
+      "noContacts": "No contacts with phone numbers found",
+      "permissionDenied": "Contacts permission is required",
+      "loadFailed": "Could not load device contacts",
+      "allAlreadyAdded": "All selected contacts are already saved",
+      "importCount": "Import {{count}}",
+      "importCount_plural": "Import {{count}} contacts",
+      "addCount": "Add {{count}}",
+      "addCount_plural": "Add {{count}} contacts",
+      "importSuccess": "{{count}} contact(s) imported",
+      "importTitle": "Import from phone"
+    },
     "toast": {
       "contactCreated": "Contact added",
       "contactDeleted": "Contact deleted",

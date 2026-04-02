@@ -909,6 +909,23 @@
     "addMembersSearch": "Buscar contactos...",
     "noMoreContacts": "Todos tus contactos ya están en esta lista",
     "noMembersYet": "Esta lista está vacía",
+    "device": {
+      "importFromPhone": "Importar del teléfono",
+      "fromDeviceContacts": "Desde contactos del teléfono",
+      "myContacts": "Mis contactos",
+      "deviceButton": "Teléfono",
+      "searchPlaceholder": "Buscar contactos del dispositivo…",
+      "noContacts": "No se encontraron contactos con número de teléfono",
+      "permissionDenied": "Se requiere permiso para acceder a los contactos",
+      "loadFailed": "No se pudieron cargar los contactos del dispositivo",
+      "allAlreadyAdded": "Todos los contactos seleccionados ya están guardados",
+      "importCount": "Importar {{count}}",
+      "importCount_plural": "Importar {{count}} contactos",
+      "addCount": "Añadir {{count}}",
+      "addCount_plural": "Añadir {{count}} contactos",
+      "importSuccess": "{{count}} contacto(s) importado(s)",
+      "importTitle": "Importar del teléfono"
+    },
     "toast": {
       "contactCreated": "Contacto añadido",
       "contactDeleted": "Contacto eliminado",
