@@ -739,7 +739,7 @@ export default function ProfilePage() {
                       )}
                       {membership.lastVerifiedAt && testingClub !== club.clubSlug && (
                         <span className="text-xs text-muted-foreground/50">
-                          · {new Date(membership.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          · {new Date(membership.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"  })}
                         </span>
                       )}
                     </div>
