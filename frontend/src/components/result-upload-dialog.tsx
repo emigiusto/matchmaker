@@ -22,7 +22,7 @@ import { getCurrentUserId } from "@/lib/current-user"
 
 interface ResultUploadDialogProps {
   match: Match
-  onResultSubmitted?: () => void
+  onResultSubmitted?: (scoreSubmitted: boolean) => void
   trigger?: React.ReactNode
 }
 
@@ -189,7 +189,7 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger }: Result
           : t("results.dialog.submittedPractice")
       )
       setOpen(false)
-      onResultSubmitted?.()
+      onResultSubmitted?.(!isPracticeNoScore)
     } catch {
       toast.error(t("results.dialog.submitFailed"))
     } finally {
