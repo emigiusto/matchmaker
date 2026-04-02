@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { Plus, X, ChevronDown, ChevronUp } from "lucide-react"
+import { Plus, X, ChevronDown, ChevronUp, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -210,9 +210,15 @@ export function ResultUploadDialog({ match, onResultSubmitted, trigger, compact 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button size="sm" variant="outline" className="gap-2">
-            {compact ? t("matchDetails.submit.buttonCompact") : t("matchDetails.submit.button")}
-          </Button>
+          compact ? (
+            <Button size="icon" variant="outline">
+              <Upload className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" className="gap-2">
+              {t("matchDetails.submit.button")}
+            </Button>
+          )
         )}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[520px]">

@@ -56,9 +56,9 @@ export function CancelMatchButton({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant={variant} size={size} className="gap-2">
+        <Button variant={variant} size={size} className={size === "icon" ? "" : "gap-2"}>
           <XCircle className={compact ? "h-4 w-4" : "h-5 w-5"} />
-          {compact ? t("matchDetails.cancelMatch.button") : t("matchDetails.cancelMatch.buttonFull")}
+          {size !== "icon" && (compact ? t("matchDetails.cancelMatch.button") : t("matchDetails.cancelMatch.buttonFull"))}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
