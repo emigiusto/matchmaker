@@ -1570,9 +1570,9 @@ export default function MatchDetailPage() {
 
 function QuestionnaireItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-2">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium text-foreground">{value}</span>
+    <div className="rounded-lg bg-muted/20 px-3 py-2.5 space-y-0.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium text-foreground">{value}</p>
     </div>
   )
 }
