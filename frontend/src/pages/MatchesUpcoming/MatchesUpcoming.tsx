@@ -415,7 +415,7 @@ export default function MatchesPage() {
                         <Link
                           key={match.id}
                           to={`/matches/${match.id}`}
-                          className="block rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
+                          className="min-h-[190px] block rounded-xl border border-border/40 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <SportFormatBadge

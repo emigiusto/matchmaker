@@ -654,8 +654,8 @@ export default function ProfilePage() {
               return (
                 <div key={club.clubSlug} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
                   {/* Club header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
+                  <div className="flex-col md:flex-row flex items-start md:items-center justify-between gap-4">
+                    <div className="min-w-50 flex flex-row items-center gap-8">
                       <p className="font-semibold text-foreground">{club.label}</p>
                       {membership && !isEditing && (
                         <p className="mt-0.5 text-sm text-muted-foreground">{t("profilePage.clubConnections.socio", { number: membership.socioNumber })}</p>
