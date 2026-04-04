@@ -69,7 +69,7 @@ export async function notifyResultSubmittedToGroup(matchId: string, result: Resu
   const locale = hostUserId
     ? await resolveGroupMessageLocale(hostUserId, participantIds, schedulingRequest?.format ?? 'singles')
     : 'es';
-  const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${matchId}`;
+  const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/#/matches/${matchId}`;
   const message = getMessages(locale).resultSubmitted(sets, labelA, labelB, matchUrl);
 
   try {

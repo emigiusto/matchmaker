@@ -524,7 +524,7 @@ async function notifyMatchParticipantsOnReschedule(matchId: string, match: Match
     const timeStr = formatTimeInTz(scheduled, tz)
     const whenStr = `${dateStr.charAt(0).toUpperCase()}${dateStr.slice(1)} · ${timeStr}`
     const loc = match.location ?? ''
-    const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`
+    const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/#/matches/${match.id}`
 
     // Send WhatsApp message with new time
     const message = getMessages(hostLocale).matchRescheduled(whenStr, loc, matchUrl)
@@ -659,7 +659,7 @@ async function notifyMatchParticipantsOnCancel(match: EnrichedMatch & { whatsapp
         ?.map((p) => p.user?.name)
         .filter((n): n is string => Boolean(n)) ?? [];
       const participantsStr = participantNames.join(', ') || '—';
-      const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
+      const matchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/#/matches/${match.id}`;
       const message = getMessages(hostLocale).matchCancelled(sport, format, whenStr, location, participantsStr, matchUrl);
       await whatsappService.sendGroupMessage(groupId, message);
       logger.info('MatchCancelledWhatsAppSent', { matchId: match.id, groupId });

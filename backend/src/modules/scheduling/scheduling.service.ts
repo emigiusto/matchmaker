@@ -218,7 +218,7 @@ function formatNoMatchWhatsAppMessage(
   const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
   const whenStr = `${dateStr} · ${timeStr}`;
   const reasonText = msgs.noMatchReason[reason];
-  const requestUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/play/${requestId}`;
+  const requestUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/#/play/${requestId}`;
   return msgs.noMatch(sport, formatLabel, whenStr, location, reasonText, requestUrl);
 }
 
@@ -997,7 +997,7 @@ export const schedulingService = {
           where: { id: match.id },
           data: { whatsappGroupId: groupResult.groupId },
         });
-        const publicMatchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/matches/${match.id}`;
+        const publicMatchUrl = `${FRONTEND_BASE.replace(/\/$/, '')}/#/matches/${match.id}`;
         const groupLocale = await resolveGroupMessageLocale(request.hostUserId, participantUserIds, format);
         const detailsMessage = formatMatchDetailsMessage(
           request.sportType,
