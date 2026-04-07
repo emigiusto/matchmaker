@@ -18,29 +18,39 @@ export interface MatchmakingRequest {
 /**
  * MatchmakingCandidate
  * A single suggestion for a potential match.
- * - candidateUserId: string (the suggested user's id)
- * - candidatePlayerId: string | null (the suggested player's id, if any)
- * - score: number (higher = better suggestion)
- * - reasons: string[] (human-readable explanations for this suggestion)
+ *
+ * matchMode:
+ *   'availability' - both users have overlapping availability slots (overlap bonus included in score)
+ *   'profile'      - no availability overlap; matched purely on profile attributes (level, location, etc.)
+ *
+ * hasOpenAvailability:
+ *   true if the candidate has at least one open future availability slot, regardless of mode.
+ *   Used by the frontend to decide whether to show the time-slot picker or a "connect" CTA.
+ *
+ * requesterAvailabilityId / candidateAvailabilityId / overlapRange:
+ *   Only present in 'availability' mode. Absent in 'profile' mode.
  */
 export interface MatchmakingCandidate {
   candidateUserId: string;
   candidatePlayerId: string | null;
   score: number;
   reasons: string[];
+  matchMode: 'availability' | 'profile';
+  hasOpenAvailability: boolean;
   scoreBreakdown?: {
     availability?: number;
     social?: number;
     level?: number;
     location?: number;
     surface?: number;
+    recentActivity?: number;
   };
   overlapRange?: {
     start: string;
     end: string;
   };
-  requesterAvailabilityId: string;
-  candidateAvailabilityId: string;
+  requesterAvailabilityId?: string;
+  candidateAvailabilityId?: string;
   candidateLevel: number;
   candidateLocation: {
     latitude: number;

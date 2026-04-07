@@ -170,6 +170,9 @@ export interface SuggestedOpponent {
   levelDifference: number
   availabilityOverlap: string[]
   reason: string
+  score?: number
+  matchMode?: 'availability' | 'profile'
+  hasOpenAvailability?: boolean
 }
 
 export interface Notification {
