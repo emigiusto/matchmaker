@@ -1,6 +1,6 @@
-# AceUp
+# Matchmaker
 
-AceUp is a sports matchmaking platform that cuts the friction of organizing matches. Players submit availability, organizers send invites via unique time-limited links, and the system handles the rest — including optional automated court booking at partner clubs.
+Matchmaker is a sports matchmaking platform that cuts the friction of organizing matches. Players submit availability, organizers send invites via unique time-limited links, and the system handles the rest — including optional automated court booking at partner clubs.
 
 WhatsApp is used only as a notification delivery channel, never for parsing replies. All confirmations go through explicit links.
 
