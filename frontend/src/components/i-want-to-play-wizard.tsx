@@ -27,7 +27,6 @@ import {
   GripVertical,
   X,
   Zap,
-  Clock,
   Users,
   CircleDot,
   Swords,
@@ -254,7 +253,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setPriorityList([])
     setBookingEnabled(false)
     setSelectedMembershipId(null)
-    setCourtAvailability(null)
+    setCourtAvailabilities({})
     setCourtAvailabilityLoading(false)
     setCourtAvailabilityError(null)
     setShowManualAdd(false)
@@ -411,7 +410,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     !(bookingEnabled && courtAvailabilityLoading)
   const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
-  const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
   const locationText = locationType === "place" ? specificPlace : cityValue
   const displayLocation = locationText.trim() || t("wizard.toBeDecided")
 
