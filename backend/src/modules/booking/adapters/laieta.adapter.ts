@@ -285,6 +285,28 @@ export class LaietaAdapter implements BookingAdapter {
     throw new AppError(errorText, 409, 'BOOKING_PAGE_ERROR')
   }
 
+  /**
+   * Apply Laieta-specific court selection priority by sport.
+   * Courts are identified by their DOM order number (e.g. "07", "08").
+   * Returns court numbers reordered by priority — all available courts included.
+   *
+   * Tennis: prefer last 2 courts (bottom of page), then rest top-down.
+   * Padel:  prefer courts 3 through last (page order), then first 2.
+   */
+  private prioritizeCourtNums(sport: string, courtNums: string[]): string[] {
+    if (courtNums.length <= 1) return courtNums
+    const sportLower = sport.toLowerCase()
+    if (sportLower === 'tennis') {
+      // Very last court first, then second-to-last, then the rest from top
+      return [...courtNums.slice(-2).reverse(), ...courtNums.slice(0, -2)]
+    }
+    if (sportLower === 'padel') {
+      // 3rd through last (in page order), then first 2
+      return [...courtNums.slice(2), ...courtNums.slice(0, 2)]
+    }
+    return courtNums
+  }
+
   // ─── BookingAdapter implementation ────────────────────────────────
 
   async testConnection(creds: ClubCredentials): Promise<boolean> {
@@ -377,7 +399,10 @@ export class LaietaAdapter implements BookingAdapter {
       // attribute selector so Puppeteer simulates a real mouse event sequence
       // (mousedown/mouseup/click). A synthetic DOM .click() inside page.evaluate()
       // does not fire the full event sequence and the portal's popup never appears.
-      const slotId = await page.evaluate((targetCourtId: string, targetHHMM: string) => {
+      //
+      // Returns all valid courts in DOM order so Node.js can apply the Laieta
+      // sport-specific priority rule before selecting which court to book.
+      const availableCourts = await page.evaluate((targetCourtId: string, targetHHMM: string) => {
         // Group sub-slots by physical court number (id prefix, e.g. "07") so we can
         // check that ALL four quarter-hour sub-slots are classempty or class4 before
         // selecting a court. A cell with any classR sub-slot cannot be booked for a
@@ -402,11 +427,18 @@ export class LaietaAdapter implements BookingAdapter {
             courtMap[courtNum].valid = false  // classR or unknown — full hour not bookable
           }
         })
-        for (const { emptyId, valid } of Object.values(courtMap)) {
-          if (valid && emptyId) return emptyId
-        }
-        return null
+        return Object.entries(courtMap)
+          .filter(([, c]) => c.valid && c.emptyId)
+          .map(([courtNum, c]) => ({ courtNum, emptyId: c.emptyId! }))
       }, courtId, targetHourMin)
+
+      // Apply sport-specific priority, then pick the top-ranked available court.
+      const prioritizedNums = this.prioritizeCourtNums(sport, availableCourts.map((c) => c.courtNum))
+      const prioritized = prioritizedNums
+        .map((num) => availableCourts.find((c) => c.courtNum === num))
+        .filter(Boolean) as Array<{ courtNum: string; emptyId: string }>
+      const slotId = prioritized[0]?.emptyId ?? null
+      logger.info(`[laieta] Court priority (${sport}): available=[${availableCourts.map((c) => c.courtNum).join(', ')}], prioritized=[${prioritized.map((c) => c.courtNum).join(', ')}], selected=${prioritized[0]?.courtNum ?? 'none'}`)
 
       if (!slotId) {
         throw new AppError(`Slot no longer available: court=${courtId} at ${time}`, 409, 'SLOT_NOT_FOUND')
