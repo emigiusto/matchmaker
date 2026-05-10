@@ -194,8 +194,6 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
         '',
         `Motivo: ${reason}`,
-        '',
-        'Por favor, reserva la pista manualmente.',
       ].join('\n');
     },
 
@@ -356,8 +354,6 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
         '',
         `Reason: ${reason}`,
-        '',
-        'Please book the court manually.',
       ].join('\n');
     },
 
