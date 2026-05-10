@@ -87,7 +87,13 @@ export function PhoneInput({
   }
 
   const handleNationalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value.replace(/\D/g, "")
+    const raw = e.target.value
+    let v = raw.replace(/\D/g, "")
+    // If the user pasted a full E.164 number (starts with +), strip the dial code
+    // prefix so the national field doesn't end up doubling it (e.g. +34 34612345678).
+    if (raw.trimStart().startsWith("+") && v.startsWith(countryDial)) {
+      v = v.slice(countryDial.length)
+    }
     setNational(v)
     const country = COUNTRY_CODES.find((c) => c.dial === countryDial)
     if (country?.dial) {
