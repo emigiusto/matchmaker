@@ -26,6 +26,7 @@ export class SchedulingController {
         candidateUserIds: body.candidateUserIds || [],
         bookingEnabled: body.bookingEnabled === true,
         timezone: body.timezone ?? 'UTC',
+        additionalDates: Array.isArray(body.additionalDates) ? body.additionalDates : undefined,
       };
       const request = await schedulingService.createSchedulingRequest(input);
       res.status(201).json(request);
