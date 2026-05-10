@@ -518,6 +518,7 @@ model SchedulingRequest {
   bookingEnabled        Boolean                 @default(false)
   timezone              String                  @default("UTC")
   currentCandidateIndex Int                     @default(0)
+  additionalDates       String?                 @db.Text
   matchId               String?                 @unique
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt

@@ -29,6 +29,8 @@ export interface CreateSchedulingRequestInput {
   format?: SchedulingFormat;
   matchType?: SchedulingMatchType;
   date: string;
+  /** If set, all dates for this request. First element must match `date`. */
+  dates?: string[];
   startTime: string;
   endTime: string;
   locationText: string;
@@ -49,6 +51,8 @@ export interface SchedulingRequestDTO {
   format: SchedulingFormat;
   matchType: SchedulingMatchType;
   date: string;
+  /** Additional dates beyond the primary (null for single-date requests). */
+  additionalDates: string[] | null;
   startTime: string;
   endTime: string;
   locationText: string;

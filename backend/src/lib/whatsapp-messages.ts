@@ -10,6 +10,8 @@ interface MessageTemplates {
   invite(hostName: string, sport: string, format: string, date: string, time: string, loc: string, timeLeft: string): string;
   /** Poll-based invite for multi-hour requests. Time options are shown as poll choices, not in the message body. */
   invitePoll(hostName: string, sport: string, format: string, date: string, loc: string, timeLeft: string): string;
+  /** Poll-based invite for multi-date requests. Day+time options are shown as poll choices. */
+  inviteMultiDatePoll(hostName: string, sport: string, format: string, loc: string, timeLeft: string): string;
   inviteNoLongerAvailable(hostName: string, sport: string, date: string): string;
   inviteReply(): string;
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
@@ -92,6 +94,26 @@ const templates: Record<Locale, MessageTemplates> = {
         `${sportEmoji}  ${sportLabel}`,
         '',
         '¿A qué hora te va bien? (selecciona una o varias)',
+        '',
+        `⏳ Tienes *${timeLeft}* para responder`,
+      ].join('\n');
+    },
+
+    inviteMultiDatePoll(hostName, sport, format, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'pádel' : 'tenis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sport === 'padel' ? 'Pádel' : 'Tenis'} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
+      return [
+        `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`,
+        '',
+        locationLine,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        '¿Cuál de estos días y horarios te va mejor? (selecciona uno o varios)',
         '',
         `⏳ Tienes *${timeLeft}* para responder`,
       ].join('\n');
@@ -263,6 +285,26 @@ const templates: Record<Locale, MessageTemplates> = {
         `${sportEmoji}  ${sportLabel}`,
         '',
         'Which hour(s) work for you?',
+        '',
+        `⏳ You have *${timeLeft}* to respond`,
+      ].join('\n');
+    },
+
+    inviteMultiDatePoll(hostName, sport, format, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
+      const formatName = format.charAt(0).toUpperCase() + format.slice(1);
+      const sportLabel = `${sportName} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Once we confirm the time, ${hostName} will find a court.`;
+      return [
+        `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`,
+        '',
+        locationLine,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        'Which of these days and times works for you? (pick one or more)',
         '',
         `⏳ You have *${timeLeft}* to respond`,
       ].join('\n');

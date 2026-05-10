@@ -26,7 +26,13 @@ import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/what
 import { resolveGroupMessageLocale } from '../../lib/locale-helpers';
 
 const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
+const DATE_TIME_SLOT_RE = /^(\d{2})\/(\d{2}) · (\d{2}):00$/;
 const NONE_OPTION_RE = /^(none|ninguno)$/i;
+
+function parseAdditionalDates(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw) as string[]; } catch { return []; }
+}
 
 // Debounce poll quorum evaluation so rapid multi-select clicks are treated as one vote batch
 const POLL_VOTE_DEBOUNCE_MS = 3000;
@@ -59,6 +65,7 @@ type RequestRow = {
   status: string;
   currentCandidateIndex: number;
   matchId: string | null;
+  additionalDates?: string | null;
   match?: { whatsappGroupId: string | null } | null;
   timezone?: string;
   createdAt: Date;
@@ -93,6 +100,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     status: r.status as SchedulingRequestDTO['status'],
     currentCandidateIndex: r.currentCandidateIndex,
     matchId: r.matchId,
+    additionalDates: parseAdditionalDates(r.additionalDates),
     whatsappGroupId: r.match?.whatsappGroupId ?? null,
     timezone: r.timezone ?? 'UTC',
     createdAt: r.createdAt.toISOString(),
@@ -402,6 +410,9 @@ export const schedulingService = {
           maxParallelCandidates: maxParallel,
           bookingEnabled: input.bookingEnabled ?? false,
           timezone: input.timezone ?? 'UTC',
+          additionalDates: input.dates && input.dates.length > 1
+            ? JSON.stringify(input.dates.slice(1))
+            : null,
           inviteToken,
           status: 'active',
         },
@@ -508,30 +519,53 @@ export const schedulingService = {
       const startHHMM = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
       const endHHMM = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
       const slots = slotsInRange(startHHMM, endHHMM);
-      let message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
-      // Annotate unavailable slots inline in the message body (only when booking is enabled and at least one slot has no courts)
-      if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && slots.length > 0) {
-        const dateStrISO = new Date(request.date).toISOString().slice(0, 10);
-        const hostMembership = await prisma.clubMembership.findFirst({
-          where: { userId: request.hostUserId, status: 'active', encryptedPassword: { not: null } },
-        });
-        if (hostMembership) {
-          const courtsPerSlot = await getCachedCourtsPerSlot(
-            request.hostUserId, hostMembership.clubSlug, dateStrISO, request.sportType, slots,
-          );
-          if (courtsPerSlot) {
-            const hasUnavailable = slots.some(slot => (courtsPerSlot[slot] ?? 1) === 0);
-            if (hasUnavailable) {
-              const noCourtsLabel = loc === 'es' ? 'No hay pistas disponibles' : 'No courts available';
-              const slotLines = slots.map(slot =>
-                (courtsPerSlot[slot] ?? 1) === 0 ? `${slot} - ${noCourtsLabel}` : slot,
-              );
-              message = `${message}\n\n${slotLines.join('\n')}`;
+
+      const additionalDates = parseAdditionalDates((request as RequestRow).additionalDates);
+      const isMultiDate = additionalDates.length > 0;
+
+      let message: string;
+      let inviteButtons: { id: string; title: string }[];
+
+      if (isMultiDate) {
+        message = msgs.inviteMultiDatePoll(hostName, request.sportType, formatLabel, request.locationText, timeLeft);
+        const allDates = [request.date, ...additionalDates.map(d => new Date(d))];
+        const noneLabel = loc === 'es' ? 'Ninguno' : 'None';
+        const multiButtons: { id: string; title: string }[] = [];
+        for (const d of allDates) {
+          const dd = String(d.getUTCDate()).padStart(2, '0');
+          const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+          for (const slot of slots) {
+            multiButtons.push({ id: `slot_${dd}${mm}_${slot.replace(':', '')}`, title: `${dd}/${mm} · ${slot}` });
+          }
+        }
+        multiButtons.push({ id: 'invite_none', title: noneLabel });
+        inviteButtons = multiButtons;
+      } else {
+        message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
+        // Annotate unavailable slots inline in the message body (only when booking is enabled and at least one slot has no courts)
+        if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && slots.length > 0) {
+          const dateStrISO = new Date(request.date).toISOString().slice(0, 10);
+          const hostMembership = await prisma.clubMembership.findFirst({
+            where: { userId: request.hostUserId, status: 'active', encryptedPassword: { not: null } },
+          });
+          if (hostMembership) {
+            const courtsPerSlot = await getCachedCourtsPerSlot(
+              request.hostUserId, hostMembership.clubSlug, dateStrISO, request.sportType, slots,
+            );
+            if (courtsPerSlot) {
+              const hasUnavailable = slots.some(slot => (courtsPerSlot[slot] ?? 1) === 0);
+              if (hasUnavailable) {
+                const noCourtsLabel = loc === 'es' ? 'No hay pistas disponibles' : 'No courts available';
+                const slotLines = slots.map(slot =>
+                  (courtsPerSlot[slot] ?? 1) === 0 ? `${slot} - ${noCourtsLabel}` : slot,
+                );
+                message = `${message}\n\n${slotLines.join('\n')}`;
+              }
             }
           }
         }
+        inviteButtons = getInviteButtons(candidateLocale, slots);
       }
-      const inviteButtons = getInviteButtons(candidateLocale, slots);
 
       await prisma.$transaction(async (tx) => {
         await tx.schedulingCandidate.update({
@@ -595,16 +629,57 @@ export const schedulingService = {
       return { processed: true };
     }
 
-    // Parse HH:MM slots from the voted option titles
-    const votedHours = options
-      .map((o) => o.trim())
+    const trimmedOptions = options.map((o) => o.trim());
+
+    // Check for multi-date votes (DD/MM · HH:00 format)
+    const multiDateOptions = trimmedOptions.filter((o) => DATE_TIME_SLOT_RE.test(o));
+    if (multiDateOptions.length > 0) {
+      const additionalDates = parseAdditionalDates(request.additionalDates);
+      const allDateStrs = [request.date.toISOString().slice(0, 10), ...additionalDates];
+      const parsedDateTimes: string[] = [];
+      for (const option of multiDateOptions) {
+        const m = DATE_TIME_SLOT_RE.exec(option);
+        if (!m) continue;
+        const [, dd, mm, hh] = m;
+        const matchedDate = allDateStrs.find(d => {
+          const dObj = new Date(d);
+          return String(dObj.getUTCDate()).padStart(2, '0') === dd &&
+                 String(dObj.getUTCMonth() + 1).padStart(2, '0') === mm;
+        });
+        if (matchedDate) parsedDateTimes.push(`${matchedDate}·${hh}`);
+      }
+      if (parsedDateTimes.length === 0) {
+        logger.info('PollVoteIgnored', { reason: 'unrecognized_multidate_response', options, candidateId: candidate.id });
+        return { processed: false };
+      }
+      await recordEvent({
+        schedulingRequestId: request.id,
+        action: 'poll_vote',
+        candidateId: candidate.id,
+        metadata: { dateTimes: parsedDateTimes },
+      });
+      logger.info('MultiDatePollVoteRecorded', { requestId: request.id, candidateId: candidate.id, dateTimes: parsedDateTimes });
+      const existing = pollDebounceTimers.get(request.id);
+      if (existing) clearTimeout(existing);
+      pollDebounceTimers.set(
+        request.id,
+        setTimeout(() => {
+          pollDebounceTimers.delete(request.id);
+          void this.checkPollQuorum(request.id);
+        }, POLL_VOTE_DEBOUNCE_MS),
+      );
+      return { processed: true };
+    }
+
+    // Parse HH:MM slots from the voted option titles (single-date poll)
+    const votedHours = trimmedOptions
       .filter((o) => TIME_SLOT_RE.test(o))
       .map((o) => o.slice(0, 2)); // normalize to 'HH'
 
     if (votedHours.length === 0) {
       // If the user explicitly selected the "None" option, treat it as a decline.
       // Any other unrecognized text (e.g. a plain chat message) is silently ignored.
-      const isExplicitDecline = options.some((o) => NONE_OPTION_RE.test(o.trim()));
+      const isExplicitDecline = trimmedOptions.some((o) => NONE_OPTION_RE.test(o));
       if (!isExplicitDecline) {
         logger.info('PollVoteIgnored', { reason: 'unrecognized_response', options, candidateId: candidate.id });
         return { processed: false };
@@ -673,6 +748,55 @@ export const schedulingService = {
       if (ev.candidateId) {
         latestVotes.set(ev.candidateId, (ev.metadata as { hours?: string[] } | null)?.hours ?? []);
       }
+    }
+
+    // Multi-date quorum path: votes stored as { dateTimes: ["YYYY-MM-DD·HH", ...] }
+    const additionalDates = parseAdditionalDates((request as RequestRow).additionalDates ?? null);
+    const isMultiDate = additionalDates.length > 0;
+
+    if (isMultiDate) {
+      const latestDateTimeVotes = new Map<string, string[]>();
+      for (const ev of allVoteEvents) {
+        if (ev.candidateId) {
+          const dateTimes = (ev.metadata as { dateTimes?: string[] } | null)?.dateTimes ?? [];
+          if (dateTimes.length > 0) latestDateTimeVotes.set(ev.candidateId, dateTimes);
+        }
+      }
+      if (latestDateTimeVotes.size < required) return;
+
+      const dateTimeCounts = new Map<string, number>();
+      for (const dateTimes of latestDateTimeVotes.values()) {
+        for (const dt of dateTimes) {
+          dateTimeCounts.set(dt, (dateTimeCounts.get(dt) ?? 0) + 1);
+        }
+      }
+      const confirmedDateTime = [...dateTimeCounts.entries()]
+        .sort(([a], [b]) => a.localeCompare(b)) // earliest first
+        .find(([, count]) => count >= required)?.[0];
+      if (!confirmedDateTime) return;
+
+      const [dateStr, hh] = confirmedDateTime.split('·');
+      const overrideSlotUTC = `${hh.padStart(2, '0')}:00`;
+      const acceptingCandidateIds = [...latestDateTimeVotes.entries()]
+        .filter(([, dts]) => dts.includes(confirmedDateTime))
+        .map(([id]) => id)
+        .slice(0, required);
+
+      await prisma.$transaction(async (tx) => {
+        await tx.schedulingCandidate.updateMany({
+          where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted'] } },
+          data: { status: 'accepted', responseAt: new Date() },
+        });
+        await tx.schedulingRequest.update({
+          where: { id: requestId },
+          data: { status: 'completed' },
+        });
+      });
+
+      logger.info('MultiDatePollQuorumReached', { requestId, confirmedDateTime });
+      void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { via: 'poll', confirmedDateTime } });
+      await this.completeScheduling(requestId, overrideSlotUTC, dateStr);
+      return;
     }
 
     if (latestVotes.size < required) return; // not enough voters yet
@@ -783,7 +907,23 @@ export const schedulingService = {
 
   async expireRequestsPastScheduledTime(): Promise<number> {
     const requests = await schedulingRepository.findActivePastScheduledTime();
+    const now = new Date();
+    let expired = 0;
     for (const r of requests) {
+      // Skip multi-date requests that still have a future date remaining
+      const additionalDates = parseAdditionalDates(r.additionalDates);
+      if (additionalDates.length > 0) {
+        const startH = new Date(r.startTime).getUTCHours();
+        const startMin = new Date(r.startTime).getUTCMinutes();
+        const hasFutureDate = additionalDates.some(d => {
+          const dObj = new Date(d);
+          const futureDt = new Date(Date.UTC(
+            dObj.getUTCFullYear(), dObj.getUTCMonth(), dObj.getUTCDate(), startH, startMin, 0,
+          ));
+          return futureDt > now;
+        });
+        if (hasFutureDate) continue;
+      }
       await schedulingRepository.updateRequestStatus(r.id, 'expired');
       logger.info('SchedulingExpired', { requestId: r.id, reason: 'scheduled_time_passed' });
       void recordEvent({ schedulingRequestId: r.id, action: 'request_expired', metadata: { reason: 'scheduled_time_passed' } });
@@ -792,11 +932,12 @@ export const schedulingService = {
         void logServerEvent(fullRequest.hostUserId, 'scheduling.no_match', { requestId: r.id });
         await notifyHostSchedulingNoMatch(fullRequest, 'scheduled_time_passed');
       }
+      expired++;
     }
-    return requests.length;
+    return expired;
   },
 
-  async completeScheduling(requestId: string, overrideSlotHHMM?: string): Promise<void> {
+  async completeScheduling(requestId: string, overrideSlotHHMM?: string, overrideDateStr?: string): Promise<void> {
     const request = await prisma.schedulingRequest.findUnique({
       where: { id: requestId },
       include: {
@@ -821,7 +962,7 @@ export const schedulingService = {
     // When bookingEnabled and the host has an active club membership, pick the earliest
     // slot in the range that has a court available (pure Redis cache read, no Puppeteer).
     // Falls back to startTime when the cache is cold or no courts are found.
-    const reqDate = new Date(request.date);
+    const reqDate = overrideDateStr ? new Date(overrideDateStr) : new Date(request.date);
     const reqStartTime = new Date(request.startTime);
     const reqEndTime = new Date(request.endTime);
     const dateStr = reqDate.toISOString().slice(0, 10);

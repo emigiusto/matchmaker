@@ -47,6 +47,7 @@ export interface SchedulingRequestDTO {
   format: "singles" | "doubles"
   matchType: "competitive" | "practice"
   date: string
+  additionalDates: string[] | null
   startTime: string
   endTime: string
   locationText: string
@@ -68,6 +69,7 @@ export interface CreateSchedulingRequestInput {
   format: "singles" | "doubles"
   matchType: "competitive" | "practice"
   date: string
+  dates?: string[]
   startTime: string
   endTime: string
   locationText: string

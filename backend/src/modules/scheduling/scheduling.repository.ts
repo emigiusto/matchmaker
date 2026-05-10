@@ -92,7 +92,7 @@ export const schedulingRepository = {
   async findActivePastScheduledTime() {
     return prisma.schedulingRequest.findMany({
       where: { status: 'active', startTime: { lte: new Date() } },
-      select: { id: true, date: true, startTime: true },
+      select: { id: true, date: true, startTime: true, additionalDates: true },
     });
   },
 

@@ -185,7 +185,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const { t, language } = useTranslation()
   const dateLocale = language === "es" ? esLocale : undefined
   const [step, setStep] = useState<Step>(1)
-  const [date, setDate] = useState<Date | undefined>(undefined)
+  const [dates, setDates] = useState<Date[]>([])
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
@@ -240,7 +240,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
   function resetWizard() {
     setStep(1)
-    setDate(undefined)
+    setDates([])
     setStartTime("")
     setEndTime("")
     setLocationType("place")
@@ -285,7 +285,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   // Keyed by date+sport+membership — changing the time picker reuses the cached result.
   // Disables the toggle if the check doesn't return within the timeout.
   useEffect(() => {
-    if (!bookingEnabled || !date) {
+    if (!bookingEnabled || dates.length === 0) {
       setCourtAvailability(null)
       setCourtAvailabilityError(null)
       return
@@ -308,10 +308,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       toast.error(t("wizard.courtAvailabilityServiceError"))
     }, 20_000)
 
+    const primaryDate = dates[0]
+    if (!primaryDate) return
     bookingService.checkAvailability({
       userId: hostUserId,
       clubSlug: membership.clubSlug,
-      date: format(date, "yyyy-MM-dd"),
+      date: format(primaryDate, "yyyy-MM-dd"),
       sport,
     }).then((result) => {
       if (settled) return
@@ -331,7 +333,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       settled = true
       clearTimeout(timeout)
     }
-  }, [bookingEnabled, date, sport, selectedMembershipId, clubMemberships, hostUserId])
+  }, [bookingEnabled, dates, sport, selectedMembershipId, clubMemberships, hostUserId])
 
   // Fetch contacts for step 3: contacts + lists (2 calls instead of 4)
   useEffect(() => {
@@ -377,7 +379,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     })
   }
 
-  const canProceedStep1 = date && startTime && endTime && !(bookingEnabled && courtAvailabilityLoading)
+  const canProceedStep1 = dates.length > 0 && startTime && endTime && !(bookingEnabled && courtAvailabilityLoading)
   const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
@@ -598,20 +600,24 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   }
 
   async function handleStartScheduling() {
-    if (!date || !startTime || !endTime || !hostUserId || priorityList.length === 0) return
+    const primaryDate = dates[0]
+    if (!primaryDate || !startTime || !endTime || !hostUserId || priorityList.length === 0) return
     setSubmitting(true)
     try {
-      const dateStr = format(date, "yyyy-MM-dd")
+      const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime())
+      const dateStr = format(sortedDates[0], "yyyy-MM-dd")
+      const allDateStrs = sortedDates.map((d) => format(d, "yyyy-MM-dd"))
       const [startH, startM] = startTime.split(":").map(Number)
       const [endH, endM] = endTime.split(":").map(Number)
-      const startDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), startH, startM)
-      const endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endH, endM)
+      const startDateTime = new Date(sortedDates[0].getFullYear(), sortedDates[0].getMonth(), sortedDates[0].getDate(), startH, startM)
+      const endDateTime = new Date(sortedDates[0].getFullYear(), sortedDates[0].getMonth(), sortedDates[0].getDate(), endH, endM)
       const req = await schedulingService.create({
         hostUserId,
         sportType: sport,
         format: matchFormat,
         matchType,
         date: dateStr,
+        dates: allDateStrs.length > 1 ? allDateStrs : undefined,
         startTime: startDateTime.toISOString(),
         endTime: endDateTime.toISOString(),
         locationText: (locationType === "place" ? specificPlace : cityValue).trim(),
@@ -713,18 +719,23 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left text-base",
-                      !date && "text-muted-foreground"
+                      dates.length === 0 && "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-5 w-5" />
-                    {date ? format(date, "EEEE, MMMM d, yyyy", { locale: dateLocale }) : t("wizard.pickDate")}
+                    {dates.length === 0
+                      ? t("wizard.pickDate")
+                      : dates.length === 1
+                        ? format([...dates].sort((a, b) => a.getTime() - b.getTime())[0], "EEEE, MMMM d, yyyy", { locale: dateLocale })
+                        : `${dates.length} ${language === "es" ? "fechas seleccionadas" : "dates selected"}`
+                    }
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(d) => { setDate(d); setDatePickerOpen(false); }}
+                    mode="multiple"
+                    selected={dates}
+                    onSelect={(d) => setDates(d ?? [])}
                     disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
                     initialFocus
                   />
@@ -913,19 +924,19 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 {bookingEnabled && (
                   <div className="border-t border-border/40 pt-3 space-y-2">
                     <p className="text-xs font-medium text-muted-foreground">{t("wizard.courtAvailability")}</p>
-                    {!date && (
+                    {dates.length === 0 && (
                       <p className="text-xs text-muted-foreground">{t("wizard.courtAvailabilityHint")}</p>
                     )}
-                    {date && courtAvailabilityLoading && (
+                    {dates.length > 0 && courtAvailabilityLoading && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         {t("wizard.checkingCourts")}
                       </div>
                     )}
-                    {date && !courtAvailabilityLoading && courtAvailabilityError && (
+                    {dates.length > 0 && !courtAvailabilityLoading && courtAvailabilityError && (
                       <p className="text-xs text-muted-foreground">{courtAvailabilityError}</p>
                     )}
-                    {date && !courtAvailabilityLoading && !courtAvailabilityError && courtAvailability && (() => {
+                    {dates.length > 0 && !courtAvailabilityLoading && !courtAvailabilityError && courtAvailability && (() => {
                       const slots = slotsInRange(startTime, endTime)
                       if (slots.length === 0) return (
                         <p className="text-xs text-muted-foreground">{t("wizard.courtAvailabilityHint")}</p>
@@ -1491,7 +1502,14 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               <div className="space-y-2">
                 <div className="flex items-center gap-3 text-sm">
                   <CalendarIcon className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="font-medium">{date ? format(date, "EEEE, MMMM d", { locale: dateLocale }) : ""}</span>
+                  <span className="font-medium">
+                    {dates.length === 0
+                      ? ""
+                      : dates.length === 1
+                        ? format([...dates].sort((a, b) => a.getTime() - b.getTime())[0], "EEEE, MMMM d", { locale: dateLocale })
+                        : `${dates.length} ${language === "es" ? "fechas" : "dates"}`
+                    }
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <Clock className="h-4 w-4 shrink-0 text-primary" />
