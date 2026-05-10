@@ -748,12 +748,13 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     : "You can select multiple days. Tap again to deselect."}
                 </p>
               </div>
-              <div className="flex justify-center rounded-xl border border-border/60 bg-muted/10">
+              <div className="rounded-xl border border-border/60 bg-muted/10">
                 <Calendar
                   mode="multiple"
                   selected={dates}
                   onSelect={handleDatesSelect}
                   disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
+                  classNames={{ root: "w-full", months: "flex flex-col w-full relative gap-4" }}
                 />
               </div>
 
