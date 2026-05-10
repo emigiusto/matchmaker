@@ -186,7 +186,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const dateLocale = language === "es" ? esLocale : undefined
   const [step, setStep] = useState<Step>(1)
   const [dateEntries, setDateEntries] = useState<Array<{ date: Date; startTime: string; endTime: string }>>([])
-  const [datePickerOpen, setDatePickerOpen] = useState(false)
+
   // Derived from dateEntries for backward-compat with downstream code
   const dates = dateEntries.map((e) => e.date)
   const startTime = dateEntries[0]?.startTime ?? ""
@@ -740,37 +740,24 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
             {/* Date + per-date time pickers */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">{t("wizard.date")}</Label>
-              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left text-base",
-                      dates.length === 0 && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-5 w-5" />
-                    {dates.length === 0
-                      ? t("wizard.pickDate")
-                      : dates.length === 1
-                        ? format([...dates].sort((a, b) => a.getTime() - b.getTime())[0], "EEEE, MMMM d, yyyy", { locale: dateLocale })
-                        : `${dates.length} ${language === "es" ? "fechas seleccionadas" : "dates selected"}`
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="multiple"
-                    selected={dates}
-                    onSelect={handleDatesSelect}
-                    disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div>
+                <Label className="text-base font-medium">{t("wizard.date")}</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {language === "es"
+                    ? "Puedes seleccionar varios días. Toca de nuevo para deseleccionar."
+                    : "You can select multiple days. Tap again to deselect."}
+                </p>
+              </div>
+              <div className="flex justify-center rounded-xl border border-border/60 bg-muted/10">
+                <Calendar
+                  mode="multiple"
+                  selected={dates}
+                  onSelect={handleDatesSelect}
+                  disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
+                />
+              </div>
 
-              {/* Per-date time pickers */}
+              {/* Per-date time pickers — appear below the calendar, no layout shift */}
               {dateEntries.length > 0 && (
                 <div className="space-y-2 pt-1">
                   {[...dateEntries]
