@@ -418,11 +418,20 @@ export class LaietaAdapter implements BookingAdapter {
       await page.evaluate((id: string) => {
         document.querySelector(`[id="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'instant' })
       }, slotId)
-      await new Promise(r => setTimeout(r, 400))
+
+      // Wait until the element's bounding rect is fully inside the viewport — not just
+      // scrolled to, but visually stable and not clipped by a sticky header/footer.
+      await page.waitForFunction((id: string) => {
+        const el = document.querySelector(`[id="${CSS.escape(id)}"]`)
+        if (!el) return false
+        const r = el.getBoundingClientRect()
+        return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth
+      }, { timeout: 5000 }, slotId).catch(() => { /* non-fatal — proceed anyway */ })
+      await new Promise(r => setTimeout(r, 600))
 
       // hover() first so the portal's mouseenter handlers fire before the click
       await page.hover(`[id="${slotId}"]`).catch(() => { /* non-fatal */ })
-      await new Promise(r => setTimeout(r, 150))
+      await new Promise(r => setTimeout(r, 200))
       await page.click(`[id="${slotId}"]`)
 
       // ── Step 2: Popup → click "Continua" ───────────────────────────
@@ -440,16 +449,35 @@ export class LaietaAdapter implements BookingAdapter {
         const popupFoundAfterJq = await page.waitForSelector(popupSelector, { timeout: 8000 }).then(() => true).catch(() => false)
 
         if (!popupFoundAfterJq) {
-          const pageUrl = page.url()
-          const bodySnippet = await page.evaluate(() =>
-            document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 500)
-          ).catch(() => '?')
-          const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
-          const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'popup-missing') : null
-          logger.error(`[laieta] Popup selector not found after slot click. url=${pageUrl}`)
-          logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
-          if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
-          throw new AppError(`Popup did not appear after clicking slot ${slotId}`, 502, 'BOOKING_POPUP_MISSING')
+          // Last resort: dispatch a full synthetic mouse event sequence on the element.
+          // Some portal event handlers listen to mousedown/mouseup rather than click,
+          // and Puppeteer's page.click() may not fire all three when the element is
+          // near the viewport edge or partially obscured.
+          logger.warn(`[laieta] Popup not found after jQuery trigger — retrying with synthetic mouse events`)
+          await page.evaluate((id: string) => {
+            const el = document.querySelector(`[id="${CSS.escape(id)}"]`)
+            if (!el) return
+            const opts: MouseEventInit = { bubbles: true, cancelable: true, view: window }
+            el.dispatchEvent(new MouseEvent('mouseenter', opts))
+            el.dispatchEvent(new MouseEvent('mouseover', opts))
+            el.dispatchEvent(new MouseEvent('mousedown', opts))
+            el.dispatchEvent(new MouseEvent('mouseup', opts))
+            el.dispatchEvent(new MouseEvent('click', opts))
+          }, slotId)
+          const popupFoundAfterSynth = await page.waitForSelector(popupSelector, { timeout: 6000 }).then(() => true).catch(() => false)
+
+          if (!popupFoundAfterSynth) {
+            const pageUrl = page.url()
+            const bodySnippet = await page.evaluate(() =>
+              document.body.innerText?.replace(/\s+/g, ' ').trim().slice(0, 500)
+            ).catch(() => '?')
+            const screenshotB64 = await page.screenshot({ encoding: 'base64', fullPage: true }).catch(() => null)
+            const screenshotPath = screenshotB64 ? this.saveScreenshot(screenshotB64 as string, 'popup-missing') : null
+            logger.error(`[laieta] Popup selector not found after all fallbacks. url=${pageUrl}`)
+            logger.error(`[laieta] Page text snippet: ${bodySnippet}`)
+            if (screenshotPath) logger.error(`[laieta] Screenshot saved: ${screenshotPath}`)
+            throw new AppError(`Popup did not appear after clicking slot ${slotId}`, 502, 'BOOKING_POPUP_MISSING')
+          }
         }
       }
       // Attach .catch immediately — before await page.click() — so that if the navigation
