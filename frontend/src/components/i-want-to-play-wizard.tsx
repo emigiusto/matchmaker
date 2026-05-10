@@ -775,7 +775,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 <div className="space-y-2 pt-1">
                   {[...dateEntries]
                     .sort((a, b) => a.date.getTime() - b.date.getTime())
-                    .map((entry, idx) => (
+                    .map((entry) => (
                       <div key={entry.date.toISOString()} className="flex items-center gap-2">
                         <span className="w-24 shrink-0 text-sm font-medium text-foreground">
                           {format(entry.date, "EEE d/M", { locale: dateLocale })}
