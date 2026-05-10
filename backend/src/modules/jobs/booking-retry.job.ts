@@ -19,10 +19,12 @@ async function runBookingRetryJob() {
 }
 
 /**
- * Runs once daily at 02:00 UTC.
+ * Runs once daily at 00:03 Europe/Madrid (GMT+2 CEST / GMT+1 CET).
+ * Courts on miclubonline open for next-day booking at midnight local time,
+ * so retrying at 00:03 captures slots that were unavailable at confirmation time.
  */
 export function scheduleBookingRetryJob() {
-  cron.schedule('0 2 * * *', runBookingRetryJob);
+  cron.schedule('3 0 * * *', runBookingRetryJob, { timezone: 'Europe/Madrid' });
   // eslint-disable-next-line no-console
-  console.log('[JOBS] BookingRetryJob: cron daily at 02:00 UTC');
+  console.log('[JOBS] BookingRetryJob: cron daily at 00:03 Europe/Madrid');
 }
