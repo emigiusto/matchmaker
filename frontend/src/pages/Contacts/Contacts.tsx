@@ -140,6 +140,7 @@ export default function Contacts() {
   const [newName, setNewName] = useState("")
   const [newPhone, setNewPhone] = useState("")
   const [newCommLang, setNewCommLang] = useState<"es" | "en">("es")
+  const [newSocioInputs, setNewSocioInputs] = useState<Record<string, string>>({})
   const [creatingContact, setCreatingContact] = useState(false)
 
   // New list dialog
@@ -293,12 +294,19 @@ export default function Contacts() {
     if (!validation.valid) { toast.error(validation.error); return }
     setCreatingContact(true)
     try {
-      await contactsService.create(currentUserId, name, phone, newCommLang)
+      const { contact } = await contactsService.create(currentUserId, name, phone, newCommLang)
+      const socioUpdates = Object.entries(newSocioInputs).filter(([, v]) => v.trim())
+      await Promise.all(
+        socioUpdates.map(([clubSlug, socioNumber]) =>
+          contactsService.updateSocioNumber(contact.id, currentUserId, contact.socioNumbers, clubSlug, socioNumber.trim())
+        )
+      )
       toast.success(t("contactsPage.toast.contactCreated"))
       setNewContactOpen(false)
       setNewName("")
       setNewPhone("")
       setNewCommLang(language as "es" | "en")
+      setNewSocioInputs({})
       await refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("contactsPage.toast.saveFailed"))
@@ -993,7 +1001,7 @@ export default function Contacts() {
       </Dialog>
 
       {/* ── New contact dialog ─────────────────────────────── */}
-      <Dialog open={newContactOpen} onOpenChange={setNewContactOpen}>
+      <Dialog open={newContactOpen} onOpenChange={(open) => { setNewContactOpen(open); if (!open) { setNewName(""); setNewPhone(""); setNewSocioInputs({}) } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("contactsPage.newContactTitle")}</DialogTitle>
@@ -1028,6 +1036,26 @@ export default function Contacts() {
                 ))}
               </div>
             </div>
+            {memberships.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm">{t("contactsPage.clubSocioNumbers")}</Label>
+                {memberships.map((ms) => (
+                  <div key={ms.clubSlug} className="flex items-center gap-3">
+                    <span className="w-36 shrink-0 truncate text-sm text-muted-foreground">
+                      {clubLabel(ms.clubSlug)}
+                    </span>
+                    <Input
+                      className="h-8 text-sm"
+                      placeholder={t("contactsPage.socioPlaceholder")}
+                      value={newSocioInputs[ms.clubSlug] ?? ""}
+                      onChange={(e) =>
+                        setNewSocioInputs((prev) => ({ ...prev, [ms.clubSlug]: e.target.value }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <DialogClose asChild>
