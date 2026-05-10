@@ -23,16 +23,22 @@ export const RESPONSE_WINDOW_OPTIONS = [15, 30, 60, 120, 240, 720, 1440, 4320] a
 
 export const MAX_ACTIVE_SCHEDULING_REQUESTS = 5;
 
+export interface AdditionalDateEntry {
+  date: string;      // YYYY-MM-DD
+  startTime: string; // HH:MM
+  endTime: string;   // HH:MM
+}
+
 export interface CreateSchedulingRequestInput {
   hostUserId: string;
   sportType: SchedulingSportType;
   format?: SchedulingFormat;
   matchType?: SchedulingMatchType;
   date: string;
-  /** If set, all dates for this request. First element must match `date`. */
-  dates?: string[];
   startTime: string;
   endTime: string;
+  /** Additional dates beyond the primary, each with its own time range. */
+  additionalDates?: AdditionalDateEntry[];
   locationText: string;
   radiusKm?: number | null;
   responseWindowMinutes?: number;
@@ -51,8 +57,8 @@ export interface SchedulingRequestDTO {
   format: SchedulingFormat;
   matchType: SchedulingMatchType;
   date: string;
-  /** Additional dates beyond the primary (null for single-date requests). */
-  additionalDates: string[] | null;
+  /** Additional dates beyond the primary, each with its own time range. Null for single-date requests. */
+  additionalDates: AdditionalDateEntry[] | null;
   startTime: string;
   endTime: string;
   locationText: string;

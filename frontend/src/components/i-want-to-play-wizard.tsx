@@ -72,7 +72,7 @@ import { SportFormatBadge } from "@/components/sport-format-badge"
 import { toast } from "sonner"
 import { validatePhoneE164 } from "@/lib/phone.utils"
 import { cn } from "@/lib/utils"
-import { schedulingService } from "@/lib/services/scheduling.service"
+import { schedulingService, type AdditionalDateEntry } from "@/lib/services/scheduling.service"
 import { playersService } from "@/lib/services/players.service"
 import { contactsService, type ContactDTO, type ContactListDTO } from "@/lib/services/contacts.service"
 import { deviceContactsService, type DeviceContact } from "@/lib/services/device-contacts.service"
@@ -185,10 +185,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const { t, language } = useTranslation()
   const dateLocale = language === "es" ? esLocale : undefined
   const [step, setStep] = useState<Step>(1)
-  const [dates, setDates] = useState<Date[]>([])
+  const [dateEntries, setDateEntries] = useState<Array<{ date: Date; startTime: string; endTime: string }>>([])
   const [datePickerOpen, setDatePickerOpen] = useState(false)
-  const [startTime, setStartTime] = useState("")
-  const [endTime, setEndTime] = useState("")
+  // Derived from dateEntries for backward-compat with downstream code
+  const dates = dateEntries.map((e) => e.date)
+  const startTime = dateEntries[0]?.startTime ?? ""
+  const endTime = dateEntries[0]?.endTime ?? ""
   const [locationType, setLocationType] = useState<LocationType>("place")
   const [specificPlace, setSpecificPlace] = useState("")
   const [cityValue, setCityValue] = useState("")
@@ -240,9 +242,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
   function resetWizard() {
     setStep(1)
-    setDates([])
-    setStartTime("")
-    setEndTime("")
+    setDateEntries([])
     setLocationType("place")
     setSpecificPlace("")
     setCityValue("")
@@ -308,7 +308,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       toast.error(t("wizard.courtAvailabilityServiceError"))
     }, 20_000)
 
-    const primaryDate = dates[0]
+    const primaryDate = dateEntries[0]?.date
     if (!primaryDate) return
     bookingService.checkAvailability({
       userId: hostUserId,
@@ -333,7 +333,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       settled = true
       clearTimeout(timeout)
     }
-  }, [bookingEnabled, dates, sport, selectedMembershipId, clubMemberships, hostUserId])
+  }, [bookingEnabled, dateEntries, sport, selectedMembershipId, clubMemberships, hostUserId])
 
   // Fetch contacts for step 3: contacts + lists (2 calls instead of 4)
   useEffect(() => {
@@ -369,17 +369,39 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     onOpenChange(val)
   }
 
-  function handleStartTimeChange(val: string) {
-    setStartTime(val)
-    // Keep end time if it's still after the new start; otherwise push it to start+1h
-    setEndTime((prev) => {
-      const [sh] = val.split(":").map(Number)
-      const [eh] = (prev || "").split(":").map(Number)
-      return !prev || eh <= sh ? addOneHour(val) : prev
+  function handleDatesSelect(selected: Date[] | undefined) {
+    const newDates = selected ?? []
+    setDateEntries((prev) => {
+      const lastEntry = prev[prev.length - 1]
+      const defaultStart = lastEntry?.startTime ?? ""
+      const defaultEnd = lastEntry?.endTime ?? ""
+      return newDates.map((d) => {
+        const existing = prev.find((e) => e.date.toDateString() === d.toDateString())
+        return existing ?? { date: d, startTime: defaultStart, endTime: defaultEnd }
+      })
     })
   }
 
-  const canProceedStep1 = dates.length > 0 && startTime && endTime && !(bookingEnabled && courtAvailabilityLoading)
+  function handleDateEntryStartTimeChange(idx: number, val: string) {
+    setDateEntries((prev) =>
+      prev.map((e, i) => {
+        if (i !== idx) return e
+        const [sh] = val.split(":").map(Number)
+        const [eh] = (e.endTime || "").split(":").map(Number)
+        const newEnd = !e.endTime || eh <= sh ? addOneHour(val) : e.endTime
+        return { ...e, startTime: val, endTime: newEnd }
+      })
+    )
+  }
+
+  function handleDateEntryEndTimeChange(idx: number, val: string) {
+    setDateEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, endTime: val } : e)))
+  }
+
+  const canProceedStep1 =
+    dateEntries.length > 0 &&
+    dateEntries.every((e) => e.startTime && e.endTime) &&
+    !(bookingEnabled && courtAvailabilityLoading)
   const spotsNeeded = matchFormat === "doubles" ? 3 : 1 // doubles: host+partner+3 others; singles: host+1
   const canProceedStep3 = priorityList.length >= spotsNeeded
   const displayTime = startTime && endTime ? `${startTime} - ${endTime}` : ""
@@ -600,26 +622,30 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   }
 
   async function handleStartScheduling() {
-    const primaryDate = dates[0]
-    if (!primaryDate || !startTime || !endTime || !hostUserId || priorityList.length === 0) return
+    if (dateEntries.length === 0 || !startTime || !endTime || !hostUserId || priorityList.length === 0) return
     setSubmitting(true)
     try {
-      const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime())
-      const dateStr = format(sortedDates[0], "yyyy-MM-dd")
-      const allDateStrs = sortedDates.map((d) => format(d, "yyyy-MM-dd"))
-      const [startH, startM] = startTime.split(":").map(Number)
-      const [endH, endM] = endTime.split(":").map(Number)
-      const startDateTime = new Date(sortedDates[0].getFullYear(), sortedDates[0].getMonth(), sortedDates[0].getDate(), startH, startM)
-      const endDateTime = new Date(sortedDates[0].getFullYear(), sortedDates[0].getMonth(), sortedDates[0].getDate(), endH, endM)
+      const sortedEntries = [...dateEntries].sort((a, b) => a.date.getTime() - b.date.getTime())
+      const primary = sortedEntries[0]
+      const dateStr = format(primary.date, "yyyy-MM-dd")
+      const [startH, startM] = primary.startTime.split(":").map(Number)
+      const [endH, endM] = primary.endTime.split(":").map(Number)
+      const startDateTime = new Date(primary.date.getFullYear(), primary.date.getMonth(), primary.date.getDate(), startH, startM)
+      const endDateTime = new Date(primary.date.getFullYear(), primary.date.getMonth(), primary.date.getDate(), endH, endM)
+      const additionalDateEntries: AdditionalDateEntry[] = sortedEntries.slice(1).map((e) => ({
+        date: format(e.date, "yyyy-MM-dd"),
+        startTime: e.startTime,
+        endTime: e.endTime,
+      }))
       const req = await schedulingService.create({
         hostUserId,
         sportType: sport,
         format: matchFormat,
         matchType,
         date: dateStr,
-        dates: allDateStrs.length > 1 ? allDateStrs : undefined,
         startTime: startDateTime.toISOString(),
         endTime: endDateTime.toISOString(),
+        additionalDates: additionalDateEntries.length > 0 ? additionalDateEntries : undefined,
         locationText: (locationType === "place" ? specificPlace : cityValue).trim(),
         radiusKm: null,
         responseWindowMinutes: responseWindow,
@@ -710,7 +736,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               </div>
             </div>
 
-            {/* Date */}
+            {/* Date + per-date time pickers */}
             <div className="space-y-2">
               <Label className="text-base font-medium">{t("wizard.date")}</Label>
               <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
@@ -735,56 +761,65 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   <Calendar
                     mode="multiple"
                     selected={dates}
-                    onSelect={(d) => setDates(d ?? [])}
+                    onSelect={handleDatesSelect}
                     disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
                     initialFocus
                   />
                 </PopoverContent>
               </Popover>
-            </div>
 
-            {/* Time */}
-            <div className="space-y-2">
-              <Label className="text-base font-medium">{t("wizard.time")}</Label>
-              <div className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
-                <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeStart")}</span>
-                  <Select value={startTime} onValueChange={handleStartTimeChange}>
-                    <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
-                      <SelectValue placeholder="--:--" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIME_SLOTS.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* Per-date time pickers */}
+              {dateEntries.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  {[...dateEntries]
+                    .sort((a, b) => a.date.getTime() - b.date.getTime())
+                    .map((entry, idx) => (
+                      <div key={entry.date.toISOString()} className="flex items-center gap-2">
+                        <span className="w-24 shrink-0 text-sm font-medium text-foreground">
+                          {format(entry.date, "EEE d/M", { locale: dateLocale })}
+                        </span>
+                        <div className="flex flex-1 items-center gap-1 rounded-xl border border-border/60 bg-muted/30 p-1">
+                          <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-2 py-1 shadow-sm">
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeStart")}</span>
+                            <Select value={entry.startTime} onValueChange={(v) => handleDateEntryStartTimeChange(idx, v)}>
+                              <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
+                                <SelectValue placeholder="--:--" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_SLOTS.map((s) => (
+                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-2 py-1 shadow-sm">
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeEnd")}</span>
+                            <Select
+                              value={entry.endTime}
+                              onValueChange={(v) => handleDateEntryEndTimeChange(idx, v)}
+                              disabled={!entry.startTime}
+                            >
+                              <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
+                                <SelectValue placeholder="--:--" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_SLOTS.filter((s) => {
+                                  const [sh] = (entry.startTime || "").split(":").map(Number)
+                                  const [h] = s.split(":").map(Number)
+                                  return h > sh
+                                }).map((s) => (
+                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  }
                 </div>
-                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-3 py-1.5 shadow-sm">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeEnd")}</span>
-                  <Select
-                    value={endTime}
-                    onValueChange={setEndTime}
-                    disabled={!startTime}
-                  >
-                    <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
-                      <SelectValue placeholder="--:--" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIME_SLOTS.filter((s) => {
-                        const [sh] = (startTime || "").split(":").map(Number)
-                        const [h] = s.split(":").map(Number)
-                        return h > sh
-                      }).map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Location — optional: Place (court/club) or City, defaults to user's preferred club */}

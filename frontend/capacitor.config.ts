@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.matchmaker.app',
+  appId: 'app.matchmaker.aceup',
   appName: 'MatchMaker',
   webDir: 'dist',
 };

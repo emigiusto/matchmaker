@@ -1,5 +1,11 @@
 import { apiClient } from "./api-client"
 
+export interface AdditionalDateEntry {
+  date: string      // YYYY-MM-DD
+  startTime: string // HH:MM
+  endTime: string   // HH:MM
+}
+
 export interface PublicSchedulingInviteDTO {
   id: string
   hostName: string
@@ -47,7 +53,7 @@ export interface SchedulingRequestDTO {
   format: "singles" | "doubles"
   matchType: "competitive" | "practice"
   date: string
-  additionalDates: string[] | null
+  additionalDates: AdditionalDateEntry[] | null
   startTime: string
   endTime: string
   locationText: string
@@ -69,7 +75,6 @@ export interface CreateSchedulingRequestInput {
   format: "singles" | "doubles"
   matchType: "competitive" | "practice"
   date: string
-  dates?: string[]
   startTime: string
   endTime: string
   locationText: string
@@ -80,6 +85,7 @@ export interface CreateSchedulingRequestInput {
   candidateUserIds: string[]
   bookingEnabled?: boolean
   timezone?: string
+  additionalDates?: AdditionalDateEntry[]
 }
 
 export type SchedulingInviteEventAction =

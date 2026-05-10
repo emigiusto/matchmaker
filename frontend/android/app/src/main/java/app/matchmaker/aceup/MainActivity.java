@@ -1,4 +1,4 @@
-package com.matchmaker.app;
+package app.matchmaker.aceup;
 
 import com.getcapacitor.BridgeActivity;
 

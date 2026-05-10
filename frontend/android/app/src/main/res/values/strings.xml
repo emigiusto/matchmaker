@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">MatchMaker</string>
     <string name="title_activity_main">MatchMaker</string>
-    <string name="package_name">com.matchmaker.app</string>
-    <string name="custom_url_scheme">com.matchmaker.app</string>
+    <string name="package_name">app.matchmaker.aceup</string>
+    <string name="custom_url_scheme">app.matchmaker.aceup</string>
 </resources>

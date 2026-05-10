@@ -1,6 +1,6 @@
 # Publishing MatchMaker to the Google Play Store
 
-App ID: `com.matchmaker.app`
+App ID: `app.matchmaker.aceup`
 
 ---
 

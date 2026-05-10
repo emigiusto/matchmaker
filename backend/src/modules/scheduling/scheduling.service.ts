@@ -18,6 +18,7 @@ import type {
   SchedulingInviteEventAction,
   SchedulingInviteEventDTO,
   PublicSchedulingInviteDTO,
+  AdditionalDateEntry,
 } from './scheduling.types';
 import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { findUserByNormalizedPhone, createGuestUser } from '../users/users.service';
@@ -29,9 +30,9 @@ const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
 const DATE_TIME_SLOT_RE = /^(\d{2})\/(\d{2}) · (\d{2}):00$/;
 const NONE_OPTION_RE = /^(none|ninguno)$/i;
 
-function parseAdditionalDates(raw: string | null | undefined): string[] {
+function parseAdditionalDates(raw: string | null | undefined): AdditionalDateEntry[] {
   if (!raw) return [];
-  try { return JSON.parse(raw) as string[]; } catch { return []; }
+  try { return JSON.parse(raw) as AdditionalDateEntry[]; } catch { return []; }
 }
 
 // Debounce poll quorum evaluation so rapid multi-select clicks are treated as one vote batch
@@ -410,8 +411,8 @@ export const schedulingService = {
           maxParallelCandidates: maxParallel,
           bookingEnabled: input.bookingEnabled ?? false,
           timezone: input.timezone ?? 'UTC',
-          additionalDates: input.dates && input.dates.length > 1
-            ? JSON.stringify(input.dates.slice(1))
+          additionalDates: input.additionalDates && input.additionalDates.length > 0
+            ? JSON.stringify(input.additionalDates)
             : null,
           inviteToken,
           status: 'active',
@@ -528,16 +529,28 @@ export const schedulingService = {
 
       if (isMultiDate) {
         message = msgs.inviteMultiDatePoll(hostName, request.sportType, formatLabel, request.locationText, timeLeft);
-        const allDates = [request.date, ...additionalDates.map(d => new Date(d))];
         const noneLabel = loc === 'es' ? 'Ninguno' : 'None';
         const multiButtons: { id: string; title: string }[] = [];
-        for (const d of allDates) {
-          const dd = String(d.getUTCDate()).padStart(2, '0');
-          const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-          for (const slot of slots) {
+
+        // Primary date uses request.startTime / endTime
+        const primaryD = request.date;
+        const primaryDd = String(primaryD.getUTCDate()).padStart(2, '0');
+        const primaryMm = String(primaryD.getUTCMonth() + 1).padStart(2, '0');
+        for (const slot of slots) {
+          multiButtons.push({ id: `slot_${primaryDd}${primaryMm}_${slot.replace(':', '')}`, title: `${primaryDd}/${primaryMm} · ${slot}` });
+        }
+
+        // Additional dates use their own startTime / endTime
+        for (const entry of additionalDates) {
+          const dObj = new Date(entry.date);
+          const dd = String(dObj.getUTCDate()).padStart(2, '0');
+          const mm = String(dObj.getUTCMonth() + 1).padStart(2, '0');
+          const addSlots = slotsInRange(entry.startTime, entry.endTime);
+          for (const slot of addSlots) {
             multiButtons.push({ id: `slot_${dd}${mm}_${slot.replace(':', '')}`, title: `${dd}/${mm} · ${slot}` });
           }
         }
+
         multiButtons.push({ id: 'invite_none', title: noneLabel });
         inviteButtons = multiButtons;
       } else {
@@ -635,7 +648,7 @@ export const schedulingService = {
     const multiDateOptions = trimmedOptions.filter((o) => DATE_TIME_SLOT_RE.test(o));
     if (multiDateOptions.length > 0) {
       const additionalDates = parseAdditionalDates(request.additionalDates);
-      const allDateStrs = [request.date.toISOString().slice(0, 10), ...additionalDates];
+      const allDateStrs = [request.date.toISOString().slice(0, 10), ...additionalDates.map(e => e.date)];
       const parsedDateTimes: string[] = [];
       for (const option of multiDateOptions) {
         const m = DATE_TIME_SLOT_RE.exec(option);
@@ -913,12 +926,11 @@ export const schedulingService = {
       // Skip multi-date requests that still have a future date remaining
       const additionalDates = parseAdditionalDates(r.additionalDates);
       if (additionalDates.length > 0) {
-        const startH = new Date(r.startTime).getUTCHours();
-        const startMin = new Date(r.startTime).getUTCMinutes();
-        const hasFutureDate = additionalDates.some(d => {
-          const dObj = new Date(d);
+        const hasFutureDate = additionalDates.some(entry => {
+          const dObj = new Date(entry.date);
+          const [sh, sm] = entry.startTime.split(':').map(Number);
           const futureDt = new Date(Date.UTC(
-            dObj.getUTCFullYear(), dObj.getUTCMonth(), dObj.getUTCDate(), startH, startMin, 0,
+            dObj.getUTCFullYear(), dObj.getUTCMonth(), dObj.getUTCDate(), sh, sm, 0,
           ));
           return futureDt > now;
         });
