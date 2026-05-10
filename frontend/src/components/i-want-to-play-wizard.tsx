@@ -382,10 +382,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     })
   }
 
-  function handleDateEntryStartTimeChange(idx: number, val: string) {
+  function handleDateEntryStartTimeChange(dateKey: string, val: string) {
     setDateEntries((prev) =>
-      prev.map((e, i) => {
-        if (i !== idx) return e
+      prev.map((e) => {
+        if (e.date.toDateString() !== dateKey) return e
         const [sh] = val.split(":").map(Number)
         const [eh] = (e.endTime || "").split(":").map(Number)
         const newEnd = !e.endTime || eh <= sh ? addOneHour(val) : e.endTime
@@ -394,8 +394,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     )
   }
 
-  function handleDateEntryEndTimeChange(idx: number, val: string) {
-    setDateEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, endTime: val } : e)))
+  function handleDateEntryEndTimeChange(dateKey: string, val: string) {
+    setDateEntries((prev) =>
+      prev.map((e) => (e.date.toDateString() === dateKey ? { ...e, endTime: val } : e))
+    )
   }
 
   const canProceedStep1 =
@@ -781,7 +783,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                         <div className="flex flex-1 items-center gap-1 rounded-xl border border-border/60 bg-muted/30 p-1">
                           <div className="flex flex-1 flex-col items-center rounded-lg bg-background px-2 py-1 shadow-sm">
                             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeStart")}</span>
-                            <Select value={entry.startTime} onValueChange={(v) => handleDateEntryStartTimeChange(idx, v)}>
+                            <Select value={entry.startTime} onValueChange={(v) => handleDateEntryStartTimeChange(entry.date.toDateString(), v)}>
                               <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
                                 <SelectValue placeholder="--:--" />
                               </SelectTrigger>
@@ -797,7 +799,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t("wizard.timeEnd")}</span>
                             <Select
                               value={entry.endTime}
-                              onValueChange={(v) => handleDateEntryEndTimeChange(idx, v)}
+                              onValueChange={(v) => handleDateEntryEndTimeChange(entry.date.toDateString(), v)}
                               disabled={!entry.startTime}
                             >
                               <SelectTrigger className="h-auto w-full justify-center border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus:ring-0 [&>svg]:hidden">
