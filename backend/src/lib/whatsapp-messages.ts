@@ -59,14 +59,17 @@ const templates: Record<Locale, MessageTemplates> = {
   es: {
     invite(hostName, sport, format, date, time, loc, timeLeft) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
-      const sportName = sport === 'padel' ? 'Pádel' : 'Tenis';
+      const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sportName} ${formatName}`;
+      const sportLabel = `${sport === 'padel' ? 'Pádel' : 'Tenis'} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
       return [
-        `${sportEmoji} *${hostName} quiere jugar contigo!*`,
+        `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`,
         '',
         `📅  ${date}  ·  ${time}`,
-        `📍  ${loc || 'TBD'}`,
+        locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         `⏳ Tienes *${timeLeft}* para responder`,
@@ -75,14 +78,17 @@ const templates: Record<Locale, MessageTemplates> = {
 
     invitePoll(hostName, sport, format, date, loc, timeLeft) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
-      const sportName = sport === 'padel' ? 'Pádel' : 'Tenis';
+      const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sportName} ${formatName}`;
+      const sportLabel = `${sport === 'padel' ? 'Pádel' : 'Tenis'} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
       return [
-        `${sportEmoji} *${hostName} quiere jugar contigo!*`,
+        `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`,
         '',
         `📅  ${date}`,
-        `📍  ${loc || 'TBD'}`,
+        locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         '¿A qué hora te va bien? (selecciona una o varias)',
@@ -224,12 +230,17 @@ const templates: Record<Locale, MessageTemplates> = {
   en: {
     invite(hostName, sport, format, date, time, loc, timeLeft) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
-      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
+      const formatName = format.charAt(0).toUpperCase() + format.slice(1);
+      const sportLabel = `${sportName} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Once we confirm the time, ${hostName} will find a court.`;
       return [
-        `${sportEmoji} *${hostName} wants to play with you!*`,
+        `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`,
         '',
         `📅  ${date}  ·  ${time}`,
-        `📍  ${loc || 'TBD'}`,
+        locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         `⏳ You have *${timeLeft}* to respond`,
@@ -238,12 +249,17 @@ const templates: Record<Locale, MessageTemplates> = {
 
     invitePoll(hostName, sport, format, date, loc, timeLeft) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
-      const sportLabel = `${sport.charAt(0).toUpperCase()}${sport.slice(1)} ${format.charAt(0).toUpperCase()}${format.slice(1)}`;
+      const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
+      const formatName = format.charAt(0).toUpperCase() + format.slice(1);
+      const sportLabel = `${sportName} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Once we confirm the time, ${hostName} will find a court.`;
       return [
-        `${sportEmoji} *${hostName} wants to play with you!*`,
+        `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`,
         '',
         `📅  ${date}`,
-        `📍  ${loc || 'TBD'}`,
+        locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         'Which hour(s) work for you?',
