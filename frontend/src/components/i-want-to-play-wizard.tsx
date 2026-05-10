@@ -214,7 +214,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const [bookingEnabled, setBookingEnabled] = useState(false)
   const [clubMemberships, setClubMemberships] = useState<ClubMembershipDTO[]>([])
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
-  const [courtAvailability, setCourtAvailability] = useState<CourtAvailabilityResult | null>(null)
+  const [courtAvailabilities, setCourtAvailabilities] = useState<Record<string, CourtAvailabilityResult>>({})
   const [courtAvailabilityLoading, setCourtAvailabilityLoading] = useState(false)
   const [courtAvailabilityError, setCourtAvailabilityError] = useState<string | null>(null)
   // Maps userId → { contactId, socioNumbers } for contacts in the priority list
@@ -286,7 +286,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   // Disables the toggle if the check doesn't return within the timeout.
   useEffect(() => {
     if (!bookingEnabled || dates.length === 0) {
-      setCourtAvailability(null)
+      setCourtAvailabilities({})
       setCourtAvailabilityError(null)
       return
     }
@@ -297,7 +297,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
 
     setCourtAvailabilityLoading(true)
     setCourtAvailabilityError(null)
-    setCourtAvailability(null)
+    setCourtAvailabilities({})
 
     let settled = false
     const timeout = setTimeout(() => {
@@ -308,18 +308,23 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
       toast.error(t("wizard.courtAvailabilityServiceError"))
     }, 20_000)
 
-    const primaryDate = dateEntries[0]?.date
-    if (!primaryDate) return
-    bookingService.checkAvailability({
-      userId: hostUserId,
-      clubSlug: membership.clubSlug,
-      date: format(primaryDate, "yyyy-MM-dd"),
-      sport,
-    }).then((result) => {
+    const dateKeys = dateEntries.map((e) => format(e.date, "yyyy-MM-dd"))
+    Promise.all(
+      dateKeys.map((dateKey) =>
+        bookingService.checkAvailability({
+          userId: hostUserId,
+          clubSlug: membership.clubSlug,
+          date: dateKey,
+          sport,
+        })
+      )
+    ).then((results) => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
-      setCourtAvailability(result)
+      const map: Record<string, CourtAvailabilityResult> = {}
+      results.forEach((r, i) => { map[dateKeys[i]] = r })
+      setCourtAvailabilities(map)
       setCourtAvailabilityLoading(false)
     }).catch(() => {
       if (settled) return
@@ -748,13 +753,12 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     : "You can select multiple days. Tap again to deselect."}
                 </p>
               </div>
-              <div className="rounded-xl border border-border/60 bg-muted/10">
+              <div className="rounded-xl border border-border/60 bg-muted/10 flex justify-center">
                 <Calendar
                   mode="multiple"
                   selected={dates}
                   onSelect={handleDatesSelect}
                   disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
-                  classNames={{ root: "w-full", months: "flex flex-col w-full relative gap-4" }}
                 />
               </div>
 
@@ -961,27 +965,36 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                     {dates.length > 0 && !courtAvailabilityLoading && courtAvailabilityError && (
                       <p className="text-xs text-muted-foreground">{courtAvailabilityError}</p>
                     )}
-                    {dates.length > 0 && !courtAvailabilityLoading && !courtAvailabilityError && courtAvailability && (() => {
-                      const slots = slotsInRange(startTime, endTime)
-                      if (slots.length === 0) return (
-                        <p className="text-xs text-muted-foreground">{t("wizard.courtAvailabilityHint")}</p>
-                      )
-                      return (
-                        <div className="space-y-1">
-                          {slots.map((slot) => {
-                            const count = courtAvailability.availableCourts.filter((c) => c.time === slot).length
-                            return (
-                              <div key={slot} className="flex items-center justify-between gap-2">
-                                <span className="text-xs text-muted-foreground">{slot}</span>
-                                <span className={`text-xs font-medium ${count > 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                                  {t("wizard.availableCourtsCount", { count })}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )
-                    })()}
+                    {dates.length > 0 && !courtAvailabilityLoading && !courtAvailabilityError && Object.keys(courtAvailabilities).length > 0 && (
+                      <div className="space-y-3">
+                        {[...dateEntries].sort((a, b) => a.date.getTime() - b.date.getTime()).map((entry) => {
+                          const dateKey = format(entry.date, "yyyy-MM-dd")
+                          const availability = courtAvailabilities[dateKey]
+                          const slots = slotsInRange(entry.startTime, entry.endTime)
+                          if (!availability || slots.length === 0) return null
+                          return (
+                            <div key={dateKey} className="space-y-1">
+                              {dateEntries.length > 1 && (
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  {format(entry.date, "EEE d/M", { locale: esLocale })}
+                                </p>
+                              )}
+                              {slots.map((slot) => {
+                                const count = availability.availableCourts.filter((c) => c.time === slot).length
+                                return (
+                                  <div key={slot} className="flex items-center justify-between gap-2">
+                                    <span className="text-xs text-muted-foreground">{slot}</span>
+                                    <span className={`text-xs font-medium ${count > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                      {t("wizard.availableCourtsCount", { count })}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1525,20 +1538,22 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 {t("wizard.matchDetailsSummary")}
               </h3>
               <div className="space-y-2">
-                <div className="flex items-center gap-3 text-sm">
-                  <CalendarIcon className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="font-medium">
-                    {dates.length === 0
-                      ? ""
-                      : dates.length === 1
-                        ? format([...dates].sort((a, b) => a.getTime() - b.getTime())[0], "EEEE, MMMM d", { locale: dateLocale })
-                        : `${dates.length} ${language === "es" ? "fechas" : "dates"}`
-                    }
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Clock className="h-4 w-4 shrink-0 text-primary" />
-                  <span>{displayTime}</span>
+                <div className="flex items-start gap-3 text-sm">
+                  <CalendarIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div className="space-y-0.5">
+                    {[...dateEntries]
+                      .sort((a, b) => a.date.getTime() - b.date.getTime())
+                      .map((entry) => (
+                        <div key={entry.date.toDateString()} className="flex items-center gap-2">
+                          <span className="font-medium">
+                            {format(entry.date, dateEntries.length === 1 ? "EEEE, MMMM d" : "EEE d/M", { locale: dateLocale })}
+                          </span>
+                          {entry.startTime && entry.endTime && (
+                            <span className="text-muted-foreground">{entry.startTime} – {entry.endTime}</span>
+                          )}
+                        </div>
+                      ))}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <MapPin className="h-4 w-4 shrink-0 text-primary" />

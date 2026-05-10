@@ -49,6 +49,7 @@ import {
   type SchedulingRequestDTO,
   type SchedulingCandidateDTO,
   type SchedulingInviteEventDTO,
+  type AdditionalDateEntry,
 } from "@/lib/services/scheduling.service"
 
 const POLL_INTERVAL_MS = 5000
@@ -418,14 +419,40 @@ export default function InviteDetailsPage() {
         {/* Meta info */}
         <Card>
           <CardContent className="grid gap-3 p-5 sm:grid-cols-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 shrink-0 text-primary" />
-              <span>{format(parseISO(request.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 shrink-0 text-primary" />
-              <span>{timeStr}</span>
-            </div>
+            {request.additionalDates && request.additionalDates.length > 0 ? (
+              <div className="flex items-start gap-2 text-sm sm:col-span-2">
+                <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <div className="space-y-0.5">
+                  {([{ date: request.date, startTime: null, endTime: null }, ...request.additionalDates] as Array<{ date: string; startTime: string | null; endTime: string | null } | AdditionalDateEntry>)
+                    .map((entry) => {
+                      const dateLabel = format(parseISO(entry.date), "EEE d/M", { locale: dateLocale })
+                      const timeLabel = entry.startTime && entry.endTime
+                        ? entry.startTime.includes("T")
+                          ? formatTimeRange(entry.startTime, entry.endTime)
+                          : `${entry.startTime} - ${entry.endTime}`
+                        : timeStr
+                      return (
+                        <div key={entry.date} className="flex items-center gap-2">
+                          <span className="font-medium">{dateLabel}</span>
+                          <span className="text-muted-foreground">·</span>
+                          <span>{timeLabel}</span>
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 shrink-0 text-primary" />
+                  <span>{format(parseISO(request.date), "EEEE, MMMM d, yyyy", { locale: dateLocale })}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 shrink-0 text-primary" />
+                  <span>{timeStr}</span>
+                </div>
+              </>
+            )}
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
               <span>{request.locationText?.trim() || t("common.tbd")}</span>
