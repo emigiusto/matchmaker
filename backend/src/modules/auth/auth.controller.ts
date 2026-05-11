@@ -47,3 +47,23 @@ export async function meController(req: Request, res: Response, next: NextFuncti
     next(err);
   }
 }
+
+export async function forgotPasswordController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { email } = req.body as { email: string };
+    await AuthService.forgotPassword(email);
+    res.json({ message: 'If that email exists, a reset link has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPasswordController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { token, password } = req.body as { token: string; password: string };
+    await AuthService.resetPassword(token, password);
+    res.json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    next(err);
+  }
+}

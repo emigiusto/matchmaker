@@ -185,6 +185,7 @@
     "lastName": "Last Name",
     "email": "Email",
     "password": "Password",
+    "newPassword": "New Password",
     "confirmPassword": "Confirm Password",
     "accept": "Accept",
     "decline": "Decline",
@@ -227,7 +228,28 @@
     "submit": "Log in",
     "noAccount": "Don't have an account?",
     "signUp": "Sign up",
-    "failed": "Login failed"
+    "failed": "Login failed",
+    "forgotPassword": "Forgot password?"
+  },
+  "forgotPassword": {
+    "title": "Forgot your password?",
+    "subtitle": "Enter your email and we'll send you a reset link",
+    "submit": "Send reset link",
+    "sentMessage": "If an account with that email exists, we've sent a password reset link. Check your inbox.",
+    "backToLogin": "Back to log in",
+    "failed": "Failed to send reset email"
+  },
+  "resetPassword": {
+    "title": "Set a new password",
+    "subtitle": "Choose a new password for your account",
+    "passwordPlaceholder": "At least 6 characters",
+    "confirmPlaceholder": "Repeat your password",
+    "submit": "Save new password",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordMismatch": "Passwords do not match",
+    "invalidToken": "This reset link is invalid or has expired",
+    "requestNewLink": "Request a new link",
+    "failed": "Failed to reset password"
   },
   "signup": {
     "title": "Create an account",

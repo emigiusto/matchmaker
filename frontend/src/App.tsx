@@ -19,6 +19,8 @@ const JoinRequest = lazy(() => import('@/pages/JoinRequest/JoinRequest'))
 const MatchesUpcoming = lazy(() => import('@/pages/MatchesUpcoming/MatchesUpcoming'))
 const Login = lazy(() => import('@/pages/Login/Login'))
 const Signup = lazy(() => import('@/pages/Signup/Signup'))
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword/ForgotPassword'))
+const ResetPassword = lazy(() => import('@/pages/ResetPassword/ResetPassword'))
 const Onboarding = lazy(() => import('@/pages/Onboarding/Onboarding'))
 const MatchDetailsGate = lazy(() => import('@/pages/MatchDetails/MatchDetailsGate'))
 const InviteDetails = lazy(() => import('@/pages/InviteDetails/InviteDetails'))
@@ -75,6 +77,8 @@ function App() {
               {/* Public: Login and Signup */}
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               {/* Public join page (no sidebar) */}
               <Route path="/join/:token" element={<JoinRequest />} />

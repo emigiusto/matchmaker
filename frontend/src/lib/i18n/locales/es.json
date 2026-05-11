@@ -185,6 +185,7 @@
     "lastName": "Apellido",
     "email": "Correo Electrónico",
     "password": "Contraseña",
+    "newPassword": "Nueva contraseña",
     "confirmPassword": "Confirmar Contraseña",
     "accept": "Aceptar",
     "decline": "Rechazar",
@@ -227,7 +228,28 @@
     "submit": "Iniciar sesión",
     "noAccount": "¿No tienes cuenta?",
     "signUp": "Regístrate",
-    "failed": "Error al iniciar sesión"
+    "failed": "Error al iniciar sesión",
+    "forgotPassword": "¿Olvidaste tu contraseña?"
+  },
+  "forgotPassword": {
+    "title": "¿Olvidaste tu contraseña?",
+    "subtitle": "Introduce tu correo y te enviaremos un enlace para restablecerla",
+    "submit": "Enviar enlace",
+    "sentMessage": "Si existe una cuenta con ese correo, hemos enviado un enlace para restablecer la contraseña. Revisa tu bandeja de entrada.",
+    "backToLogin": "Volver al inicio de sesión",
+    "failed": "Error al enviar el correo"
+  },
+  "resetPassword": {
+    "title": "Crear nueva contraseña",
+    "subtitle": "Elige una nueva contraseña para tu cuenta",
+    "passwordPlaceholder": "Mínimo 6 caracteres",
+    "confirmPlaceholder": "Repite tu contraseña",
+    "submit": "Guardar nueva contraseña",
+    "passwordTooShort": "La contraseña debe tener al menos 6 caracteres",
+    "passwordMismatch": "Las contraseñas no coinciden",
+    "invalidToken": "Este enlace de restablecimiento no es válido o ha expirado",
+    "requestNewLink": "Solicitar un nuevo enlace",
+    "failed": "Error al restablecer la contraseña"
   },
   "signup": {
     "title": "Crear una cuenta",
