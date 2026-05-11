@@ -20,10 +20,10 @@ const TOTAL_STEPS = 3
 
 const LEVEL_OPTIONS = [
   { key: "beginner",     value:  800, confidence: 0.15 },
-  { key: "learning",     value:  900, confidence: 0.18 },
-  { key: "intermediate", value: 1000, confidence: 0.20 },
-  { key: "advanced",     value: 1200, confidence: 0.22 },
-  { key: "competitive",  value: 1400, confidence: 0.25 },
+  { key: "learning",     value:  900, confidence: 0.15 },
+  { key: "intermediate", value: 1000, confidence: 0.15 },
+  { key: "advanced",     value: 1200, confidence: 0.15 },
+  { key: "competitive",  value: 1400, confidence: 0.15 },
 ] as const
 type LevelOption = typeof LEVEL_OPTIONS[number]
 
