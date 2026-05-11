@@ -483,7 +483,7 @@ model Message {
 model RatingHistory {
   id            String   @id @default(uuid())
   playerId      String
-  matchId       String
+  matchId       String?  // null for onboarding seed entries
   oldRating     Float
   newRating     Float
   delta         Float

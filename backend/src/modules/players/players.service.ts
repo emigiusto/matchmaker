@@ -186,6 +186,21 @@ export class PlayersService {
         longitude: data.longitude,
       },
     });
+    // Seed initial RatingHistory entry so the rating chart shows the onboarding baseline.
+    // Scale reference: beginner=800, learning=900, intermediate=1000, advanced=1200, competitive=1400
+    if (typeof data.levelValue === 'number' && typeof data.levelConfidence === 'number') {
+      await prisma.ratingHistory.create({
+        data: {
+          playerId: player.id,
+          matchId: null,
+          oldRating: data.levelValue,
+          newRating: data.levelValue,
+          delta: 0,
+          oldConfidence: data.levelConfidence,
+          newConfidence: data.levelConfidence,
+        },
+      });
+    }
     // Replace all PlayerSurface entries (no duplicates)
     await PlayersService.replacePlayerSurfaces(player.id, data.preferredSurfaces);
     // Set User.isGuest = false (progressive enrichment)
