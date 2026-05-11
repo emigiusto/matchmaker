@@ -205,7 +205,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   // 10 sec default for local testing; 60 min for production
   const defaultResponseWindow = typeof import.meta !== "undefined" && import.meta.env?.DEV
     ? 10 / 60 // 10 seconds
-    : 60
+    : 480
   const [responseWindow, setResponseWindow] = useState<number>(defaultResponseWindow) // minutes (can be fractional)
   const [maxParallelCandidates, setMaxParallelCandidates] = useState(1) // 1–3 contacts reached out at once
   const [availableContacts, setAvailableContacts] = useState<AvailableContact[]>([])
@@ -1460,6 +1460,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   { value: 60, label: "1h" },
                   { value: 120, label: "2h" },
                   { value: 240, label: "4h" },
+                  { value: 480, label: "8h" },
                   { value: 720, label: "12h" },
                   { value: 1440, label: "24h" },
                   { value: 4320, label: "72h" },
