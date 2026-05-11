@@ -85,6 +85,17 @@ describe('RatingService.updateRatingsForCompletedMatch', () => {
     await expect(RatingService.updateRatingsForCompletedMatch(tx, matchId)).rejects.toThrow(AppError);
   });
 
+  it('skips if either player is a guest user', async () => {
+    const tx = makeMockTx({
+      user: { findUnique: vi.fn().mockResolvedValue({ isGuest: true }) },
+    });
+    tx.match.findUnique.mockResolvedValue(completedMatch);
+    tx.result.findUnique.mockResolvedValue(result);
+    tx.player.findUnique.mockResolvedValueOnce(playerA).mockResolvedValueOnce(playerB);
+    await RatingService.updateRatingsForCompletedMatch(tx, matchId);
+    expect(tx.player.update).not.toHaveBeenCalled();
+  });
+
   it('skips if players missing', async () => {
     const tx = makeMockTx();
     tx.match.findUnique.mockResolvedValue(completedMatch);

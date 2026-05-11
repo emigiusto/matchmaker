@@ -61,6 +61,11 @@ export type RatingTx = {
     Prisma.TransactionClient['ratingHistory'],
     'create'
   >;
+
+  // Optional: used to gate ELO updates to registered (non-guest) users only
+  user?: {
+    findUnique: (args: { where: { id: string }; select: { isGuest: true } }) => Promise<{ isGuest: boolean } | null>;
+  };
 };
 
 
@@ -138,6 +143,15 @@ export class RatingService {
       loserPlayer = playerA;
     } else {
       throw new AppError('Cannot update ratings: winner does not match players', 500);
+    }
+
+    // Skip ELO if either player is a guest (contact without a real registered account)
+    if (tx.user) {
+      const [winnerUser, loserUser] = await Promise.all([
+        tx.user.findUnique({ where: { id: winnerPlayer.userId }, select: { isGuest: true } }),
+        tx.user.findUnique({ where: { id: loserPlayer.userId }, select: { isGuest: true } }),
+      ]);
+      if (winnerUser?.isGuest || loserUser?.isGuest) return;
     }
 
     // Compute margin-of-victory score ratio from set data

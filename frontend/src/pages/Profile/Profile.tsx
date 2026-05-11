@@ -309,7 +309,7 @@ export default function ProfilePage() {
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-bold text-primary">
                 {displayName.split(" ").map((n) => n[0]).join("") || "?"}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h2 className="truncate text-lg font-bold tracking-tight text-foreground">
                   {displayName}
                 </h2>
@@ -317,6 +317,16 @@ export default function ProfilePage() {
                   <p className="truncate mt-0.5 text-sm text-muted-foreground">{user.email}</p>
                 )}
               </div>
+              {player?.levelValue != null && (
+                <div className="shrink-0 flex flex-col items-end ml-4">
+                  <span className="text-2xl font-bold tracking-tight leading-none">
+                    {Math.round(player.levelValue)}
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mt-0.5">
+                    ELO
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </Card>
