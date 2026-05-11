@@ -64,6 +64,7 @@ export interface SchedulingRequestDTO {
   currentCandidateIndex: number
   matchId: string | null
   whatsappGroupId: string | null
+  showCandidates: boolean
   createdAt: string
   updatedAt: string
   candidates?: SchedulingCandidateDTO[]
@@ -86,6 +87,7 @@ export interface CreateSchedulingRequestInput {
   bookingEnabled?: boolean
   timezone?: string
   additionalDates?: AdditionalDateEntry[]
+  showCandidates?: boolean
 }
 
 export type SchedulingInviteEventAction =

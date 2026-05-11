@@ -67,6 +67,7 @@ type RequestRow = {
   currentCandidateIndex: number;
   matchId: string | null;
   additionalDates?: string | null;
+  showCandidates?: boolean;
   match?: { whatsappGroupId: string | null } | null;
   timezone?: string;
   createdAt: Date;
@@ -104,6 +105,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     additionalDates: parseAdditionalDates(r.additionalDates),
     whatsappGroupId: r.match?.whatsappGroupId ?? null,
     timezone: r.timezone ?? 'UTC',
+    showCandidates: (r as RequestRow).showCandidates ?? false,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -411,6 +413,7 @@ export const schedulingService = {
           maxParallelCandidates: maxParallel,
           bookingEnabled: input.bookingEnabled ?? false,
           timezone: input.timezone ?? 'UTC',
+          showCandidates: (input.showCandidates === true) && format === 'doubles',
           additionalDates: input.additionalDates && input.additionalDates.length > 0
             ? JSON.stringify(input.additionalDates)
             : null,
@@ -578,6 +581,24 @@ export const schedulingService = {
           }
         }
         inviteButtons = getInviteButtons(candidateLocale, slots);
+      }
+
+      // For doubles with showCandidates enabled, append who else might be playing
+      if ((request as RequestRow).showCandidates && format === 'doubles' && request.candidates) {
+        const otherNames = (request.candidates as Array<{ contactUserId: string; contactUser?: { name?: string | null } | null }>)
+          .filter((c) => c.contactUserId !== candidate.contactUserId)
+          .slice(0, 4)
+          .map((c) => {
+            const firstName = (c.contactUser?.name ?? '').split(' ')[0].slice(0, 12);
+            return firstName;
+          })
+          .filter(Boolean);
+        if (otherNames.length > 0) {
+          const namesLine = loc === 'es'
+            ? `👥 Posibles compañeros: ${otherNames.join(', ')}`
+            : `👥 Possible partners: ${otherNames.join(', ')}`;
+          message = `${message}\n\n${namesLine}`;
+        }
       }
 
       await prisma.$transaction(async (tx) => {

@@ -197,6 +197,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   // Step 2: Match type + format + sport
   const [matchType, setMatchType] = useState<"competitive" | "practice">("competitive")
   const [matchFormat, setMatchFormat] = useState<"singles" | "doubles">("singles")
+  const [showCandidates, setShowCandidates] = useState(false)
   const [sport, setSport] = useState<"tennis" | "padel">("tennis")
   
   // Step 3: Contact priority list
@@ -247,6 +248,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setCityValue("")
     setMatchType("practice")
     setMatchFormat("singles")
+    setShowCandidates(false)
     setSport("tennis")
     setResponseWindow(defaultResponseWindow)
     setMaxParallelCandidates(1)
@@ -659,6 +661,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         candidateUserIds: priorityList.map((c) => c.id),
         bookingEnabled,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        showCandidates: matchFormat === "doubles" ? showCandidates : false,
       })
       await schedulingService.start(req.id)
       toast.success(t("wizard.toast.schedulingStarted"), {
@@ -1507,6 +1510,19 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                 ))}
               </div>
             </div>
+
+            {/* Show candidates toggle — doubles only */}
+            {matchFormat === "doubles" && (
+              <div className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/30 px-4 py-3">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Mostrar posibles jugadores</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Incluye en el mensaje de invitación quiénes más podrían jugar
+                  </p>
+                </div>
+                <Switch checked={showCandidates} onCheckedChange={setShowCandidates} />
+              </div>
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(2)}>

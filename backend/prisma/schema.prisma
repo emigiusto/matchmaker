@@ -519,6 +519,7 @@ model SchedulingRequest {
   timezone              String                  @default("UTC")
   currentCandidateIndex Int                     @default(0)
   additionalDates       String?                 @db.Text
+  showCandidates        Boolean                 @default(false)
   matchId               String?                 @unique
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
