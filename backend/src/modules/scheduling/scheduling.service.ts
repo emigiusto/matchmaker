@@ -783,10 +783,36 @@ export const schedulingService = {
           dateTimeCounts.set(dt, (dateTimeCounts.get(dt) ?? 0) + 1);
         }
       }
-      const confirmedDateTime = [...dateTimeCounts.entries()]
-        .sort(([a], [b]) => a.localeCompare(b)) // earliest first
-        .find(([, count]) => count >= required)?.[0];
-      if (!confirmedDateTime) return;
+      // All date-times that reached quorum, sorted earliest first
+      const confirmedDateTimes = [...dateTimeCounts.entries()]
+        .filter(([, count]) => count >= required)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([dt]) => dt);
+      if (confirmedDateTimes.length === 0) return;
+
+      // Default: pick earliest with quorum
+      let confirmedDateTime = confirmedDateTimes[0];
+
+      // When booking is enabled, prefer the earliest confirmed slot that has courts available in cache
+      if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && confirmedDateTimes.length > 1) {
+        const hostUser = request.hostUser;
+        if (hostUser) {
+          const hostMembership = await prisma.clubMembership.findFirst({
+            where: { userId: hostUser.id, status: 'active', encryptedPassword: { not: null } },
+          });
+          if (hostMembership) {
+            for (const dt of confirmedDateTimes) {
+              const [dateStr, hh] = dt.split('·');
+              const slotHHMM = `${hh.padStart(2, '0')}:00`;
+              const nextH = String(Number(hh) + 1).padStart(2, '0');
+              const picked = await pickBestSlotInRange(
+                hostUser.id, hostMembership.clubSlug, dateStr, request.sportType, slotHHMM, `${nextH}:00`,
+              );
+              if (picked === slotHHMM) { confirmedDateTime = dt; break; }
+            }
+          }
+        }
+      }
 
       const [dateStr, hh] = confirmedDateTime.split('·');
       const overrideSlotUTC = `${hh.padStart(2, '0')}:00`;
