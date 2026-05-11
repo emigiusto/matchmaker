@@ -840,7 +840,14 @@ export const schedulingService = {
       }
 
       const [dateStr, hh] = confirmedDateTime.split('·');
-      const overrideSlotUTC = `${hh.padStart(2, '0')}:00`;
+      // hh is in local time (as shown in the poll) — convert to UTC before passing to completeScheduling.
+      // Use noon UTC on the confirmed date as reference to safely compute DST-aware offset.
+      const tz = (request as RequestRow).timezone ?? 'UTC';
+      const noonUtc = new Date(`${dateStr}T12:00:00.000Z`);
+      const localNoonH = Number(formatInTz(noonUtc, 'en-US', { hour: '2-digit', hour12: false }, tz));
+      const tzOffsetH = localNoonH - 12;
+      const utcH = ((Number(hh) - tzOffsetH) + 24) % 24;
+      const overrideSlotUTC = `${String(utcH).padStart(2, '0')}:00`;
       const acceptingCandidateIds = [...latestDateTimeVotes.entries()]
         .filter(([, dts]) => dts.includes(confirmedDateTime))
         .map(([id]) => id)
@@ -859,8 +866,8 @@ export const schedulingService = {
         });
       });
 
-      logger.info('MultiDatePollQuorumReached', { requestId, confirmedDateTime });
-      void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { via: 'poll', confirmedDateTime } });
+      logger.info('MultiDatePollQuorumReached', { requestId, confirmedDateTime, overrideSlotUTC });
+      void recordEvent({ schedulingRequestId: requestId, action: 'request_completed', metadata: { via: 'poll', confirmedDateTime, overrideSlotUTC } });
       await this.completeScheduling(requestId, overrideSlotUTC, dateStr);
       return;
     }

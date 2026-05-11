@@ -29,6 +29,7 @@ export function getBookingErrorMessage(
     case 'SLOT_NOT_FOUND':
       return t("matchDetails.booking.errors.slotNoLongerAvailable")
     case 'BOOKING_PAGE_ERROR':
+    case 'BOOKING_QUOTA_EXCEEDED':
       return errorMessage ?? t("matchDetails.booking.errors.unknown")
     default:
       return t("matchDetails.booking.errors.unknown")

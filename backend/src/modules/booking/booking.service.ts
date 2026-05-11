@@ -578,18 +578,23 @@ function notifyBookingFailed(
     logger.warn(`[booking] Failed to send booking.failed notification for match ${match.id}:`, err instanceof Error ? err.message : err)
   })
 
-  if (match.whatsappGroupId) {
-    resolveGroupMessageLocale(hostUserId, match.participants.map((p) => p.userId), format ?? 'singles')
-      .then((locale) => {
-        const when = `${date} · ${time}`
-        const loc = match.availability?.locationText ?? ''
-        const message = getMessages(locale).courtBookingFailed(when, loc, reason)
-        return whatsappService.sendGroupMessage(match.whatsappGroupId!, message)
-      })
-      .catch((err) => {
-        logger.warn(`[booking] Failed to send booking failed WhatsApp for match ${match.id}:`, err instanceof Error ? err.message : err)
-      })
-  }
+  // Re-fetch whatsappGroupId: the booking job may start before the scheduling service saves it
+  prisma.match.findUnique({ where: { id: match.id }, select: { whatsappGroupId: true } })
+    .then((m) => m?.whatsappGroupId ?? null)
+    .catch(() => match.whatsappGroupId)
+    .then((groupId) => {
+      if (!groupId) return
+      return resolveGroupMessageLocale(hostUserId, match.participants.map((p) => p.userId), format ?? 'singles')
+        .then((locale) => {
+          const when = `${date} · ${time}`
+          const loc = match.availability?.locationText ?? ''
+          const message = getMessages(locale).courtBookingFailed(when, loc, reason)
+          return whatsappService.sendGroupMessage(groupId, message)
+        })
+    })
+    .catch((err) => {
+      logger.warn(`[booking] Failed to send booking failed WhatsApp for match ${match.id}:`, err instanceof Error ? err.message : err)
+    })
 }
 
 async function failAttempt(attemptId: string, errorMessage: string, errorCode?: string): Promise<void> {
