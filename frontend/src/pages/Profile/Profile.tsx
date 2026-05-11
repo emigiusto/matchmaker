@@ -566,13 +566,14 @@ export default function ProfilePage() {
                   <Globe className="h-4 w-4" />
                   {t("profilePage.settings.preferredLanguage")}
                 </Label>
-                <Select value={language} onValueChange={(v) => setLanguage(v as "en" | "es")}>
+                <Select value={language} onValueChange={(v) => setLanguage(v as "en" | "es" | "ca")}>
                   <SelectTrigger className="max-w-[200px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="en">{t("common.english")}</SelectItem>
                     <SelectItem value="es">{t("common.spanish")}</SelectItem>
+                    <SelectItem value="ca">{t("common.catalan")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
