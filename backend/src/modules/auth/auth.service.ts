@@ -96,6 +96,8 @@ export async function forgotPassword(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email: trimmedEmail } });
   if (!user) return; // silent — don't reveal whether the email exists
 
+  console.log(`[auth] password reset requested for user ${user.id} (${trimmedEmail})`);
+
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
@@ -106,8 +108,9 @@ export async function forgotPassword(email: string): Promise<void> {
 
   const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
   const resetUrl = `${frontendBaseUrl}/#/reset-password?token=${token}`;
+  const locale = user.locale ?? 'es';
 
-  await sendPasswordResetEmail(trimmedEmail, resetUrl);
+  await sendPasswordResetEmail(trimmedEmail, resetUrl, locale);
 }
 
 /**
