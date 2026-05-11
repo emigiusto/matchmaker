@@ -158,7 +158,7 @@ function isMultiHour(startTime: Date, endTime: Date): boolean {
 /** Poll buttons: one per available time slot, plus a "None" option to decline. */
 function getInviteButtons(locale: string | null | undefined, slots: string[]): { id: string; title: string }[] {
   const loc = resolveLocale(locale);
-  const noneLabel = loc === 'es' ? 'Ninguno' : 'None';
+  const noneLabel = loc === 'es' ? 'Ninguno' : loc === 'ca' ? 'Cap' : 'None';
   return [
     ...slots.map((slot, i) => ({ id: `slot_${i}`, title: slot })),
     { id: 'invite_none', title: noneLabel },
@@ -181,19 +181,20 @@ function formatGroupInviteMessage(input: {
   const formatLabel = input.format === 'doubles' ? 'Doubles' : 'Singles';
   const loc = (input.location && input.location.trim()) || 'TBD';
   const matchUrl = input.matchUrl ?? null;
-  const isEs = resolveLocale(input.locale) === 'es';
+  const resolvedLoc = resolveLocale(input.locale);
+  const confirmedLine = resolvedLoc === 'ca' ? '🎉 El teu partit està confirmat!' : resolvedLoc === 'es' ? '¡Tu partido está confirmado!' : 'Your match is confirmed!';
+  const viewMatchLabel = resolvedLoc === 'ca' ? 'Veure el partit' : resolvedLoc === 'es' ? 'Ver partido' : 'View match';
+  const joinGroupLine = resolvedLoc === 'ca' ? "Uneix-te al grup de WhatsApp del partit:" : resolvedLoc === 'es' ? 'Únete al grupo de WhatsApp del partido:' : 'Join the match WhatsApp group:';
   return [
-    `${sportEmoji} *${isEs ? '¡Tu partido está confirmado!' : 'Your match is confirmed!'}*`,
+    `${sportEmoji} *${confirmedLine}*`,
     '',
     `📅  ${input.whenStr}`,
     `📍  ${loc}`,
     `🏅  ${sport} ${formatLabel}`,
     ...(input.rivalOrPlayersStr ? [`👥  ${input.rivalOrPlayersStr}`] : []),
     '',
-    ...(matchUrl ? [`🔗 *${isEs ? 'Ver partido' : 'View match'}:* ${matchUrl}`, ''] : []),
-    isEs
-      ? 'Únete al grupo de WhatsApp del partido:'
-      : 'Join the match WhatsApp group:',
+    ...(matchUrl ? [`🔗 *${viewMatchLabel}:* ${matchUrl}`, ''] : []),
+    joinGroupLine,
   ].join('\n');
 }
 
@@ -272,13 +273,13 @@ async function sendInviteNoLongerAvailable(
 
   const candidateLocale = candidate.contactUser?.locale ?? 'es';
   const loc = resolveLocale(candidateLocale);
-  const intlLocale = loc === 'es' ? 'es-ES' : 'en-US';
+  const intlLocale = loc === 'es' ? 'es-ES' : loc === 'ca' ? 'ca-ES' : 'en-US';
   const tz = request.timezone ?? 'UTC';
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  const sep = loc === 'es' ? ' de ' : ' ';
+  const sep = loc === 'en' ? ' ' : ' de ';
   const dateStr = `${cap(formatInTz(request.date, intlLocale, { weekday: 'long' }, tz))}, ${formatInTz(request.date, intlLocale, { day: 'numeric' }, tz)}${sep}${cap(formatInTz(request.date, intlLocale, { month: 'long' }, tz))}`;
 
-  const hostName = request.hostUser?.name ?? 'El organizador';
+  const hostName = request.hostUser?.name ?? (loc === 'ca' ? "L'organitzador" : loc === 'en' ? 'The organizer' : 'El organizador');
   const msgs = getMessages(candidateLocale);
   const message = msgs.inviteNoLongerAvailable(hostName, request.sportType, dateStr);
 
@@ -304,7 +305,8 @@ async function notifyHostSchedulingNoMatch(
 ): Promise<void> {
   const hostLocale = (request.hostUser as { locale?: string | null } | null | undefined)?.locale ?? 'es';
   const tz = (request as RequestRow).timezone ?? 'UTC';
-  const intlLocale = resolveLocale(hostLocale) === 'es' ? 'es-ES' : 'en-US';
+  const _hostLoc = resolveLocale(hostLocale);
+  const intlLocale = _hostLoc === 'es' ? 'es-ES' : _hostLoc === 'ca' ? 'ca-ES' : 'en-US';
   const dateStr = formatInTz(request.date, intlLocale, { weekday: 'short', month: 'short', day: 'numeric' }, tz);
   const timeStr = `${formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)} - ${formatInTz(request.endTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)}`;
   const payload = {
@@ -510,10 +512,10 @@ export const schedulingService = {
       const candidateLocale = ownerContact?.communicationLanguage
         ?? (candidate.contactUser as { locale?: string | null } | null | undefined)?.locale
         ?? 'es';
-      const intlLocale = resolveLocale(candidateLocale) === 'es' ? 'es-ES' : 'en-US';
-      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       const loc = resolveLocale(candidateLocale);
-      const sep = loc === 'es' ? ' de ' : ' ';
+      const intlLocale = loc === 'es' ? 'es-ES' : loc === 'ca' ? 'ca-ES' : 'en-US';
+      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      const sep = loc === 'en' ? ' ' : ' de ';
       const dateStr = `${cap(formatInTz(request.date, intlLocale, { weekday: 'long' }, tz))}, ${formatInTz(request.date, intlLocale, { day: 'numeric' }, tz)}${sep}${cap(formatInTz(request.date, intlLocale, { month: 'long' }, tz))}`;
       const timeStr = `${formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)} · ${formatInTz(request.endTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)}`;
       const timeLeft = formatResponseWindow(request.responseWindowMinutes ?? 240, candidateLocale);
@@ -532,7 +534,7 @@ export const schedulingService = {
 
       if (isMultiDate) {
         message = msgs.inviteMultiDatePoll(hostName, request.sportType, formatLabel, request.locationText, timeLeft);
-        const noneLabel = loc === 'es' ? 'Ninguno' : 'None';
+        const noneLabel = loc === 'es' ? 'Ninguno' : loc === 'ca' ? 'Cap' : 'None';
         const multiButtons: { id: string; title: string }[] = [];
 
         // Primary date uses request.startTime / endTime
@@ -571,7 +573,7 @@ export const schedulingService = {
             if (courtsPerSlot) {
               const hasUnavailable = slots.some(slot => (courtsPerSlot[slot] ?? 1) === 0);
               if (hasUnavailable) {
-                const noCourtsLabel = loc === 'es' ? 'No hay pistas disponibles' : 'No courts available';
+                const noCourtsLabel = loc === 'es' ? 'No hay pistas disponibles' : loc === 'ca' ? 'No hi ha pistes disponibles' : 'No courts available';
                 const slotLines = slots.map(slot =>
                   (courtsPerSlot[slot] ?? 1) === 0 ? `${slot} - ${noCourtsLabel}` : slot,
                 );
@@ -596,6 +598,8 @@ export const schedulingService = {
         if (otherNames.length > 0) {
           const namesLine = loc === 'es'
             ? `👥 Posibles compañeros: ${otherNames.join(', ')}`
+            : loc === 'ca'
+            ? `👥 Possibles companys: ${otherNames.join(', ')}`
             : `👥 Possible partners: ${otherNames.join(', ')}`;
           message = `${message}\n\n${namesLine}`;
         }

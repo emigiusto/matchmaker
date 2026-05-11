@@ -1,8 +1,8 @@
 // whatsapp-messages.ts
-// Locale-aware WhatsApp message templates for ES and EN.
+// Locale-aware WhatsApp message templates for ES, EN, and CA.
 // All message-building logic lives here; call sites only pick a locale and pass params.
 
-type Locale = 'es' | 'en';
+type Locale = 'es' | 'en' | 'ca';
 
 export type NoMatchReasonKey = 'no_more_candidates' | 'all_candidates_exhausted' | 'scheduled_time_passed';
 
@@ -35,26 +35,31 @@ export function formatResponseWindow(minutes: number, locale: string): string {
   if (minutes < 60) {
     const m = Math.round(minutes);
     if (loc === 'es') return `${m} ${m === 1 ? 'minuto' : 'minutos'}`;
+    if (loc === 'ca') return `${m} ${m === 1 ? 'minut' : 'minuts'}`;
     return `${m} ${m === 1 ? 'minute' : 'minutes'}`;
   }
   const hours = minutes / 60;
   if (hours < 24) {
     const h = Math.round(hours);
     if (loc === 'es') return `${h} ${h === 1 ? 'hora' : 'horas'}`;
+    if (loc === 'ca') return `${h} ${h === 1 ? 'hora' : 'hores'}`;
     return `${h} ${h === 1 ? 'hour' : 'hours'}`;
   }
   const days = hours / 24;
   const d = Math.round(days);
   if (loc === 'es') return `${d} ${d === 1 ? 'día' : 'días'}`;
+  if (loc === 'ca') return `${d} ${d === 1 ? 'dia' : 'dies'}`;
   return `${d} ${d === 1 ? 'day' : 'days'}`;
 }
 
 /**
  * Resolve an arbitrary locale string to one of the supported locales.
- * Defaults to 'es' unless the resolved value is explicitly 'en'.
+ * Defaults to 'es' unless the resolved value is explicitly 'en' or 'ca'.
  */
 export function resolveLocale(locale?: string | null): Locale {
-  return locale === 'en' ? 'en' : 'es';
+  if (locale === 'en') return 'en';
+  if (locale === 'ca') return 'ca';
+  return 'es';
 }
 
 const templates: Record<Locale, MessageTemplates> = {
@@ -435,6 +440,197 @@ const templates: Record<Locale, MessageTemplates> = {
         'The result is pending confirmation.',
         '',
         `🔗 *View match:* ${url}`,
+      ].join('\n');
+    },
+  },
+
+  ca: {
+    invite(hostName, sport, format, date, time, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sport === 'padel' ? 'Pàdel' : 'Tennis'} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
+      return [
+        `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`,
+        '',
+        `📅  ${date}  ·  ${time}`,
+        locationLine,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        `⏳ Tens *${timeLeft}* per respondre`,
+      ].join('\n');
+    },
+
+    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sport === 'padel' ? 'Pàdel' : 'Tennis'} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
+      return [
+        `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`,
+        '',
+        `📅  ${date}`,
+        locationLine,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        "A quina hora et va bé? (selecciona'n una o diverses)",
+        '',
+        `⏳ Tens *${timeLeft}* per respondre`,
+      ].join('\n');
+    },
+
+    inviteMultiDatePoll(hostName, sport, format, loc, timeLeft) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
+      const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
+      const sportLabel = `${sport === 'padel' ? 'Pàdel' : 'Tennis'} ${formatName}`;
+      const locationLine = loc
+        ? `📍  ${loc}`
+        : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
+      return [
+        `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`,
+        '',
+        locationLine,
+        `${sportEmoji}  ${sportLabel}`,
+        '',
+        "Quin d'aquests dies i horaris et va millor? (selecciona'n un o diversos)",
+        '',
+        `⏳ Tens *${timeLeft}* per respondre`,
+      ].join('\n');
+    },
+
+    inviteNoLongerAvailable(hostName, sport, date) {
+      const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
+      const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
+      return `${sportEmoji} La invitació de *${hostName}* per jugar a ${sportName} el *${date}* ja no està disponible.`;
+    },
+
+    inviteReply() {
+      return 'Respon *SÍ* ✅ per acceptar o *NO* ❌ per declinar';
+    },
+
+    matchConfirmed(sport, format, when, loc, url) {
+      return [
+        '✅ *Partit confirmat!*',
+        '',
+        `${sport} · ${format}`,
+        `*Quan:* ${when}`,
+        `*On:* ${loc || 'TBD'}`,
+        '',
+        `🔗 *Veure el partit:* ${url}`,
+      ].join('\n');
+    },
+
+    noMatch(sport, format, when, loc, reason, url) {
+      return [
+        '❌ *La teva sol·licitud de partit no ha tingut match*',
+        '',
+        `${sport} · ${format}`,
+        `*Quan:* ${when}`,
+        `*On:* ${loc || 'TBD'}`,
+        '',
+        reason,
+        '',
+        `🔗 *Veure la sol·licitud:* ${url}`,
+        '',
+        'Pots afegir més contactes o crear una nova sol·licitud des de Matchmaker.',
+      ].join('\n');
+    },
+
+    noMatchReason: {
+      no_more_candidates: 'No quedaven més candidats disponibles per contactar.',
+      all_candidates_exhausted: 'Tots els candidats van rebutjar o no van respondre a temps.',
+      scheduled_time_passed: "Ha passat l'hora programada sense confirmar el partit.",
+    },
+
+    matchCancelled(sport, format, when, loc, participants, url) {
+      return [
+        '⚠️ *Partit cancel·lat*',
+        '',
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        `👥 ${participants}`,
+        '',
+        'Aquest partit ha estat cancel·lat. Gràcies per la teva comprensió.',
+        '',
+        `🔗 *Veure el partit:* ${url}`,
+      ].join('\n');
+    },
+
+    matchRescheduled(when, loc, url) {
+      return [
+        '📅 *Horari actualitzat*',
+        '',
+        `*Nou horari:* ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `🔗 *Veure el partit:* ${url}`,
+      ].join('\n');
+    },
+
+    reminder(opponentName, sport, format, when, loc, url) {
+      const lines = [
+        '⏰ *Recordatori Matchmaker*',
+        '',
+        `El teu partit contra ${opponentName} s'acosta.`,
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        'Molta sort i que gaudeixis! 🎾',
+      ];
+      if (url) lines.splice(5, 0, `🔗 ${url}`);
+      return lines.join('\n');
+    },
+
+    courtBooked(courtName, when, loc, bookingUrl) {
+      const lines = [
+        '✅ *Pista reservada!*',
+        '',
+        `🏟️ ${courtName}`,
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+      ];
+      if (bookingUrl) lines.push('', `🔗 ${bookingUrl}`);
+      return lines.join('\n');
+    },
+
+    courtBookingFailed(when, loc, reason) {
+      return [
+        "⚠️ *No s'ha pogut reservar la pista automàticament.*",
+        '',
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+        '',
+        `Motiu: ${reason}`,
+      ].join('\n');
+    },
+
+    courtCancelled(courtName, when, loc) {
+      return [
+        '❌ *Reserva de pista cancel·lada*',
+        '',
+        `🏟️ ${courtName}`,
+        `📅 ${when}`,
+        `📍 ${loc || 'TBD'}`,
+      ].join('\n');
+    },
+
+    resultSubmitted(sets, labelA, labelB, url) {
+      const setsStr = sets.map((s) => `Set ${s.setNumber}: *${labelA}* ${s.scoreA} - ${s.scoreB} *${labelB}*`).join('\n');
+      return [
+        '📊 *Resultat carregat*',
+        '',
+        setsStr,
+        '',
+        'El resultat està pendent de confirmació.',
+        '',
+        `🔗 *Veure el partit:* ${url}`,
       ].join('\n');
     },
   },
