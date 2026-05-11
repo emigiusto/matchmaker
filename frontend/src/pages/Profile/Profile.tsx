@@ -325,6 +325,11 @@ export default function ProfilePage() {
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mt-0.5">
                     ELO
                   </span>
+                  {player.levelConfidence != null && (
+                    <span className="text-[10px] text-muted-foreground mt-1">
+                      {t("profile.rating.confidence")} {Math.round(player.levelConfidence * 100)}%
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -334,71 +339,6 @@ export default function ProfilePage() {
         {/* ── Player Analytics ── */}
         {player && (
           <>
-            {/* Rating card */}
-            {(() => {
-              const currentRating = player.levelValue
-              const confidence = player.levelConfidence
-              const history = stats?.ratingHistory ?? []
-              const weeklyDelta = (() => {
-                if (history.length < 2) return null
-                const now = new Date()
-                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-                // Find entry closest to 7 days ago
-                let closest: { date: string; rating: number; delta: number } | null = null
-                let minDiff = Infinity
-                for (const entry of history) {
-                  const diff = Math.abs(parseISO(entry.date).getTime() - sevenDaysAgo.getTime())
-                  if (diff < minDiff) { minDiff = diff; closest = entry }
-                }
-                if (!closest) return null
-                const latest = history[history.length - 1]
-                return latest.rating - (closest as { date: string; rating: number; delta: number }).rating
-              })()
-
-              return (
-                <Card>
-                  <CardContent className="pt-5 pb-5">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-                      {t("profile.rating.title")}
-                    </p>
-                    {currentRating != null ? (
-                      <div className="flex items-end gap-4 flex-wrap">
-                        <div>
-                          <span className="text-4xl font-bold tracking-tight">{currentRating.toFixed(2)}</span>
-                        </div>
-                        {weeklyDelta !== null && (
-                          <div className="flex items-center gap-1 mb-1">
-                            {weeklyDelta > 0 ? (
-                              <TrendingUp className="h-4 w-4 text-green-500" />
-                            ) : weeklyDelta < 0 ? (
-                              <TrendingDown className="h-4 w-4 text-red-500" />
-                            ) : (
-                              <Minus className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <span className={`text-sm font-semibold ${weeklyDelta > 0 ? "text-green-600 dark:text-green-400" : weeklyDelta < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
-                              {weeklyDelta > 0 ? "+" : ""}{weeklyDelta.toFixed(2)}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{t("profile.rating.vsLastWeek")}</span>
-                          </div>
-                        )}
-                        {confidence != null && (
-                          <div className="ml-auto flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground">{t("profile.rating.confidence")}</span>
-                            <span className="text-sm font-semibold">{Math.round(confidence * 100)}%</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="py-2">
-                        <p className="text-sm text-muted-foreground">{t("profile.rating.noData")}</p>
-                        <p className="text-xs text-muted-foreground/70 mt-0.5">{t("profile.rating.noDataHint")}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })()}
-
             {/* Stat tiles */}
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
               <Card>
