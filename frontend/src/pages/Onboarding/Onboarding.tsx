@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Phone, MapPin, Building2, Users, X, Loader2, Swords, ArrowLeft, CheckCircle2, ChevronRight } from "lucide-react"
+import { Phone, MapPin, Building2, Loader2, Swords, ArrowLeft, CheckCircle2, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,12 +12,11 @@ import { useTranslation } from "@/lib/i18n"
 import { usersService } from "@/lib/services/users.service"
 import { playersService } from "@/lib/services/players.service"
 import { bookingService, SUPPORTED_CLUBS } from "@/lib/services/booking.service"
-import { contactsService } from "@/lib/services/contacts.service"
 import { track } from "@/lib/analytics/analytics"
 import { toast } from "sonner"
 import { Link, useSearchParams } from "react-router-dom"
 
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 3
 
 const LEVEL_OPTIONS = [
   { key: "beginner",     value:  800, confidence: 0.15 },
@@ -95,11 +94,6 @@ export default function Onboarding() {
   const [clubSlug, setClubSlug] = useState<string>(SUPPORTED_CLUBS[0].clubSlug)
   const [socioNumber, setSocioNumber] = useState("")
   const [password, setPassword] = useState("")
-
-  // Step 4: Contacts
-  const [contactDrafts, setContactDrafts] = useState<Array<{ name: string; phone: string }>>([])
-  const [draftName, setDraftName] = useState("")
-  const [draftPhone, setDraftPhone] = useState("")
 
   // Pre-fill with existing data in case the user returns to onboarding
   useEffect(() => {
@@ -192,30 +186,6 @@ export default function Onboarding() {
           socioNumber: socioNumber.trim(),
           password: password.trim() || undefined,
         })
-      }
-      setStep(4)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  function addContactDraft() {
-    if (!draftName.trim() || !draftPhone.trim()) return
-    setContactDrafts((prev) => [...prev, { name: draftName.trim(), phone: draftPhone.trim() }])
-    setDraftName("")
-    setDraftPhone("")
-  }
-
-  async function handleStep4(skip = false) {
-    if (!user) return
-    setSaving(true)
-    try {
-      if (!skip && contactDrafts.length > 0) {
-        await Promise.allSettled(
-          contactDrafts.map((c) => contactsService.create(user.id, c.name, c.phone))
-        )
       }
       await finish()
     } catch (err) {
@@ -417,73 +387,6 @@ export default function Onboarding() {
             </StepCard>
           )}
 
-          {/* Step 4: Contacts */}
-          {step === 4 && (
-            <StepCard
-              icon={<Users className="h-5 w-5 text-primary" />}
-              title={t("onboarding.step4.title")}
-              description={t("onboarding.step4.description")}
-              optional
-            >
-              {/* Add contact form */}
-              <div className="flex gap-2">
-                <Input
-                  placeholder={t("onboarding.step4.namePlaceholder")}
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  className="flex-1"
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addContactDraft() } }}
-                />
-                <Input
-                  placeholder={t("onboarding.step4.phonePlaceholder")}
-                  value={draftPhone}
-                  onChange={(e) => setDraftPhone(e.target.value)}
-                  className="flex-1"
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addContactDraft() } }}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={addContactDraft}
-                  disabled={!draftName.trim() || !draftPhone.trim()}
-                >
-                  {t("onboarding.step4.addButton")}
-                </Button>
-              </div>
-
-              {/* Added contacts list */}
-              {contactDrafts.length > 0 && (
-                <div className="space-y-1.5">
-                  {contactDrafts.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
-                      <span className="font-medium">{c.name}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-muted-foreground">{c.phone}</span>
-                        <button
-                          type="button"
-                          onClick={() => setContactDrafts((prev) => prev.filter((_, j) => j !== i))}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <StepActions
-                onContinue={() => handleStep4(false)}
-                onSkip={() => handleStep4(true)}
-                loading={saving}
-                continueLabel={contactDrafts.length > 0 ? t("onboarding.step4.continue") : t("onboarding.skip")}
-                skipLabel={t("onboarding.step4.skipLabel")}
-                continueDisabled={false}
-                skipProminent={contactDrafts.length === 0}
-              />
-            </StepCard>
-          )}
-
           {/* Step 5: Success */}
           {step === 5 && (
             <div className="rounded-2xl border border-border/60 bg-card p-8 shadow-sm text-center space-y-6">
@@ -508,9 +411,14 @@ export default function Onboarding() {
                   </Link>
                 </div>
               )}
-              <Button className="w-full" onClick={() => navigate(redirectAfter, { replace: true })}>
-                {t("onboarding.done.button")}
-              </Button>
+              <div className="flex flex-col gap-3">
+                <Button className="w-full" onClick={() => navigate(redirectAfter, { replace: true })}>
+                  {t("onboarding.done.button")}
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => navigate("/contacts", { replace: true })}>
+                  {t("onboarding.done.goToContacts")}
+                </Button>
+              </div>
             </div>
           )}
 

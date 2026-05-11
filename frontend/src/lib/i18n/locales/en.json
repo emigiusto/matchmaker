@@ -1038,9 +1038,10 @@
       "getStarted": "Get started"
     },
     "done": {
-      "title": "You're all set!",
-      "description": "Your profile is ready. Time to find your first match.",
+      "title": "You're ready to play!",
+      "description": "Your account is set up. Add your contacts to start organising matches, or head straight to the dashboard.",
       "button": "Go to dashboard",
+      "goToContacts": "Add contacts",
       "matchesFound_one": "We linked 1 match from before you created your account.",
       "matchesFound_other": "We linked {{count}} matches from before you created your account.",
       "viewMatches": "View match history"
