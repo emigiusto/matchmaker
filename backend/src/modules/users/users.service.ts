@@ -342,7 +342,7 @@ export async function findUsersByIdsCached(userIds: string[]): Promise<UserDTO[]
  */
 export async function findProfileByUserId(userId: string): Promise<{
   user: UserDTO;
-  player: { id: string; defaultCity?: string; preferredClub?: string } | null;
+  player: { id: string; defaultCity?: string; preferredClub?: string; levelValue?: number; levelConfidence?: number } | null;
 }> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError('User not found', 404);
@@ -359,6 +359,8 @@ export async function findProfileByUserId(userId: string): Promise<{
           id: player.id,
           defaultCity: player.defaultCity ?? undefined,
           preferredClub: (player as { preferredClub?: string }).preferredClub ?? undefined,
+          levelValue: player.levelValue ?? undefined,
+          levelConfidence: player.levelConfidence ?? undefined,
         }
       : null,
   };
