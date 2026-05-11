@@ -11,7 +11,7 @@ export const defaultConfig: RatingConfig = {
   upsetMultiplier: 1.5,
   maxDelta: 0.25,
   lossFactor: 0.5,
-  confidenceIncrement: 0.02,
+  confidenceIncrement: 0.05,
   confidenceMax: 1,
   defaultRating: 1000,
   defaultConfidence: 0.3,
@@ -98,8 +98,8 @@ export class RatingService {
       return;
     }
 
-    // 4. Load Result
-    const result = await tx.result.findUnique({ where: { matchId } });
+    // 4. Load Result (including set scores for margin-of-victory)
+    const result = await tx.result.findUnique({ where: { matchId }, include: { sets: true } } as any);
     if (!result) return;
     // Defensive: Only update if result is confirmed
     if (result.status !== 'confirmed') {
@@ -140,6 +140,17 @@ export class RatingService {
       throw new AppError('Cannot update ratings: winner does not match players', 500);
     }
 
+    // Compute margin-of-victory score ratio from set data
+    // playerAScore/playerBScore columns correspond to match.playerAId / match.playerBId
+    let scoreRatio: number | undefined = undefined;
+    const sets: Array<{ playerAScore: number; playerBScore: number }> = (result as any).sets ?? [];
+    if (sets.length > 0) {
+      const winnerIsPlayerA = winnerPlayer.id === match.playerAId;
+      const winnerGames = sets.reduce((sum, s) => sum + (winnerIsPlayerA ? s.playerAScore : s.playerBScore), 0);
+      const totalGames = sets.reduce((sum, s) => sum + s.playerAScore + s.playerBScore, 0);
+      if (totalGames > 0) scoreRatio = winnerGames / totalGames;
+    }
+
     let updateResult;
     let winnerSnapshot: PlayerSnapshot | EloPlayerSnapshot;
     let loserSnapshot: PlayerSnapshot | EloPlayerSnapshot;
@@ -159,7 +170,8 @@ export class RatingService {
       };
       updateResult = this.algorithm.compute({
         winner: winnerSnapshot as EloPlayerSnapshot,
-        loser: loserSnapshot as EloPlayerSnapshot
+        loser: loserSnapshot as EloPlayerSnapshot,
+        scoreRatio,
       });
     } else {
       // Deterministic or other algorithms

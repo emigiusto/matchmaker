@@ -10,14 +10,14 @@ import { computeDecayedConfidence } from '../utils/confidence.utils';
 export class EloRatingAlgorithm implements RatingAlgorithm {
   constructor(
     private readonly kFactor: number = 32,
-    private readonly confidenceIncrement: number = 0.02,
+    private readonly confidenceIncrement: number = 0.05,
     private readonly confidenceMax: number = 1,
     private readonly confidenceDecayRate: number = 0.01,
     private readonly inactivityThresholdDays: number = 14,
     private readonly minConfidence: number = 0
   ) {}
 
-  compute(input: { winner: EloPlayerSnapshot; loser: EloPlayerSnapshot }): RatingUpdateResult {
+  compute(input: { winner: EloPlayerSnapshot; loser: EloPlayerSnapshot; scoreRatio?: number }): RatingUpdateResult {
     // Apply confidence decay to both players BEFORE volatility calculation
     const now = new Date();
     const winnerConfidenceDecayed = computeDecayedConfidence(
@@ -48,14 +48,20 @@ export class EloRatingAlgorithm implements RatingAlgorithm {
     // 3. Compute expected score (classic ELO)
     const expectedScore = 1 / (1 + Math.pow(10, (input.loser.rating - input.winner.rating) / 400));
 
-    // 4. Compute deltas independently (not strictly zero-sum)
-    const winnerDelta = winnerK * (1 - expectedScore);
-    const loserDelta = loserK * (0 - (1 - expectedScore));
+    // 4. Margin-of-victory multiplier: [0.5, 1.0] ratio → [1.0, 2.0]x scaling
+    // Omitting scoreRatio (no set data) keeps multiplier at 1.0 (standard behavior).
+    const movMultiplier = input.scoreRatio !== undefined
+      ? 1 + (Math.max(0.5, Math.min(1.0, input.scoreRatio)) - 0.5) * 2
+      : 1;
+
+    // 5. Compute deltas independently (not strictly zero-sum)
+    const winnerDelta = winnerK * (1 - expectedScore) * movMultiplier;
+    const loserDelta = loserK * (0 - (1 - expectedScore)) * movMultiplier;
 
     const winnerNewRating = input.winner.rating + winnerDelta;
     const loserNewRating = input.loser.rating + loserDelta;
 
-    // 5. Confidence update (simple increment, clamped)
+    // 6. Confidence update (simple increment, clamped)
     const winnerNewConfidence = Math.min(winnerConfidenceDecayed + this.confidenceIncrement, this.confidenceMax);
     const loserNewConfidence = Math.min(loserConfidenceDecayed + this.confidenceIncrement, this.confidenceMax);
 

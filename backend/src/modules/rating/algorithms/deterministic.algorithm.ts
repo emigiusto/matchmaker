@@ -10,7 +10,7 @@ export class DeterministicRatingAlgorithm implements RatingAlgorithm {
 
   constructor(private readonly config: RatingConfig) {}
 
-  compute(input: { winner: PlayerSnapshot; loser: PlayerSnapshot }): RatingUpdateResult {
+  compute(input: { winner: PlayerSnapshot; loser: PlayerSnapshot; scoreRatio?: number }): RatingUpdateResult {
     const { winner, loser } = input;
     const c = this.config;
     const ratingDiff = Math.abs(winner.rating - loser.rating);
