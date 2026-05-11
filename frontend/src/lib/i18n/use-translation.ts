@@ -1,10 +1,11 @@
 import en from "./locales/en.json"
 import es from "./locales/es.json"
+import ca from "./locales/ca.json"
 import { useLanguage } from "./language-context"
 
 export function useTranslation() {
   const { language } = useLanguage()
-  const translations = language === "es" ? es : en
+  const translations = language === "es" ? es : language === "ca" ? ca : en
 
   const t = (key: string, paramsOrDefault?: Record<string, string | number> | string): string => {
     const keys = key.split(".")

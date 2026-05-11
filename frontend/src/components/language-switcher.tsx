@@ -36,6 +36,13 @@ export function LanguageSwitcher() {
           <span className="mr-2">{language === "es" ? "✓" : " "}</span>
           {t("common.spanish")}
         </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => setLanguage("ca")}
+          className={language === "ca" ? "bg-primary/10" : ""}
+        >
+          <span className="mr-2">{language === "ca" ? "✓" : " "}</span>
+          {t("common.catalan")}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

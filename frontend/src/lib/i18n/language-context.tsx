@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from "react"
 import type { ReactNode } from "react"
 
-type Language = "en" | "es"
+type Language = "en" | "es" | "ca"
 
 interface LanguageContextType {
   language: Language
@@ -12,7 +12,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 function detectLanguage(): Language {
   const saved = localStorage.getItem("language")
-  if (saved === "en" || saved === "es") return saved
+  if (saved === "en" || saved === "es" || saved === "ca") return saved
   return "es"
 }
 
