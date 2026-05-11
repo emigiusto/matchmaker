@@ -23,12 +23,13 @@ export const createContactSchema = z.object({
   phone: phoneE164,
   importSource: z.string().optional(),
   externalId: z.string().optional(),
+  communicationLanguage: z.enum(['es', 'en', 'ca']).optional(),
 });
 
 export const updateContactSchema = z.object({
   name: z.string().min(1).optional(),
   socioNumbers: z.record(z.string(), z.string()).optional(),
-  communicationLanguage: z.enum(['es', 'en']).optional(),
+  communicationLanguage: z.enum(['es', 'en', 'ca']).optional(),
 });
 
 export const createContactListSchema = z.object({

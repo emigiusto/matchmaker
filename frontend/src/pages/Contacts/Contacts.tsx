@@ -104,7 +104,7 @@ function SortableListMemberRow({
         <p className="truncate text-xs text-muted-foreground">{contact.phone}</p>
       </div>
       <Badge variant="outline" className="h-5 shrink-0 px-1.5 py-0 text-[10px] text-muted-foreground">
-        {contact.communicationLanguage === "en" ? "EN" : "ES"}
+        {contact.communicationLanguage === "en" ? "EN" : contact.communicationLanguage === "ca" ? "CA" : "ES"}
       </Badge>
       <Button
         size="sm"
@@ -139,7 +139,7 @@ export default function Contacts() {
   const [newContactOpen, setNewContactOpen] = useState(false)
   const [newName, setNewName] = useState("")
   const [newPhone, setNewPhone] = useState("")
-  const [newCommLang, setNewCommLang] = useState<"es" | "en">("es")
+  const [newCommLang, setNewCommLang] = useState<"es" | "en" | "ca">(language as "es" | "en" | "ca")
   const [newSocioInputs, setNewSocioInputs] = useState<Record<string, string>>({})
   const [creatingContact, setCreatingContact] = useState(false)
 
@@ -151,7 +151,7 @@ export default function Contacts() {
   // Edit contact dialog
   const [editingContact, setEditingContact] = useState<ContactDTO | null>(null)
   const [editName, setEditName] = useState("")
-  const [editCommLang, setEditCommLang] = useState<"es" | "en">("es")
+  const [editCommLang, setEditCommLang] = useState<"es" | "en" | "ca">("es")
   const [editSocioInputs, setEditSocioInputs] = useState<Record<string, string>>({})
   const [editListIds, setEditListIds] = useState<Set<string>>(new Set())
   const [savingEdit, setSavingEdit] = useState(false)
@@ -222,7 +222,7 @@ export default function Contacts() {
   function openEdit(c: ContactDTO) {
     setEditingContact(c)
     setEditName(c.name)
-    setEditCommLang((c.communicationLanguage === "en" ? "en" : "es") as "es" | "en")
+    setEditCommLang((c.communicationLanguage === "en" ? "en" : c.communicationLanguage === "ca" ? "ca" : "es") as "es" | "en" | "ca")
     setEditSocioInputs({ ...c.socioNumbers })
     setEditListIds(
       new Set(lists.filter((l) => l.members.some((m) => m.id === c.id)).map((l) => l.id)),
@@ -631,7 +631,7 @@ export default function Contacts() {
                                 </Badge>
                               )}
                               <Badge variant="outline" className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground">
-                                {c.communicationLanguage === "en" ? "EN" : "ES"}
+                                {c.communicationLanguage === "en" ? "EN" : c.communicationLanguage === "ca" ? "CA" : "ES"}
                               </Badge>
                               {socioEntries.map(([slug, num]) => (
                                 <Badge key={slug} variant="secondary" className="h-5 px-1.5 py-0 text-[10px]">
@@ -925,7 +925,7 @@ export default function Contacts() {
             <div className="space-y-1.5">
               <Label>{t("contactsPage.communicationLanguage")}</Label>
               <div className="flex gap-2">
-                {(["es", "en"] as const).map((lang) => (
+                {(["es", "en", "ca"] as const).map((lang) => (
                   <Button
                     key={lang}
                     type="button"
@@ -933,7 +933,7 @@ export default function Contacts() {
                     variant={editCommLang === lang ? "default" : "outline"}
                     onClick={() => setEditCommLang(lang)}
                   >
-                    {lang === "es" ? "Español" : "English"}
+                    {lang === "es" ? "Español" : lang === "ca" ? "Català" : "English"}
                   </Button>
                 ))}
               </div>
@@ -1023,7 +1023,7 @@ export default function Contacts() {
             <div>
               <Label className="mb-1 block text-sm">{t("contactsPage.communicationLanguage")}</Label>
               <div className="flex gap-2">
-                {(["es", "en"] as const).map((lang) => (
+                {(["es", "en", "ca"] as const).map((lang) => (
                   <Button
                     key={lang}
                     type="button"
@@ -1031,7 +1031,7 @@ export default function Contacts() {
                     variant={newCommLang === lang ? "default" : "outline"}
                     onClick={() => setNewCommLang(lang)}
                   >
-                    {lang === "es" ? "Español" : "English"}
+                    {lang === "es" ? "Español" : lang === "ca" ? "Català" : "English"}
                   </Button>
                 ))}
               </div>
