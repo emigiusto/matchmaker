@@ -822,8 +822,10 @@ export const schedulingService = {
         .slice(0, required);
 
       await prisma.$transaction(async (tx) => {
+        // Include 'expired' so candidates whose window elapsed before quorum was reached
+        // are still marked accepted — their vote was cast and they should be in the match.
         await tx.schedulingCandidate.updateMany({
-          where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted'] } },
+          where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted', 'expired'] } },
           data: { status: 'accepted', responseAt: new Date() },
         });
         await tx.schedulingRequest.update({
@@ -904,8 +906,10 @@ export const schedulingService = {
       .slice(0, required);
 
     await prisma.$transaction(async (tx) => {
+      // Include 'expired' so candidates whose window elapsed before quorum was reached
+      // are still marked accepted — their vote was cast and they should be in the match.
       await tx.schedulingCandidate.updateMany({
-        where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted'] } },
+        where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted', 'expired'] } },
         data: { status: 'accepted', responseAt: new Date() },
       });
       await tx.schedulingRequest.update({
