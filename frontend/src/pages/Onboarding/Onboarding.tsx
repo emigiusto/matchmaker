@@ -63,7 +63,7 @@ function StepIndicator({ current, onBack }: { current: number; onBack?: () => vo
 }
 
 export default function Onboarding() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
@@ -121,6 +121,7 @@ export default function Onboarding() {
     setSaving(true)
     try {
       track('onboarding.completed')
+      await refreshUser()
       setStep(5)
     } finally {
       setSaving(false)
@@ -412,7 +413,7 @@ export default function Onboarding() {
                 </div>
               )}
               <div className="flex flex-col gap-3">
-                <Button className="w-full" onClick={() => navigate(redirectAfter, { replace: true })}>
+                <Button className="w-full" onClick={() => navigate("/", { replace: true })}>
                   {t("onboarding.done.button")}
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => navigate("/contacts", { replace: true })}>
