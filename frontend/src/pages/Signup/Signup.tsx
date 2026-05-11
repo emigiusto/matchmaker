@@ -31,9 +31,13 @@ export default function SignupPage() {
       setError(t("signup.passwordMinLength"))
       return
     }
+    if (!phone.trim()) {
+      setError(t("signup.phoneRequired"))
+      return
+    }
     setSubmitting(true)
     try {
-      await signup(name, email, password, phone.trim() || undefined)
+      await signup(name, email, password, phone.trim())
       const onboardingUrl = redirect !== "/"
         ? `/onboarding?redirect=${encodeURIComponent(redirect)}`
         : "/onboarding"
@@ -108,7 +112,7 @@ export default function SignupPage() {
               />
             </div>
             <div>
-              <Label>{t("signup.phoneLabel")}</Label>
+              <Label>{t("signup.phoneLabel")} <span className="text-destructive">*</span></Label>
               <PhoneInput value={phone} onChange={setPhone} className="mt-1.5" />
               <p className="mt-1 text-xs text-muted-foreground">{t("signup.phoneHint")}</p>
             </div>

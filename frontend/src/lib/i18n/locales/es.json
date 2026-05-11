@@ -263,7 +263,8 @@
     "logIn": "Iniciar sesión",
     "failed": "Error al registrarse",
     "phoneLabel": "Número de teléfono",
-    "phoneHint": "Opcional — nos ayuda a vincular tu historial de partidos si fuiste invitado antes de registrarte"
+    "phoneHint": "Necesario para recibir invitaciones y mensajes por WhatsApp",
+    "phoneRequired": "El número de teléfono es obligatorio"
   },
   "play": {
     "pageTitle": "Mis Invitaciones",

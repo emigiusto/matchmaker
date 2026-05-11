@@ -263,7 +263,8 @@
     "logIn": "Log in",
     "failed": "Sign up failed",
     "phoneLabel": "Phone number",
-    "phoneHint": "Optional — helps us link your match history if you were invited before signing up"
+    "phoneHint": "Required to receive invites and messages via WhatsApp",
+    "phoneRequired": "Phone number is required"
   },
   "play": {
     "pageTitle": "My Invites",
