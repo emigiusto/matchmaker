@@ -609,6 +609,11 @@ async function failAttempt(attemptId: string, errorMessage: string, errorCode?: 
  * Only allowed when the current attempt status is 'failed'.
  */
 export async function retryBookingForMatch(matchId: string, membershipId?: string): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, scheduledAt: true } })
+  if (!match) throw new AppError('Match not found', 404)
+  if (match.status === 'cancelled') throw new AppError('Cannot retry booking for a cancelled match', 400)
+  if (match.scheduledAt <= new Date()) throw new AppError('Cannot retry booking for a match in the past', 400)
+
   const existing = await prisma.bookingAttempt.findUnique({ where: { matchId } })
 
   if (!existing) {
@@ -795,6 +800,7 @@ export async function retryFailedBookingsForFutureMatches(): Promise<number> {
       clubMembership: { status: 'active' },
       match: {
         scheduledAt: { gt: new Date() },
+        status: { not: 'cancelled' },
         result: { is: null },
       },
     },
