@@ -491,7 +491,7 @@ export const schedulingService = {
       return;
     }
 
-    const hostName = request.hostUser?.name || 'Someone';
+    const hostName = request.hostUser?.name || request.hostUser?.email || 'Un jugador';
     const tz = (request as RequestRow).timezone ?? 'UTC';
     const format = (request as RequestRow).format || 'singles';
 

@@ -265,6 +265,7 @@
     "failed": "Error al registrarse",
     "phoneLabel": "Número de teléfono",
     "phoneHint": "Necesario para recibir invitaciones y mensajes por WhatsApp",
+    "nameRequired": "El nombre es obligatorio",
     "phoneRequired": "El número de teléfono es obligatorio"
   },
   "play": {

@@ -27,6 +27,10 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
+    if (!name.trim()) {
+      setError(t("signup.nameRequired"))
+      return
+    }
     if (password.length < 6) {
       setError(t("signup.passwordMinLength"))
       return
@@ -73,13 +77,14 @@ export default function SignupPage() {
               </div>
             )}
             <div>
-              <Label htmlFor="name">{t("signup.fullName")}</Label>
+              <Label htmlFor="name">{t("signup.fullName")} <span className="text-destructive">*</span></Label>
               <Input
                 id="name"
                 type="text"
                 placeholder={t("signup.fullNamePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required
                 className="mt-1.5"
                 autoComplete="name"
               />

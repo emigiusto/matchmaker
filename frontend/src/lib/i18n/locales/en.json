@@ -265,6 +265,7 @@
     "failed": "Sign up failed",
     "phoneLabel": "Phone number",
     "phoneHint": "Required to receive invites and messages via WhatsApp",
+    "nameRequired": "Full name is required",
     "phoneRequired": "Phone number is required"
   },
   "play": {

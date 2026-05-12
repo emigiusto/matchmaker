@@ -265,6 +265,7 @@
     "failed": "Error en registrar-se",
     "phoneLabel": "Número de telèfon",
     "phoneHint": "Necessari per rebre invitacions i missatges per WhatsApp",
+    "nameRequired": "El nom és obligatori",
     "phoneRequired": "El número de telèfon és obligatori"
   },
   "play": {
