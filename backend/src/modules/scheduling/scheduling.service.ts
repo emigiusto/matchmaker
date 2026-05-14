@@ -587,13 +587,18 @@ export const schedulingService = {
 
       // For doubles always append who else is invited (including the host)
       if (format === 'doubles' && request.candidates) {
-        const hostFirstName = hostName.split(' ')[0].slice(0, 12);
+        const shortName = (fullName: string) => {
+          const parts = fullName.trim().split(/\s+/);
+          const first = parts[0] ?? '';
+          const lastInitial = parts[1] ? ` ${parts[1][0].toUpperCase()}.` : '';
+          return `${first}${lastInitial}`;
+        };
         const otherNames = [
-          hostFirstName,
+          shortName(hostName),
           ...(request.candidates as Array<{ contactUserId: string; contactUser?: { name?: string | null } | null }>)
             .filter((c) => c.contactUserId !== candidate.contactUserId && c.contactUserId !== request.hostUserId)
             .slice(0, 3)
-            .map((c) => (c.contactUser?.name ?? '').split(' ')[0].slice(0, 12))
+            .map((c) => shortName(c.contactUser?.name ?? ''))
             .filter(Boolean),
         ];
         if (otherNames.length > 0) {
