@@ -429,26 +429,15 @@ export default function InviteDetailsPage() {
           const quorumNeeded = request.format === "doubles" ? 3 : 1
           const respondedCount = candidates.filter((c) => c.status === "responded" || c.status === "accepted").length
           if (respondedCount === 0) return null
-          const hasQuorum = respondedCount >= quorumNeeded
+          const countMet = respondedCount >= quorumNeeded
           return (
             <div className="flex items-start gap-2 rounded-md border border-blue-200/60 bg-blue-500/8 px-3 py-2.5 text-sm text-blue-800 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-400">
               <ScanSearch className="mt-0.5 h-4 w-4 shrink-0" />
               <div className="space-y-0.5">
-                {hasQuorum ? (
-                  <>
-                    <span>{t("invites.quorumReachedStatus", { responded: respondedCount })}</span>
-                    {request.bookingEnabled && (
-                      <div className="text-xs opacity-80">{t("invites.quorumAwaitingCourt")}</div>
-                    )}
-                  </>
+                {countMet ? (
+                  <span>{t(request.bookingEnabled ? "invites.quorumCountMetBooking" : "invites.quorumCountMet", { responded: respondedCount })}</span>
                 ) : (
-                  <>
-                    <span>{t("invites.quorumPending", { responded: respondedCount })}</span>
-                    <div className="text-xs opacity-80">
-                      {t("invites.quorumPendingNeedMore", { needed: quorumNeeded - respondedCount })}
-                      {request.bookingEnabled && ` · ${t("invites.quorumBookingRequired")}`}
-                    </div>
-                  </>
+                  <span>{t("invites.quorumPending", { responded: respondedCount, needed: quorumNeeded - respondedCount })}</span>
                 )}
               </div>
             </div>
