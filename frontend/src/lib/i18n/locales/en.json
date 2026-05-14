@@ -418,6 +418,7 @@
       "candidateCancelledByHost": "You cancelled {{name}}",
       "candidateRetried": "{{name}} queued for retry",
       "candidatesAdded": "{{count}} contact(s) added",
+      "candidatesAddedNames": "{{names}} added",
       "bookingSuccess": "Court booked{{court}}",
       "bookingFailed": "Booking failed{{error}}",
       "inviteLinkAccepted": "{{name}} accepted via invite link",

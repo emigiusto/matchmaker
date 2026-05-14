@@ -1346,7 +1346,9 @@ export const schedulingService = {
     }
 
     await schedulingRepository.addCandidates(requestId, toAdd);
-    void recordEvent({ schedulingRequestId: requestId, action: 'candidates_added', actorUserId: userId, metadata: { count: toAdd.length } });
+    const addedUsers = await prisma.user.findMany({ where: { id: { in: toAdd } }, select: { name: true } });
+    const addedNames = addedUsers.map((u) => u.name).filter(Boolean);
+    void recordEvent({ schedulingRequestId: requestId, action: 'candidates_added', actorUserId: userId, metadata: { count: toAdd.length, names: addedNames } });
 
     if (request.status === 'expired') {
       await schedulingRepository.updateRequestStatus(requestId, 'active');

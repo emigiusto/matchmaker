@@ -522,6 +522,7 @@ describe('SchedulingService', () => {
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
       mockRepo.countActiveCandidates.mockResolvedValue(1);
+      mockTx.user.findMany.mockResolvedValue([]);
 
       const result = await schedulingService.addCandidates('req1', ['cand2'], 'host1');
 
@@ -1247,6 +1248,7 @@ describe('SchedulingService', () => {
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
       mockRepo.countActiveCandidates.mockResolvedValue(1);
+      mockTx.user.findMany.mockResolvedValue([]);
 
       const result = await schedulingService.addCandidates('req1', ['cand3'], 'host1');
 

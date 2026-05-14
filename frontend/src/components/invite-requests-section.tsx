@@ -431,6 +431,8 @@ export function InviteRequestsSection({
           : t("invites.events.candidateCancelled", { name })
       case "candidate_retried": return t("invites.events.candidateRetried", { name })
       case "candidates_added": {
+        const names = event.metadata?.names as string[] | undefined
+        if (names && names.length > 0) return t("invites.events.candidatesAddedNames", { names: names.join(", ") })
         const count = (event.metadata?.count as number) ?? 1
         return t("invites.events.candidatesAdded", { count })
       }

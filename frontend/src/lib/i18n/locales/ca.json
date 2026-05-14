@@ -418,6 +418,7 @@
       "candidateCancelledByHost": "Has cancel·lat a {{name}}",
       "candidateRetried": "{{name}} en cua per a reintent",
       "candidatesAdded": "{{count}} contacte(s) afegit(s)",
+      "candidatesAddedNames": "{{names}} afegit(s)",
       "bookingSuccess": "Pista reservada{{court}}",
       "bookingFailed": "Error en la reserva{{error}}",
       "inviteLinkAccepted": "{{name}} ha acceptat a través de l'enllaç d'invitació",
