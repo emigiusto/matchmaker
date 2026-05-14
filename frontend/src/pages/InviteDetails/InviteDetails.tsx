@@ -223,9 +223,9 @@ export default function InviteDetailsPage() {
   }, [fetchRequest, fetchEvents])
 
   useEffect(() => {
-    if (!requestId) return
+    if (!requestId || !request?.bookingEnabled) return
     schedulingService.getCourtAvailability(requestId).then(setCourtAvailability).catch(() => {})
-  }, [requestId])
+  }, [requestId, request?.bookingEnabled])
 
   useEffect(() => {
     if (events.length > prevEventsCountRef.current) {
