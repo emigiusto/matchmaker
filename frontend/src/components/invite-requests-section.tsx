@@ -69,7 +69,7 @@ export interface InviteRequest {
     contactUserId: string
     name: string
     phone: string | null
-    status: "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled" | "send_failed"
+    status: "pending" | "contacted" | "responded" | "declined" | "accepted" | "no_response" | "cancelled" | "send_failed"
     contactedAt: string | null
   }[]
   currentIndex: number
@@ -103,6 +103,7 @@ function mapSchedulingToInviteRequest(
     pending: "pending" as const,
     contacted: "contacted" as const,
     waiting_reply: "contacted" as const,
+    responded: "responded" as const,
     accepted: "accepted" as const,
     declined: "declined" as const,
     expired: "no_response" as const,
@@ -657,9 +658,11 @@ export function InviteRequestsSection({
                                         ? "bg-muted/60"
                                         : contact.status === "send_failed"
                                           ? "bg-orange-500/10"
-                                          : contact.status === "contacted"
-                                          ? "bg-blue-500/10"
-                                          : "bg-muted/30"
+                                          : contact.status === "responded"
+                                            ? "bg-purple-500/10"
+                                            : contact.status === "contacted"
+                                            ? "bg-blue-500/10"
+                                            : "bg-muted/30"
                               }`}
                             >
                               <span className="flex h-4 w-4 shrink-0 items-center justify-center">
@@ -677,6 +680,9 @@ export function InviteRequestsSection({
                                 )}
                                 {contact.status === "send_failed" && (
                                   <PhoneOff className="h-3.5 w-3.5 text-orange-500" />
+                                )}
+                                {contact.status === "responded" && (
+                                  <CheckCircle className="h-3.5 w-3.5 text-purple-600" />
                                 )}
                                 {contact.status === "contacted" && displayStatus === "scheduling" && (
                                   <Loader2
