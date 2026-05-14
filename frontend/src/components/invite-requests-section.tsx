@@ -254,9 +254,9 @@ export function InviteRequestsSection({
         setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
         switchToFilterForStatus(mapped.status, mapped)
         if (mapped.status === "matched") {
-          toast.success(t("invites.toast.matchConfirmed"))
+          toast.success(t("invites.toast.quorumReached"))
         } else {
-          toast.info(t("invites.toast.quorumChecked"))
+          toast.info(t("invites.toast.quorumNotReached"))
         }
       }
     } catch (e) {

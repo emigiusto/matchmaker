@@ -503,7 +503,9 @@
       "retryQueued": "Invite will be retried",
       "retryFailed": "Failed to retry invite",
       "linkCopied": "Invite link copied",
-      "quorumChecked": "Quorum checked — no changes"
+      "quorumReached": "Quorum reached! The match is being confirmed",
+      "quorumNotReached": "No quorum yet — no time slot has enough matching votes",
+      "quorumStatus": "{{responded}} of {{needed}} people have voted — looking for a common slot"
     }
   },
   "inviteDetails": {

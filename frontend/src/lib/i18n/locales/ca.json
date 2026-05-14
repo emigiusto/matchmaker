@@ -503,7 +503,9 @@
       "retryQueued": "Es reintentarà la invitació",
       "retryFailed": "Error en reintentar la invitació",
       "linkCopied": "Enllaç d'invitació copiat",
-      "quorumChecked": "Quòrum avaluat — sense canvis"
+      "quorumReached": "Quòrum assolit! El partit s'està confirmant",
+      "quorumNotReached": "Encara no hi ha quòrum — cap horari té prou vots coincidents",
+      "quorumStatus": "{{responded}} de {{needed}} persones han votat — buscant horari en comú"
     }
   },
   "inviteDetails": {

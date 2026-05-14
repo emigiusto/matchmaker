@@ -318,7 +318,11 @@ export default function InviteDetailsPage() {
       const updated = await schedulingService.checkQuorum(requestId, currentUserId)
       setRequest(updated)
       await fetchEvents()
-      toast.success(t("invites.toast.quorumChecked"))
+      if (updated.status === "completed") {
+        toast.success(t("invites.toast.quorumReached"))
+      } else {
+        toast.info(t("invites.toast.quorumNotReached"))
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("errors.generic"))
     } finally {
@@ -412,6 +416,19 @@ export default function InviteDetailsPage() {
             <span>{t("invites.noCourtsAtQuorum")}</span>
           </div>
         )}
+
+        {/* Quorum status banner */}
+        {displayStatus === "scheduling" && !request.noCourtsAtQuorum && (() => {
+          const quorumNeeded = request.format === "doubles" ? 3 : 1
+          const respondedCount = candidates.filter((c) => c.status === "responded" || c.status === "accepted").length
+          if (respondedCount === 0) return null
+          return (
+            <div className="flex items-start gap-2 rounded-md border border-blue-200/60 bg-blue-500/8 px-3 py-2.5 text-sm text-blue-800 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-400">
+              <ScanSearch className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{t("invites.quorumStatus", { responded: respondedCount, needed: quorumNeeded })}</span>
+            </div>
+          )
+        })()}
 
         {/* Meta info */}
         <Card>

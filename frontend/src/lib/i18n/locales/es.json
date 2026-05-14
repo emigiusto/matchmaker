@@ -503,7 +503,9 @@
       "retryQueued": "Se reintentará la invitación",
       "retryFailed": "Error al reintentar la invitación",
       "linkCopied": "Enlace de invitación copiado",
-      "quorumChecked": "Quórum evaluado — sin cambios"
+      "quorumReached": "¡Quórum alcanzado! El partido se está confirmando",
+      "quorumNotReached": "Todavía no hay quórum — ningún horario tiene suficientes votos coincidentes",
+      "quorumStatus": "{{responded}} de {{needed}} personas han votado — buscando horario en común"
     }
   },
   "inviteDetails": {
