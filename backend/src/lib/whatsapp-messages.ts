@@ -43,7 +43,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sport === 'padel' ? 'Pádel' : 'Tenis'} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Pádel' : `Tenis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
@@ -63,7 +63,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sport === 'padel' ? 'Pádel' : 'Tenis'} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Pádel' : `Tenis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
@@ -85,7 +85,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sport === 'padel' ? 'Pádel' : 'Tenis'} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Pádel' : `Tenis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
@@ -248,7 +248,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
       const formatName = format.charAt(0).toUpperCase() + format.slice(1);
-      const sportLabel = `${sportName} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Padel' : `Tennis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Once we confirm the time, ${hostName} will find a court.`;
@@ -268,7 +268,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
       const formatName = format.charAt(0).toUpperCase() + format.slice(1);
-      const sportLabel = `${sportName} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Padel' : `Tennis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Once we confirm the time, ${hostName} will find a court.`;
@@ -290,7 +290,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
       const formatName = format.charAt(0).toUpperCase() + format.slice(1);
-      const sportLabel = `${sportName} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Padel' : `Tennis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Once we confirm the time, ${hostName} will find a court.`;
@@ -452,7 +452,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sport === 'padel' ? 'Pàdel' : 'Tennis'} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Pàdel' : `Tennis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
@@ -472,7 +472,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sport === 'padel' ? 'Pàdel' : 'Tennis'} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Pàdel' : `Tennis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
@@ -494,7 +494,7 @@ const templates: Record<Locale, MessageTemplates> = {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
-      const sportLabel = `${sport === 'padel' ? 'Pàdel' : 'Tennis'} ${formatName}`;
+      const sportLabel = sport === 'padel' ? 'Pàdel' : `Tennis ${formatName}`;
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
