@@ -196,7 +196,7 @@ export const schedulingService = {
     )
   },
 
-  async confirmMatch(requestId: string, data: { userId: string; date: string; time: string }): Promise<SchedulingRequestDTO> {
+  async confirmMatch(requestId: string, data: { userId: string; date: string; time: string; candidateIds: string[] }): Promise<SchedulingRequestDTO> {
     return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/confirm-match`, data)
   },
 

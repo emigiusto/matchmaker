@@ -172,6 +172,7 @@ export default function InviteDetailsPage() {
   const [confirmMatchOpen, setConfirmMatchOpen] = useState(false)
   const [confirmMatchDate, setConfirmMatchDate] = useState("")
   const [confirmMatchTime, setConfirmMatchTime] = useState("")
+  const [confirmMatchCandidates, setConfirmMatchCandidates] = useState<string[]>([])
   const [confirmMatchLoading, setConfirmMatchLoading] = useState(false)
   const [pendingAction, setPendingAction] = useState<{
     candidateId: string
@@ -287,13 +288,14 @@ export default function InviteDetailsPage() {
   }
 
   async function handleConfirmMatch() {
-    if (!requestId || !confirmMatchDate || !confirmMatchTime) return
+    if (!requestId || !confirmMatchDate || !confirmMatchTime || confirmMatchCandidates.length === 0) return
     setConfirmMatchLoading(true)
     try {
       const updated = await schedulingService.confirmMatch(requestId, {
         userId: currentUserId,
         date: confirmMatchDate,
         time: confirmMatchTime,
+        candidateIds: confirmMatchCandidates,
       })
       setRequest(updated)
       await fetchEvents()
@@ -558,6 +560,7 @@ export default function InviteDetailsPage() {
                   const primaryDateStr = request.date.slice(0, 10)
                   setConfirmMatchDate(primaryDateStr)
                   setConfirmMatchTime(format(new Date(request.startTime), "HH:mm"))
+                  setConfirmMatchCandidates([])
                   setConfirmMatchOpen(true)
                 }}
               >
@@ -795,6 +798,40 @@ export default function InviteDetailsPage() {
             <DialogDescription>{t("inviteDetails.confirmMatchDialog.description")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Candidate selection */}
+            {(() => {
+              const required = request.format === "doubles" ? 3 : 1
+              const eligible = candidates.filter((c) => ["responded", "contacted", "waiting_reply"].includes(c.status))
+              const toggle = (id: string) => setConfirmMatchCandidates((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < required ? [...prev, id] : prev
+              )
+              return (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">{t("inviteDetails.confirmMatchDialog.selectCandidates", { needed: required })}</p>
+                  <div className="flex flex-col gap-1">
+                    {eligible.map((c) => {
+                      const name = c.contactUserName ?? c.contactPhone ?? c.id
+                      const checked = confirmMatchCandidates.includes(c.id)
+                      const disabled = !checked && confirmMatchCandidates.length >= required
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => toggle(c.id)}
+                          disabled={disabled}
+                          className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${checked ? "border-primary bg-primary/5 text-primary" : disabled ? "border-border opacity-40" : "border-border hover:bg-muted"}`}
+                        >
+                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${checked ? "border-primary bg-primary text-primary-foreground" : "border-input"}`}>
+                            {checked && <CheckCircle className="h-3 w-3" />}
+                          </span>
+                          <span>{name}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">{t(`invites.candidateStatus.${mapCandidateStatus(c.status)}`)}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
             {/* Date selection */}
             <div className="space-y-1.5">
               <p className="text-sm font-medium">{t("inviteDetails.confirmMatchDialog.selectDate")}</p>
@@ -861,7 +898,7 @@ export default function InviteDetailsPage() {
             </Button>
             <Button
               onClick={handleConfirmMatch}
-              disabled={!confirmMatchDate || !confirmMatchTime || confirmMatchLoading}
+              disabled={!confirmMatchDate || !confirmMatchTime || confirmMatchCandidates.length === 0 || confirmMatchLoading}
             >
               {confirmMatchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
               <span className="ml-1.5">{t("inviteDetails.confirmMatchDialog.confirm")}</span>

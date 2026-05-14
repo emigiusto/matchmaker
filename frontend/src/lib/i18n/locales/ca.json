@@ -524,6 +524,7 @@
       "description": "El sistema assumirà que tots els candidats estan disponibles a l'horari seleccionat i confirmarà el partit. S'iniciarà la reserva de pista si està habilitada.",
       "selectDate": "Selecciona una data",
       "selectTime": "Selecciona un horari",
+      "selectCandidates": "Selecciona els jugadors ({{needed}} necessaris)",
       "confirm": "Confirmar",
       "cancel": "Cancel·lar",
       "success": "Partit confirmat",

@@ -1371,8 +1371,9 @@ export const schedulingService = {
   async confirmMatchOverride(
     requestId: string,
     userId: string,
-    dateStr: string,  // YYYY-MM-DD in request timezone
-    timeHHMM: string, // HH:MM in request timezone
+    dateStr: string,       // YYYY-MM-DD in request timezone
+    timeHHMM: string,      // HH:MM in request timezone
+    candidateIds: string[], // exact candidate IDs the host selected
   ): Promise<SchedulingRequestDTO> {
     const request = await schedulingRepository.findRequestById(requestId);
     if (!request) throw new AppError('Scheduling request not found', 404);
@@ -1381,6 +1382,15 @@ export const schedulingService = {
 
     const format = (request as RequestRow).format || 'singles';
     const required = getRequiredAcceptances(format);
+
+    if (candidateIds.length !== required) {
+      throw new AppError(`Must select exactly ${required} candidate(s) for a ${format} match`, 400);
+    }
+
+    // Validate that selected candidates belong to this request
+    const allCandidates = (request.candidates ?? []) as Array<{ id: string; status: string }>;
+    const invalidId = candidateIds.find((id) => !allCandidates.some((c) => c.id === id));
+    if (invalidId) throw new AppError(`Candidate ${invalidId} not found on this request`, 400);
 
     // Convert local HH:MM → UTC using DST-safe noon reference
     const tz = (request as RequestRow).timezone ?? 'UTC';
@@ -1391,17 +1401,7 @@ export const schedulingService = {
     const utcH = ((Number(hStr) - tzOffsetH) + 24) % 24;
     const overrideSlotUTC = `${String(utcH).padStart(2, '0')}:${mStr ?? '00'}`;
 
-    // Pick candidates to accept: responded first (they engaged), then contacted/waiting_reply
-    const candidates = ((request.candidates ?? []) as Array<{ id: string; status: string; priorityOrder: number }>)
-      .sort((a, b) => a.priorityOrder - b.priorityOrder);
-    const pool = [
-      ...candidates.filter((c) => c.status === 'responded'),
-      ...candidates.filter((c) => ['contacted', 'waiting_reply'].includes(c.status)),
-    ];
-    if (pool.length < required) {
-      throw new AppError(`Not enough candidates to confirm (need ${required}, have ${pool.length})`, 400);
-    }
-    const toAccept = pool.slice(0, required).map((c) => c.id);
+    const toAccept = candidateIds;
 
     await prisma.$transaction(async (tx) => {
       await tx.schedulingCandidate.updateMany({

@@ -89,11 +89,12 @@ export class SchedulingController {
     try {
       const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
       if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
-      const { userId, date, time } = req.body;
+      const { userId, date, time, candidateIds } = req.body;
       if (!userId) return res.status(400).json({ error: 'Missing userId' });
       if (!date || typeof date !== 'string') return res.status(400).json({ error: 'Missing or invalid date (YYYY-MM-DD)' });
       if (!time || typeof time !== 'string') return res.status(400).json({ error: 'Missing or invalid time (HH:MM)' });
-      const result = await schedulingService.confirmMatchOverride(requestId, userId, date, time);
+      if (!Array.isArray(candidateIds) || candidateIds.length === 0) return res.status(400).json({ error: 'Missing candidateIds' });
+      const result = await schedulingService.confirmMatchOverride(requestId, userId, date, time, candidateIds);
       res.json(result);
     } catch (err) {
       next(err);
