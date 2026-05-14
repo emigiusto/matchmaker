@@ -70,13 +70,6 @@ function mapCandidateStatus(s: SchedulingCandidateDTO["status"]): ContactStatus 
   return map[s] ?? "pending"
 }
 
-function formatResponseWindow(minutes: number, t: (key: string, params?: Record<string, string | number>) => string): string {
-  if (minutes < 60) return t("inviteDetails.responseWindowMin", { n: Math.round(minutes) })
-  const hours = minutes / 60
-  if (hours < 24) return t("inviteDetails.responseWindowH", { n: Math.round(hours) })
-  const days = Math.round(hours / 24)
-  return t(days === 1 ? "inviteDetails.responseWindowDay" : "inviteDetails.responseWindowDays", { n: days })
-}
 
 function formatTimeRange(startIso: string, endIso: string): string {
   try {
@@ -457,12 +450,6 @@ export default function InviteDetailsPage() {
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
               <span>{request.locationText?.trim() || t("common.tbd")}</span>
             </div>
-            {displayStatus === "scheduling" && (
-              <div className="flex items-center gap-2 text-sm">
-                <Hourglass className="h-4 w-4 shrink-0 text-primary" />
-                <span>{t("inviteDetails.replyWindow")} {formatResponseWindow(request.responseWindowMinutes, t)}</span>
-              </div>
-            )}
           </CardContent>
         </Card>
 

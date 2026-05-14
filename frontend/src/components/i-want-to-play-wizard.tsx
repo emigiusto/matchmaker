@@ -32,8 +32,6 @@ import {
   Swords,
   Target,
   Building2,
-  Copy,
-  Check,
   Loader2,
   UserPlus,
   List,
@@ -241,10 +239,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setCityValue("")
     setMatchType("practice")
     setMatchFormat("singles")
-    setShowCandidates(false)
     setSport("tennis")
-    setResponseWindow(defaultResponseWindow)
-    setMaxParallelCandidates(1)
     setPriorityList([])
     setBookingEnabled(false)
     setSelectedMembershipId(null)
