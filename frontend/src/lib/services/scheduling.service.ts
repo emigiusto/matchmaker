@@ -73,6 +73,7 @@ export interface SchedulingRequestDTO {
   matchId: string | null
   whatsappGroupId: string | null
   noCourtsAtQuorum: boolean
+  bookingEnabled: boolean
   createdAt: string
   updatedAt: string
   candidates?: SchedulingCandidateDTO[]
