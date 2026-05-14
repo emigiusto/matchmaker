@@ -15,15 +15,14 @@ import {
   Hourglass,
   PhoneOff,
   RotateCcw,
-  Link2,
-  Copy,
-  Check,
   ExternalLink,
   Trash2,
   CirclePlay,
   History,
   Building2,
   Ban,
+  ScanSearch,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -54,13 +53,14 @@ import {
 
 const POLL_INTERVAL_MS = 5000
 
-type ContactStatus = "pending" | "contacted" | "declined" | "accepted" | "no_response" | "cancelled" | "send_failed"
+type ContactStatus = "pending" | "contacted" | "responded" | "declined" | "accepted" | "no_response" | "cancelled" | "send_failed"
 
 function mapCandidateStatus(s: SchedulingCandidateDTO["status"]): ContactStatus {
   const map: Record<SchedulingCandidateDTO["status"], ContactStatus> = {
     pending: "pending",
     contacted: "contacted",
     waiting_reply: "contacted",
+    responded: "responded",
     accepted: "accepted",
     declined: "declined",
     expired: "no_response",
@@ -124,6 +124,7 @@ function getEventLabel(event: SchedulingInviteEventDTO, t: (key: string, params?
     case "booking_success": return t("invites.events.bookingSuccess", { court: event.metadata?.courtName ? `: ${event.metadata.courtName}` : "" })
     case "booking_failed": return t("invites.events.bookingFailed", { error: event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : "" })
     case "booking_cancelled": return t("invites.events.bookingCancelled")
+    case "no_courts_at_quorum": return t("invites.events.noCourtsAtQuorum")
     default: return event.action
   }
 }
@@ -147,6 +148,7 @@ function getEventIcon(action: SchedulingInviteEventDTO["action"]) {
     case "booking_success": return <Building2 className="h-3.5 w-3.5 text-green-600" />
     case "booking_failed": return <Building2 className="h-3.5 w-3.5 text-destructive" />
     case "booking_cancelled": return <Ban className="h-3.5 w-3.5 text-muted-foreground" />
+    case "no_courts_at_quorum": return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
     default: return <Clock className="h-3.5 w-3.5 text-muted-foreground" />
   }
 }
@@ -161,7 +163,7 @@ export default function InviteDetailsPage() {
   const [events, setEvents] = useState<SchedulingInviteEventDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [eventsLoading, setEventsLoading] = useState(true)
-  const [copiedLink, setCopiedLink] = useState(false)
+  const [checkQuorumLoading, setCheckQuorumLoading] = useState(false)
   const historyBottomRef = useRef<HTMLDivElement>(null)
   const prevEventsCountRef = useRef(0)
   const [acceptConfirm, setAcceptConfirm] = useState<{
@@ -307,27 +309,19 @@ export default function InviteDetailsPage() {
     }
   }
 
-  async function handleCopyLink() {
-    if (!request) return
+  async function handleCheckQuorum() {
+    if (!requestId) return
+    setCheckQuorumLoading(true)
     try {
-      const link = await schedulingService.getInviteLink(request.id, window.location.origin)
-      const fullUrl = link.startsWith("http") ? link : `${window.location.origin}/#${link}`
-      await navigator.clipboard.writeText(fullUrl)
-    } catch {
-      navigator.clipboard.writeText(
-        `${window.location.origin}/#/join/${request.inviteToken}`
-      )
+      const updated = await schedulingService.checkQuorum(requestId, currentUserId)
+      setRequest(updated)
+      await fetchEvents()
+      toast.success(t("invites.toast.quorumChecked"))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("errors.generic"))
+    } finally {
+      setCheckQuorumLoading(false)
     }
-    setCopiedLink(true)
-    toast.success(t("inviteDetails.toast.linkCopied"))
-    setTimeout(() => setCopiedLink(false), 2000)
-  }
-
-  function handleShareWhatsApp() {
-    if (!request) return
-    const link = `${window.location.origin}/#/join/${request.inviteToken}`
-    const message = encodeURIComponent(`Join my match! ${link}`)
-    window.open(`https://wa.me/?text=${message}`, "_blank")
   }
 
   if (loading) {
@@ -408,6 +402,14 @@ export default function InviteDetailsPage() {
             </span>
           )}
         </div>
+
+        {/* No courts at quorum banner */}
+        {request.noCourtsAtQuorum && displayStatus === "scheduling" && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-200/60 bg-amber-500/8 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-500/10 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{t("invites.noCourtsAtQuorum")}</span>
+          </div>
+        )}
 
         {/* Meta info */}
         <Card>
@@ -497,18 +499,20 @@ export default function InviteDetailsPage() {
               hostUserId={currentUserId}
               onSuccess={() => { fetchRequest(); fetchEvents() }}
             />
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyLink}>
-              {copiedLink ? <><Check className="h-3.5 w-3.5" /> {t("invites.actions.copied")}</> : <><Copy className="h-3.5 w-3.5" /> {t("invites.actions.copyLink")}</>}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-[#25D366] hover:border-[#25D366]/40 hover:bg-[#25D366]/10 hover:text-[#25D366]"
-              onClick={handleShareWhatsApp}
-            >
-              <Link2 className="h-3.5 w-3.5" />
-              {t("invites.actions.whatsapp")}
-            </Button>
+            {displayStatus === "scheduling" && candidates.some((c) => c.status === "contacted" || c.status === "waiting_reply" || c.status === "responded") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleCheckQuorum}
+                disabled={checkQuorumLoading}
+              >
+                {checkQuorumLoading
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <ScanSearch className="h-3.5 w-3.5" />}
+                {t("invites.actions.checkQuorum")}
+              </Button>
+            )}
             {(request.status === "active" || request.status === "expired") && (
               <Button
                 variant="ghost"
@@ -549,9 +553,11 @@ export default function InviteDetailsPage() {
                             ? "bg-muted/60"
                             : uiStatus === "send_failed"
                               ? "bg-orange-500/10"
-                              : uiStatus === "contacted"
-                                ? "bg-blue-500/10"
-                                : "bg-muted/30"
+                              : uiStatus === "responded"
+                                ? "bg-purple-500/10"
+                                : uiStatus === "contacted"
+                                  ? "bg-blue-500/10"
+                                  : "bg-muted/30"
                   }`}
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -560,6 +566,7 @@ export default function InviteDetailsPage() {
                     {uiStatus === "cancelled" && <XCircle className="h-4 w-4 text-amber-600" />}
                     {uiStatus === "no_response" && <Hourglass className="h-4 w-4 text-muted-foreground" />}
                     {uiStatus === "send_failed" && <PhoneOff className="h-4 w-4 text-orange-500" />}
+                    {uiStatus === "responded" && <CheckCircle className="h-4 w-4 text-purple-600" />}
                     {uiStatus === "contacted" && displayStatus === "scheduling" && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
                     {uiStatus === "contacted" && displayStatus !== "scheduling" && <Hourglass className="h-4 w-4 text-muted-foreground" />}
                     {uiStatus === "pending" && (

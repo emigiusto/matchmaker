@@ -1578,7 +1578,7 @@ export const schedulingService = {
       : [];
     const actorMap = new Map(actors.map((u) => [u.id, u.name]));
 
-    return events.map((e) => ({
+    const mapped = events.map((e) => ({
       id: e.id,
       schedulingRequestId: e.schedulingRequestId,
       candidateId: e.candidateId,
@@ -1589,6 +1589,26 @@ export const schedulingService = {
       metadata: e.metadata as Record<string, unknown> | null,
       createdAt: e.createdAt.toISOString(),
     }));
+
+    const POLL_VOTE_DEDUP_MS = 2 * 60 * 1000;
+    const deduped: SchedulingInviteEventDTO[] = [];
+    for (const event of mapped) {
+      if (event.action === 'poll_vote' && event.candidateId) {
+        let lastIdx = -1;
+        for (let i = deduped.length - 1; i >= 0; i--) {
+          if (deduped[i].action === 'poll_vote' && deduped[i].candidateId === event.candidateId) {
+            lastIdx = i;
+            break;
+          }
+        }
+        if (lastIdx >= 0 && new Date(event.createdAt).getTime() - new Date(deduped[lastIdx].createdAt).getTime() < POLL_VOTE_DEDUP_MS) {
+          deduped[lastIdx] = event;
+          continue;
+        }
+      }
+      deduped.push(event);
+    }
+    return deduped;
   },
 
   async listIncomingInvites(userId: string): Promise<SchedulingRequestDTO[]> {

@@ -427,6 +427,7 @@
     "candidateStatus": {
       "pending": "Pendent",
       "contacted": "Contactat",
+      "responded": "Respost",
       "accepted": "Acceptat",
       "declined": "Rebutjat",
       "no_response": "Sense resposta",

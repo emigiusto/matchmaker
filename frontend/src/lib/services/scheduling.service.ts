@@ -25,6 +25,7 @@ export type SchedulingCandidateStatus =
   | "pending"
   | "contacted"
   | "waiting_reply"
+  | "responded"
   | "accepted"
   | "declined"
   | "expired"
