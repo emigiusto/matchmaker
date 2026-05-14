@@ -585,16 +585,17 @@ export const schedulingService = {
         inviteButtons = getInviteButtons(candidateLocale, slots);
       }
 
-      // For doubles always append who else is invited
+      // For doubles always append who else is invited (including the host)
       if (format === 'doubles' && request.candidates) {
-        const otherNames = (request.candidates as Array<{ contactUserId: string; contactUser?: { name?: string | null } | null }>)
-          .filter((c) => c.contactUserId !== candidate.contactUserId)
-          .slice(0, 4)
-          .map((c) => {
-            const firstName = (c.contactUser?.name ?? '').split(' ')[0].slice(0, 12);
-            return firstName;
-          })
-          .filter(Boolean);
+        const hostFirstName = hostName.split(' ')[0].slice(0, 12);
+        const otherNames = [
+          hostFirstName,
+          ...(request.candidates as Array<{ contactUserId: string; contactUser?: { name?: string | null } | null }>)
+            .filter((c) => c.contactUserId !== candidate.contactUserId && c.contactUserId !== request.hostUserId)
+            .slice(0, 3)
+            .map((c) => (c.contactUser?.name ?? '').split(' ')[0].slice(0, 12))
+            .filter(Boolean),
+        ];
         if (otherNames.length > 0) {
           const namesLine = loc === 'es'
             ? `👥 Posibles compañeros: ${otherNames.join(', ')}`
