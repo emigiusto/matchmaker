@@ -422,10 +422,22 @@ export default function InviteDetailsPage() {
           const quorumNeeded = request.format === "doubles" ? 3 : 1
           const respondedCount = candidates.filter((c) => c.status === "responded" || c.status === "accepted").length
           if (respondedCount === 0) return null
+          const hasQuorum = respondedCount >= quorumNeeded
           return (
             <div className="flex items-start gap-2 rounded-md border border-blue-200/60 bg-blue-500/8 px-3 py-2.5 text-sm text-blue-800 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-400">
               <ScanSearch className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{t("invites.quorumStatus", { responded: respondedCount, needed: quorumNeeded })}</span>
+              <div className="space-y-0.5">
+                <span>{t("invites.quorumStatus", { responded: respondedCount, needed: quorumNeeded })}</span>
+                {hasQuorum && request.bookingEnabled && (
+                  <div className="text-xs opacity-80">{t("invites.quorumAwaitingCourt")}</div>
+                )}
+                {!hasQuorum && (
+                  <div className="text-xs opacity-80">
+                    {t("invites.quorumNeedMore", { needed: quorumNeeded - respondedCount })}
+                    {request.bookingEnabled && ` · ${t("invites.quorumBookingRequired")}`}
+                  </div>
+                )}
+              </div>
             </div>
           )
         })()}
