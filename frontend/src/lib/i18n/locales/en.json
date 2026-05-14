@@ -483,9 +483,10 @@
     "expiredNotEnough": "Not enough contacts responded in time. Add more contacts or start a new request.",
     "expiredNoOne": "No one responded in time. Add more contacts or start a new request.",
     "noCourtsAtQuorum": "Everyone is available, but no courts are free at the voted times. Will look for a court again at midnight.",
-    "quorumStatus": "{{responded}} people have voted — no common slot yet",
-    "quorumNeedMore": "{{needed}} more vote(s) needed to reach quorum",
-    "quorumAwaitingCourt": "Quorum reached — looking for an available court",
+    "quorumPending": "{{responded}} people have voted — no common slot yet",
+    "quorumPendingNeedMore": "{{needed}} more vote(s) needed to reach quorum",
+    "quorumReachedStatus": "Quorum reached — {{responded}} people have voted",
+    "quorumAwaitingCourt": "Looking for an available court",
     "quorumBookingRequired": "an available court is also required",
     "whatsappNotAvailable": "WhatsApp group link not available",
     "cancelRequestDialog": {

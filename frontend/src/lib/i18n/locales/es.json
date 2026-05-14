@@ -483,9 +483,10 @@
     "expiredNotEnough": "No hubo suficientes respuestas a tiempo. Añade más contactos o inicia una nueva solicitud.",
     "expiredNoOne": "Nadie respondió a tiempo. Añade más contactos o inicia una nueva solicitud.",
     "noCourtsAtQuorum": "Hay horario donde todos están disponibles, pero no hay pistas libres en esos horarios. Se buscará pista a la medianoche.",
-    "quorumStatus": "{{responded}} personas han votado — aún no hay horario en común",
-    "quorumNeedMore": "Faltan {{needed}} votos más para alcanzar quórum",
-    "quorumAwaitingCourt": "Quórum alcanzado — buscando pista disponible",
+    "quorumPending": "{{responded}} personas han votado — aún no hay horario en común",
+    "quorumPendingNeedMore": "Faltan {{needed}} votos más para alcanzar quórum",
+    "quorumReachedStatus": "Quórum alcanzado — {{responded}} personas han votado",
+    "quorumAwaitingCourt": "Buscando pista disponible",
     "quorumBookingRequired": "también se necesita pista disponible",
     "whatsappNotAvailable": "Enlace al grupo de WhatsApp no disponible",
     "cancelRequestDialog": {

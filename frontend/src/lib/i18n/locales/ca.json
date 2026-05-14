@@ -483,9 +483,10 @@
     "expiredNotEnough": "No hi va haver prou respostes a temps. Afegeix més contactes o inicia una nova sol·licitud.",
     "expiredNoOne": "Ningú va respondre a temps. Afegeix més contactes o inicia una nova sol·licitud.",
     "noCourtsAtQuorum": "Tothom és disponible, però no hi ha pistes lliures en els horaris votats. Es buscarà pista de nou a la mitjanit.",
-    "quorumStatus": "{{responded}} persones han votat — encara sense horari en comú",
-    "quorumNeedMore": "Falten {{needed}} vots més per assolir el quòrum",
-    "quorumAwaitingCourt": "Quòrum assolit — buscant pista disponible",
+    "quorumPending": "{{responded}} persones han votat — encara sense horari en comú",
+    "quorumPendingNeedMore": "Falten {{needed}} vots més per assolir el quòrum",
+    "quorumReachedStatus": "Quòrum assolit — {{responded}} persones han votat",
+    "quorumAwaitingCourt": "Buscant pista disponible",
     "quorumBookingRequired": "també cal una pista disponible",
     "whatsappNotAvailable": "Enllaç al grup de WhatsApp no disponible",
     "cancelRequestDialog": {
