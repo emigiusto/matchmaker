@@ -22,7 +22,7 @@ export type SchedulingCandidateStatus =
 
 export const MAX_ACTIVE_SCHEDULING_REQUESTS = 5;
 export const MAX_CANDIDATES_SINGLES = 5;
-export const MAX_CANDIDATES_DOUBLES = 8;
+export const MAX_CANDIDATES_DOUBLES = 10;
 
 export interface AdditionalDateEntry {
   date: string;      // YYYY-MM-DD
