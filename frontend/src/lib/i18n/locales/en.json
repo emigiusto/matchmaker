@@ -483,6 +483,7 @@
     "expiredNotEnough": "Not enough contacts responded in time. Add more contacts or start a new request.",
     "expiredNoOne": "No one responded in time. Add more contacts or start a new request.",
     "noCourtsAtQuorum": "Everyone is available, but no courts are free at the voted times. Will look for a court again at midnight.",
+    "quorumStatus": "{{responded}} of {{needed}} people have voted — looking for a common slot",
     "whatsappNotAvailable": "WhatsApp group link not available",
     "cancelRequestDialog": {
       "title": "Cancel invite request",
@@ -504,8 +505,7 @@
       "retryFailed": "Failed to retry invite",
       "linkCopied": "Invite link copied",
       "quorumReached": "Quorum reached! The match is being confirmed",
-      "quorumNotReached": "No quorum yet — no time slot has enough matching votes",
-      "quorumStatus": "{{responded}} of {{needed}} people have voted — looking for a common slot"
+      "quorumNotReached": "No quorum yet — no time slot has enough matching votes"
     }
   },
   "inviteDetails": {

@@ -483,6 +483,7 @@
     "expiredNotEnough": "No hi va haver prou respostes a temps. Afegeix més contactes o inicia una nova sol·licitud.",
     "expiredNoOne": "Ningú va respondre a temps. Afegeix més contactes o inicia una nova sol·licitud.",
     "noCourtsAtQuorum": "Tothom és disponible, però no hi ha pistes lliures en els horaris votats. Es buscarà pista de nou a la mitjanit.",
+    "quorumStatus": "{{responded}} de {{needed}} persones han votat — buscant horari en comú",
     "whatsappNotAvailable": "Enllaç al grup de WhatsApp no disponible",
     "cancelRequestDialog": {
       "title": "Cancel·lar sol·licitud d'invitació",
@@ -504,8 +505,7 @@
       "retryFailed": "Error en reintentar la invitació",
       "linkCopied": "Enllaç d'invitació copiat",
       "quorumReached": "Quòrum assolit! El partit s'està confirmant",
-      "quorumNotReached": "Encara no hi ha quòrum — cap horari té prou vots coincidents",
-      "quorumStatus": "{{responded}} de {{needed}} persones han votat — buscant horari en comú"
+      "quorumNotReached": "Encara no hi ha quòrum — cap horari té prou vots coincidents"
     }
   },
   "inviteDetails": {

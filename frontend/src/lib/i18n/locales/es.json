@@ -483,6 +483,7 @@
     "expiredNotEnough": "No hubo suficientes respuestas a tiempo. Añade más contactos o inicia una nueva solicitud.",
     "expiredNoOne": "Nadie respondió a tiempo. Añade más contactos o inicia una nueva solicitud.",
     "noCourtsAtQuorum": "Hay horario donde todos están disponibles, pero no hay pistas libres en esos horarios. Se buscará pista a la medianoche.",
+    "quorumStatus": "{{responded}} de {{needed}} personas han votado — buscando horario en común",
     "whatsappNotAvailable": "Enlace al grupo de WhatsApp no disponible",
     "cancelRequestDialog": {
       "title": "Cancelar solicitud de invitación",
@@ -504,8 +505,7 @@
       "retryFailed": "Error al reintentar la invitación",
       "linkCopied": "Enlace de invitación copiado",
       "quorumReached": "¡Quórum alcanzado! El partido se está confirmando",
-      "quorumNotReached": "Todavía no hay quórum — ningún horario tiene suficientes votos coincidentes",
-      "quorumStatus": "{{responded}} de {{needed}} personas han votado — buscando horario en común"
+      "quorumNotReached": "Todavía no hay quórum — ningún horario tiene suficientes votos coincidentes"
     }
   },
   "inviteDetails": {
