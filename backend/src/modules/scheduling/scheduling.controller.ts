@@ -212,6 +212,17 @@ export class SchedulingController {
     }
   }
 
+  static async getCourtAvailability(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
+      const slots = await schedulingService.getCourtAvailability(requestId);
+      res.json(slots);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async getEventHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;

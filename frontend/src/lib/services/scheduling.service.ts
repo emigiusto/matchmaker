@@ -6,6 +6,14 @@ export interface AdditionalDateEntry {
   endTime: string   // HH:MM
 }
 
+export interface CourtAvailabilitySlot {
+  date: string
+  startTime: string
+  endTime: string
+  courtsPerSlot: Record<string, number>
+  hasAvailability: boolean | null
+}
+
 export interface PublicSchedulingInviteDTO {
   id: string
   hostName: string
@@ -217,6 +225,10 @@ export const schedulingService = {
 
   async getEvents(requestId: string): Promise<SchedulingInviteEventDTO[]> {
     return apiClient.get<SchedulingInviteEventDTO[]>(`/scheduling/${requestId}/events`)
+  },
+
+  async getCourtAvailability(requestId: string): Promise<CourtAvailabilitySlot[]> {
+    return apiClient.get<CourtAvailabilitySlot[]>(`/scheduling/${requestId}/court-availability`)
   },
 
   async getInviteLink(requestId: string, baseUrl?: string): Promise<string> {

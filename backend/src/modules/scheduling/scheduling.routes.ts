@@ -19,6 +19,7 @@ router.get('/by-token/:token', SchedulingController.getSchedulingRequestByToken)
 router.get('/join/:token', SchedulingController.getSchedulingRequestForJoin);
 router.post('/join/:token/accept', SchedulingController.acceptViaLink);
 router.get('/:requestId/invite-link', SchedulingController.getInviteLink);
+router.get('/:requestId/court-availability', SchedulingController.getCourtAvailability);
 router.get('/:requestId/events', SchedulingController.getEventHistory);
 router.get('/:requestId', SchedulingController.getSchedulingRequest);
 router.post('/:requestId/start', SchedulingController.startScheduling);

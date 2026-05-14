@@ -1571,6 +1571,41 @@ export const schedulingService = {
     return requests.map((r) => toRequestDTOWithCandidates({ ...r, noCourtsAtQuorum: noCourtsIds.has(r.id) }));
   },
 
+  async getCourtAvailability(requestId: string): Promise<import('./scheduling.types').CourtAvailabilitySlot[]> {
+    const request = await schedulingRepository.findRequestById(requestId);
+    if (!request) throw new AppError('Scheduling request not found', 404);
+
+    const hostMembership = await prisma.clubMembership.findFirst({
+      where: { userId: request.hostUserId, status: 'active', encryptedPassword: { not: null } },
+    });
+    if (!hostMembership) return [];
+
+    const tz = (request as RequestRow).timezone ?? 'UTC';
+    const additionalDates = parseAdditionalDates((request as RequestRow).additionalDates);
+
+    const buildEntry = async (
+      dateStr: string,
+      startHHMM: string,
+      endHHMM: string,
+    ): Promise<import('./scheduling.types').CourtAvailabilitySlot> => {
+      const slots = slotsInRange(startHHMM, endHHMM);
+      const availability = await getCachedCourtsPerSlot(request.hostUserId, hostMembership.clubSlug, dateStr, request.sportType, slots);
+      const courtsPerSlot = availability ?? {};
+      const hasAvailability = availability ? Object.values(availability).some((n) => n > 0) : null;
+      return { date: dateStr, startTime: startHHMM, endTime: endHHMM, courtsPerSlot, hasAvailability };
+    };
+
+    const primaryDateStr = request.date.toISOString().slice(0, 10);
+    const primaryStart = formatInTz(request.startTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+    const primaryEnd = formatInTz(request.endTime, 'en-US', { hour: '2-digit', minute: '2-digit', hour12: false }, tz);
+
+    const results = await Promise.all([
+      buildEntry(primaryDateStr, primaryStart, primaryEnd),
+      ...additionalDates.map((e) => buildEntry(e.date, e.startTime, e.endTime)),
+    ]);
+    return results;
+  },
+
   async getEventHistory(requestId: string): Promise<SchedulingInviteEventDTO[]> {
     const events = await prisma.schedulingInviteEvent.findMany({
       where: { schedulingRequestId: requestId },

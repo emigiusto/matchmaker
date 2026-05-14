@@ -89,6 +89,14 @@ export interface SchedulingCandidateDTO {
   updatedAt: string;
 }
 
+export interface CourtAvailabilitySlot {
+  date: string;        // YYYY-MM-DD
+  startTime: string;   // HH:MM
+  endTime: string;     // HH:MM
+  courtsPerSlot: Record<string, number>; // { "18:00": 2, "19:00": 0 }
+  hasAvailability: boolean | null;       // null = cache cold
+}
+
 export type SchedulingInviteEventAction =
   | 'invite_sent'
   | 'invite_accepted'

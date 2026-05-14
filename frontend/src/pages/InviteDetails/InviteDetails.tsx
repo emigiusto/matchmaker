@@ -49,6 +49,7 @@ import {
   type SchedulingCandidateDTO,
   type SchedulingInviteEventDTO,
   type AdditionalDateEntry,
+  type CourtAvailabilitySlot,
 } from "@/lib/services/scheduling.service"
 
 const POLL_INTERVAL_MS = 5000
@@ -166,6 +167,7 @@ export default function InviteDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [eventsLoading, setEventsLoading] = useState(true)
   const [checkQuorumLoading, setCheckQuorumLoading] = useState(false)
+  const [courtAvailability, setCourtAvailability] = useState<CourtAvailabilitySlot[]>([])
   const historyBottomRef = useRef<HTMLDivElement>(null)
   const prevEventsCountRef = useRef(0)
   const [acceptConfirm, setAcceptConfirm] = useState<{
@@ -219,6 +221,11 @@ export default function InviteDetailsPage() {
     fetchRequest(true)
     fetchEvents()
   }, [fetchRequest, fetchEvents])
+
+  useEffect(() => {
+    if (!requestId) return
+    schedulingService.getCourtAvailability(requestId).then(setCourtAvailability).catch(() => {})
+  }, [requestId])
 
   useEffect(() => {
     if (events.length > prevEventsCountRef.current) {
@@ -686,6 +693,59 @@ export default function InviteDetailsPage() {
             })}
           </CardContent>
         </Card>
+
+        {/* Court availability */}
+        {request.bookingEnabled && courtAvailability.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Building2 className="h-4 w-4" />
+                {t("inviteDetails.courtAvailability")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+              {courtAvailability.map((slot) => {
+                const dateLabel = format(parseISO(slot.date), "EEE d/M", { locale: dateLocale })
+                const hours = Object.keys(slot.courtsPerSlot).sort()
+                const cacheEmpty = slot.hasAvailability === null
+                return (
+                  <div key={slot.date}>
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="text-sm font-medium">{dateLabel}</span>
+                      <span className="text-xs text-muted-foreground">{slot.startTime} – {slot.endTime}</span>
+                      {cacheEmpty && (
+                        <span className="text-xs text-muted-foreground italic">{t("inviteDetails.courtCacheEmpty")}</span>
+                      )}
+                    </div>
+                    {hours.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">{t("inviteDetails.courtNoData")}</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {hours.map((hour) => {
+                          const count = slot.courtsPerSlot[hour]
+                          const available = count > 0
+                          return (
+                            <span
+                              key={hour}
+                              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium ${
+                                available
+                                  ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                                  : "bg-red-500/10 text-red-600 dark:text-red-400"
+                              }`}
+                            >
+                              {hour}
+                              {available ? ` · ${count} ${t("inviteDetails.courtUnit")}` : ` · ✗`}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* History */}
         <Card>

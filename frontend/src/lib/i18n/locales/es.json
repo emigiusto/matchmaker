@@ -544,7 +544,11 @@
     "responseWindowDays": "{{n}} días",
     "events": {
       "inviteLinkAccepted": "{{name}} aceptó a través del enlace de invitación"
-    }
+    },
+    "courtAvailability": "Disponibilidad de Pistas",
+    "courtCacheEmpty": "sin datos en caché",
+    "courtNoData": "Sin información de pistas",
+    "courtUnit": "pista"
   },
   "joinRequest": {
     "title": "Te han invitado a jugar",

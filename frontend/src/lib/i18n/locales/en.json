@@ -544,7 +544,11 @@
     "responseWindowDays": "{{n}} days",
     "events": {
       "inviteLinkAccepted": "{{name}} accepted via invite link"
-    }
+    },
+    "courtAvailability": "Court Availability",
+    "courtCacheEmpty": "no cached data",
+    "courtNoData": "No court information available",
+    "courtUnit": "court"
   },
   "joinRequest": {
     "title": "You're invited to play",

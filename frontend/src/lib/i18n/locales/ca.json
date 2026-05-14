@@ -544,7 +544,11 @@
     "responseWindowDays": "{{n}} dies",
     "events": {
       "inviteLinkAccepted": "{{name}} ha acceptat a través de l'enllaç d'invitació"
-    }
+    },
+    "courtAvailability": "Disponibilitat de Pistes",
+    "courtCacheEmpty": "sense dades en memòria cau",
+    "courtNoData": "Sense informació de pistes",
+    "courtUnit": "pista"
   },
   "joinRequest": {
     "title": "T'han convidat a jugar",
