@@ -7,11 +7,11 @@ type Locale = 'es' | 'en' | 'ca';
 export type NoMatchReasonKey = 'no_more_candidates' | 'all_candidates_exhausted' | 'scheduled_time_passed';
 
 interface MessageTemplates {
-  invite(hostName: string, sport: string, format: string, date: string, time: string, loc: string, timeLeft: string): string;
+  invite(hostName: string, sport: string, format: string, date: string, time: string, loc: string): string;
   /** Poll-based invite for multi-hour requests. Time options are shown as poll choices, not in the message body. */
-  invitePoll(hostName: string, sport: string, format: string, date: string, loc: string, timeLeft: string): string;
+  invitePoll(hostName: string, sport: string, format: string, date: string, loc: string): string;
   /** Poll-based invite for multi-date requests. Day+time options are shown as poll choices. */
-  inviteMultiDatePoll(hostName: string, sport: string, format: string, loc: string, timeLeft: string): string;
+  inviteMultiDatePoll(hostName: string, sport: string, format: string, loc: string): string;
   inviteNoLongerAvailable(hostName: string, sport: string, date: string): string;
   inviteReply(): string;
   matchConfirmed(sport: string, format: string, when: string, loc: string, url: string): string;
@@ -24,32 +24,7 @@ interface MessageTemplates {
   courtBookingFailed(when: string, loc: string, reason: string): string;
   courtCancelled(courtName: string, when: string, loc: string): string;
   resultSubmitted(sets: { setNumber: number; scoreA: number; scoreB: number }[], labelA: string, labelB: string, url: string): string;
-}
-
-/**
- * Format a response-window duration in a locale-aware way.
- * e.g. 90 → "2 horas" (es) / "2 hours" (en)
- */
-export function formatResponseWindow(minutes: number, locale: string): string {
-  const loc = resolveLocale(locale);
-  if (minutes < 60) {
-    const m = Math.round(minutes);
-    if (loc === 'es') return `${m} ${m === 1 ? 'minuto' : 'minutos'}`;
-    if (loc === 'ca') return `${m} ${m === 1 ? 'minut' : 'minuts'}`;
-    return `${m} ${m === 1 ? 'minute' : 'minutes'}`;
-  }
-  const hours = minutes / 60;
-  if (hours < 24) {
-    const h = Math.round(hours);
-    if (loc === 'es') return `${h} ${h === 1 ? 'hora' : 'horas'}`;
-    if (loc === 'ca') return `${h} ${h === 1 ? 'hora' : 'hores'}`;
-    return `${h} ${h === 1 ? 'hour' : 'hours'}`;
-  }
-  const days = hours / 24;
-  const d = Math.round(days);
-  if (loc === 'es') return `${d} ${d === 1 ? 'día' : 'días'}`;
-  if (loc === 'ca') return `${d} ${d === 1 ? 'dia' : 'dies'}`;
-  return `${d} ${d === 1 ? 'day' : 'days'}`;
+  noCourtsAtQuorum(): string;
 }
 
 /**
@@ -64,7 +39,7 @@ export function resolveLocale(locale?: string | null): Locale {
 
 const templates: Record<Locale, MessageTemplates> = {
   es: {
-    invite(hostName, sport, format, date, time, loc, timeLeft) {
+    invite(hostName, sport, format, date, time, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
@@ -72,18 +47,19 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *¡Has sido invitado a un partido de ${sportName}!*`
+        : `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`;
       return [
-        `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`,
+        intro,
         '',
         `📅  ${date}  ·  ${time}`,
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
-        '',
-        `⏳ Tienes *${timeLeft}* para responder`,
       ].join('\n');
     },
 
-    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+    invitePoll(hostName, sport, format, date, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
@@ -91,20 +67,21 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *¡Has sido invitado a un partido de ${sportName}!*`
+        : `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`;
       return [
-        `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`,
+        intro,
         '',
         `📅  ${date}`,
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         '¿A qué hora te va bien? (selecciona una o varias)',
-        '',
-        `⏳ Tienes *${timeLeft}* para responder`,
       ].join('\n');
     },
 
-    inviteMultiDatePoll(hostName, sport, format, loc, timeLeft) {
+    inviteMultiDatePoll(hostName, sport, format, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pádel' : 'tenis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
@@ -112,15 +89,16 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Una vez confirmemos el horario, ${hostName} reservará la pista.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *¡Has sido invitado a un partido de ${sportName}!*`
+        : `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`;
       return [
-        `${sportEmoji} *¡Hola! ${hostName} quiere jugar al ${sportName} contigo.*`,
+        intro,
         '',
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         '¿Cuál de estos días y horarios te va mejor? (selecciona uno o varios)',
-        '',
-        `⏳ Tienes *${timeLeft}* para responder`,
       ].join('\n');
     },
 
@@ -227,6 +205,8 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
         '',
         `Motivo: ${reason}`,
+        '',
+        '🔄 Se reintentará a la medianoche nuevamente.',
       ].join('\n');
     },
 
@@ -252,10 +232,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `🔗 *Ver partido:* ${url}`,
       ].join('\n');
     },
+
+    noCourtsAtQuorum() {
+      return [
+        '🏟️ *¡Hay horario donde todos están disponibles!*',
+        '',
+        'Sin embargo, no hay pistas libres en los horarios votados.',
+        '🔄 Se buscará pista nuevamente a la medianoche.',
+      ].join('\n');
+    },
   },
 
   en: {
-    invite(hostName, sport, format, date, time, loc, timeLeft) {
+    invite(hostName, sport, format, date, time, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
       const formatName = format.charAt(0).toUpperCase() + format.slice(1);
@@ -263,18 +252,19 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Once we confirm the time, ${hostName} will find a court.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *You've been invited to a ${sport} match!*`
+        : `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`;
       return [
-        `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`,
+        intro,
         '',
         `📅  ${date}  ·  ${time}`,
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
-        '',
-        `⏳ You have *${timeLeft}* to respond`,
       ].join('\n');
     },
 
-    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+    invitePoll(hostName, sport, format, date, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
       const formatName = format.charAt(0).toUpperCase() + format.slice(1);
@@ -282,20 +272,21 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Once we confirm the time, ${hostName} will find a court.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *You've been invited to a ${sport} match!*`
+        : `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`;
       return [
-        `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`,
+        intro,
         '',
         `📅  ${date}`,
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         'Which hour(s) work for you?',
-        '',
-        `⏳ You have *${timeLeft}* to respond`,
       ].join('\n');
     },
 
-    inviteMultiDatePoll(hostName, sport, format, loc, timeLeft) {
+    inviteMultiDatePoll(hostName, sport, format, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
       const formatName = format.charAt(0).toUpperCase() + format.slice(1);
@@ -303,15 +294,16 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Once we confirm the time, ${hostName} will find a court.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *You've been invited to a ${sport} match!*`
+        : `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`;
       return [
-        `${sportEmoji} *Hi! ${hostName} would like to play ${sport} with you.*`,
+        intro,
         '',
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         'Which of these days and times works for you? (pick one or more)',
-        '',
-        `⏳ You have *${timeLeft}* to respond`,
       ].join('\n');
     },
 
@@ -417,6 +409,8 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
         '',
         `Reason: ${reason}`,
+        '',
+        '🔄 Will retry at midnight.',
       ].join('\n');
     },
 
@@ -442,10 +436,19 @@ const templates: Record<Locale, MessageTemplates> = {
         `🔗 *View match:* ${url}`,
       ].join('\n');
     },
+
+    noCourtsAtQuorum() {
+      return [
+        '🏟️ *Everyone is available!*',
+        '',
+        'However, no courts are free at the voted times.',
+        '🔄 Will look for a court again at midnight.',
+      ].join('\n');
+    },
   },
 
   ca: {
-    invite(hostName, sport, format, date, time, loc, timeLeft) {
+    invite(hostName, sport, format, date, time, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
@@ -453,18 +456,19 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *Has estat convidat a un partit de ${sportName}!*`
+        : `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`;
       return [
-        `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`,
+        intro,
         '',
         `📅  ${date}  ·  ${time}`,
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
-        '',
-        `⏳ Tens *${timeLeft}* per respondre`,
       ].join('\n');
     },
 
-    invitePoll(hostName, sport, format, date, loc, timeLeft) {
+    invitePoll(hostName, sport, format, date, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
@@ -472,20 +476,21 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *Has estat convidat a un partit de ${sportName}!*`
+        : `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`;
       return [
-        `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`,
+        intro,
         '',
         `📅  ${date}`,
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         "A quina hora et va bé? (selecciona'n una o diverses)",
-        '',
-        `⏳ Tens *${timeLeft}* per respondre`,
       ].join('\n');
     },
 
-    inviteMultiDatePoll(hostName, sport, format, loc, timeLeft) {
+    inviteMultiDatePoll(hostName, sport, format, loc) {
       const sportEmoji = sport === 'padel' ? '🏓' : '🎾';
       const sportName = sport === 'padel' ? 'pàdel' : 'tennis';
       const formatName = format.toLowerCase() === 'doubles' ? 'Dobles' : 'Individual';
@@ -493,15 +498,16 @@ const templates: Record<Locale, MessageTemplates> = {
       const locationLine = loc
         ? `📍  ${loc}`
         : `📍  Un cop confirmem l'horari, ${hostName} reservarà la pista.`;
+      const intro = format.toLowerCase() === 'doubles'
+        ? `${sportEmoji} *Has estat convidat a un partit de ${sportName}!*`
+        : `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`;
       return [
-        `${sportEmoji} *Hola! ${hostName} vol jugar a ${sportName} amb tu.*`,
+        intro,
         '',
         locationLine,
         `${sportEmoji}  ${sportLabel}`,
         '',
         "Quin d'aquests dies i horaris et va millor? (selecciona'n un o diversos)",
-        '',
-        `⏳ Tens *${timeLeft}* per respondre`,
       ].join('\n');
     },
 
@@ -608,6 +614,8 @@ const templates: Record<Locale, MessageTemplates> = {
         `📍 ${loc || 'TBD'}`,
         '',
         `Motiu: ${reason}`,
+        '',
+        '🔄 Es tornarà a intentar a la mitjanit.',
       ].join('\n');
     },
 
@@ -631,6 +639,15 @@ const templates: Record<Locale, MessageTemplates> = {
         'El resultat està pendent de confirmació.',
         '',
         `🔗 *Veure el partit:* ${url}`,
+      ].join('\n');
+    },
+
+    noCourtsAtQuorum() {
+      return [
+        '🏟️ *Tothom és disponible!*',
+        '',
+        'Però no hi ha pistes lliures en els horaris votats.',
+        '🔄 Buscarem pista de nou a la mitjanit.',
       ].join('\n');
     },
   },

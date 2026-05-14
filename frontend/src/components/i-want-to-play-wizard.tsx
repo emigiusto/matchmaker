@@ -197,17 +197,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   // Step 2: Match type + format + sport
   const [matchType, setMatchType] = useState<"competitive" | "practice">("competitive")
   const [matchFormat, setMatchFormat] = useState<"singles" | "doubles">("singles")
-  const [showCandidates, setShowCandidates] = useState(false)
   const [sport, setSport] = useState<"tennis" | "padel">("tennis")
-  
+
   // Step 3: Contact priority list
   const [priorityList, setPriorityList] = useState<Contact[]>([])
-  // 10 sec default for local testing; 60 min for production
-  const defaultResponseWindow = typeof import.meta !== "undefined" && import.meta.env?.DEV
-    ? 10 / 60 // 10 seconds
-    : 480
-  const [responseWindow, setResponseWindow] = useState<number>(defaultResponseWindow) // minutes (can be fractional)
-  const [maxParallelCandidates, setMaxParallelCandidates] = useState(1) // 1–3 contacts reached out at once
   const [availableContacts, setAvailableContacts] = useState<AvailableContact[]>([])
   const [contactLists, setContactLists] = useState<ContactListDTO[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
@@ -618,15 +611,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     }
   }, [])
 
-  const [linkCopied, setLinkCopied] = useState(false)
-
-  function handleCopyInviteLink() {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/#/join/tok-${Date.now()}` : ""
-    navigator.clipboard.writeText(url)
-    setLinkCopied(true)
-    toast.success(t("wizard.toast.linkCopied"))
-    setTimeout(() => setLinkCopied(false), 2000)
-  }
 
   async function handleStartScheduling() {
     if (dateEntries.length === 0 || !startTime || !endTime || !hostUserId || priorityList.length === 0) return
@@ -655,13 +639,10 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
         additionalDates: additionalDateEntries.length > 0 ? additionalDateEntries : undefined,
         locationText: (locationType === "place" ? specificPlace : cityValue).trim(),
         radiusKm: null,
-        responseWindowMinutes: responseWindow,
-        maxParallelCandidates,
         hostPartnerUserId: null,
         candidateUserIds: priorityList.map((c) => c.id),
         bookingEnabled,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        showCandidates: matchFormat === "doubles" ? showCandidates : false,
       })
       await schedulingService.start(req.id)
       toast.success(t("wizard.toast.schedulingStarted"), {
@@ -1435,95 +1416,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               </div>
             )}
 
-            {/* Response window */}
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-1">
-                <Label className="text-base font-medium">{t("wizard.responseWindowLabel")}</Label>
-                <span className="text-sm font-semibold text-primary shrink-0">
-                  {responseWindow < 1
-                    ? t("wizard.responseWindowSec", { n: Math.round(responseWindow * 60) })
-                    : responseWindow < 60
-                    ? t("wizard.responseWindowMinutes", { n: responseWindow })
-                    : responseWindow === 60
-                    ? t("wizard.responseWindowOneHour")
-                    : t("wizard.responseWindowHours", { n: responseWindow / 60 })}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">{t("wizard.responseWindowHint")}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  ...(typeof import.meta !== "undefined" && import.meta.env?.DEV
-                    ? [{ value: 10 / 60, label: "10s" }]
-                    : []),
-                  { value: 15, label: "15m" },
-                  { value: 30, label: "30m" },
-                  { value: 60, label: "1h" },
-                  { value: 120, label: "2h" },
-                  { value: 240, label: "4h" },
-                  { value: 480, label: "8h" },
-                  { value: 720, label: "12h" },
-                  { value: 1440, label: "24h" },
-                  { value: 4320, label: "72h" },
-                ].map(({ value, label }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setResponseWindow(value)}
-                    className={cn(
-                      "rounded-md px-2 py-1.5 text-xs font-medium transition-all",
-                      Math.abs(responseWindow - value) < 0.01
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Parallel candidates */}
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-1">
-                <Label className="text-base font-medium">{t("wizard.contactAtOnceLabel")}</Label>
-                <span className="text-sm font-semibold text-primary shrink-0">
-                  {maxParallelCandidates === 1
-                    ? t("wizard.contactAtOncePerson", { n: maxParallelCandidates })
-                    : t("wizard.contactAtOncePeople", { n: maxParallelCandidates })}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">{t("wizard.contactAtOnceHint")}</p>
-              <div className="flex gap-1.5">
-                {[1, 2, 3].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setMaxParallelCandidates(n)}
-                    className={cn(
-                      "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all",
-                      maxParallelCandidates === n
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Show candidates toggle — doubles only */}
-            {matchFormat === "doubles" && (
-              <div className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/30 px-4 py-3">
-                <div className="space-y-0.5">
-                  <Label className="text-sm font-medium">Mostrar posibles jugadores</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Incluye en el mensaje de invitación quiénes más podrían jugar
-                  </p>
-                </div>
-                <Switch checked={showCandidates} onCheckedChange={setShowCandidates} />
-              </div>
-            )}
 
             <div className="flex gap-3 pt-2">
               <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(2)}>
@@ -1619,51 +1511,13 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               <ul className="space-y-1.5 text-xs text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  {t("wizard.howItWorks1", { n: maxParallelCandidates })}
-                </li>
-                <li className="flex items-start gap-2">
-                  <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
                   {t("wizard.howItWorks2")}
-                </li>
-                <li className="flex items-start gap-2">
-                  <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-                  {t("wizard.howItWorks3", {
-                    window: responseWindow < 1
-                      ? t("wizard.responseWindowSec", { n: Math.round(responseWindow * 60) })
-                      : responseWindow < 60
-                      ? t("wizard.responseWindowMinutes", { n: responseWindow })
-                      : responseWindow === 60
-                      ? t("wizard.responseWindowOneHour")
-                      : t("wizard.responseWindowHours", { n: responseWindow / 60 })
-                  })}
                 </li>
                 <li className="flex items-start gap-2">
                   <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
                   {t("wizard.howItWorks4")}
                 </li>
               </ul>
-            </div>
-
-            {/* Copy invite link */}
-            <div className="rounded-xl border border-border/40 bg-card px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">{t("wizard.shareInviteLink")}</p>
-                  <p className="text-xs text-muted-foreground">{t("wizard.shareInviteLinkHint")}</p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 gap-1.5"
-                  onClick={handleCopyInviteLink}
-                >
-                  {linkCopied ? (
-                    <><Check className="h-3.5 w-3.5" />{t("wizard.copied")}</>
-                  ) : (
-                    <><Copy className="h-3.5 w-3.5" />{t("wizard.copyLink")}</>
-                  )}
-                </Button>
-              </div>
             </div>
 
             <div className="flex gap-3 pt-2">

@@ -18,9 +18,6 @@ import {
   Hourglass,
   PhoneOff,
   RotateCcw,
-  Link2,
-  Copy,
-  Check,
   ExternalLink,
   History,
   ChevronDown,
@@ -28,7 +25,7 @@ import {
   Building2,
   Ban,
 } from "lucide-react"
-import type { SchedulingInviteEventDTO } from "@/lib/services/scheduling.service"
+import type { SchedulingInviteEventDTO, AdditionalDateEntry } from "@/lib/services/scheduling.service"
 import { SportFormatBadge } from "@/components/sport-format-badge"
 import { MatchTypeBadge } from "@/components/match-type-badge"
 import { Button } from "@/components/ui/button"
@@ -64,7 +61,8 @@ export interface InviteRequest {
   status: "scheduling" | "matched" | "expired" | "cancelled"
   matchId: string | null
   whatsappGroupId: string | null
-  responseWindowMinutes: number
+  noCourtsAtQuorum: boolean
+  additionalDates: AdditionalDateEntry[] | null
   contacts: {
     id: string
     contactUserId: string
@@ -79,54 +77,6 @@ export interface InviteRequest {
 const MAX_ACTIVE_REQUESTS = 5
 const SCHEDULING_POLL_INTERVAL_MS = 5000
 
-function formatResponseWindow(minutes: number, t: (key: string, vars?: Record<string, string | number>) => string): string {
-  if (minutes < 60) return t("inviteDetails.responseWindowMin", { n: Math.round(minutes) })
-  const hours = minutes / 60
-  if (hours < 24) return t("inviteDetails.responseWindowH", { n: Math.round(hours) })
-  const days = hours / 24
-  const d = Math.round(days)
-  return d === 1 ? t("inviteDetails.responseWindowDay", { n: d }) : t("inviteDetails.responseWindowDays", { n: d })
-}
-
-function formatTimeLeft(contactedAt: string, responseWindowMinutes: number): string {
-  const contacted = new Date(contactedAt).getTime()
-  const expiresAt = contacted + responseWindowMinutes * 60 * 1000
-  const now = Date.now()
-  const msLeft = expiresAt - now
-  if (msLeft <= 0) return "Expired"
-  const mins = Math.floor(msLeft / 60_000)
-  const hours = Math.floor(mins / 60)
-  if (hours >= 1) return `${hours}h ${mins % 60}m left`
-  if (mins >= 1) return `${mins} min left`
-  return "< 1 min left"
-}
-
-/** Renders time left until invite expires; re-renders every 30s for live countdown */
-function TimeLeftBadge({
-  contactedAt,
-  responseWindowMinutes,
-}: {
-  contactedAt: string
-  responseWindowMinutes: number
-}) {
-  const { t } = useTranslation()
-  const [, tick] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 30_000)
-    return () => clearInterval(id)
-  }, [])
-  const text = formatTimeLeft(contactedAt, responseWindowMinutes)
-  const isExpired = text === "Expired"
-  return (
-    <span
-      className={`text-[10px] font-medium ${
-        isExpired ? "text-muted-foreground" : "text-blue-600"
-      }`}
-    >
-      {isExpired ? t("invites.status.expired") : text}
-    </span>
-  )
-}
 
 function formatTimeRange(startIso: string, endIso: string): string {
   try {
@@ -182,7 +132,8 @@ function mapSchedulingToInviteRequest(
     status: statusMap[r.status] ?? "scheduling",
     matchId: r.matchId ?? null,
     whatsappGroupId: r.whatsappGroupId ?? null,
-    responseWindowMinutes: r.responseWindowMinutes ?? 240,
+    noCourtsAtQuorum: r.noCourtsAtQuorum ?? false,
+    additionalDates: r.additionalDates ?? null,
     contacts,
     currentIndex: r.currentCandidateIndex,
   }
@@ -219,7 +170,6 @@ export function InviteRequestsSection({
   const dateLocale = language === "es" ? esLocale : undefined
   const [inviteRequests, setInviteRequests] = useState<InviteRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [copiedRequestId, setCopiedRequestId] = useState<string | null>(null)
   const [acceptConfirm, setAcceptConfirm] = useState<{
     requestId: string
     candidateId: string
@@ -442,29 +392,6 @@ export function InviteRequestsSection({
     }
   }
 
-  function handleShareWhatsApp(request: InviteRequest) {
-    const message = encodeURIComponent(
-      `Want to play ${request.sport} on ${format(parseISO(request.date), "EEE, MMM d")} (${request.time}) at ${request.location?.trim() || t("common.tbd")}? Accept my invite here:\n\n${window.location.origin}/#/play?invite=${request.inviteToken}`
-    )
-    window.open(`https://wa.me/?text=${message}`, "_blank")
-  }
-
-  async function handleCopyRequestLink(request: InviteRequest) {
-    try {
-      const link = await schedulingService.getInviteLink(request.id, window.location.origin)
-      const fullUrl = link.startsWith("http") ? link : `${window.location.origin}/#${link}`
-      await navigator.clipboard.writeText(fullUrl)
-      setCopiedRequestId(request.id)
-      toast.success(t("invites.toast.linkCopied"))
-      setTimeout(() => setCopiedRequestId(null), 2000)
-    } catch {
-      const fallback = `${window.location.origin}/#/play?invite=${request.inviteToken}`
-      await navigator.clipboard.writeText(fallback)
-      setCopiedRequestId(request.id)
-      toast.success(t("invites.toast.linkCopied"))
-      setTimeout(() => setCopiedRequestId(null), 2000)
-    }
-  }
 
   function getEventLabel(event: SchedulingInviteEventDTO): string {
     const name = event.candidateUserName ?? t("common.unknown")
@@ -492,6 +419,7 @@ export function InviteRequestsSection({
       case "booking_failed": return t("invites.events.bookingFailed", { error: event.metadata?.errorMessage ? `: ${event.metadata.errorMessage}` : "" })
       case "booking_cancelled": return t("invites.events.bookingCancelled")
       case "poll_vote": return t("invites.events.pollVote", { name })
+      case "no_courts_at_quorum": return t("invites.events.noCourtsAtQuorum")
       case "invite_link_accepted": return t("invites.events.inviteLinkAccepted", { name: event.metadata?.userName as string ?? name })
       default: return event.action
     }
@@ -516,6 +444,7 @@ export function InviteRequestsSection({
       case "booking_failed": return <Building2 className="h-3 w-3 text-destructive" />
       case "booking_cancelled": return <Ban className="h-3 w-3 text-muted-foreground" />
       case "poll_vote": return <Clock className="h-3 w-3 text-blue-500" />
+      case "no_courts_at_quorum": return <Building2 className="h-3 w-3 text-amber-500" />
       case "invite_link_accepted": return <UserCheck className="h-3 w-3 text-green-600" />
       default: return <Clock className="h-3 w-3 text-muted-foreground" />
     }
@@ -648,27 +577,43 @@ export function InviteRequestsSection({
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-foreground">
-                        <span className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-primary" />
-                          {language === "es"
-                            ? format(parseISO(request.date), "EEEE d 'de' MMMM", { locale: dateLocale })
-                            : format(parseISO(request.date), "EEE, MMM d", { locale: dateLocale })}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-primary" />
-                          {request.time}
+                        <span className="flex items-start gap-2">
+                          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          {request.additionalDates && request.additionalDates.length > 0 ? (
+                            <span className="space-y-0.5">
+                              {[{ date: request.date, startTime: null as string | null, endTime: null as string | null }, ...request.additionalDates].map((entry) => (
+                                <span key={entry.date} className="flex items-center gap-1.5">
+                                  <span className="font-medium">
+                                    {language === "es"
+                                      ? format(parseISO(entry.date), "EEE d/M", { locale: dateLocale })
+                                      : format(parseISO(entry.date), "EEE d/M", { locale: dateLocale })}
+                                  </span>
+                                  <span className="text-muted-foreground">·</span>
+                                  <span>{entry.startTime ? `${entry.startTime}–${entry.endTime}` : request.time}</span>
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span>
+                              {language === "es"
+                                ? format(parseISO(request.date), "EEEE d 'de' MMMM", { locale: dateLocale })
+                                : format(parseISO(request.date), "EEE, MMM d", { locale: dateLocale })}
+                              {" · "}{request.time}
+                            </span>
+                          )}
                         </span>
                         <span className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-primary" />
                           {request.location?.trim() || t("common.tbd")}
                         </span>
-                        {displayStatus === "scheduling" && (
-                          <span className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
-                            <Hourglass className="h-3.5 w-3.5" />
-                            {t("inviteDetails.replyWithin", { window: formatResponseWindow(request.responseWindowMinutes, t) })}
-                          </span>
-                        )}
                       </div>
+
+                      {request.noCourtsAtQuorum && request.status === "scheduling" && (
+                        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200/60 bg-amber-500/8 px-3 py-2.5 text-xs text-amber-700 dark:border-amber-800/40 dark:bg-amber-500/10 dark:text-amber-400">
+                          <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{t("invites.noCourtsAtQuorum")}</span>
+                        </div>
+                      )}
 
                       <div className="mt-4 border-t border-border/30 pt-4">
                         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -734,14 +679,6 @@ export function InviteRequestsSection({
                                   </span>
                                 )}
                               </span>
-                              {contact.status === "contacted" &&
-                                contact.contactedAt &&
-                                request.status === "scheduling" && (
-                                  <TimeLeftBadge
-                                    contactedAt={contact.contactedAt}
-                                    responseWindowMinutes={request.responseWindowMinutes}
-                                  />
-                                )}
                               {request.status !== "matched" &&
                                 request.status !== "cancelled" &&
                                 (contact.status === "pending" ||
@@ -892,33 +829,6 @@ export function InviteRequestsSection({
                                 hostUserId={currentUserId}
                                 onSuccess={() => fetchSchedulingData(false)}
                               />
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5"
-                                onClick={() => handleCopyRequestLink(request)}
-                              >
-                                {copiedRequestId === request.id ? (
-                                  <>
-                                    <Check className="h-3.5 w-3.5" />
-                                    {t("invites.actions.copied")}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="h-3.5 w-3.5" />
-                                    {t("invites.actions.copyLink")}
-                                  </>
-                                )}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5 text-[#25D366] hover:border-[#25D366]/40 hover:bg-[#25D366]/10 hover:text-[#25D366]"
-                                onClick={() => handleShareWhatsApp(request)}
-                              >
-                                <Link2 className="h-3.5 w-3.5" />
-                                {t("invites.actions.whatsapp")}
-                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"

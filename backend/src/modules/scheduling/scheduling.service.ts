@@ -22,8 +22,8 @@ import type {
 } from './scheduling.types';
 import { normalizePhoneToCanonical } from '../../shared/utils/phone.utils';
 import { findUserByNormalizedPhone, createGuestUser } from '../users/users.service';
-import { MAX_ACTIVE_SCHEDULING_REQUESTS, RESPONSE_WINDOW_OPTIONS } from './scheduling.types';
-import { getMessages, formatResponseWindow, resolveLocale } from '../../lib/whatsapp-messages';
+import { MAX_ACTIVE_SCHEDULING_REQUESTS, MAX_CANDIDATES_SINGLES, MAX_CANDIDATES_DOUBLES } from './scheduling.types';
+import { getMessages, resolveLocale } from '../../lib/whatsapp-messages';
 import { resolveGroupMessageLocale } from '../../lib/locale-helpers';
 
 const TIME_SLOT_RE = /^\d{2}:\d{2}$/;
@@ -60,18 +60,16 @@ type RequestRow = {
   endTime: Date;
   locationText: string;
   radiusKm: number | null;
-  responseWindowMinutes: number;
-  maxParallelCandidates: number;
   inviteToken: string;
   status: string;
   currentCandidateIndex: number;
   matchId: string | null;
   additionalDates?: string | null;
-  showCandidates?: boolean;
   match?: { whatsappGroupId: string | null } | null;
   timezone?: string;
   createdAt: Date;
   updatedAt: Date;
+  noCourtsAtQuorum?: boolean;
 };
 
 /** Format a Date in a given IANA timezone, e.g. "Europe/Madrid". Falls back to UTC on invalid tz. */
@@ -96,8 +94,6 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     endTime: r.endTime.toISOString(),
     locationText: r.locationText,
     radiusKm: r.radiusKm,
-    responseWindowMinutes: r.responseWindowMinutes ?? 240,
-    maxParallelCandidates: (r as RequestRow).maxParallelCandidates ?? 1,
     inviteToken: r.inviteToken,
     status: r.status as SchedulingRequestDTO['status'],
     currentCandidateIndex: r.currentCandidateIndex,
@@ -105,7 +101,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     additionalDates: parseAdditionalDates(r.additionalDates),
     whatsappGroupId: r.match?.whatsappGroupId ?? null,
     timezone: r.timezone ?? 'UTC',
-    showCandidates: (r as RequestRow).showCandidates ?? false,
+    noCourtsAtQuorum: r.noCourtsAtQuorum ?? false,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -289,6 +285,25 @@ async function sendInviteNoLongerAvailable(
   }
 }
 
+async function notifyNoCourtsAtQuorum(requestId: string): Promise<void> {
+  void recordEvent({ schedulingRequestId: requestId, action: 'no_courts_at_quorum' });
+  const candidates = await prisma.schedulingCandidate.findMany({
+    where: { schedulingRequestId: requestId, status: { in: ['responded', 'contacted', 'waiting_reply'] } },
+    include: { contactUser: { select: { phone: true, locale: true } } },
+  });
+  await Promise.all(
+    candidates.map(async (c) => {
+      const phone = c.contactUser?.phone;
+      if (!phone) return;
+      const msgs = getMessages(c.contactUser?.locale);
+      const result = await whatsappService.sendInviteMessage(phone, msgs.noCourtsAtQuorum());
+      if (!result.success) {
+        logger.warn('FailedToSendNoCourtsAtQuorum', { candidateId: c.id, phone, error: result.error });
+      }
+    })
+  );
+}
+
 async function notifyHostSchedulingNoMatch(
   request: {
     id: string;
@@ -379,18 +394,11 @@ export const schedulingService = {
       );
     }
 
-    // Round to 3 decimal places to avoid float precision issues
-    const rawWindow = input.responseWindowMinutes ?? 240;
-    const responseWindow = Math.round(rawWindow * 1000) / 1000;
-    // Min 10 seconds (0.167 min) for dev testing, max 72 hours (4320 min)
-    if (responseWindow < 10 / 60 || responseWindow > 4320) {
-      throw new AppError(
-        'Invalid responseWindowMinutes. Use 15, 30, 60, 120, 240, 720, 1440, or 4320 (minutes). Dev: 0.167 (10 sec).',
-        400
-      );
+    // Enforce candidate limits: 5 for singles, 8 for doubles
+    const maxCandidates = format === 'doubles' ? MAX_CANDIDATES_DOUBLES : MAX_CANDIDATES_SINGLES;
+    if (candidateIds.length > maxCandidates) {
+      throw new AppError(`Too many candidates. Maximum is ${maxCandidates} for ${format}.`, 400);
     }
-
-    const maxParallel = Math.min(3, Math.max(1, input.maxParallelCandidates ?? 1));
 
     const matchType = input.matchType ?? 'competitive';
     const date = new Date(input.date);
@@ -411,11 +419,8 @@ export const schedulingService = {
           endTime,
           locationText: (input.locationText ?? "").trim(),
           radiusKm: input.radiusKm ?? null,
-          responseWindowMinutes: responseWindow,
-          maxParallelCandidates: maxParallel,
           bookingEnabled: input.bookingEnabled ?? false,
           timezone: input.timezone ?? 'UTC',
-          showCandidates: (input.showCandidates === true) && format === 'doubles',
           additionalDates: input.additionalDates && input.additionalDates.length > 0
             ? JSON.stringify(input.additionalDates)
             : null,
@@ -473,16 +478,12 @@ export const schedulingService = {
     const request = await schedulingRepository.findActiveRequestById(requestId);
     if (!request) return;
 
-    const maxParallel = (request as RequestRow & { maxParallelCandidates?: number }).maxParallelCandidates ?? 1;
-    const waitingCount = await schedulingRepository.countWaitingReplyCandidates(requestId);
-    const slotsToFill = Math.max(0, maxParallel - waitingCount);
-    if (slotsToFill === 0) return;
-
-    const toContact = await schedulingRepository.findPendingCandidatesOrdered(requestId, slotsToFill);
+    // Contact ALL pending candidates at once — no sequential queue
+    const toContact = await schedulingRepository.findPendingCandidatesOrdered(requestId, 100);
     if (toContact.length === 0) {
       const pendingCount = await schedulingRepository.countPendingCandidates(requestId);
-      const waitingReplyCount = await schedulingRepository.countWaitingReplyCandidates(requestId);
-      if (pendingCount === 0 && waitingReplyCount === 0) {
+      const activeCount = await schedulingRepository.countActiveCandidates(requestId);
+      if (pendingCount === 0 && activeCount === 0) {
         await schedulingRepository.updateRequestStatus(requestId, 'expired');
         logger.info('SchedulingExpired', { requestId, reason: 'all_candidates_exhausted' });
         void recordEvent({ schedulingRequestId: requestId, action: 'request_expired', metadata: { reason: 'all_candidates_exhausted' } });
@@ -518,7 +519,6 @@ export const schedulingService = {
       const sep = loc === 'en' ? ' ' : ' de ';
       const dateStr = `${cap(formatInTz(request.date, intlLocale, { weekday: 'long' }, tz))}, ${formatInTz(request.date, intlLocale, { day: 'numeric' }, tz)}${sep}${cap(formatInTz(request.date, intlLocale, { month: 'long' }, tz))}`;
       const timeStr = `${formatInTz(request.startTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)} · ${formatInTz(request.endTime, intlLocale, { hour: '2-digit', minute: '2-digit' }, tz)}`;
-      const timeLeft = formatResponseWindow(request.responseWindowMinutes ?? 240, candidateLocale);
       const msgs = getMessages(candidateLocale);
       const formatLabel = format === 'doubles' ? 'Doubles' : 'Singles';
 
@@ -533,7 +533,7 @@ export const schedulingService = {
       let inviteButtons: { id: string; title: string }[];
 
       if (isMultiDate) {
-        message = msgs.inviteMultiDatePoll(hostName, request.sportType, formatLabel, request.locationText, timeLeft);
+        message = msgs.inviteMultiDatePoll(hostName, request.sportType, format, request.locationText);
         const noneLabel = loc === 'es' ? 'Ninguno' : loc === 'ca' ? 'Cap' : 'None';
         const multiButtons: { id: string; title: string }[] = [];
 
@@ -559,7 +559,7 @@ export const schedulingService = {
         multiButtons.push({ id: 'invite_none', title: noneLabel });
         inviteButtons = multiButtons;
       } else {
-        message = msgs.invitePoll(hostName, request.sportType, formatLabel, dateStr, request.locationText, timeLeft);
+        message = msgs.invitePoll(hostName, request.sportType, format, dateStr, request.locationText);
         // Annotate unavailable slots inline in the message body (only when booking is enabled and at least one slot has no courts)
         if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && slots.length > 0) {
           const dateStrISO = new Date(request.date).toISOString().slice(0, 10);
@@ -585,8 +585,8 @@ export const schedulingService = {
         inviteButtons = getInviteButtons(candidateLocale, slots);
       }
 
-      // For doubles with showCandidates enabled, append who else might be playing
-      if ((request as RequestRow).showCandidates && format === 'doubles' && request.candidates) {
+      // For doubles always append who else is invited
+      if (format === 'doubles' && request.candidates) {
         const otherNames = (request.candidates as Array<{ contactUserId: string; contactUser?: { name?: string | null } | null }>)
           .filter((c) => c.contactUserId !== candidate.contactUserId)
           .slice(0, 4)
@@ -697,6 +697,10 @@ export const schedulingService = {
         metadata: { dateTimes: parsedDateTimes },
       });
       logger.info('MultiDatePollVoteRecorded', { requestId: request.id, candidateId: candidate.id, dateTimes: parsedDateTimes });
+      await prisma.schedulingCandidate.updateMany({
+        where: { id: candidate.id, status: { in: ['waiting_reply', 'contacted'] } },
+        data: { status: 'responded', responseAt: new Date() },
+      });
       const existing = pollDebounceTimers.get(request.id);
       if (existing) clearTimeout(existing);
       pollDebounceTimers.set(
@@ -748,6 +752,10 @@ export const schedulingService = {
     });
 
     logger.info('PollVoteRecorded', { requestId: request.id, candidateId: candidate.id, hours: votedHours });
+    await prisma.schedulingCandidate.updateMany({
+      where: { id: candidate.id, status: { in: ['waiting_reply', 'contacted'] } },
+      data: { status: 'responded', responseAt: new Date() },
+    });
 
     // Debounce quorum evaluation — Wasender fires one poll.results webhook per click,
     // each containing the FULL current poll state. We reset the timer on every vote so
@@ -818,14 +826,15 @@ export const schedulingService = {
       // Default: pick earliest with quorum
       let confirmedDateTime = confirmedDateTimes[0];
 
-      // When booking is enabled, prefer the earliest confirmed slot that has courts available in cache
-      if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled && confirmedDateTimes.length > 1) {
+      // When booking is enabled, only confirm if a court is available for one of the confirmed slots
+      if ((request as RequestRow & { bookingEnabled?: boolean }).bookingEnabled) {
         const hostUser = request.hostUser;
         if (hostUser) {
           const hostMembership = await prisma.clubMembership.findFirst({
             where: { userId: hostUser.id, status: 'active', encryptedPassword: { not: null } },
           });
           if (hostMembership) {
+            let found: string | null = null;
             for (const dt of confirmedDateTimes) {
               const [dateStr, hh] = dt.split('·');
               const slotHHMM = `${hh.padStart(2, '0')}:00`;
@@ -833,8 +842,13 @@ export const schedulingService = {
               const picked = await pickBestSlotInRange(
                 hostUser.id, hostMembership.clubSlug, dateStr, request.sportType, slotHHMM, `${nextH}:00`,
               );
-              if (picked === slotHHMM) { confirmedDateTime = dt; break; }
+              if (picked === slotHHMM) { found = dt; break; }
             }
+            if (!found) {
+              await notifyNoCourtsAtQuorum(requestId);
+              return;
+            }
+            confirmedDateTime = found;
           }
         }
       }
@@ -857,7 +871,7 @@ export const schedulingService = {
         // Include 'expired' so candidates whose window elapsed before quorum was reached
         // are still marked accepted — their vote was cast and they should be in the match.
         await tx.schedulingCandidate.updateMany({
-          where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted', 'expired'] } },
+          where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted', 'responded', 'expired'] } },
           data: { status: 'accepted', responseAt: new Date() },
         });
         await tx.schedulingRequest.update({
@@ -915,13 +929,19 @@ export const schedulingService = {
           where: { userId: hostUser.id, status: 'active', encryptedPassword: { not: null } },
         });
         if (hostMembership) {
+          let found: string | null = null;
           for (const slot of confirmedSlots) {
             const nextH = String(Number(slot.slice(0, 2)) + 1).padStart(2, '0');
             const courtSlot = await pickBestSlotInRange(
               hostUser.id, hostMembership.clubSlug, dateStr, request.sportType, slot, `${nextH}:00`,
             );
-            if (courtSlot === slot) { bestSlot = slot; break; }
+            if (courtSlot === slot) { found = slot; break; }
           }
+          if (!found) {
+            await notifyNoCourtsAtQuorum(requestId);
+            return;
+          }
+          bestSlot = found;
         }
       }
     }
@@ -941,7 +961,7 @@ export const schedulingService = {
       // Include 'expired' so candidates whose window elapsed before quorum was reached
       // are still marked accepted — their vote was cast and they should be in the match.
       await tx.schedulingCandidate.updateMany({
-        where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted', 'expired'] } },
+        where: { id: { in: acceptingCandidateIds }, status: { in: ['waiting_reply', 'contacted', 'responded', 'expired'] } },
         data: { status: 'accepted', responseAt: new Date() },
       });
       await tx.schedulingRequest.update({
@@ -1533,7 +1553,14 @@ export const schedulingService = {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return requests.map(toRequestDTOWithCandidates);
+    const ids = requests.map((r) => r.id);
+    const noCourtsIds = ids.length > 0
+      ? new Set((await prisma.schedulingInviteEvent.findMany({
+          where: { schedulingRequestId: { in: ids }, action: 'no_courts_at_quorum' },
+          select: { schedulingRequestId: true },
+        })).map((e) => e.schedulingRequestId))
+      : new Set<string>();
+    return requests.map((r) => toRequestDTOWithCandidates({ ...r, noCourtsAtQuorum: noCourtsIds.has(r.id) }));
   },
 
   async getEventHistory(requestId: string): Promise<SchedulingInviteEventDTO[]> {

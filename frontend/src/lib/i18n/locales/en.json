@@ -421,7 +421,8 @@
       "bookingSuccess": "Court booked{{court}}",
       "bookingFailed": "Booking failed{{error}}",
       "inviteLinkAccepted": "{{name}} accepted via invite link",
-      "pollVote": "{{name}} voted in the poll"
+      "pollVote": "{{name}} voted in the poll",
+      "noCourtsAtQuorum": "No courts available at quorum times — will retry at midnight"
     },
     "candidateStatus": {
       "pending": "Pending",
@@ -478,6 +479,7 @@
     "allMembersAdded": "All members from this list are already added",
     "expiredNotEnough": "Not enough contacts responded in time. Add more contacts or start a new request.",
     "expiredNoOne": "No one responded in time. Add more contacts or start a new request.",
+    "noCourtsAtQuorum": "Everyone is available, but no courts are free at the voted times. Will look for a court again at midnight.",
     "whatsappNotAvailable": "WhatsApp group link not available",
     "cancelRequestDialog": {
       "title": "Cancel invite request",
@@ -739,7 +741,8 @@
       "confirm": "Cancel match",
       "cancelling": "Cancelling…",
       "successToast": "Match cancelled",
-      "failedToCancel": "Failed to cancel match"
+      "failedToCancel": "Failed to cancel match",
+      "pastMatch": "Cannot cancel a match whose scheduled time has already passed"
     },
     "addToCalendar": {
       "calendar": "Calendar",

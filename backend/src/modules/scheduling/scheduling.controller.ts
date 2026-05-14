@@ -18,16 +18,11 @@ export class SchedulingController {
         endTime: body.endTime,
         locationText: body.locationText ?? "",
         radiusKm: body.radiusKm ?? null,
-        responseWindowMinutes: body.responseWindowMinutes != null
-          ? Number(body.responseWindowMinutes)
-          : undefined,
-        maxParallelCandidates: body.maxParallelCandidates != null ? Number(body.maxParallelCandidates) : undefined,
         hostPartnerUserId: body.hostPartnerUserId ?? null,
         candidateUserIds: body.candidateUserIds || [],
         bookingEnabled: body.bookingEnabled === true,
         timezone: body.timezone ?? 'UTC',
         additionalDates: Array.isArray(body.additionalDates) ? body.additionalDates : undefined,
-        showCandidates: body.showCandidates === true,
       };
       const request = await schedulingService.createSchedulingRequest(input);
       res.status(201).json(request);

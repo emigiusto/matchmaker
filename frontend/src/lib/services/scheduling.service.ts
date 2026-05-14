@@ -58,13 +58,12 @@ export interface SchedulingRequestDTO {
   endTime: string
   locationText: string
   radiusKm: number | null
-  responseWindowMinutes: number
   inviteToken: string
   status: SchedulingRequestStatus
   currentCandidateIndex: number
   matchId: string | null
   whatsappGroupId: string | null
-  showCandidates: boolean
+  noCourtsAtQuorum: boolean
   createdAt: string
   updatedAt: string
   candidates?: SchedulingCandidateDTO[]
@@ -80,14 +79,11 @@ export interface CreateSchedulingRequestInput {
   endTime: string
   locationText: string
   radiusKm?: number | null
-  responseWindowMinutes: number
-  maxParallelCandidates?: number
   hostPartnerUserId?: string | null
   candidateUserIds: string[]
   bookingEnabled?: boolean
   timezone?: string
   additionalDates?: AdditionalDateEntry[]
-  showCandidates?: boolean
 }
 
 export type SchedulingInviteEventAction =
@@ -109,6 +105,7 @@ export type SchedulingInviteEventAction =
   | 'booking_failed'
   | 'booking_cancelled'
   | 'poll_vote'
+  | 'no_courts_at_quorum'
 
 export interface SchedulingInviteEventDTO {
   id: string

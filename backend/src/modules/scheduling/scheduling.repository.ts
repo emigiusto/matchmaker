@@ -174,7 +174,7 @@ export const schedulingRepository = {
     if (!senderDigits) return null;
 
     const candidates = await prisma.schedulingCandidate.findMany({
-      where: { status: { in: ['waiting_reply', 'contacted', 'expired'] } },
+      where: { status: { in: ['waiting_reply', 'contacted', 'responded', 'expired'] } },
       include: {
         schedulingRequest: { include: { hostUser: true, hostPartner: true } },
         contactUser: true,
@@ -184,7 +184,7 @@ export const schedulingRepository = {
     for (const c of candidates) {
       const contactDigits = normalizePhoneToCanonical(c.contactUser?.phone);
       if (!phoneDigitsMatch(senderDigits, contactDigits)) continue;
-      if (c.status === 'waiting_reply' || c.status === 'contacted') return c;
+      if (c.status === 'waiting_reply' || c.status === 'contacted' || c.status === 'responded') return c;
       if (c.status === 'expired' && !c.responseAt && c.contactedAt) {
         const GRACE_MS = 5 * 60 * 1000;
         if (Date.now() - c.contactedAt.getTime() <= GRACE_MS) return c;
@@ -198,9 +198,9 @@ export const schedulingRepository = {
   async findCandidateToRecordResponseByContactUserId(contactUserId: string) {
     const waiting = await this.findWaitingReplyCandidateByContactUserId(contactUserId);
     if (waiting) return waiting;
-    // contacted = invite just sent, waiting for waiting_reply (retry or race)
+    // contacted or responded = invite sent/voted but can still update vote
     const contacted = await prisma.schedulingCandidate.findFirst({
-      where: { contactUserId, status: 'contacted' },
+      where: { contactUserId, status: { in: ['contacted', 'responded'] } },
       include: {
         schedulingRequest: { include: { hostUser: true, hostPartner: true } },
         contactUser: true,
@@ -223,22 +223,17 @@ export const schedulingRepository = {
     });
   },
 
-  async findWaitingReplyCandidatesToExpire() {
-    const candidates = await prisma.schedulingCandidate.findMany({
-      where: { status: 'waiting_reply' },
-      include: {
-        schedulingRequest: { include: { hostUser: true } },
-        contactUser: true,
+  async findWaitingReplyCandidatesToExpire(): Promise<{ id: string }[]> {
+    // Response windows were removed — candidates no longer expire automatically.
+    return [];
+  },
+
+  async countActiveCandidates(schedulingRequestId: string): Promise<number> {
+    return prisma.schedulingCandidate.count({
+      where: {
+        schedulingRequestId,
+        status: { in: ['contacted', 'waiting_reply', 'responded'] },
       },
-    });
-    const now = Date.now();
-    return candidates.filter((c) => {
-      if (!c.contactedAt) return false;
-      const mins = c.schedulingRequest.responseWindowMinutes;
-      // Treat 0 or invalid as 20 sec (0.333 min) for testing - was truncated by old Int column
-      const windowMinutes = mins && mins > 0 ? mins : 1 / 3;
-      const windowMs = windowMinutes * 60 * 1000;
-      return now - c.contactedAt.getTime() > windowMs;
     });
   },
 

@@ -363,10 +363,6 @@ export async function cancelMatch(matchId: string, userId: string): Promise<Matc
     if (!isParticipant) {
       throw new AppError('Only participants can cancel this match', 403);
     }
-    const now = new Date();
-    if (now >= match.scheduledAt) {
-      throw new AppError('Cannot cancel match after scheduled time', 409);
-    }
     // Update status
     const hostUserId = match.availability?.userId ?? null;
     const updated = await tx.match.update({

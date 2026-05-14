@@ -13,15 +13,16 @@ export type SchedulingCandidateStatus =
   | 'pending'
   | 'contacted'
   | 'waiting_reply'
+  | 'responded'
   | 'accepted'
   | 'declined'
   | 'expired'
-  | 'cancelled';
-
-// minutes: 15m, 30m, 1h, 2h, 4h, 12h, 24h, 72h. Dev-only: 10/60 (10 sec)
-export const RESPONSE_WINDOW_OPTIONS = [15, 30, 60, 120, 240, 720, 1440, 4320] as const;
+  | 'cancelled'
+  | 'send_failed';
 
 export const MAX_ACTIVE_SCHEDULING_REQUESTS = 5;
+export const MAX_CANDIDATES_SINGLES = 5;
+export const MAX_CANDIDATES_DOUBLES = 8;
 
 export interface AdditionalDateEntry {
   date: string;      // YYYY-MM-DD
@@ -41,13 +42,10 @@ export interface CreateSchedulingRequestInput {
   additionalDates?: AdditionalDateEntry[];
   locationText: string;
   radiusKm?: number | null;
-  responseWindowMinutes?: number;
-  maxParallelCandidates?: number;
   hostPartnerUserId?: string | null;
   candidateUserIds: string[];
   bookingEnabled?: boolean;
   timezone?: string;
-  showCandidates?: boolean;
 }
 
 export interface SchedulingRequestDTO {
@@ -64,15 +62,13 @@ export interface SchedulingRequestDTO {
   endTime: string;
   locationText: string;
   radiusKm: number | null;
-  responseWindowMinutes: number;
-  maxParallelCandidates: number;
   inviteToken: string;
   status: SchedulingRequestStatus;
   currentCandidateIndex: number;
   matchId: string | null;
   whatsappGroupId: string | null;
   timezone: string;
-  showCandidates: boolean;
+  noCourtsAtQuorum: boolean;
   createdAt: string;
   updatedAt: string;
   candidates?: SchedulingCandidateDTO[];
@@ -111,7 +107,8 @@ export type SchedulingInviteEventAction =
   | 'booking_success'
   | 'booking_failed'
   | 'booking_cancelled'
-  | 'poll_vote';
+  | 'poll_vote'
+  | 'no_courts_at_quorum';
 
 export interface PublicSchedulingInviteDTO {
   id: string;

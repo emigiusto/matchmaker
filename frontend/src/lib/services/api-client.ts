@@ -9,10 +9,12 @@ function getAuthHeaders(): Record<string, string> {
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  errorCode: string | undefined
+  constructor(status: number, message: string, errorCode?: string) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.errorCode = errorCode
   }
 }
 
@@ -25,13 +27,15 @@ async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorBody = await response.text().catch(() => "Unknown error")
     let message = "Unknown error"
+    let errorCode: string | undefined
     try {
-      const parsed = JSON.parse(errorBody) as { error?: string; message?: string }
+      const parsed = JSON.parse(errorBody) as { error?: string; message?: string; errorCode?: string }
       message = parsed.error ?? parsed.message ?? errorBody
+      errorCode = parsed.errorCode
     } catch {
       message = errorBody || response.statusText
     }
-    throw new ApiError(response.status, typeof message === "string" ? message : "Request failed")
+    throw new ApiError(response.status, typeof message === "string" ? message : "Request failed", errorCode)
   }
   if (response.status === 204 || response.headers.get("content-length") === "0") {
     return undefined as T

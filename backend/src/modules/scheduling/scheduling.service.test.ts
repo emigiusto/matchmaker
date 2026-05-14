@@ -29,6 +29,7 @@ const { mockTx, mockRepo } = vi.hoisted(() => {
     findPendingCandidatesOrdered: vi.fn(),
     countWaitingReplyCandidates: vi.fn(),
     countPendingCandidates: vi.fn(),
+    countActiveCandidates: vi.fn(),
     updateRequestStatus: vi.fn(),
     updateCandidateStatus: vi.fn(),
     retryCandidate: vi.fn(),
@@ -112,7 +113,6 @@ const baseInput = {
   startTime: '2025-04-15T10:00:00.000Z',
   endTime: '2025-04-15T11:00:00.000Z',
   locationText: 'Court 1',
-  responseWindowMinutes: 240,
   candidateUserIds: ['cand1'],
 };
 
@@ -129,8 +129,6 @@ const baseRequest = {
   endTime: new Date('2025-04-15T11:00:00.000Z'),
   locationText: 'Court 1',
   radiusKm: null,
-  responseWindowMinutes: 240,
-  maxParallelCandidates: 1,
   inviteToken: 'tok123',
   status: 'active',
   currentCandidateIndex: 0,
@@ -235,18 +233,6 @@ describe('SchedulingService', () => {
       ).rejects.toThrow(/Doubles matches require at least 3 candidates/);
     });
 
-    it('throws when responseWindowMinutes is invalid', async () => {
-      mockRepo.countActiveByHostUserId.mockResolvedValue(0);
-      mockTx.user.findUnique.mockResolvedValue({ id: 'host1', name: 'Host' });
-
-      await expect(
-        schedulingService.createSchedulingRequest({
-          ...baseInput,
-          responseWindowMinutes: 5000, // exceeds max 4320 (72h)
-        })
-      ).rejects.toThrow(/Invalid responseWindowMinutes/);
-    });
-
     it('creates request successfully with valid input', async () => {
       mockRepo.countActiveByHostUserId.mockResolvedValue(0);
       mockTx.user.findUnique.mockResolvedValue({ id: 'host1', name: 'Host' });
@@ -263,12 +249,10 @@ describe('SchedulingService', () => {
         endTime: new Date(baseInput.endTime),
         locationText: baseInput.locationText,
         radiusKm: null,
-        responseWindowMinutes: baseInput.responseWindowMinutes,
         inviteToken: 'tok-xyz',
         status: 'active',
         currentCandidateIndex: 0,
         matchId: null,
-        maxParallelCandidates: 1,
         createdAt: now,
         updatedAt: now,
       };
@@ -313,8 +297,6 @@ describe('SchedulingService', () => {
         endTime: new Date('2025-04-15T11:00:00.000Z'),
         locationText: 'Court 1',
         radiusKm: null,
-        responseWindowMinutes: 240,
-        maxParallelCandidates: 1,
         inviteToken: 'tok-tz',
         status: 'active',
         currentCandidateIndex: 0,
@@ -367,8 +349,6 @@ describe('SchedulingService', () => {
         endTime: new Date('2025-04-15T11:00:00.000Z'),
         locationText: 'Court 1',
         radiusKm: null,
-        responseWindowMinutes: 240,
-        maxParallelCandidates: 1,
         inviteToken: 'tok-utc',
         status: 'active',
         currentCandidateIndex: 0,
@@ -489,10 +469,8 @@ describe('SchedulingService', () => {
           },
         ])
         .mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates
-        .mockResolvedValueOnce(0)
-        .mockResolvedValue(1);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(1);
 
       const result = await schedulingService.retryCandidate('req1', 'cand1', 'host1');
 
@@ -542,7 +520,8 @@ describe('SchedulingService', () => {
       mockRepo.updateRequestStatus.mockResolvedValue(undefined);
       mockRepo.findActiveRequestById.mockResolvedValue({ ...expiredReq, status: 'active' });
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(1);
+      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(1);
 
       const result = await schedulingService.addCandidates('req1', ['cand2'], 'host1');
 
@@ -602,8 +581,8 @@ describe('SchedulingService', () => {
       mockTx.schedulingCandidate.updateMany.mockResolvedValue({ count: 1 });
       mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(0);
 
       const result = await schedulingService.handleCandidateResponse('+456', '', ['Ninguno']);
 
@@ -739,8 +718,8 @@ describe('SchedulingService', () => {
       mockRepo.updateRequestStatus.mockResolvedValue(undefined);
       mockRepo.findActiveRequestById.mockResolvedValue(reqWithWaiting);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(0);
 
       const result = await schedulingService.manualAcceptCandidate('req1', 'cand1', 'host1');
 
@@ -777,7 +756,8 @@ describe('SchedulingService', () => {
       mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
       mockRepo.findActiveRequestById.mockResolvedValue(reqWithContacted);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(1);
+      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(1);
 
       const result = await schedulingService.cancelContactedCandidate('req1', 'cand1', 'host1');
 
@@ -843,8 +823,8 @@ describe('SchedulingService', () => {
       mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
       mockRepo.findActiveRequestById.mockResolvedValue(reqWithAccepted);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(0);
 
       const result = await schedulingService.cancelAcceptedCandidate('req1', 'cand1', 'host1');
 
@@ -978,8 +958,8 @@ describe('SchedulingService', () => {
       mockTx.schedulingCandidate.updateMany.mockResolvedValue({ count: 1 });
       mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(0);
 
       const result = await schedulingService.handleCandidateResponse('+456', '', ['Ninguno']);
 
@@ -1025,12 +1005,10 @@ describe('SchedulingService', () => {
         endTime: new Date(baseInput.endTime),
         locationText: 'Court 1',
         radiusKm: null,
-        responseWindowMinutes: 240,
         inviteToken: 'tok-padel',
         status: 'active',
         currentCandidateIndex: 0,
         matchId: null,
-        maxParallelCandidates: 1,
         createdAt: now,
         updatedAt: now,
       };
@@ -1089,8 +1067,8 @@ describe('SchedulingService', () => {
       mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
       mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(0);
 
       await schedulingService.expireCandidate('cand1');
 
@@ -1099,28 +1077,12 @@ describe('SchedulingService', () => {
   });
 
   describe('expireWaitingCandidates', () => {
-    it('expires candidates past response window', async () => {
-      const oldCandidate = {
-        id: 'cand1',
-        contactedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
-        schedulingRequest: { responseWindowMinutes: 240 },
-      };
-      mockRepo.findWaitingReplyCandidatesToExpire.mockResolvedValue([oldCandidate]);
-      mockTx.schedulingCandidate.findUnique.mockResolvedValue({
-        ...baseRequest.candidates![0],
-        status: 'waiting_reply',
-        contactUser: { phone: '+456' },
-        schedulingRequest: baseRequest,
-      });
-      mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
-      mockRepo.findActiveRequestById.mockResolvedValue(baseRequest);
-      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
-      mockRepo.countPendingCandidates.mockResolvedValue(0);
+    it('returns 0 because response windows were removed', async () => {
+      mockRepo.findWaitingReplyCandidatesToExpire.mockResolvedValue([]);
 
       const count = await schedulingService.expireWaitingCandidates();
 
-      expect(count).toBe(1);
+      expect(count).toBe(0);
     });
   });
 
@@ -1139,6 +1101,7 @@ describe('SchedulingService', () => {
   describe('listSchedulingRequestsByHost', () => {
     it('returns requests for host', async () => {
       mockTx.schedulingRequest.findMany.mockResolvedValue([baseRequest]);
+      mockTx.schedulingInviteEvent.findMany.mockResolvedValue([]); // no_courts_at_quorum batch check
       mockRepo.findActivePastScheduledTime.mockResolvedValue([]); // called by expireRequestsPastScheduledTime
 
       const result = await schedulingService.listSchedulingRequestsByHost('host1');
@@ -1282,7 +1245,8 @@ describe('SchedulingService', () => {
       mockRepo.addCandidates.mockResolvedValue([{ id: 'cand3' }]);
       mockRepo.findActiveRequestById.mockResolvedValue(activeReq);
       mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(1);
+      mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(1);
 
       const result = await schedulingService.addCandidates('req1', ['cand3'], 'host1');
 
@@ -1949,7 +1913,6 @@ describe('SchedulingService', () => {
         hostUser: { ...baseRequest.hostUser, locale: 'es' },
       };
       mockRepo.findActiveRequestById.mockResolvedValue(multiHourReq);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.findPendingCandidatesOrdered
         .mockResolvedValueOnce([{
           ...baseRequest.candidates![0],
@@ -1959,6 +1922,7 @@ describe('SchedulingService', () => {
         .mockResolvedValue([]);
       mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(0);
       mockTx.schedulingCandidate.update.mockResolvedValue({});
       mockTx.schedulingRequest.update.mockResolvedValue({});
       mockTx.schedulingInviteEvent.create.mockResolvedValue({});
@@ -1988,7 +1952,6 @@ describe('SchedulingService', () => {
         hostUser: { ...baseRequest.hostUser, locale: 'es' },
       };
       mockRepo.findActiveRequestById.mockResolvedValue(singleHourReq);
-      mockRepo.countWaitingReplyCandidates.mockResolvedValue(0);
       mockRepo.findPendingCandidatesOrdered
         .mockResolvedValueOnce([{
           ...baseRequest.candidates![0],
@@ -1998,6 +1961,7 @@ describe('SchedulingService', () => {
         .mockResolvedValue([]);
       mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
       mockRepo.countPendingCandidates.mockResolvedValue(0);
+      mockRepo.countActiveCandidates.mockResolvedValue(0);
       mockTx.schedulingCandidate.update.mockResolvedValue({});
       mockTx.schedulingRequest.update.mockResolvedValue({});
       mockTx.schedulingInviteEvent.create.mockResolvedValue({});
@@ -2034,12 +1998,10 @@ describe('SchedulingService', () => {
         endTime: new Date(baseInput.endTime),
         locationText: 'Court 1',
         radiusKm: null,
-        responseWindowMinutes: 240,
         inviteToken: 'tok-book',
         status: 'active',
         currentCandidateIndex: 0,
         matchId: null,
-        maxParallelCandidates: 1,
         bookingEnabled: true,
         createdAt: now,
         updatedAt: now,
@@ -2073,9 +2035,9 @@ describe('SchedulingService', () => {
         id: 'req-no-booking', hostUserId: 'host1', hostPartnerUserId: null,
         sportType: 'tennis', format: 'singles', matchType: 'practice',
         date: new Date(baseInput.date), startTime: new Date(baseInput.startTime), endTime: new Date(baseInput.endTime),
-        locationText: 'Court 1', radiusKm: null, responseWindowMinutes: 240,
+        locationText: 'Court 1', radiusKm: null,
         inviteToken: 'tok-x', status: 'active', currentCandidateIndex: 0,
-        matchId: null, maxParallelCandidates: 1, bookingEnabled: false, createdAt: now, updatedAt: now,
+        matchId: null, bookingEnabled: false, createdAt: now, updatedAt: now,
       };
       mockTx.schedulingRequest.create.mockResolvedValue(createdReq);
       mockTx.schedulingCandidate.create.mockResolvedValue({

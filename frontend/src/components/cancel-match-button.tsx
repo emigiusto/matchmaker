@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { matchesService } from "@/lib/services/matches.service"
+import { ApiError } from "@/lib/services/api-client"
 import { toast } from "sonner"
 import type { Match } from "@/lib/types"
 import { useTranslation } from "@/lib/i18n/use-translation"
@@ -46,8 +47,11 @@ export function CancelMatchButton({
       toast.success(t("matchDetails.cancelMatch.successToast"))
       onSuccess?.(match)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t("matchDetails.cancelMatch.failedToCancel")
-      toast.error(msg)
+      if (err instanceof ApiError && err.errorCode === "MATCH_CANCEL_PAST") {
+        toast.error(t("matchDetails.cancelMatch.pastMatch"))
+      } else {
+        toast.error(err instanceof Error ? err.message : t("matchDetails.cancelMatch.failedToCancel"))
+      }
     } finally {
       setLoading(false)
     }

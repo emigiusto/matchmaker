@@ -513,15 +513,12 @@ model SchedulingRequest {
   endTime               DateTime
   locationText          String
   radiusKm              Float?
-  responseWindowMinutes Float                   @default(240)
-  maxParallelCandidates Int                     @default(1)
   inviteToken           String                  @unique
   status                SchedulingRequestStatus @default(active)
   bookingEnabled        Boolean                 @default(false)
   timezone              String                  @default("UTC")
   currentCandidateIndex Int                     @default(0)
   additionalDates       String?                 @db.Text
-  showCandidates        Boolean                 @default(false)
   matchId               String?                 @unique
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
@@ -601,10 +598,11 @@ enum SchedulingCandidateStatus {
   pending
   contacted
   waiting_reply
+  responded   // voted on the poll (quorum not yet reached)
   accepted
-  declined // invitee said no (rejected)
-  expired // no response in time
-  cancelled // host cancelled/skipped the candidate
+  declined    // invitee said no (rejected)
+  expired     // no response before request expired
+  cancelled   // host cancelled/skipped the candidate
   send_failed // WhatsApp message could not be delivered (bad/unreachable number)
 }
 

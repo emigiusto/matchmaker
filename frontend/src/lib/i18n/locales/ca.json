@@ -421,7 +421,8 @@
       "bookingSuccess": "Pista reservada{{court}}",
       "bookingFailed": "Error en la reserva{{error}}",
       "inviteLinkAccepted": "{{name}} ha acceptat a través de l'enllaç d'invitació",
-      "pollVote": "{{name}} ha votat a l'enquesta"
+      "pollVote": "{{name}} ha votat a l'enquesta",
+      "noCourtsAtQuorum": "Sense pistes disponibles en els horaris amb quòrum — es tornarà a intentar a la mitjanit"
     },
     "candidateStatus": {
       "pending": "Pendent",
@@ -478,6 +479,7 @@
     "allMembersAdded": "Tots els membres d'aquesta llista ja estan afegits",
     "expiredNotEnough": "No hi va haver prou respostes a temps. Afegeix més contactes o inicia una nova sol·licitud.",
     "expiredNoOne": "Ningú va respondre a temps. Afegeix més contactes o inicia una nova sol·licitud.",
+    "noCourtsAtQuorum": "Tothom és disponible, però no hi ha pistes lliures en els horaris votats. Es buscarà pista de nou a la mitjanit.",
     "whatsappNotAvailable": "Enllaç al grup de WhatsApp no disponible",
     "cancelRequestDialog": {
       "title": "Cancel·lar sol·licitud d'invitació",
@@ -739,7 +741,8 @@
       "confirm": "Cancel·lar partit",
       "cancelling": "Cancel·lant…",
       "successToast": "Partit cancel·lat",
-      "failedToCancel": "Error en cancel·lar el partit"
+      "failedToCancel": "Error en cancel·lar el partit",
+      "pastMatch": "No es pot cancel·lar un partit l'hora del qual ja ha passat"
     },
     "addToCalendar": {
       "calendar": "Calendari",

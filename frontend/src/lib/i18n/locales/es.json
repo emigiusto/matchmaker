@@ -421,7 +421,8 @@
       "bookingSuccess": "Pista reservada{{court}}",
       "bookingFailed": "Error en la reserva{{error}}",
       "inviteLinkAccepted": "{{name}} aceptó a través del enlace de invitación",
-      "pollVote": "{{name}} votó en la encuesta"
+      "pollVote": "{{name}} votó en la encuesta",
+      "noCourtsAtQuorum": "Sin pistas disponibles en los horarios con quórum — se reintentará a la medianoche"
     },
     "candidateStatus": {
       "pending": "Pendiente",
@@ -478,6 +479,7 @@
     "allMembersAdded": "Todos los miembros de esta lista ya están añadidos",
     "expiredNotEnough": "No hubo suficientes respuestas a tiempo. Añade más contactos o inicia una nueva solicitud.",
     "expiredNoOne": "Nadie respondió a tiempo. Añade más contactos o inicia una nueva solicitud.",
+    "noCourtsAtQuorum": "Hay horario donde todos están disponibles, pero no hay pistas libres en esos horarios. Se buscará pista a la medianoche.",
     "whatsappNotAvailable": "Enlace al grupo de WhatsApp no disponible",
     "cancelRequestDialog": {
       "title": "Cancelar solicitud de invitación",
@@ -739,7 +741,8 @@
       "confirm": "Cancelar partido",
       "cancelling": "Cancelando…",
       "successToast": "Partido cancelado",
-      "failedToCancel": "Error al cancelar el partido"
+      "failedToCancel": "Error al cancelar el partido",
+      "pastMatch": "No se puede cancelar un partido cuya hora ya ha pasado"
     },
     "addToCalendar": {
       "calendar": "Calendario",
