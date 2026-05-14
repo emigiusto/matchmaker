@@ -445,6 +445,7 @@
       "copied": "Copiado",
       "whatsapp": "WhatsApp",
       "cancelRequest": "Cancelar solicitud",
+      "checkQuorum": "Evaluar quórum",
       "backToInvites": "Volver a invitaciones",
       "cancelInvite": "Cancelar invitación"
     },
@@ -499,7 +500,8 @@
       "acceptFailed": "Error al aceptar",
       "retryQueued": "Se reintentará la invitación",
       "retryFailed": "Error al reintentar la invitación",
-      "linkCopied": "Enlace de invitación copiado"
+      "linkCopied": "Enlace de invitación copiado",
+      "quorumChecked": "Quórum evaluado — sin cambios"
     }
   },
   "inviteDetails": {

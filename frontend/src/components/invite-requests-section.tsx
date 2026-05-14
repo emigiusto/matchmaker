@@ -24,6 +24,7 @@ import {
   ChevronUp,
   Building2,
   Ban,
+  ScanSearch,
 } from "lucide-react"
 import type { SchedulingInviteEventDTO, AdditionalDateEntry } from "@/lib/services/scheduling.service"
 import { SportFormatBadge } from "@/components/sport-format-badge"
@@ -182,6 +183,7 @@ export function InviteRequestsSection({
   const [historyMap, setHistoryMap] = useState<Record<string, SchedulingInviteEventDTO[]>>({})
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null)
   const [groupLinkLoadingId, setGroupLinkLoadingId] = useState<string | null>(null)
+  const [checkQuorumLoadingId, setCheckQuorumLoadingId] = useState<string | null>(null)
 
   async function fetchSchedulingData(isInitial = false) {
     if (isInitial) setLoading(true)
@@ -239,6 +241,27 @@ export function InviteRequestsSection({
       toast.error(err instanceof Error ? err.message : t("errors.generic"))
     } finally {
       setGroupLinkLoadingId(null)
+    }
+  }
+
+  async function handleCheckQuorum(requestId: string) {
+    setCheckQuorumLoadingId(requestId)
+    try {
+      const updated = await schedulingService.checkQuorum(requestId, currentUserId)
+      const mapped = mapSchedulingToInviteRequest(updated, t)
+      if (mapped) {
+        setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
+        switchToFilterForStatus(mapped.status, mapped)
+        if (mapped.status === "matched") {
+          toast.success(t("invites.toast.matchConfirmed"))
+        } else {
+          toast.info(t("invites.toast.quorumChecked"))
+        }
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("errors.generic"))
+    } finally {
+      setCheckQuorumLoadingId(null)
     }
   }
 
@@ -829,6 +852,21 @@ export function InviteRequestsSection({
                                 hostUserId={currentUserId}
                                 onSuccess={() => fetchSchedulingData(false)}
                               />
+                              {request.contacts.some((c) => c.status === "contacted") && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5"
+                                  disabled={checkQuorumLoadingId === request.id}
+                                  onClick={() => handleCheckQuorum(request.id)}
+                                >
+                                  {checkQuorumLoadingId === request.id
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : <ScanSearch className="h-3.5 w-3.5" />
+                                  }
+                                  {t("invites.actions.checkQuorum")}
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"

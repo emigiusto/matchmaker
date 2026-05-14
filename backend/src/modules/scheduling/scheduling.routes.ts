@@ -28,6 +28,7 @@ router.post('/:requestId/cancel-contacted/:candidateId', SchedulingController.ca
 router.post('/:requestId/remove/:candidateId', SchedulingController.removeCandidate);
 router.post('/:requestId/retry/:candidateId', SchedulingController.retryCandidate);
 router.post('/:requestId/candidates', SchedulingController.addCandidates);
+router.post('/:requestId/check-quorum', SchedulingController.checkQuorum);
 router.post('/:requestId/cancel', SchedulingController.cancelSchedulingRequest);
 
 export default router;

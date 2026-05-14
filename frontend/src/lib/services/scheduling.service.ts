@@ -206,6 +206,10 @@ export const schedulingService = {
     })
   },
 
+  async checkQuorum(requestId: string, userId: string): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/check-quorum`, { userId })
+  },
+
   async getById(requestId: string): Promise<SchedulingRequestDTO | null> {
     return apiClient.get<SchedulingRequestDTO>(`/scheduling/${requestId}`)
   },

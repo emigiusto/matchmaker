@@ -264,4 +264,22 @@ export class SchedulingController {
       next(err);
     }
   }
+
+  static async checkQuorum(req: Request, res: Response, next: NextFunction) {
+    try {
+      const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
+      const { userId } = req.body;
+      if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const request = await schedulingService.getSchedulingRequestById(requestId);
+      if (!request) return res.status(404).json({ error: 'Scheduling request not found' });
+      if (request.hostUserId !== userId) return res.status(403).json({ error: 'Not authorized' });
+      if (request.status !== 'active') return res.status(400).json({ error: 'Request is not active' });
+      await schedulingService.checkPollQuorum(requestId);
+      const updated = await schedulingService.getSchedulingRequestById(requestId);
+      res.json(updated);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
