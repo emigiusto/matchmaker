@@ -172,11 +172,6 @@ export function InviteRequestsSection({
   const dateLocale = language === "es" ? esLocale : undefined
   const [inviteRequests, setInviteRequests] = useState<InviteRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [acceptConfirm, setAcceptConfirm] = useState<{
-    requestId: string
-    candidateId: string
-    contactName: string
-  } | null>(null)
   const [cancelConfirm, setCancelConfirm] = useState<string | null>(null)
   type InviteFilter = "active" | "expired" | "past" | "confirmed" | "cancelled"
   const [inviteFilter, setInviteFilter] = useState<InviteFilter>("active")
@@ -367,22 +362,6 @@ export function InviteRequestsSection({
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("invites.toast.cancelFailed"))
-    }
-  }
-
-  async function handleManualAccept(requestId: string, candidateId: string) {
-    try {
-      const updated = await schedulingService.manualAccept(requestId, candidateId, currentUserId)
-      const mapped = mapSchedulingToInviteRequest(updated, t)
-      if (mapped) {
-        setInviteRequests((prev) => prev.map((r) => (r.id === requestId ? mapped : r)))
-        switchToFilterForStatus(mapped.status, mapped)
-        toast.success(t("invites.toast.matchConfirmed"))
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("invites.toast.acceptFailed"))
-    } finally {
-      setAcceptConfirm(null)
     }
   }
 
@@ -712,26 +691,6 @@ export function InviteRequestsSection({
                               </span>
                               {request.status !== "matched" &&
                                 request.status !== "cancelled" &&
-                                (contact.status === "pending" ||
-                                  contact.status === "contacted" ||
-                                  contact.status === "no_response" ||
-                                  contact.status === "cancelled") && (
-                                  <button
-                                    onClick={() =>
-                                      setAcceptConfirm({
-                                        requestId: request.id,
-                                        candidateId: contact.id,
-                                        contactName: contact.name,
-                                      })
-                                    }
-                                    title={t("invites.actions.accept")}
-                                    className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-700"
-                                  >
-                                    <UserCheck className="h-3 w-3" />
-                                  </button>
-                                )}
-                              {request.status !== "matched" &&
-                                request.status !== "cancelled" &&
                                 contact.status === "pending" && (
                                   <button
                                     onClick={() => handleRemoveContact(request.id, contact.id)}
@@ -1019,31 +978,6 @@ export function InviteRequestsSection({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={!!acceptConfirm}
-        onOpenChange={(open) => !open && setAcceptConfirm(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Accept candidate</AlertDialogTitle>
-            <AlertDialogDescription>
-              Accept {acceptConfirm?.contactName ?? "this person"} for this match? This will mark
-              them as confirmed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                acceptConfirm &&
-                handleManualAccept(acceptConfirm.requestId, acceptConfirm.candidateId)
-              }
-            >
-              Accept
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   )
 }
