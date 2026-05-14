@@ -196,11 +196,8 @@ export const schedulingService = {
     )
   },
 
-  async manualAccept(requestId: string, candidateId: string, userId: string): Promise<SchedulingRequestDTO> {
-    return apiClient.post<SchedulingRequestDTO>(
-      `/scheduling/${requestId}/accept/${candidateId}`,
-      { userId }
-    )
+  async confirmMatch(requestId: string, data: { userId: string; date: string; time: string }): Promise<SchedulingRequestDTO> {
+    return apiClient.post<SchedulingRequestDTO>(`/scheduling/${requestId}/confirm-match`, data)
   },
 
   async retry(requestId: string, candidateId: string, userId: string): Promise<SchedulingRequestDTO> {

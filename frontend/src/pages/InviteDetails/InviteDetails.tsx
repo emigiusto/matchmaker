@@ -10,6 +10,7 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Trophy,
   UserCheck,
   UserX,
   Hourglass,
@@ -30,15 +31,13 @@ import { PageHeader } from "@/components/page-header"
 import { SportFormatBadge } from "@/components/sport-format-badge"
 import { AddContactsToInvite } from "@/components/add-contacts-to-invite"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { getCurrentUserId } from "@/lib/current-user"
 import { useTranslation } from "@/lib/i18n"
@@ -170,13 +169,13 @@ export default function InviteDetailsPage() {
   const [courtAvailability, setCourtAvailability] = useState<CourtAvailabilitySlot[]>([])
   const historyBottomRef = useRef<HTMLDivElement>(null)
   const prevEventsCountRef = useRef(0)
-  const [acceptConfirm, setAcceptConfirm] = useState<{
-    candidateId: string
-    contactName: string
-  } | null>(null)
+  const [confirmMatchOpen, setConfirmMatchOpen] = useState(false)
+  const [confirmMatchDate, setConfirmMatchDate] = useState("")
+  const [confirmMatchTime, setConfirmMatchTime] = useState("")
+  const [confirmMatchLoading, setConfirmMatchLoading] = useState(false)
   const [pendingAction, setPendingAction] = useState<{
     candidateId: string
-    action: "accept" | "cancel" | "retry" | "cancelAccepted"
+    action: "cancel" | "retry" | "cancelAccepted"
   } | null>(null)
   const [fetchingGroupLink, setFetchingGroupLink] = useState(false)
 
@@ -287,19 +286,23 @@ export default function InviteDetailsPage() {
     }
   }
 
-  async function handleManualAccept(candidateId: string) {
-    if (!requestId) return
-    setPendingAction({ candidateId, action: "accept" })
+  async function handleConfirmMatch() {
+    if (!requestId || !confirmMatchDate || !confirmMatchTime) return
+    setConfirmMatchLoading(true)
     try {
-      const updated = await schedulingService.manualAccept(requestId, candidateId, currentUserId)
+      const updated = await schedulingService.confirmMatch(requestId, {
+        userId: currentUserId,
+        date: confirmMatchDate,
+        time: confirmMatchTime,
+      })
       setRequest(updated)
       await fetchEvents()
-      setAcceptConfirm(null)
-      toast.success(t("inviteDetails.toast.candidateAccepted"))
+      setConfirmMatchOpen(false)
+      toast.success(t("inviteDetails.confirmMatchDialog.success"))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("inviteDetails.toast.acceptFailed"))
+      toast.error(e instanceof Error ? e.message : t("inviteDetails.confirmMatchDialog.error"))
     } finally {
-      setPendingAction(null)
+      setConfirmMatchLoading(false)
     }
   }
 
@@ -546,6 +549,22 @@ export default function InviteDetailsPage() {
                 {t("invites.actions.checkQuorum")}
               </Button>
             )}
+            {displayStatus === "scheduling" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => {
+                  const primaryDateStr = request.date.slice(0, 10)
+                  setConfirmMatchDate(primaryDateStr)
+                  setConfirmMatchTime(format(new Date(request.startTime), "HH:mm"))
+                  setConfirmMatchOpen(true)
+                }}
+              >
+                <Trophy className="h-3.5 w-3.5" />
+                {t("invites.actions.confirmMatch")}
+              </Button>
+            )}
             {(request.status === "active" || request.status === "expired") && (
               <Button
                 variant="ghost"
@@ -623,21 +642,6 @@ export default function InviteDetailsPage() {
                   <span className="text-xs text-muted-foreground">{t(`invites.candidateStatus.${uiStatus}`)}</span>
                   {/* Actions */}
                   <div className="flex items-center gap-1">
-                    {displayStatus !== "matched" &&
-                      displayStatus !== "cancelled" &&
-                      (uiStatus === "pending" || uiStatus === "contacted" || uiStatus === "no_response" || uiStatus === "cancelled") && (() => {
-                        const busy = pendingAction?.candidateId === candidate.id && pendingAction.action === "accept"
-                        return (
-                          <button
-                            onClick={() => setAcceptConfirm({ candidateId: candidate.id, contactName })}
-                            disabled={!!pendingAction}
-                            title={t("invites.actions.accept")}
-                            className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10 disabled:opacity-50"
-                          >
-                            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
-                          </button>
-                        )
-                      })()}
                     {displayStatus !== "matched" &&
                       displayStatus !== "cancelled" &&
                       uiStatus === "contacted" && (() => {
@@ -784,24 +788,87 @@ export default function InviteDetailsPage() {
         </Card>
       </div>
 
-      <AlertDialog open={!!acceptConfirm} onOpenChange={(open) => !open && setAcceptConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("inviteDetails.confirmDialog.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("inviteDetails.confirmDialog.description", { name: acceptConfirm?.contactName ?? t("common.unknown") })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("inviteDetails.confirmDialog.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => acceptConfirm && handleManualAccept(acceptConfirm.candidateId)}
+      <Dialog open={confirmMatchOpen} onOpenChange={setConfirmMatchOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("inviteDetails.confirmMatchDialog.title")}</DialogTitle>
+            <DialogDescription>{t("inviteDetails.confirmMatchDialog.description")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Date selection */}
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">{t("inviteDetails.confirmMatchDialog.selectDate")}</p>
+              <div className="flex flex-col gap-1">
+                {[
+                  { dateStr: request?.date?.slice(0, 10) ?? "", startTime: request?.startTime ?? "", endTime: request?.endTime ?? "", isIso: true },
+                  ...(request?.additionalDates ?? []).map((e) => ({ dateStr: e.date, startTime: e.startTime, endTime: e.endTime, isIso: false })),
+                ].filter(d => d.dateStr).map((d) => {
+                  const label = format(parseISO(d.dateStr), "EEE d/M", { locale: dateLocale })
+                  const range = d.isIso ? formatTimeRange(d.startTime, d.endTime) : `${d.startTime} – ${d.endTime}`
+                  const slots = (() => {
+                    const startH = parseInt(d.isIso ? format(new Date(d.startTime), "HH") : d.startTime.slice(0, 2))
+                    const endH = parseInt(d.isIso ? format(new Date(d.endTime), "HH") : d.endTime.slice(0, 2))
+                    return Array.from({ length: endH - startH }, (_, i) => `${String(startH + i).padStart(2, "0")}:00`)
+                  })()
+                  const selected = confirmMatchDate === d.dateStr
+                  return (
+                    <button
+                      key={d.dateStr}
+                      onClick={() => {
+                        setConfirmMatchDate(d.dateStr)
+                        setConfirmMatchTime(slots[0] ?? "")
+                      }}
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${selected ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted"}`}
+                    >
+                      <span className="font-medium">{label}</span>
+                      <span className="text-xs text-muted-foreground">{range}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            {/* Time selection */}
+            {confirmMatchDate && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium">{t("inviteDetails.confirmMatchDialog.selectTime")}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(() => {
+                    const all = [
+                      { dateStr: request?.date?.slice(0, 10) ?? "", startTime: request?.startTime ?? "", endTime: request?.endTime ?? "", isIso: true },
+                      ...(request?.additionalDates ?? []).map((e) => ({ dateStr: e.date, startTime: e.startTime, endTime: e.endTime, isIso: false })),
+                    ]
+                    const d = all.find((x) => x.dateStr === confirmMatchDate)
+                    if (!d) return null
+                    const startH = parseInt(d.isIso ? format(new Date(d.startTime), "HH") : d.startTime.slice(0, 2))
+                    const endH = parseInt(d.isIso ? format(new Date(d.endTime), "HH") : d.endTime.slice(0, 2))
+                    return Array.from({ length: endH - startH }, (_, i) => `${String(startH + i).padStart(2, "0")}:00`).map((slot) => (
+                      <button
+                        key={slot}
+                        onClick={() => setConfirmMatchTime(slot)}
+                        className={`rounded px-3 py-1 text-sm transition-colors ${confirmMatchTime === slot ? "bg-primary text-primary-foreground" : "border border-border hover:bg-muted"}`}
+                      >
+                        {slot}
+                      </button>
+                    ))
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmMatchOpen(false)}>
+              {t("inviteDetails.confirmMatchDialog.cancel")}
+            </Button>
+            <Button
+              onClick={handleConfirmMatch}
+              disabled={!confirmMatchDate || !confirmMatchTime || confirmMatchLoading}
             >
-              {t("inviteDetails.confirmDialog.accept")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {confirmMatchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
+              <span className="ml-1.5">{t("inviteDetails.confirmMatchDialog.confirm")}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

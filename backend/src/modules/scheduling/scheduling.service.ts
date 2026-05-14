@@ -1368,36 +1368,60 @@ export const schedulingService = {
     return toRequestDTOWithCandidates(updated);
   },
 
-  async manualAcceptCandidate(
+  async confirmMatchOverride(
     requestId: string,
-    candidateId: string,
-    userId: string
+    userId: string,
+    dateStr: string,  // YYYY-MM-DD in request timezone
+    timeHHMM: string, // HH:MM in request timezone
   ): Promise<SchedulingRequestDTO> {
     const request = await schedulingRepository.findRequestById(requestId);
     if (!request) throw new AppError('Scheduling request not found', 404);
-    if (request.hostUserId !== userId) throw new AppError('Only the host can accept candidates', 403);
-    if (request.status === 'completed') throw new AppError('Match already completed', 400);
-    if (request.status === 'cancelled') throw new AppError('Cannot accept on a cancelled request', 400);
+    if (request.hostUserId !== userId) throw new AppError('Only the host can confirm a match', 403);
+    if (request.status !== 'active') throw new AppError('Request must be active to confirm a match', 400);
 
-    const candidate = (request.candidates ?? []).find((c) => c.id === candidateId);
-    if (!candidate) throw new AppError('Candidate not found', 404);
-    if (candidate.status === 'accepted') throw new AppError('Candidate already accepted', 400);
-    if (candidate.status === 'declined') throw new AppError('Candidate declined; cannot manually accept', 400);
-
-    const now = new Date();
-    await schedulingRepository.updateCandidateStatus(candidateId, 'accepted', now);
-    void recordEvent({ schedulingRequestId: requestId, action: 'invite_manually_accepted', candidateId, actorUserId: userId });
     const format = (request as RequestRow).format || 'singles';
     const required = getRequiredAcceptances(format);
-    // +1 because we just accepted this candidate (not yet reflected in request.candidates)
-    const acceptedCount = (request.candidates ?? []).filter((c) => c.status === 'accepted').length + 1;
-    if (acceptedCount >= required) {
-      await schedulingRepository.updateRequestStatus(requestId, 'completed');
-      logger.info('ManualAccept', { requestId, candidateId, userId });
-      await this.completeScheduling(requestId);
-    } else {
-      await this.contactNextCandidates(requestId);
+
+    // Convert local HH:MM → UTC using DST-safe noon reference
+    const tz = (request as RequestRow).timezone ?? 'UTC';
+    const noonUtc = new Date(`${dateStr}T12:00:00.000Z`);
+    const localNoonH = Number(formatInTz(noonUtc, 'en-US', { hour: '2-digit', hour12: false }, tz));
+    const tzOffsetH = localNoonH - 12;
+    const [hStr, mStr] = timeHHMM.split(':');
+    const utcH = ((Number(hStr) - tzOffsetH) + 24) % 24;
+    const overrideSlotUTC = `${String(utcH).padStart(2, '0')}:${mStr ?? '00'}`;
+
+    // Pick candidates to accept: responded first (they engaged), then contacted/waiting_reply
+    const candidates = ((request.candidates ?? []) as Array<{ id: string; status: string; priorityOrder: number }>)
+      .sort((a, b) => a.priorityOrder - b.priorityOrder);
+    const pool = [
+      ...candidates.filter((c) => c.status === 'responded'),
+      ...candidates.filter((c) => ['contacted', 'waiting_reply'].includes(c.status)),
+    ];
+    if (pool.length < required) {
+      throw new AppError(`Not enough candidates to confirm (need ${required}, have ${pool.length})`, 400);
     }
+    const toAccept = pool.slice(0, required).map((c) => c.id);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.schedulingCandidate.updateMany({
+        where: { id: { in: toAccept } },
+        data: { status: 'accepted', responseAt: new Date() },
+      });
+      await tx.schedulingRequest.update({
+        where: { id: requestId },
+        data: { status: 'completed' },
+      });
+    });
+
+    void recordEvent({
+      schedulingRequestId: requestId,
+      action: 'request_completed',
+      actorUserId: userId,
+      metadata: { via: 'host_override', date: dateStr, time: timeHHMM, timeUTC: overrideSlotUTC },
+    });
+    logger.info('MatchConfirmedOverride', { requestId, userId, dateStr, timeHHMM, overrideSlotUTC });
+    await this.completeScheduling(requestId, overrideSlotUTC, dateStr);
 
     const updated = await schedulingRepository.findRequestById(requestId);
     return updated ? toRequestDTOWithCandidates(updated) : toRequestDTOWithCandidates(request);

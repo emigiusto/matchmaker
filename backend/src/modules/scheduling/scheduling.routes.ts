@@ -23,7 +23,7 @@ router.get('/:requestId/court-availability', SchedulingController.getCourtAvaila
 router.get('/:requestId/events', SchedulingController.getEventHistory);
 router.get('/:requestId', SchedulingController.getSchedulingRequest);
 router.post('/:requestId/start', SchedulingController.startScheduling);
-router.post('/:requestId/accept/:candidateId', SchedulingController.manualAcceptCandidate);
+router.post('/:requestId/confirm-match', SchedulingController.confirmMatch);
 router.post('/:requestId/cancel-accepted/:candidateId', SchedulingController.cancelAcceptedCandidate);
 router.post('/:requestId/cancel-contacted/:candidateId', SchedulingController.cancelContactedCandidate);
 router.post('/:requestId/remove/:candidateId', SchedulingController.removeCandidate);

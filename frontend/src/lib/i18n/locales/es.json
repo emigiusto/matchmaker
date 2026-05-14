@@ -448,6 +448,7 @@
       "whatsapp": "WhatsApp",
       "cancelRequest": "Cancelar solicitud",
       "checkQuorum": "Evaluar quórum",
+      "confirmMatch": "Confirmar partido",
       "backToInvites": "Volver a invitaciones",
       "cancelInvite": "Cancelar invitación"
     },
@@ -518,11 +519,15 @@
     "noCandidates": "Sin candidatos todavía",
     "noEvents": "Sin eventos registrados todavía",
     "replyWindow": "Ventana de respuesta:",
-    "confirmDialog": {
-      "title": "Aceptar candidato",
-      "description": "¿Aceptar a {{name}} para este partido?",
+    "confirmMatchDialog": {
+      "title": "Confirmar partido",
+      "description": "El sistema asumirá que todos los candidatos están disponibles en el horario seleccionado y confirmará el partido. Se iniciará la reserva de pista si está habilitada.",
+      "selectDate": "Selecciona una fecha",
+      "selectTime": "Selecciona un horario",
+      "confirm": "Confirmar",
       "cancel": "Cancelar",
-      "accept": "Aceptar"
+      "success": "Partido confirmado",
+      "error": "Error al confirmar el partido"
     },
     "toast": {
       "requestCancelled": "Solicitud cancelada",

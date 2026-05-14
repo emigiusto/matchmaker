@@ -679,56 +679,6 @@ describe('SchedulingService', () => {
     });
   });
 
-  describe('manualAcceptCandidate', () => {
-    it('throws when user is not the host', async () => {
-      mockRepo.findRequestById.mockResolvedValue(baseRequest);
-
-      await expect(
-        schedulingService.manualAcceptCandidate('req1', 'cand1', 'other-user')
-      ).rejects.toThrow('Only the host can accept candidates');
-    });
-
-    it('throws when request is completed', async () => {
-      mockRepo.findRequestById.mockResolvedValue({ ...baseRequest, status: 'completed' });
-
-      await expect(
-        schedulingService.manualAcceptCandidate('req1', 'cand1', 'host1')
-      ).rejects.toThrow('Match already completed');
-    });
-
-    it('throws when candidate already accepted', async () => {
-      mockRepo.findRequestById.mockResolvedValue({
-        ...baseRequest,
-        candidates: [{ ...baseRequest.candidates![0], status: 'accepted' }],
-      });
-
-      await expect(
-        schedulingService.manualAcceptCandidate('req1', 'cand1', 'host1')
-      ).rejects.toThrow('Candidate already accepted');
-    });
-
-    it('accepts candidate and calls contactNextCandidates when singles not complete', async () => {
-      const reqWithWaiting = {
-        ...baseRequest,
-        candidates: [{ ...baseRequest.candidates![0], status: 'waiting_reply' }],
-      };
-      mockRepo.findRequestById
-        .mockResolvedValueOnce(reqWithWaiting)
-        .mockResolvedValue({ ...reqWithWaiting, candidates: [{ ...reqWithWaiting.candidates![0], status: 'accepted' }] });
-      mockRepo.updateCandidateStatus.mockResolvedValue(undefined);
-      mockRepo.updateRequestStatus.mockResolvedValue(undefined);
-      mockRepo.findActiveRequestById.mockResolvedValue(reqWithWaiting);
-      mockRepo.findPendingCandidatesOrdered.mockResolvedValue([]);
-      mockRepo.countPendingCandidates.mockResolvedValue(0);
-      mockRepo.countActiveCandidates.mockResolvedValue(0);
-
-      const result = await schedulingService.manualAcceptCandidate('req1', 'cand1', 'host1');
-
-      expect(mockRepo.updateCandidateStatus).toHaveBeenCalledWith('cand1', 'accepted', expect.any(Date));
-      expect(result).toBeDefined();
-    });
-  });
-
   describe('cancelContactedCandidate', () => {
     it('throws when request is not active', async () => {
       mockRepo.findRequestById.mockResolvedValue({ ...baseRequest, status: 'expired' });

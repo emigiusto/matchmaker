@@ -85,15 +85,16 @@ export class SchedulingController {
     }
   }
 
-  static async manualAcceptCandidate(req: Request, res: Response, next: NextFunction) {
+  static async confirmMatch(req: Request, res: Response, next: NextFunction) {
     try {
       const requestId = typeof req.params.requestId === 'string' ? req.params.requestId : undefined;
-      const candidateId = typeof req.params.candidateId === 'string' ? req.params.candidateId : undefined;
-      const { userId } = req.body;
-      if (!requestId || !candidateId) return res.status(400).json({ error: 'Missing requestId or candidateId' });
+      if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
+      const { userId, date, time } = req.body;
       if (!userId) return res.status(400).json({ error: 'Missing userId' });
-      const request = await schedulingService.manualAcceptCandidate(requestId, candidateId, userId);
-      res.json(request);
+      if (!date || typeof date !== 'string') return res.status(400).json({ error: 'Missing or invalid date (YYYY-MM-DD)' });
+      if (!time || typeof time !== 'string') return res.status(400).json({ error: 'Missing or invalid time (HH:MM)' });
+      const result = await schedulingService.confirmMatchOverride(requestId, userId, date, time);
+      res.json(result);
     } catch (err) {
       next(err);
     }

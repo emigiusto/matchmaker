@@ -448,6 +448,7 @@
       "whatsapp": "WhatsApp",
       "cancelRequest": "Cancel request",
       "checkQuorum": "Check quorum",
+      "confirmMatch": "Confirm match",
       "backToInvites": "Back to invites",
       "cancelInvite": "Cancel invite"
     },
@@ -518,11 +519,15 @@
     "noCandidates": "No candidates yet",
     "noEvents": "No events recorded yet",
     "replyWindow": "Reply window:",
-    "confirmDialog": {
-      "title": "Accept candidate",
-      "description": "Accept {{name}} for this match?",
+    "confirmMatchDialog": {
+      "title": "Confirm match",
+      "description": "The system will assume all candidates are available at the selected date and time, confirm the match, and trigger court booking if enabled.",
+      "selectDate": "Select a date",
+      "selectTime": "Select a time",
+      "confirm": "Confirm",
       "cancel": "Cancel",
-      "accept": "Accept"
+      "success": "Match confirmed",
+      "error": "Failed to confirm match"
     },
     "toast": {
       "requestCancelled": "Request cancelled",

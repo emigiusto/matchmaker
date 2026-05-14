@@ -448,6 +448,7 @@
       "whatsapp": "WhatsApp",
       "cancelRequest": "Cancel·lar sol·licitud",
       "checkQuorum": "Avaluar quòrum",
+      "confirmMatch": "Confirmar partit",
       "backToInvites": "Tornar a invitacions",
       "cancelInvite": "Cancel·lar invitació"
     },
@@ -518,11 +519,15 @@
     "noCandidates": "Sense candidats encara",
     "noEvents": "Sense esdeveniments registrats encara",
     "replyWindow": "Finestra de resposta:",
-    "confirmDialog": {
-      "title": "Acceptar candidat",
-      "description": "Acceptar a {{name}} per a aquest partit?",
+    "confirmMatchDialog": {
+      "title": "Confirmar partit",
+      "description": "El sistema assumirà que tots els candidats estan disponibles a l'horari seleccionat i confirmarà el partit. S'iniciarà la reserva de pista si està habilitada.",
+      "selectDate": "Selecciona una data",
+      "selectTime": "Selecciona un horari",
+      "confirm": "Confirmar",
       "cancel": "Cancel·lar",
-      "accept": "Acceptar"
+      "success": "Partit confirmat",
+      "error": "Error en confirmar el partit"
     },
     "toast": {
       "requestCancelled": "Sol·licitud cancel·lada",
