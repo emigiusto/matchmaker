@@ -102,6 +102,7 @@ function toRequestDTO(r: RequestRow): SchedulingRequestDTO {
     whatsappGroupId: r.match?.whatsappGroupId ?? null,
     timezone: r.timezone ?? 'UTC',
     noCourtsAtQuorum: r.noCourtsAtQuorum ?? false,
+    bookingEnabled: (r as { bookingEnabled?: boolean }).bookingEnabled ?? false,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };

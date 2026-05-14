@@ -69,6 +69,7 @@ export interface SchedulingRequestDTO {
   whatsappGroupId: string | null;
   timezone: string;
   noCourtsAtQuorum: boolean;
+  bookingEnabled: boolean;
   createdAt: string;
   updatedAt: string;
   candidates?: SchedulingCandidateDTO[];
