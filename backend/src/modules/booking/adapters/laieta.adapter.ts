@@ -739,7 +739,7 @@ export class LaietaAdapter implements BookingAdapter {
     }
   }
 
-  async cancel(creds: ClubCredentials, externalBookingId: string): Promise<void> {
+  async cancel(creds: ClubCredentials, externalBookingId: string, scheduledAt?: { date: string; time: string }): Promise<void> {
     // externalBookingId can be:
     //   - A numeric ID (new format): "629061" — find the fieldset by its /reservas/{id} link
     //   - A compound ID (legacy):   "courtId::YYYY-MM-DD::HH" (possibly prefixed with "[TEST-MODE]::")
@@ -751,75 +751,109 @@ export class LaietaAdapter implements BookingAdapter {
       const sessionValue = await this.login(browser, creds)
       const page = await this.openWithSession(browser, `${BASE_URL}/reservas`, sessionValue)
 
-      let cancelButtonName: string | null
+      let cancelButtonName: string | null = null
 
-      if (isNumericId) {
-        // New format: find the fieldset that links to /reservas/{numericId}
-        cancelButtonName = await page.evaluate((bookingId: string) => {
-          const fieldsets = document.querySelectorAll('fieldset.panel.panel-default')
-          for (const fieldset of fieldsets) {
-            const links = Array.from(fieldset.querySelectorAll('a[href]'))
-            const hasLink = links.some((a) => (a as HTMLAnchorElement).getAttribute('href')?.includes(`/reservas/${bookingId}`))
-            if (hasLink) {
-              const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
-              return cancelBtn?.name ?? null
-            }
-          }
-          return null
-        }, externalBookingId)
-
-        if (!cancelButtonName) {
-          throw new AppError(
-            `No reservation was found at the club for booking #${externalBookingId}. It may have already been cancelled.`,
-            404,
-            'BOOKING_NOT_FOUND',
-          )
-        }
-        logger.info(`[laieta] Cancelling booking: name=${cancelButtonName}, id=${externalBookingId}`)
-      } else {
-        // Legacy format: courtId::YYYY-MM-DD::HH
-        const cleanId = externalBookingId.replace(/^\[TEST-MODE\]::/, '')
-        const parts = cleanId.split('::')
-        if (parts.length < 3) {
-          throw new AppError(`Cannot parse externalBookingId for cancellation: ${externalBookingId}`, 400, 'INVALID_BOOKING_ID')
-        }
-        const [courtId, date, hour] = parts
-        const [year, month, day] = date.split('-')
+      // Primary: find by scheduled date+time — more reliable than a stored booking ID
+      if (scheduledAt) {
+        const [year, month, day] = scheduledAt.date.split('-')
         const pageDate = `${day}-${month}-${year}`
-        const pageHour = `${hour}:00`
-        const normalizeCourt = (s: string) => s.replace(/\s+/g, ' ').trim().toUpperCase()
-        const targetCourt = normalizeCourt(courtId)
+        const pageHour = scheduledAt.time // HH:MM
 
         cancelButtonName = await page.evaluate(
-          (targetDate: string, targetHour: string, targetCourt: string) => {
-            const normalizeCourt = (s: string) => s.replace(/\s+/g, ' ').trim().toUpperCase()
+          (targetDate: string, targetHour: string) => {
             const fieldsets = document.querySelectorAll('fieldset.panel.panel-default')
             for (const fieldset of fieldsets) {
               const dateEl = fieldset.querySelector('[id^="edit-date--"]')
               const hourEl = fieldset.querySelector('[id^="edit-hour--"]')
-              const placeEl = fieldset.querySelector('[id^="edit-place--"]')
-              if (!dateEl || !hourEl || !placeEl) continue
+              if (!dateEl || !hourEl) continue
               const bookingDate = dateEl.textContent?.trim() ?? ''
               const bookingHour = hourEl.textContent?.trim() ?? ''
-              const bookingCourt = normalizeCourt(placeEl.textContent?.trim() ?? '')
-              if (bookingDate === targetDate && bookingHour === targetHour && bookingCourt === targetCourt) {
+              if (bookingDate === targetDate && bookingHour === targetHour) {
                 const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
                 return cancelBtn?.name ?? null
               }
             }
             return null
           },
-          pageDate, pageHour, targetCourt,
+          pageDate, pageHour,
         )
 
-        if (!cancelButtonName) {
-          throw new AppError(
-            `No reservation was found at the club for ${courtId} on ${pageDate} at ${pageHour}. It may have already been cancelled or the booking details don't match.`,
-            404,
-            'BOOKING_NOT_FOUND',
-          )
+        if (cancelButtonName) {
+          logger.info(`[laieta] Cancelling booking by date+time: date=${scheduledAt.date}, time=${scheduledAt.time}`)
+        } else {
+          logger.warn(`[laieta] Date+time lookup found nothing for ${scheduledAt.date} ${scheduledAt.time} — falling back to ID-based lookup`)
         }
-        logger.info(`[laieta] Cancelling booking: name=${cancelButtonName}, court=${courtId}, date=${date}, time=${pageHour}`)
+      }
+
+      // Fallback: find by stored booking ID (numeric or compound legacy)
+      if (!cancelButtonName) {
+        if (isNumericId) {
+          cancelButtonName = await page.evaluate((bookingId: string) => {
+            const fieldsets = document.querySelectorAll('fieldset.panel.panel-default')
+            for (const fieldset of fieldsets) {
+              const links = Array.from(fieldset.querySelectorAll('a[href]'))
+              const hasLink = links.some((a) => (a as HTMLAnchorElement).getAttribute('href')?.includes(`/reservas/${bookingId}`))
+              if (hasLink) {
+                const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
+                return cancelBtn?.name ?? null
+              }
+            }
+            return null
+          }, externalBookingId)
+
+          if (!cancelButtonName) {
+            throw new AppError(
+              `No reservation found at the club for booking #${externalBookingId}. It may have already been cancelled.`,
+              404,
+              'BOOKING_NOT_FOUND',
+            )
+          }
+          logger.info(`[laieta] Cancelling booking by ID: name=${cancelButtonName}, id=${externalBookingId}`)
+        } else {
+          // Legacy compound format: courtId::YYYY-MM-DD::HH
+          const cleanId = externalBookingId.replace(/^\[TEST-MODE\]::/, '')
+          const parts = cleanId.split('::')
+          if (parts.length < 3) {
+            throw new AppError(`Cannot parse externalBookingId for cancellation: ${externalBookingId}`, 400, 'INVALID_BOOKING_ID')
+          }
+          const [courtId, date, hour] = parts
+          const [year, month, day] = date.split('-')
+          const pageDate = `${day}-${month}-${year}`
+          const pageHour = `${hour}:00`
+          const normalizeCourt = (s: string) => s.replace(/\s+/g, ' ').trim().toUpperCase()
+          const targetCourt = normalizeCourt(courtId)
+
+          cancelButtonName = await page.evaluate(
+            (targetDate: string, targetHour: string, targetCourt: string) => {
+              const normalizeCourt = (s: string) => s.replace(/\s+/g, ' ').trim().toUpperCase()
+              const fieldsets = document.querySelectorAll('fieldset.panel.panel-default')
+              for (const fieldset of fieldsets) {
+                const dateEl = fieldset.querySelector('[id^="edit-date--"]')
+                const hourEl = fieldset.querySelector('[id^="edit-hour--"]')
+                const placeEl = fieldset.querySelector('[id^="edit-place--"]')
+                if (!dateEl || !hourEl || !placeEl) continue
+                const bookingDate = dateEl.textContent?.trim() ?? ''
+                const bookingHour = hourEl.textContent?.trim() ?? ''
+                const bookingCourt = normalizeCourt(placeEl.textContent?.trim() ?? '')
+                if (bookingDate === targetDate && bookingHour === targetHour && bookingCourt === targetCourt) {
+                  const cancelBtn = fieldset.querySelector('button[name^="cancel-"]') as HTMLButtonElement | null
+                  return cancelBtn?.name ?? null
+                }
+              }
+              return null
+            },
+            pageDate, pageHour, targetCourt,
+          )
+
+          if (!cancelButtonName) {
+            throw new AppError(
+              `No reservation found at the club for ${courtId} on ${pageDate} at ${pageHour}. It may have already been cancelled or the booking details don't match.`,
+              404,
+              'BOOKING_NOT_FOUND',
+            )
+          }
+          logger.info(`[laieta] Cancelling booking by legacy ID: name=${cancelButtonName}, court=${courtId}, date=${date}, time=${pageHour}`)
+        }
       }
 
       // Override confirmDialog to auto-confirm, then click the cancel button

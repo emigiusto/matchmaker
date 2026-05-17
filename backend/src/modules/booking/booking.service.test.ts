@@ -503,6 +503,7 @@ describe('cancelBookingForMatch', () => {
     const { logger } = await import('../../config/logger');
     mockPrisma.bookingAttempt.findUnique.mockResolvedValue(baseAttempt);
     mockPrisma.clubMembership.findUnique.mockResolvedValue(baseMembership);
+    mockPrisma.match.findUnique.mockResolvedValue({ ...baseMatch, scheduledAt: now });
     mockAdapter.cancel.mockRejectedValue(new Error('No reservation was found at the club'));
     mockPrisma.bookingAttempt.update.mockResolvedValue({ ...baseAttempt, status: 'cancelled' });
     mockPrisma.schedulingRequest.findUnique.mockResolvedValue(null);
@@ -523,6 +524,7 @@ describe('cancelBookingForMatch', () => {
   it('cancels successfully via adapter and marks attempt cancelled', async () => {
     mockPrisma.bookingAttempt.findUnique.mockResolvedValue(baseAttempt);
     mockPrisma.clubMembership.findUnique.mockResolvedValue(baseMembership);
+    mockPrisma.match.findUnique.mockResolvedValue({ ...baseMatch, scheduledAt: now });
     mockAdapter.cancel.mockResolvedValue(undefined);
     mockPrisma.bookingAttempt.update.mockResolvedValue({ ...baseAttempt, status: 'cancelled' });
     mockPrisma.schedulingRequest.findUnique.mockResolvedValue(null);
@@ -532,6 +534,7 @@ describe('cancelBookingForMatch', () => {
     expect(mockAdapter.cancel).toHaveBeenCalledWith(
       { socioNumber: '12345', password: 'secret' },
       'laieta::2026-03-15::10',
+      { date: '2026-03-15', time: '10:00' },
     );
     expect(mockPrisma.bookingAttempt.update).toHaveBeenCalledWith(
       expect.objectContaining({

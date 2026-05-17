@@ -477,7 +477,7 @@ async function runBookingJob(
         // Match was cancelled while booking was in progress — cancel the just-made reservation.
         if (updated.count === 0) {
           logger.warn(`[booking] Match ${matchId} was cancelled during booking — cancelling reservation ${result.externalId}`)
-          await adapter.cancel(creds, result.externalId).catch((err) => {
+          await adapter.cancel(creds, result.externalId, { date, time }).catch((err) => {
             logger.warn(`[booking] Failed to cancel mid-flight reservation for match ${matchId}:`, err instanceof Error ? err.message : err)
           })
           logBookingEvent(matchId, 'booking_cancelled', { reason: 'match_cancelled_mid_flight' }).catch(() => {})
@@ -701,8 +701,18 @@ export async function cancelBookingForMatch(matchId: string): Promise<void> {
     password: decrypt(membership.encryptedPassword),
   }
 
+  const matchForCancel = await prisma.match.findUnique({ where: { id: matchId }, select: { scheduledAt: true } })
+  const srForCancel = await prisma.schedulingRequest.findUnique({ where: { matchId }, select: { timezone: true } }).catch(() => null)
+  const cancelTz = srForCancel?.timezone ?? 'UTC'
+  const cancelScheduledAt = matchForCancel?.scheduledAt
+    ? {
+        date: new Date(matchForCancel.scheduledAt).toLocaleDateString('en-CA', { timeZone: cancelTz }),
+        time: new Date(matchForCancel.scheduledAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: cancelTz }),
+      }
+    : undefined
+
   try {
-    await adapter.cancel(creds, attempt.externalBookingId)
+    await adapter.cancel(creds, attempt.externalBookingId, cancelScheduledAt)
   } catch (err) {
     // If the reservation is already gone at the club side, treat as cancelled.
     // Log and continue — the desired end state (no active booking) is already true.
@@ -768,7 +778,16 @@ export async function resetBookingForReschedule(matchId: string): Promise<void> 
     if (membership?.encryptedPassword) {
       const adapter = getAdapter(membership.adapterType)
       const creds = { socioNumber: membership.socioNumber, password: decrypt(membership.encryptedPassword) }
-      await adapter.cancel(creds, attempt.externalBookingId).catch((err) => {
+      const matchForReschedule = await prisma.match.findUnique({ where: { id: matchId }, select: { scheduledAt: true } })
+      const srForReschedule = await prisma.schedulingRequest.findUnique({ where: { matchId }, select: { timezone: true } }).catch(() => null)
+      const rescheduleTz = srForReschedule?.timezone ?? 'UTC'
+      const rescheduleScheduledAt = matchForReschedule?.scheduledAt
+        ? {
+            date: new Date(matchForReschedule.scheduledAt).toLocaleDateString('en-CA', { timeZone: rescheduleTz }),
+            time: new Date(matchForReschedule.scheduledAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: rescheduleTz }),
+          }
+        : undefined
+      await adapter.cancel(creds, attempt.externalBookingId, rescheduleScheduledAt).catch((err) => {
         logger.warn(`[booking] Adapter cancel on reschedule failed for match ${matchId}:`, err instanceof Error ? err.message : err)
       })
     }

@@ -37,7 +37,9 @@ export interface BookingAdapter {
   ): Promise<BookingResult>
 
   /**
-   * Cancel an existing booking by its external ID.
+   * Cancel an existing booking.
+   * scheduledAt (YYYY-MM-DD date + HH:MM local time) is the preferred lookup key — more reliable than the external ID.
+   * Falls back to ID-based lookup if date+time search yields no match.
    */
-  cancel(creds: ClubCredentials, externalBookingId: string): Promise<void>
+  cancel(creds: ClubCredentials, externalBookingId: string, scheduledAt?: { date: string; time: string }): Promise<void>
 }
