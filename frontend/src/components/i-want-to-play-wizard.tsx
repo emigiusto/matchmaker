@@ -1,30 +1,13 @@
 import { useState, useCallback, useEffect } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core"
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
 import { format, startOfDay, isBefore } from "date-fns"
-import { es as esLocale } from "date-fns/locale"
+import { es as esLocale, ca as caLocale } from "date-fns/locale"
 import {
   Calendar as CalendarIcon,
   MapPin,
   ChevronRight,
   ChevronLeft,
   ChevronUp,
-  GripVertical,
   X,
   Zap,
   Users,
@@ -126,39 +109,9 @@ type AvailableContact = {
   socioNumbers: Record<string, string>
 }
 
-function SortableContactItem({
-  contact,
-  index,
-  onRemove,
-  dragLabel = "Drag to reorder",
-}: {
-  contact: Contact
-  index: number
-  onRemove: (id: string) => void
-  dragLabel?: string
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: contact.id })
-  const style = { transform: CSS.Transform.toString(transform), transition }
+function ContactItem({ contact, onRemove }: { contact: Contact; onRemove: (id: string) => void }) {
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-colors",
-        isDragging ? "border-primary bg-primary/5 shadow-md opacity-80" : "border-border/40 hover:border-primary/30"
-      )}
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
-        aria-label={dragLabel}
-      >
-        <GripVertical className="h-4 w-4 shrink-0" />
-      </button>
-      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-        {index + 1}
-      </div>
+    <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-card px-3 py-2">
       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
         {contact.name[0]}
       </div>
@@ -180,7 +133,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
   const hostUserId = hostUserIdProp ?? getCurrentUserId()
   const navigate = useNavigate()
   const { t, language } = useTranslation()
-  const dateLocale = language === "es" ? esLocale : undefined
+  const dateLocale = language === "es" ? esLocale : language === "ca" ? caLocale : undefined
   const [step, setStep] = useState<Step>(1)
   const [dateEntries, setDateEntries] = useState<Array<{ date: Date; startTime: string; endTime: string }>>([])
 
@@ -589,22 +542,6 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
     setPriorityList(prev => prev.filter(c => c.id !== id))
   }
 
-  // Drag and drop sensors (mouse + touch)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
-  )
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
-    if (over && active.id !== over.id) {
-      setPriorityList(prev => {
-        const oldIndex = prev.findIndex(c => c.id === active.id)
-        const newIndex = prev.findIndex(c => c.id === over.id)
-        return arrayMove(prev, oldIndex, newIndex)
-      })
-    }
-  }, [])
 
 
   async function handleStartScheduling() {
@@ -736,6 +673,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   selected={dates}
                   onSelect={handleDatesSelect}
                   disabled={(d) => isBefore(startOfDay(d), startOfDay(new Date()))}
+                  locale={dateLocale}
                 />
               </div>
 
@@ -953,7 +891,7 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                             <div key={dateKey} className="space-y-1">
                               {dateEntries.length > 1 && (
                                 <p className="text-xs font-medium text-muted-foreground">
-                                  {format(entry.date, "EEE d/M", { locale: esLocale })}
+                                  {format(entry.date, "EEE d/M", { locale: dateLocale })}
                                 </p>
                               )}
                               {slots.map((slot) => {
@@ -1339,21 +1277,16 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
               )
             )}
 
-            {/* Priority list */}
+            {/* Selected players list */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-medium">
-                  {t("wizard.priorityOrder")}
-                  {priorityList.length > 0 && (
-                    <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
-                      {priorityList.length}
-                    </span>
-                  )}
-                </Label>
+              <Label className="text-base font-medium">
+                {t("wizard.selectedPlayers")}
                 {priorityList.length > 0 && (
-                  <span className="text-xs text-muted-foreground">{t("wizard.dragToReorder")}</span>
+                  <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                    {priorityList.length}
+                  </span>
                 )}
-              </div>
+              </Label>
 
               {priorityList.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-8 text-center">
@@ -1366,21 +1299,11 @@ export function IWantToPlayWizard({ open, onOpenChange, hostUserId: hostUserIdPr
                   </p>
                 </div>
               ) : (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={priorityList.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-1.5">
-                      {priorityList.map((contact, index) => (
-                        <SortableContactItem
-                          key={contact.id}
-                          contact={contact}
-                          index={index}
-                          onRemove={removeContact}
-                          dragLabel={t("wizard.dragToReorder")}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
+                <div className="space-y-1.5">
+                  {priorityList.map((contact) => (
+                    <ContactItem key={contact.id} contact={contact} onRemove={removeContact} />
+                  ))}
+                </div>
               )}
             </div>
 
