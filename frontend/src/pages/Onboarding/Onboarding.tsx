@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Phone, MapPin, Building2, Loader2, Swords, ArrowLeft, CheckCircle2, ChevronRight } from "lucide-react"
+import { Phone, MapPin, Building2, Loader2, Swords, ArrowLeft, CheckCircle2, ChevronRight, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -94,6 +94,7 @@ export default function Onboarding() {
   const [clubSlug, setClubSlug] = useState<string>(SUPPORTED_CLUBS[0].clubSlug)
   const [socioNumber, setSocioNumber] = useState("")
   const [password, setPassword] = useState("")
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
 
   // Pre-fill with existing data in case the user returns to onboarding
   useEffect(() => {
@@ -171,6 +172,25 @@ export default function Onboarding() {
       toast.error(err instanceof Error ? err.message : t("error.somethingWentWrong"))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleTestConnection() {
+    if (!user || !socioNumber.trim()) return
+    setTestStatus("testing")
+    try {
+      const club = SUPPORTED_CLUBS.find((c) => c.clubSlug === clubSlug)!
+      await bookingService.upsertMembership({
+        userId: user.id,
+        clubSlug,
+        adapterType: club.adapterType,
+        socioNumber: socioNumber.trim(),
+        password: password.trim() || undefined,
+      })
+      const ok = await bookingService.testConnection(user.id, clubSlug)
+      setTestStatus(ok ? "success" : "error")
+    } catch {
+      setTestStatus("error")
     }
   }
 
@@ -362,7 +382,7 @@ export default function Onboarding() {
                 <Input
                   placeholder={t("onboarding.step3.socioPlaceholder")}
                   value={socioNumber}
-                  onChange={(e) => setSocioNumber(e.target.value)}
+                  onChange={(e) => { setSocioNumber(e.target.value); setTestStatus("idle") }}
                 />
               </div>
               <div className="space-y-1.5">
@@ -371,10 +391,32 @@ export default function Onboarding() {
                   type="password"
                   placeholder={t("onboarding.step3.passwordPlaceholder")}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setTestStatus("idle") }}
                   autoComplete="new-password"
                 />
                 <p className="text-xs text-muted-foreground">{t("onboarding.step3.passwordNote")}</p>
+              </div>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleTestConnection}
+                  disabled={!socioNumber.trim() || testStatus === "testing" || saving}
+                >
+                  {testStatus === "testing"
+                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    : testStatus === "success"
+                    ? <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
+                    : testStatus === "error"
+                    ? <XCircle className="mr-2 h-4 w-4 text-destructive" />
+                    : null}
+                  {testStatus === "success"
+                    ? t("onboarding.step3.testSuccess")
+                    : testStatus === "error"
+                    ? t("onboarding.step3.testError")
+                    : t("onboarding.step3.testButton")}
+                </Button>
               </div>
               <StepActions
                 onContinue={() => handleStep3(false)}
