@@ -38,7 +38,7 @@ export interface ClubMembershipDTO {
 }
 
 export const SUPPORTED_CLUBS = [
-  { clubSlug: "laieta", label: "Club Sportiu Laieta", adapterType: "miclubonline" },
+  { clubSlug: "laieta", label: "Club Esportiu Laieta", adapterType: "miclubonline" },
 ] as const
 
 export const bookingService = {
