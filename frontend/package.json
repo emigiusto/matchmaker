@@ -11,12 +11,16 @@
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npm run android:sync && npx cap open android",
     "android:build": "npm run android:sync && cd android && ./gradlew assembleDebug",
-    "android:icons": "npx capacitor-assets generate --android"
+    "android:icons": "npx capacitor-assets generate --android",
+    "ios:sync": "npm run build && npx cap sync ios",
+    "ios:open": "npm run ios:sync && npx cap open ios",
+    "ios:icons": "npx capacitor-assets generate --ios"
   },
   "dependencies": {
     "@capacitor-community/contacts": "^7.1.0",
     "@capacitor/android": "^8.3.0",
     "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
